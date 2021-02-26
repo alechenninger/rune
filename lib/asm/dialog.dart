@@ -3,10 +3,10 @@ import 'package:charcode/ascii.dart';
 import 'asm.dart';
 
 class _ControlCodes {
-  static final portrait = Data.fromByteHex('F4');
-  static final newLine = Data.fromByteHex('FC');
-  static final cursor = Data.fromByteHex('FD');
-  static final endDialog = Data.fromByteHex('FF');
+  static final portrait = Bytes.hex('F4');
+  static final newLine = Bytes.hex('FC');
+  static final cursor = Bytes.hex('FD');
+  static final endDialog = Bytes.hex('FF');
 }
 
 // TODO: transforms needs to happen in another layer
@@ -19,8 +19,8 @@ final _transforms = {
   '…': '...',
 };
 
-Asm dialog(Data portrait, Data dialog) {
-  dialog = dialog.trim(asciiSpace);
+Asm dialog(Bytes portrait, Bytes dialog) {
+  dialog = dialog.trim($space);
 
   var asm = Asm.empty();
   var lineStart = 0;
@@ -31,7 +31,7 @@ Asm dialog(Data portrait, Data dialog) {
   asm.add(dc.b(_ControlCodes.portrait));
   asm.add(dc.b(portrait));
 
-  void append(Data line) {
+  void append(Bytes line) {
     var lineOffset = (asm.length - 2) % 4;
     if (lineOffset == 1) {
       asm.add(dc.b(_ControlCodes.newLine));
@@ -69,7 +69,7 @@ Asm dialog(Data portrait, Data dialog) {
   return asm;
 }
 
-bool _isBreakable(int char, Data dialog, int index) {
+bool _isBreakable(int char, Bytes dialog, int index) {
   if (index == 0) return false;
 
   if (char == $space) {

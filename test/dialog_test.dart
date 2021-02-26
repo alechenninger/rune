@@ -3,11 +3,11 @@ import 'package:rune/asm/dialog.dart';
 import 'package:test/test.dart';
 
 void main() {
-  var portrait = Data.fromByte(1);
+  var portrait = Bytes.of(1);
 
   test('line wrap', () {
     var asm = dialog(portrait,
-        Data.fromAscii('This is a test of a long line that should wrap.'));
+        Bytes.ascii('This is a test of a long line that should wrap.'));
     expect(asm.toString(), equals(r'''	dc.b	$F4
 	dc.b	$01
 	dc.b	"This is a test of a long line"
@@ -17,7 +17,7 @@ void main() {
   });
 
   test('maintains double space', () {
-    var asm = dialog(portrait, Data.fromAscii('Maintains  a double space.'));
+    var asm = dialog(portrait, Bytes.ascii('Maintains  a double space.'));
     expect(asm.toString(), equals(r'''	dc.b	$F4
 	dc.b	$01
 	dc.b	"Maintains  a double space."
@@ -26,7 +26,7 @@ void main() {
 
   test('can end line after dash', () {
     var asm = dialog(portrait,
-        Data.fromAscii('It is testing a very long line--broken by dashes.'));
+        Bytes.ascii('It is testing a very long line--broken by dashes.'));
     expect(asm.toString(), equals(r'''	dc.b	$F4
 	dc.b	$01
 	dc.b	"It is testing a very long line--"
@@ -36,8 +36,8 @@ void main() {
   });
 
   test('cannot end line between dashes', () {
-    var asm = dialog(portrait,
-        Data.fromAscii("It's a test of a very long line--with dashes."));
+    var asm = dialog(
+        portrait, Bytes.ascii("It's a test of a very long line--with dashes."));
     expect(asm.toString(), equals(r'''	dc.b	$F4
 	dc.b	$01
 	dc.b	"It's a test of a very long"
@@ -49,7 +49,7 @@ void main() {
   test('continues many lines', () {
     var asm = dialog(
         portrait,
-        Data.fromAscii("We'll meet head-on whatever the guild throws our way.  "
+        Bytes.ascii("We'll meet head-on whatever the guild throws our way.  "
             "They'll have to go looking for new cases instead of "
             'waiting for the work to come in.'));
     expect(asm.toString(), equals(r'''	dc.b	$F4
