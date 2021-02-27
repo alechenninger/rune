@@ -9,8 +9,11 @@ void main() {
 
     var asm = dialog.toAsm();
 
-    print(asm);
-
-    expect(asm.toString(), '''''');
+    expect(asm.toString(), r'''	dc.b	$F4
+	dc.b	$02
+	dc.b	"Hi I'm Alys! ", $64, $6F, $68, $7B, " ", $68, $79, $6C, " ", $80, $76, $7C, " ", $6B, $76, $70, $75, $6E
+	dc.b	$FC
+	dc.b	$6F, $6C, $79, $6C, $83
+	dc.b	$FD''');
   });
 }

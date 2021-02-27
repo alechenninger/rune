@@ -63,7 +63,12 @@ final _lowercaseStart = 97;
 final _uppercaseTileStart = 78;
 final _lowercaseTileStart = _uppercaseTileStart + 26;
 
-final _nonItalicizedLetters = {'x', 'z'};
+final _italicizedOther = {
+  '!': 130,
+  '?': 131,
+};
+
+final _nonItalicizedLetters = <String>{}; //{'x', 'z'};
 final _quotes = ['"', '“', '”'];
 
 extension SpanToAscii on Span {
@@ -81,17 +86,23 @@ extension SpanToAscii on Span {
       return Bytes.ascii(transformed);
     }
 
-    var builder = _BytesBuilder();
+    var builder = BytesBuilder();
 
     for (var c in transformed.characters) {
       if (_nonItalicizedLetters.contains(c)) {
-        builder.acceptAsciiCharacter(c);
+        builder.writeAsciiCharacter(c);
+        continue;
+      }
+
+      var other = _italicizedOther[c];
+      if (other != null) {
+        builder.writeByte(other);
         continue;
       }
 
       if (_uppercase.hasMatch(c)) {
         var code = c.codePoint - _uppercaseStart + _uppercaseTileStart;
-        builder.acceptByte(code);
+        builder.writeByte(code);
         continue;
       }
 
@@ -104,50 +115,12 @@ extension SpanToAscii on Span {
           }
         }
         code = code - skips;
-        builder.acceptByte(code);
+        builder.writeByte(code);
         continue;
       }
 
-      builder.acceptAsciiCharacter(c);
+      builder.writeAsciiCharacter(c);
     }
     return builder.bytes();
-  }
-}
-
-class _BytesBuilder {
-  var _ascii = false;
-  final _currentSpan = <int>[];
-  final _bytesList = <Bytes>[];
-
-  Bytes bytes() {
-    _finishSpan();
-    return BytesAndAscii(_bytesList);
-  }
-
-  void acceptAsciiCharacter(String c) {
-    if (!_ascii) {
-      _finishSpan();
-      _ascii = true;
-    }
-
-    _currentSpan.add(c.codePoint);
-  }
-
-  void acceptByte(int byte) {
-    if (_ascii) {
-      _finishSpan();
-      _ascii = false;
-    }
-
-    _currentSpan.add(byte);
-  }
-
-  void _finishSpan() {
-    if (_currentSpan.isNotEmpty) {
-      _bytesList.add(_ascii
-          ? Bytes.ascii(String.fromCharCodes(_currentSpan))
-          : Bytes.list(_currentSpan));
-      _currentSpan.clear();
-    }
   }
 }

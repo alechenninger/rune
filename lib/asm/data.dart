@@ -183,9 +183,10 @@ class BytesAndAscii extends Bytes {
 
     void add(Bytes span) {
       if (span is BytesAndAscii) {
-        for (var inner in span._spans) {
-          add(inner);
-        }
+        // As inner spans are already normalized, just make sure the first one
+        // is combined with the prior (if possible)
+        add(span._spans.first);
+        normalized.addAll(span._spans.skip(1));
         return;
       }
 
@@ -280,6 +281,44 @@ class BytesAndAscii extends Bytes {
   }
 }
 
+class BytesBuilder {
+  var _ascii = false;
+  final _currentSpan = <int>[];
+  final _bytesList = <Bytes>[];
+
+  Bytes bytes() {
+    _finishSpan();
+    return BytesAndAscii(_bytesList);
+  }
+
+  void writeAsciiCharacter(String c) {
+    if (!_ascii) {
+      _finishSpan();
+      _ascii = true;
+    }
+
+    _currentSpan.add(c.codePoint);
+  }
+
+  void writeByte(int byte) {
+    if (_ascii) {
+      _finishSpan();
+      _ascii = false;
+    }
+
+    _currentSpan.add(byte);
+  }
+
+  void _finishSpan() {
+    if (_currentSpan.isNotEmpty) {
+      _bytesList.add(_ascii
+          ? Bytes.ascii(String.fromCharCodes(_currentSpan))
+          : Bytes.list(_currentSpan));
+      _currentSpan.clear();
+    }
+  }
+}
+
 class Words extends Data<Uint16List, Words> {
   Words(Uint16List bytes) : super(bytes, bytes.elementSizeInBytes);
 
@@ -290,7 +329,7 @@ class Words extends Data<Uint16List, Words> {
     return Words(Uint16List.fromList([d]));
   }
 
-  factory Words.fromWordHex(String d) {
+  factory Words.hex(String d) {
     return Words.fromWord(int.parse('0x$d'));
   }
 
@@ -311,7 +350,7 @@ class Longwords extends Data<Uint32List, Longwords> {
     return Longwords(Uint32List.fromList([d]));
   }
 
-  factory Longwords.fromLongwordHex(String d) {
+  factory Longwords.hex(String d) {
     return Longwords.fromLongword(int.parse('0x$d'));
   }
 
@@ -377,12 +416,20 @@ extension TrimList on List<int> {
   }
 
   List<int> trimTrailing({int value = 0}) {
-    return takeWhile((b) => b != value).toList();
+    return reversed
+        .skipWhile((b) => b == value)
+        .toList(growable: false)
+        .reversed
+        .toList();
   }
 
   List<int> trim({int value = 0}) {
     return skipWhile((b) => b == value)
-        .takeWhile((b) => b != value)
-        .toList(growable: false);
+        .toList(growable: false)
+        .reversed
+        .skipWhile((b) => b == value)
+        .toList(growable: false)
+        .reversed
+        .toList();
   }
 }
