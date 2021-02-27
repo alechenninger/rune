@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   charcode: 1.2.0
+  characters: 1.1.0
 
 dev_dependencies:
   pedantic: ^1.10.0

@@ -6,11 +6,13 @@ export 'data.dart';
 const Dc dc = Dc();
 const Move move = Move();
 
+// It looks like this should be limited to 32 bytes per line
 class Dc {
   const Dc();
 
-  /// Byte width (dc.b)
   Asm b(Bytes d) => Asm.fromLine('	dc.b	$d');
+  Asm w(Words d) => Asm.fromLine('	dc.w	$d');
+  Asm l(Longwords d) => Asm.fromLine('	dc.l	$d');
 }
 
 class Move {

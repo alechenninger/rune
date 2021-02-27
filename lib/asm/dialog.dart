@@ -9,24 +9,12 @@ class _ControlCodes {
   static final endDialog = Bytes.hex('FF');
 }
 
-// TODO: transforms needs to happen in another layer
-// because they go from utf8 to ascii
-final _transforms = {
-  '‘': '[',
-  '’': "'",
-  '–': '=',
-  '—': '=',
-  '…': '...',
-};
-
 Asm dialog(Bytes portrait, Bytes dialog) {
   dialog = dialog.trim($space);
 
   var asm = Asm.empty();
   var lineStart = 0;
   var breakPoint = 0;
-  // var quotes = _Quotes(); TODO: need to swap utf8 at another layer again
-  //  I think ... goes with transforms.
 
   asm.add(dc.b(_ControlCodes.portrait));
   asm.add(dc.b(portrait));
@@ -83,18 +71,6 @@ bool _isBreakable(int char, Bytes dialog, int index) {
   }
 
   return false;
-}
-
-class _Quotes {
-  var _current = $less_than;
-  var _next = $greater_than;
-
-  int next() {
-    var q = _current;
-    _current = _next;
-    _next = q;
-    return q;
-  }
 }
 
 const _canBreakAfterButNotOn = [$dash, $dot];
