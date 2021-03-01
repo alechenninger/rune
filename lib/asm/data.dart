@@ -6,6 +6,61 @@ import 'asm.dart';
 
 int hex(String d) => int.parse('0x$d');
 
+// TODO: unsigned. what about signed?
+abstract class Value<T extends Value<T>> {
+  /// Value as an [int]
+  final int value;
+
+  Value(this.value) {
+    if (value >= (1 << (size * 8))) {
+      throw AsmError(value, 'too large to fit in $size bytes');
+    }
+  }
+
+  Immediate<T> get i => Immediate<T>(this as T);
+  Address get absolute => Address.absolute(this);
+
+  /// Size in bytes
+  int get size;
+
+  /// Hex representation including $ prefix.
+  String get hex =>
+      '\$${value.toRadixString(16).toUpperCase().padLeft(size * 2, '0')}';
+}
+
+class Byte extends Value<Byte> {
+  Byte(int value) : super(value);
+  @override
+  final size = 1;
+}
+
+class Word extends Value<Word> {
+  Word(int value) : super(value);
+  @override
+  final size = 2;
+}
+
+class Longword extends Value<Longword> {
+  Longword(int value) : super(value);
+  @override
+  final size = 4;
+}
+
+extension ToValue on int {
+  Value toValue({required int size}) {
+    switch (size) {
+      case 1:
+        return Byte(this);
+      case 2:
+        return Word(this);
+      case 4:
+        return Longword(this);
+    }
+    throw AsmError(size, 'invalid data size (must be 1, 2, or 4)');
+  }
+}
+
+/// An arbitrary list of data.
 abstract class Data<T extends List<int>, D extends Data<T, D>> {
   final T bytes;
   final int elementSizeInBytes;
@@ -14,26 +69,27 @@ abstract class Data<T extends List<int>, D extends Data<T, D>> {
   Data(this.bytes, this.elementSizeInBytes)
       : hexDigits = elementSizeInBytes * 2;
 
-  D _new(T t);
-  D _newFromList(List<int> l);
+  D _new(List<int> l);
 
   int get length => bytes.length;
 
+  String get immediate => '';
+
   /// Trims both trailing and leading bytes equal to [byte].
   D trim(int byte) {
-    return _newFromList(bytes.trim(value: byte));
+    return _new(bytes.trim(value: byte));
   }
 
   D trimLeading(int byte) {
-    return _newFromList(bytes.trimLeading(value: byte));
+    return _new(bytes.trimLeading(value: byte));
   }
 
   D trimTrailing(int byte) {
-    return _newFromList(bytes.trimTrailing(value: byte));
+    return _new(bytes.trimTrailing(value: byte));
   }
 
-  D operator +(D other) => _newFromList(
-      bytes.toList(growable: false) + other.bytes.toList(growable: false));
+  D operator +(D other) =>
+      _new(bytes.toList(growable: false) + other.bytes.toList(growable: false));
 
   int operator [](int index) => bytes[index];
 
@@ -46,7 +102,7 @@ abstract class Data<T extends List<int>, D extends Data<T, D>> {
   }
 
   D sublist(int start, [int? end]) {
-    return _new(bytes.sublist(start, end) as T);
+    return _new(bytes.sublist(start, end));
   }
 
   int indexWhere(bool Function(int) test, [int? start]) {
@@ -118,10 +174,7 @@ class Bytes extends Data<Uint8List, Bytes> {
   }
 
   @override
-  Bytes _new(Uint8List bytes) => Bytes(bytes);
-
-  @override
-  Bytes _newFromList(List<int> bytes) => Bytes(Uint8List.fromList(bytes));
+  Bytes _new(List<int> bytes) => Bytes(Uint8List.fromList(bytes));
 }
 
 class Ascii extends Bytes {
@@ -137,10 +190,7 @@ class Ascii extends Bytes {
   }
 
   @override
-  Ascii _new(Uint8List bytes) => Ascii(bytes);
-
-  @override
-  Ascii _newFromList(List<int> bytes) => Ascii(Uint8List.fromList(bytes));
+  Ascii _new(List<int> bytes) => Ascii(Uint8List.fromList(bytes));
 
   @override
   Bytes operator +(Bytes other) {
@@ -284,11 +334,11 @@ class BytesAndAscii extends Bytes {
 class BytesBuilder {
   var _ascii = false;
   final _currentSpan = <int>[];
-  final _bytesList = <Bytes>[];
+  final _spans = <Bytes>[];
 
   Bytes bytes() {
     _finishSpan();
-    return BytesAndAscii(_bytesList);
+    return BytesAndAscii(_spans);
   }
 
   void writeAsciiCharacter(String c) {
@@ -311,7 +361,7 @@ class BytesBuilder {
 
   void _finishSpan() {
     if (_currentSpan.isNotEmpty) {
-      _bytesList.add(_ascii
+      _spans.add(_ascii
           ? Bytes.ascii(String.fromCharCodes(_currentSpan))
           : Bytes.list(_currentSpan));
       _currentSpan.clear();
@@ -334,10 +384,7 @@ class Words extends Data<Uint16List, Words> {
   }
 
   @override
-  Words _new(Uint16List bytes) => Words(bytes);
-
-  @override
-  Words _newFromList(List<int> bytes) => Words(Uint16List.fromList(bytes));
+  Words _new(List<int> bytes) => Words(Uint16List.fromList(bytes));
 }
 
 class Longwords extends Data<Uint32List, Longwords> {
@@ -345,7 +392,7 @@ class Longwords extends Data<Uint32List, Longwords> {
 
   factory Longwords.fromLongword(int d) {
     if (d > 4294967295) {
-      throw AsmError(d, 'is larger than a single word (max 4294967295)');
+      throw AsmError(d, 'is larger than a longword (max 4294967295)');
     }
     return Longwords(Uint32List.fromList([d]));
   }
@@ -355,11 +402,7 @@ class Longwords extends Data<Uint32List, Longwords> {
   }
 
   @override
-  Longwords _new(Uint32List bytes) => Longwords(bytes);
-
-  @override
-  Longwords _newFromList(List<int> bytes) =>
-      Longwords(Uint32List.fromList(bytes));
+  Longwords _new(List<int> bytes) => Longwords(Uint32List.fromList(bytes));
 }
 
 extension TrimBytes on Uint8List {

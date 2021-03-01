@@ -8,6 +8,18 @@ import 'package:rune/model/model.dart';
 import '../asm/asm.dart';
 import '../characters.dart';
 
+extension DialogToAsm on Dialog {
+  Asm toAsm() {
+    var asm = Asm.empty();
+    var quotes = Quotes();
+
+    var ascii = spans.map((s) => s.toAscii(quotes)).reduce((a1, a2) => a1 + a2);
+    asm.add(dialog(speaker?.portraitCode ?? Bytes.of(0), ascii));
+
+    return asm;
+  }
+}
+
 final _transforms = {
   '‘': '[',
   '’': "'",
@@ -15,43 +27,6 @@ final _transforms = {
   '—': '=',
   '…': '...',
 };
-// var quotes = _Quotes(); TODO: need to swap utf8 at another layer again
-//  I think ... goes with transforms.
-
-class Quotes {
-  var _current = $less_than;
-  var _next = $greater_than;
-
-  int next() {
-    var q = _current;
-    _current = _next;
-    _next = q;
-    return q;
-  }
-}
-
-extension DialogToAsm on Dialog {
-  Asm toAsm() {
-    var asm = Asm.empty();
-    var quotes = Quotes();
-
-    var ascii = spans.map((s) => s.toAscii(quotes)).reduce((accum, next) {
-      return accum + next;
-    });
-    asm.add(dialog(speaker?.portraitCode ?? Bytes.of(0), ascii));
-
-    return asm;
-  }
-}
-
-extension Portrait on Character {
-  static final _index = [null, Shay, Alys];
-
-  Bytes get portraitCode {
-    var index = _index.indexOf(runtimeType);
-    return Bytes.of(max(0, index));
-  }
-}
 
 // TODO: this is a bit of a mess, clean it up
 
@@ -121,6 +96,28 @@ extension SpanToAscii on Span {
 
       builder.writeAsciiCharacter(c);
     }
+
     return builder.bytes();
+  }
+}
+
+class Quotes {
+  var _current = $less_than;
+  var _next = $greater_than;
+
+  int next() {
+    var q = _current;
+    _current = _next;
+    _next = q;
+    return q;
+  }
+}
+
+extension Portrait on Character {
+  static final _index = [null, Shay, Alys];
+
+  Bytes get portraitCode {
+    var index = _index.indexOf(runtimeType);
+    return Bytes.of(max(0, index));
   }
 }
