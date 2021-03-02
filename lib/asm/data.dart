@@ -6,44 +6,141 @@ import 'asm.dart';
 
 int hex(String d) => int.parse('0x$d');
 
+const byte = Size.b;
+const word = Size.w;
+const long = Size.l;
+
+abstract class Expression {
+  bool get isZero;
+  bool get isNotZero => !isZero;
+
+  /// Assembly representation of the expression.
+  @override
+  String toString();
+}
+
+class Constant extends Expression {
+  final String constant;
+
+  @override
+  final bool isZero = false;
+
+  Constant(this.constant);
+
+  @override
+  String toString() => constant;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Constant &&
+          runtimeType == other.runtimeType &&
+          constant == other.constant;
+
+  @override
+  int get hashCode => constant.hashCode;
+}
+
+class Label extends Expression {
+  final String name;
+
+  @override
+  final bool isZero = false;
+
+  Label(this.name);
+
+  Absolute get l => Absolute.longword(this);
+
+  @override
+  String toString() => name;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Label && runtimeType == other.runtimeType && name == other.name;
+
+  @override
+  int get hashCode => name.hashCode;
+}
+
 // TODO: unsigned. what about signed?
-abstract class Value<T extends Value<T>> {
+// see: http://mrjester.hapisan.com/04_MC68/Sect04Part02/Index.html
+abstract class Value<T extends Value<T>> implements Expression {
   /// Value as an [int]
   final int value;
 
   Value(this.value) {
-    if (value >= (1 << (size * 8))) {
+    if (value >= (1 << (size.bytes * 8))) {
       throw AsmError(value, 'too large to fit in $size bytes');
     }
   }
 
-  Immediate<T> get i => Immediate<T>(this as T);
-  Address get absolute => Address.absolute(this);
+  const Value._(this.value);
 
   /// Size in bytes
-  int get size;
+  Size get size;
+
+  @override
+  bool get isZero => value == 0;
+  @override
+  bool get isNotZero => !isZero;
 
   /// Hex representation including $ prefix.
   String get hex =>
-      '\$${value.toRadixString(16).toUpperCase().padLeft(size * 2, '0')}';
+      '\$${value.toRadixString(16).toUpperCase().padLeft(size.bytes * 2, '0')}';
+
+  // Default to hex expression
+  @override
+  String toString() => hex;
 }
 
 class Byte extends Value<Byte> {
+  static const zero = Byte._(0);
+
   Byte(int value) : super(value);
+
+  const Byte._(int value) : super._(value);
+
   @override
-  final size = 1;
+  final size = Size.b;
 }
 
 class Word extends Value<Word> {
   Word(int value) : super(value);
   @override
-  final size = 2;
+  final size = Size.w;
 }
 
 class Longword extends Value<Longword> {
   Longword(int value) : super(value);
   @override
-  final size = 4;
+  final size = Size.l;
+}
+
+class Size {
+  static const b = Size._(1, 'b');
+  static const w = Size._(2, 'w');
+  static const l = Size._(4, 'l');
+
+  final int bytes;
+  final String code;
+
+  bool get isB => this == b;
+  bool get isW => this == w;
+  bool get isL => this == l;
+
+  const Size._(this.bytes, this.code);
+
+  @override
+  String toString() => code;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Size && runtimeType == other.runtimeType && bytes == other.bytes;
+
+  @override
+  int get hashCode => bytes.hashCode;
 }
 
 extension ToValue on int {

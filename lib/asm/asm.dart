@@ -7,6 +7,8 @@ const Dc dc = Dc();
 const Move move = Move();
 
 Asm lea(Address src, Address dst) => cmd('lea', [src, dst]);
+Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
+Asm jsr(Address to) => cmd('jsr', [to]);
 
 // It looks like this should be limited to 32 bytes per line
 class Dc {
@@ -20,9 +22,9 @@ class Dc {
 class Move {
   const Move();
 
-  Asm b(from, to) => cmd('move.b', [from, to]);
-  Asm w(from, to) => cmd('move.w', [from, to]);
-  Asm l(from, to) => cmd('move.l', [from, to]);
+  Asm b(Address from, Address to) => cmd('move.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('move.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('move.l', [from, to]);
 }
 
 class AsmError extends ArgumentError {
@@ -33,6 +35,10 @@ class Asm {
   final List<String> lines = [];
 
   Asm.empty();
+
+  Asm(List<Asm> asm) {
+    asm.forEach((a) => add(a));
+  }
 
   Asm.fromLine(String line) {
     addLine(line);
@@ -56,8 +62,9 @@ class Asm {
 }
 
 abstract class Address {
-  static Absolute absolute(Value v) => Absolute.longword(v);
-  static Immediate<T> immediate<T extends Value<T>>(T v) => Immediate<T>(v);
+  static Absolute absolute(Expression e) => Absolute.longword(e);
+  static Immediate immediate(Expression e) => Immediate(e);
+  static DirectDataRegister d(int num) => DirectDataRegister(num);
 }
 
 class _Address implements Address {
@@ -80,20 +87,18 @@ class _Address implements Address {
 }
 
 class Absolute extends _Address {
-  final String value;
-  final String size;
-  Absolute._({required this.value, required this.size}) : super('$value.$size');
-  Absolute.word(Value v) : this._(value: v.hex, size: 'w');
-  Absolute.longword(Value v) : this._(value: v.hex, size: 'l');
-  Absolute.constant(String c) : this._(value: c, size: 'w');
-  Absolute.constantLongword(String c) : this._(value: c, size: 'l');
+  final Expression exp;
+  final Size size;
+  Absolute._({required this.exp, required this.size}) : super('$exp.$size');
+  Absolute.word(Expression e) : this._(exp: e, size: word);
+  Absolute.longword(Expression e) : this._(exp: e, size: long);
 
-  Absolute get w => size == 'w' ? this : Absolute._(value: value, size: 'w');
-  Absolute get l => size == 'l' ? this : Absolute._(value: value, size: 'l');
+  Absolute get w => size.isW ? this : Absolute._(exp: exp, size: word);
+  Absolute get l => size.isL ? this : Absolute._(exp: exp, size: long);
 }
 
-class Immediate<T extends Value<T>> extends _Address {
-  Immediate(T value) : super('#${value.hex}');
+class Immediate extends _Address {
+  Immediate(Expression e) : super('#$e');
 }
 
 class DirectAddressRegister extends _Address {
@@ -112,16 +117,16 @@ class DirectDataRegister extends _Address {
 
 class IndirectAddressRegister extends _Address {
   final int register;
-  final int fixedOffset; // TODO: need to allow constant here
-  final DirectDataRegister? variableOffset;
+  final Expression displacement;
+  final DirectDataRegister? variableDisplacement;
 
   IndirectAddressRegister(this.register,
-      {this.fixedOffset = 0, this.variableOffset})
+      {this.displacement = Byte.zero, this.variableDisplacement})
       : super([
           '(',
-          if (fixedOffset > 0) fixedOffset,
+          if (displacement.isNotZero) displacement,
           'A$register',
-          if (variableOffset != null) variableOffset,
+          if (variableDisplacement != null) variableDisplacement,
           ')',
         ].join()) {
     if (register > 7 || register < 0) {
@@ -152,7 +157,10 @@ Asm setLabel(String label) {
   return Asm.fromLine('$label:');
 }
 
-Asm cmd(String cmd, List args, {String? label}) {
-  return Asm.fromLine(
-      [if (label == null) '' else '$label:', cmd, args.join(', ')].join('	'));
+Asm cmd(String cmd, List operands, {String? label}) {
+  return Asm.fromLine([
+    if (label == null) '' else '$label:',
+    cmd,
+    operands.join(', ')
+  ].join('	'));
 }
