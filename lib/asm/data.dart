@@ -14,6 +14,16 @@ abstract class Expression {
   bool get isZero;
   bool get isNotZero => !isZero;
 
+  Expression();
+
+  const Expression.constant();
+
+  Immediate get i => Immediate(this);
+
+  Absolute get w => Absolute.word(this);
+
+  Absolute get l => Absolute.long(this);
+
   /// Assembly representation of the expression.
   @override
   String toString();
@@ -25,7 +35,7 @@ class Constant extends Expression {
   @override
   final bool isZero = false;
 
-  Constant(this.constant);
+  const Constant(this.constant) : super.constant();
 
   @override
   String toString() => constant;
@@ -47,9 +57,7 @@ class Label extends Expression {
   @override
   final bool isZero = false;
 
-  Label(this.name);
-
-  Absolute get l => Absolute.longword(this);
+  const Label(this.name) : super.constant();
 
   @override
   String toString() => name;
@@ -65,7 +73,7 @@ class Label extends Expression {
 
 // TODO: unsigned. what about signed?
 // see: http://mrjester.hapisan.com/04_MC68/Sect04Part02/Index.html
-abstract class Value<T extends Value<T>> implements Expression {
+abstract class Value<T extends Value<T>> extends Expression {
   /// Value as an [int]
   final int value;
 
@@ -75,7 +83,7 @@ abstract class Value<T extends Value<T>> implements Expression {
     }
   }
 
-  const Value._(this.value);
+  const Value._(this.value) : super.constant();
 
   /// Size in bytes
   Size get size;

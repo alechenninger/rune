@@ -1,11 +1,81 @@
 import 'asm.dart';
 
+const dest_x_pos = Constant('dest_x_pos');
+const dest_y_pos = Constant('dest_y_pos');
+const curr_x_pos = Constant('curr_x_pos');
+const curr_y_pos = Constant('curr_y_pos');
+
+const Char_Move_Flags = Constant('Char_Move_Flags');
+
+Asm popdlg = cmd('popdlg', []);
+
+Asm dialogTreesToRAM(Address dialogTree) {
+  return Asm([
+    move.l(dialogTree, d0),
+    jsr(Label('DialogueTreesToRAM').l),
+  ]);
+}
+
+Asm getAndRunDialog(Address dialogId) {
+  return Asm([
+    moveq(dialogId, d0),
+    jsr(Label('Event_GetAndRunDialogue').l),
+  ]);
+}
+
+Asm characterBySlotToA4(int slot) {
+  return lea(Constant('Character_$slot').w, a4);
+}
+
+Asm characterByNameToA4(String name) {
+  return Asm([
+    moveq(Constant('CharID_$name').i, d0),
+    jsr(Label('Event_GetCharacter').l),
+  ]);
+}
+
+Asm updateObjFacing(Address direction) {
+  return Asm([
+    moveq(direction, d0),
+    jsr(Label('Event_UpdateObjFacing').l),
+  ]);
+}
+
+Asm doNotFollowLeader() {
+  return cmd('bset', [Byte.zero, Char_Move_Flags.w]);
+}
+
+Asm followLeader() {
+  return cmd('bclr', [Byte.zero, Char_Move_Flags.w]);
+}
+
+/// Multiple characters can move with [moveCharacter], but they must be prepared
+/// prior to calling. Load each character into a4, call this, and then after
+/// loading the last character, call [moveCharacter].
+Asm setDestination({required Address x, required Address y}) {
+  return Asm([
+    move.w(x, a4.indirect.plus(dest_x_pos)),
+    move.w(y, a4.indirect.plus(dest_y_pos)),
+  ]);
+}
+
+Asm moveCharacter({required Address x, required Address y}) {
+  return Asm([
+    move.w(x, d0),
+    move.w(y, d1),
+    jsr(Label('Event_MoveCharacter').l),
+  ]);
+}
+
+/// Moves the object at address A4 by rate ([x] and [y]) and time ([frames])).
 Asm stepObject(
     {required Address x, required Address y, required Address frames}) {
   return Asm([
-    move.l(x, Address.d(0)),
-    move.l(y, Address.d(1)),
-    move.l(frames, Address.d(2)),
-    jsr(Label('Event_StepObject').l)
+    move.l(x, d0),
+    move.l(y, d1),
+    move.l(frames, d2),
+    jsr(Label('Event_StepObject').l),
+    setDestination(
+        x: a4.indirect.plus(curr_x_pos), y: a4.indirect.plus(curr_y_pos))
   ]);
 }
