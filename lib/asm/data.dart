@@ -103,11 +103,9 @@ abstract class Value<T extends Value<T>> extends Expression {
 }
 
 class Byte extends Value<Byte> {
-  static const zero = Byte._(0);
+  static const zero = Byte(0);
 
-  Byte(int value) : super(value);
-
-  const Byte._(int value) : super._(value);
+  const Byte(int value) : super._(value);
 
   @override
   final size = Size.b;

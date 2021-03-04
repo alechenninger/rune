@@ -41,12 +41,13 @@ Asm updateObjFacing(Address direction) {
   ]);
 }
 
-Asm doNotFollowLeader() {
-  return cmd('bset', [Byte.zero, Char_Move_Flags.w]);
+Asm lockCamera(bool lock) {
+  // Or is this reversed?
+  return cmd(lock ? 'bset' : 'bclr', [const Byte(2).i, Char_Move_Flags.w]);
 }
 
-Asm followLeader() {
-  return cmd('bclr', [Byte.zero, Char_Move_Flags.w]);
+Asm followLeader(bool follow) {
+  return cmd(follow ? 'bset' : 'bclr', [Byte.zero.i, Char_Move_Flags.w]);
 }
 
 /// Multiple characters can move with [moveCharacter], but they must be prepared
@@ -77,5 +78,15 @@ Asm stepObject(
     jsr(Label('Event_StepObject').l),
     setDestination(
         x: a4.indirect.plus(curr_x_pos), y: a4.indirect.plus(curr_y_pos))
+  ]);
+}
+
+Asm moveCamera(
+    {required Address x, required Address y, required Address speed}) {
+  return Asm([
+    move.l(x, d0),
+    move.l(y, d1),
+    move.l(speed, d2),
+    jsr(Label('Event_MoveCamera').l),
   ]);
 }
