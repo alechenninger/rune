@@ -60,7 +60,7 @@ class Absolute extends _Address {
 }
 
 class Immediate extends _Address {
-  Immediate(Expression e) : super('#$e');
+  const Immediate(Expression e) : super('#$e');
 }
 
 class DirectAddressRegister extends _Address {
@@ -92,13 +92,11 @@ class IndirectAddressRegister extends _Address {
 
   IndirectAddressRegister(this.register,
       {this.displacement = Byte.zero, this.variableDisplacement})
-      : super([
-          '(',
+      : super('(${[
           if (displacement.isNotZero) displacement,
           'A$register',
           if (variableDisplacement != null) variableDisplacement,
-          ')',
-        ].join()) {
+        ].join(',')})') {
     if (register > 7 || register < 0) {
       throw AsmError(register, 'is not a valid address register');
     }

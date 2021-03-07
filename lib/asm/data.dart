@@ -4,8 +4,6 @@ import 'dart:typed_data';
 import '../characters.dart';
 import 'asm.dart';
 
-int hex(String d) => int.parse('0x$d');
-
 const byte = Size.b;
 const word = Size.w;
 const long = Size.l;

@@ -23,8 +23,16 @@ Asm getAndRunDialog(Address dialogId) {
   ]);
 }
 
+/// [slot] is 1-indexed
 Asm characterBySlotToA4(int slot) {
   return lea(Constant('Character_$slot').w, a4);
+}
+
+Asm characterByIdToA4(Address id) {
+  return Asm([
+    moveq(id, d0),
+    jsr(Label('Event_GetCharacter').l),
+  ]);
 }
 
 Asm characterByNameToA4(String name) {
@@ -47,7 +55,7 @@ Asm lockCamera(bool lock) {
 }
 
 Asm followLeader(bool follow) {
-  return cmd(follow ? 'bset' : 'bclr', [Byte.zero.i, Char_Move_Flags.w]);
+  return cmd(follow ? 'bclr' : 'bset', [Byte.zero.i, Char_Move_Flags.w]);
 }
 
 /// Multiple characters can move with [moveCharacter], but they must be prepared
@@ -60,6 +68,7 @@ Asm setDestination({required Address x, required Address y}) {
   ]);
 }
 
+/// [x] and [y] should be word size.
 Asm moveCharacter({required Address x, required Address y}) {
   return Asm([
     move.w(x, d0),
