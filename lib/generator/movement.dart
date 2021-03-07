@@ -18,6 +18,7 @@ extension MoveToAsm on Move {
 
     var traveled = 0;
     var delayed = Map<Moveable, Movement>.from(movements);
+    // Shortest distance last
     var now = SplayTreeSet<MapEntry<Moveable, Movement>>((e1, e2) {
       var comparison = e2.value.distance.compareTo(e1.value.distance);
       if (comparison == 0) {
@@ -45,7 +46,7 @@ extension MoveToAsm on Move {
 
         if (movement.delay > traveled) {
           delayed[moveable] = movement;
-          stepsUntilDelayed = stepsUntilDelayed.lesserOf(movement.delay);
+          stepsUntilDelayed = stepsUntilDelayed.capTo(movement.delay);
         } else {
           now.add(entry);
         }
@@ -65,7 +66,7 @@ extension MoveToAsm on Move {
           .reduce((maxParallel, d) => maxParallel = math.min(maxParallel, d));
       var maxUntilDelayed =
           stepsUntilDelayed == null ? null : stepsUntilDelayed - traveled;
-      var maxNow = maxUntilDelayed.lesserOf(maxParallelSteps);
+      var maxNow = maxUntilDelayed.capTo(maxParallelSteps);
       Moveable? a4;
 
       void toA4(Moveable moveable) {
@@ -88,7 +89,7 @@ extension MoveToAsm on Move {
             throw StateError('no current position set for $moveable');
           }
 
-          var toTravel = maxNow.lesserOf(movement.distance);
+          var toTravel = maxNow.capTo(movement.distance);
           var dest =
               curr + (movement.direction.normal * toTravel) * unitsPerStep;
           ctx.positions[moveable] = dest;
@@ -108,7 +109,8 @@ extension MoveToAsm on Move {
         }
       }
 
-      for (var next in now) {
+      // Should we wait until everything done moving for this?
+      for (var next in now.toList().reversed) {
         var moveable = next.key;
         var movement = next.value;
         if (movement is StepDirection) {
@@ -122,21 +124,14 @@ extension MoveToAsm on Move {
       // TODO: is it always maxNow?
       // if less was moved, it means delay is greater than actual moved spaces
       traveled += maxNow;
-
-      // For movements starting now
-      // Move until next round of movements – until leastDelay traveled
-      // If there are multiple, load use address displacement
-      // I guess need a basic pathing algorithm to know where to stop along
-      // destination :/
-      // Or we force defining movements in terms of x then y or y then x
     }
 
     return asm;
   }
 }
 
-extension Min on int? {
-  int lesserOf(int other) {
+extension Cap on int? {
+  int capTo(int other) {
     var self = this;
     return self == null ? other : math.min(self, other);
   }

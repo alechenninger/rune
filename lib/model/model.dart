@@ -224,8 +224,8 @@ class Shay extends Character {
 class Direction {
   final Point<int> normal;
   const Direction._(this.normal);
-  static const up = Direction._(Point(0, 1));
+  static const up = Direction._(Point(0, -1));
   static const left = Direction._(Point(-1, 0));
   static const right = Direction._(Point(1, 0));
-  static const down = Direction._(Point(0, -1));
+  static const down = Direction._(Point(0, 1));
 }
