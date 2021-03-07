@@ -83,6 +83,9 @@ extension MoveToAsm on Move {
 
         toA4(moveable);
 
+        // NOTE: each movement ends with a slight pause so one direction at a
+        // time is not as smooth as setting both
+
         if (movement is StepDirection) {
           var curr = ctx.positions[moveable];
           if (curr == null) {
