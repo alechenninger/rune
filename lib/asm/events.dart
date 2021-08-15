@@ -50,7 +50,6 @@ Asm updateObjFacing(Address direction) {
 }
 
 Asm lockCamera(bool lock) {
-  // Or is this reversed?
   return cmd(lock ? 'bset' : 'bclr', [const Byte(2).i, Char_Move_Flags.w]);
 }
 
