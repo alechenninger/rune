@@ -1,7 +1,7 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:characters/characters.dart';
+import 'package:characters/src/extensions.dart';
 
 /*
 Scene: Introduction (Prologue)
@@ -165,12 +165,21 @@ class StepToPoint extends Movement {
 
 class Dialog extends Event {
   Character? speaker;
-  final String markup;
-  final List<Span> _spans = [];
+  final List<Span> _spans;
   List<Span> get spans => UnmodifiableListView(_spans);
 
-  // TODO: markup maybe belongs in parse layer
-  Dialog({this.speaker, required this.markup}) {
+  Dialog({this.speaker, List<Span> spans = const []}) : _spans = spans;
+}
+
+class Span {
+  final String text;
+  final bool italic;
+
+  Span(this.text, this.italic);
+
+  // TODO: markup parsing belongs in parse layer
+  static List<Span> parse(String markup) {
+    var _spans = <Span>[];
     var italic = false;
     var text = StringBuffer();
 
@@ -188,14 +197,8 @@ class Dialog extends Event {
 
       text.write(c);
     }
+    return _spans;
   }
-}
-
-class Span {
-  final String text;
-  final bool italic;
-
-  Span(this.text, this.italic);
 }
 
 class Slot extends Moveable {
@@ -208,6 +211,17 @@ class Party extends Moveable {}
 
 abstract class Character extends Moveable {
   const Character();
+
+  /// throws if no character found by name.
+  static Character byName(String name) {
+    switch (name.toLowerCase()) {
+      case 'alys':
+        return alys;
+      case 'shay':
+        return shay;
+    }
+    throw ArgumentError.value(name, 'name', 'does not match known character');
+  }
 }
 
 const alys = Alys();
