@@ -10,3 +10,35 @@ their own tradeoffs. So, we have to present a choice, rather than always choose 
 * Event code can be hardcoded in DSL just using scene context.
 * Allow insertion into document directly for editing
 * Or allow overriding with event DSL
+
+## google docs workflow
+
+1. (Mike) Add new scene
+2. (Alec) insert existing event flags (event code reused at this point)
+3. Generate rom
+   ```
+   -> request to mylab.com/projects/grand-cross/build
+      -> parses document.
+      -> generates asm.
+      -> compiles asm.
+   <- responds with compiled binary.
+   ```
+   
+   a simple version in the meantime can be to just generate the assembly in memory and download 
+   that.
+
+   or can github actions be used in a productive way here?
+4. play
+
+event code can be edited inline somehow (e.g. own dsl, or inline assembly as footnotes, or 
+image(s) with description alt text, or ...).
+
+after edits, repeat from 3.
+
+### google docs parsing
+
+portrait image - alt text is character name. text in same paragraph is dialog
+
+image alt text could also be used for cutscene panels
+
+just ignore paragraph text otherwise.
