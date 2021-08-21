@@ -8,6 +8,8 @@ void main() {
         speaker: Alys(),
         spans: Span.parse("Hi I'm Alys! _What are you doing here?_"));
 
+    print(dialog);
+
     var asm = dialog.toAsm();
 
     expect(asm.toString(), r'''	dc.b	$F4

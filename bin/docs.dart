@@ -1,8 +1,10 @@
 @JS()
 library rune_docs;
 
+import 'package:characters/src/extensions.dart';
 import 'package:js/js.dart';
 import 'package:rune/gapps/document.dart';
+import 'package:rune/model/model.dart';
 
 @JS()
 external set compileScene(value);
@@ -43,11 +45,11 @@ void compileSceneDart() {
       continue;
     }
 
-    var p = heading as Paragraph;
+    var p = heading.asParagraph();
     Logger.log(p);
     Logger.log(p.getHeading());
 
-    if (p.getHeading() == DocumentApp.ParagraphHeading.HEADING2) {
+    if (p.getHeading() != DocumentApp.ParagraphHeading.NORMAL) {
       break;
     }
   }
@@ -56,6 +58,8 @@ void compileSceneDart() {
     Logger.log('no starting heading found');
     return;
   }
+
+  var dialog = <Dialog>[];
 
   // now parse elements until next heading
   for (var e = heading.getNextSibling(); e != null; e = e.getNextSibling()) {
@@ -71,26 +75,56 @@ void compileSceneDart() {
     }
 
     var portrait = p.getChild(0)!;
-    var dialog = p.getChild(1)!;
+    var speech = p.getChild(1)!;
 
     if (portrait.getType() != DocumentApp.ElementType.INLINE_IMAGE) {
       Logger.log('First child is not an image: $portrait');
       continue;
     }
 
-    if (dialog.getType() != DocumentApp.ElementType.TEXT) {
-      Logger.log('Second child is not text: $dialog');
+    if (speech.getType() != DocumentApp.ElementType.TEXT) {
+      Logger.log('Second child is not text: $speech');
       continue;
     }
 
     portrait = portrait as InlineImage;
-    dialog = dialog as Text;
+    speech = speech as Text;
 
-    var character = portrait.getAltTitle();
-    DocumentApp.getUi().alert('$character: ${dialog.getText()}');
+    var speaker = portrait.getAltTitle();
+    var text = speech.getText();
+    var offset = text.length - text.trimLeft().length;
+    var characters = text.trim().characters;
+    var spans = <Span>[];
+    var italic = false;
+    var buffer = StringBuffer();
+
+    for (var i = 0; i < characters.length; i++) {
+      if (italic != nullToFalse(speech.isItalic(i + offset))) {
+        if (buffer.isNotEmpty) {
+          spans.add(Span(buffer.toString(), italic));
+          buffer.clear();
+        }
+        italic = !italic;
+      }
+      buffer.write(characters.elementAt(i));
+    }
+
+    if (buffer.isNotEmpty) {
+      spans.add(Span(buffer.toString(), italic));
+    }
+
+    var character = Character.byName(speaker);
+    Logger.log('speaker: $speaker, character: $character');
+    var d = Dialog(speaker: character, spans: spans);
+    Logger.log(d);
+    dialog.add(d);
   }
+
+  Logger.log(dialog);
 }
 
 bool isContainer(Element e) {
   return [DocumentApp.ElementType.PARAGRAPH].contains(e.getType());
 }
+
+bool nullToFalse(bool? b) => b ?? false;

@@ -114,6 +114,7 @@ class Text extends Element {
   external Text setFontSize(int sizeOrStart, [int endInclusive, int size]);
   external Text setBold(dynamic valueOrStart, [int endInclusive, bool value]);
   external String getText();
+  external bool? isItalic(int offset);
 }
 
 @JS()

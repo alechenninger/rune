@@ -169,6 +169,11 @@ class Dialog extends Event {
   List<Span> get spans => UnmodifiableListView(_spans);
 
   Dialog({this.speaker, List<Span> spans = const []}) : _spans = spans;
+
+  @override
+  String toString() {
+    return 'Dialog{speaker: $speaker, _spans: $_spans}';
+  }
 }
 
 class Span {
@@ -198,6 +203,11 @@ class Span {
       text.write(c);
     }
     return _spans;
+  }
+
+  @override
+  String toString() {
+    return 'Span{text: $text, italic: $italic}';
   }
 }
 
@@ -229,10 +239,12 @@ const shay = Shay();
 
 class Alys extends Character {
   const Alys();
+  String toString() => 'Alys';
 }
 
 class Shay extends Character {
   const Shay();
+  String toString() => 'Shay';
 }
 
 class Direction {
