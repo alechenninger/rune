@@ -166,5 +166,5 @@ class ContainerElement extends Element {
 
 @JS()
 class InlineImage extends Element {
-  external String getAltTitle();
+  external String? getAltTitle();
 }

@@ -3,18 +3,17 @@ library rune_docs;
 
 import 'package:characters/src/extensions.dart';
 import 'package:js/js.dart';
+import 'package:rune/asm/asm.dart';
 import 'package:rune/gapps/document.dart';
+import 'package:rune/gapps/drive.dart';
+import 'package:rune/generator/dialog.dart';
 import 'package:rune/model/model.dart';
 
 @JS()
-external set compileScene(value);
+external set compileSceneLib(value);
 
 @JS()
-external set onOpen(value);
-
-void sayHelloDart() {
-  DocumentApp.getUi().alert('Hello world');
-}
+external set onOpenLib(value);
 
 void onOpenDart(e) {
   DocumentApp.getUi()
@@ -24,8 +23,8 @@ void onOpenDart(e) {
 }
 
 void main(List<String> arguments) {
-  onOpen = allowInterop(onOpenDart);
-  compileScene = allowInterop(compileSceneDart);
+  onOpenLib = allowInterop(onOpenDart);
+  compileSceneLib = allowInterop(compileSceneDart);
 }
 
 void compileSceneDart() {
@@ -92,6 +91,12 @@ void compileSceneDart() {
 
     var speaker = portrait.getAltTitle();
     var text = speech.getText();
+
+    if (speaker == null) {
+      Logger.log('Missing alt text on portrait image for dialog: "$text"');
+      continue;
+    }
+
     var offset = text.length - text.trimLeft().length;
     var characters = text.trim().characters;
     var spans = <Span>[];
@@ -120,7 +125,13 @@ void compileSceneDart() {
     dialog.add(d);
   }
 
-  Logger.log(dialog);
+  var dialogAsm = Asm.empty();
+  dialog.forEach((d) => dialogAsm.add(d.toAsm()));
+
+  var folder = DriveApp.getFolderById('secret');
+  var scene = folderByName(folder, 'name');
+  updateFile(scene, 'dialog.asm', dialogAsm.toString());
+  // event asm
 }
 
 bool isContainer(Element e) {
@@ -128,3 +139,19 @@ bool isContainer(Element e) {
 }
 
 bool nullToFalse(bool? b) => b ?? false;
+
+Folder folderByName(Folder parent, String name) {
+  var folders = parent.getFoldersByName(name);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return parent.createFolder(name);
+}
+
+File updateFile(Folder folder, String name, String content) {
+  var files = folder.getFilesByName(name);
+  if (files.hasNext()) {
+    return files.next().setContent(content);
+  }
+  return folder.createFile(name, content);
+}

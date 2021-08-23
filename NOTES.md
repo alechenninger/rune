@@ -17,15 +17,12 @@ their own tradeoffs. So, we have to present a choice, rather than always choose 
 2. (Alec) insert existing event flags (event code reused at this point)
 3. Generate rom
    ```
-   -> request to mylab.com/projects/grand-cross/build
-      -> parses document.
-      -> generates asm.
-      -> compiles asm.
-   <- responds with compiled binary.
+   -> generate each scene asm
+   -> upload to drive
+   -> ping lab builder
+   -> builder uploads latest to drive / responds with download url
+   (or can use google drive sync app)
    ```
-   
-   a simple version in the meantime can be to just generate the assembly in memory and download 
-   that.
 
    or can github actions be used in a productive way here?
 4. play

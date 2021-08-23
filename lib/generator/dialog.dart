@@ -2,11 +2,11 @@ import 'dart:math';
 
 import 'package:characters/characters.dart';
 import 'package:charcode/ascii.dart';
-import 'package:rune/asm/dialog.dart';
-import 'package:rune/model/model.dart';
 
 import '../asm/asm.dart';
+import '../asm/dialog.dart';
 import '../characters.dart';
+import '../model/model.dart';
 
 extension DialogToAsm on Dialog {
   Asm toAsm() {

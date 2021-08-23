@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:math';
 
 import 'package:characters/src/extensions.dart';
+import 'package:rune/generator/generator.dart';
 
 /*
 Scene: Introduction (Prologue)
@@ -74,7 +75,9 @@ Alys and Shay exit the house.
 
  */
 
-class Event {}
+abstract class Event {
+  Asm generateAsm(AsmGenerator generator, EventContext ctx);
+}
 
 class EventContext {
   final positions = <Moveable, Point<int>>{};
@@ -82,13 +85,18 @@ class EventContext {
   final slots = <Character>[];
 }
 
-class AggregateEvent extends Event {
+class Scene {
   final List<Event> events = [];
 }
 
 /// A group of parallel movements
 class Move extends Event {
   Map<Moveable, Movement> movements = {};
+
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    return generator.moveToAsm(this, ctx);
+  }
 }
 
 // character by name? character by slot? party?
@@ -173,6 +181,11 @@ class Dialog extends Event {
   @override
   String toString() {
     return 'Dialog{speaker: $speaker, _spans: $_spans}';
+  }
+
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    return generator.dialogToAsm(this);
   }
 }
 

@@ -7,6 +7,11 @@ class _ControlCodes {
   static final newLine = Bytes.hex('FC');
   static final cursor = Bytes.hex('FD');
   static final endDialog = Bytes.hex('FF');
+  static final event = Bytes.hex('F7');
+}
+
+Asm eventBreak() {
+  return dc.b(_ControlCodes.event);
 }
 
 Asm dialog(Bytes portrait, Bytes dialog) {
