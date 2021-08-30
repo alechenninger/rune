@@ -38,15 +38,11 @@ void compileSceneDart() {
   for (heading = cursor.getElement();
       heading != null;
       heading = heading.getPreviousSibling() ?? heading.getParent()) {
-    Logger.log(heading);
-
     if (heading.getType() != DocumentApp.ElementType.PARAGRAPH) {
       continue;
     }
 
     var p = heading.asParagraph();
-    Logger.log(p);
-    Logger.log(p.getHeading());
 
     if (p.getHeading() != DocumentApp.ParagraphHeading.NORMAL) {
       break;
@@ -58,6 +54,8 @@ void compileSceneDart() {
     return;
   }
 
+  var sceneId = Tech.parseFirst<SceneId>(heading.asParagraph())?.id ??
+      toFileSafe(heading.asParagraph().getText());
   var dialog = <Dialog>[];
 
   // now parse elements until next heading
@@ -69,7 +67,9 @@ void compileSceneDart() {
     var p = e.asParagraph();
 
     if (p.getNumChildren() < 2) {
-      Logger.log('Not enough children: "${p.editAsText().toString()}"');
+      if (p.getText().isNotEmpty) {
+        Logger.log('not dialog; not enough children: "${p.getText()}"');
+      }
       continue;
     }
 
@@ -119,18 +119,16 @@ void compileSceneDart() {
     }
 
     var character = Character.byName(speaker);
-    Logger.log('speaker: $speaker, character: $character');
     var d = Dialog(speaker: character, spans: spans);
-    Logger.log(d);
+    Logger.log('${d.speaker}: ${d.spans}');
     dialog.add(d);
   }
 
   var dialogAsm = Asm.empty();
   dialog.forEach((d) => dialogAsm.add(d.toAsm()));
 
-  var folder = DriveApp.getFolderById('secret');
-  var scene = folderByName(folder, 'name');
-  updateFile(scene, 'dialog.asm', dialogAsm.toString());
+  var folder = DriveApp.getFolderById('__RUNE_DRIVE_FOLDER_ID__');
+  updateFile(folder, '${sceneId}_dialog.asm', dialogAsm.toString());
   // event asm
 }
 
@@ -154,4 +152,53 @@ File updateFile(Folder folder, String name, String content) {
     return files.next().setContent(content);
   }
   return folder.createFile(name, content);
+}
+
+abstract class Tech {
+  static final _techs = <String, Tech Function(String?)>{
+    'scene_id': (c) => SceneId(c!)
+  };
+
+  static T? parseFirst<T extends Tech>(ContainerElement container) {
+    for (var i = 0; i < container.getNumChildren(); i++) {
+      Tech? tech;
+
+      var child = container.getChild(i);
+      if (child?.getType() == DocumentApp.ElementType.INLINE_IMAGE) {
+        var img = child!.asInlineImage();
+        if (img.getAltTitle()?.startsWith('tech:') == true) {
+          var type = img.getAltTitle()!.substring(5).trim();
+
+          Logger.log('found tech. type=$type container=$container');
+
+          var content = img.getAltDescription();
+          tech = _techForType(type, content);
+        }
+      }
+
+      if (tech != null && tech is T) {
+        Logger.log('tech is desired type. T=$T');
+        return tech;
+      }
+    }
+  }
+
+  static Tech _techForType(String type, String? content) {
+    var factory = _techs[type];
+    if (factory == null) {
+      throw ArgumentError.value(type, 'type',
+          'unsupported tech type. expected one of: ${_techs.keys}');
+    }
+    return factory(content);
+  }
+}
+
+class SceneId extends Tech {
+  final String id;
+
+  SceneId(this.id);
+}
+
+String toFileSafe(String name) {
+  return name.replaceAll(RegExp('[\s().]'), '_');
 }

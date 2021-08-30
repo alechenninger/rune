@@ -15,6 +15,7 @@ extension SceneToAsm on Scene {
 
     for (var e in events) {
       if (e is Dialog) {
+        isDialog = true;
         dialog.add(e.generateAsm(generator, ctx));
         continue;
       }

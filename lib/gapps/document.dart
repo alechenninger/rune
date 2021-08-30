@@ -61,6 +61,7 @@ class Body extends Element {
 
 @JS()
 class Paragraph extends ContainerElement {
+  external String getText();
   external Paragraph setAlignment(HorizontalAlignment alignment);
   external Text editAsText();
   external void setText(String text);
@@ -167,4 +168,5 @@ class ContainerElement extends Element {
 @JS()
 class InlineImage extends Element {
   external String? getAltTitle();
+  external String? getAltDescription();
 }

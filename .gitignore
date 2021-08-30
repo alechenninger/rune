@@ -11,3 +11,6 @@ doc/api/
 # IntelliJ
 *.iml
 .idea/
+
+# With secrets
+bin/_docs.dart
