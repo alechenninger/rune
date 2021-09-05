@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 
 import 'address.dart';
 import 'data.dart';
@@ -41,14 +42,19 @@ class Asm extends IterableBase<Asm> {
   Asm.empty();
 
   Asm(List<Asm> asm) {
-    asm.forEach((a) => add(a));
+    asm.forEach(add);
   }
 
   Asm.fromLine(String line) {
     addLine(line);
   }
 
+  Asm.fromMultiline(String multi) {
+    LineSplitter.split(multi).forEach(addLine);
+  }
+
   void add(Asm asm) {
+    // TODO: max length
     lines.addAll(asm.lines);
   }
 
