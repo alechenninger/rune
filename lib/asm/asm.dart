@@ -53,9 +53,16 @@ class Asm extends IterableBase<Asm> {
     LineSplitter.split(multi).forEach(addLine);
   }
 
-  void add(Asm asm) {
+  /// returns position in list in which asm was added.
+  int add(Asm asm) {
     // TODO: max length
     lines.addAll(asm.lines);
+    return lines.length - asm.length;
+  }
+
+  void replace(int index, Asm asm) {
+    lines.removeRange(index, asm.length);
+    lines.insertAll(index, asm.lines);
   }
 
   void addLine(String line) {

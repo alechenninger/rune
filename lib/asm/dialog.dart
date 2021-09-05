@@ -14,6 +14,10 @@ Asm eventBreak() {
   return dc.b(_ControlCodes.event);
 }
 
+Asm endDialog() {
+  return dc.b(_ControlCodes.endDialog);
+}
+
 Asm dialog(Bytes portrait, Bytes dialog) {
   dialog = dialog.trim($space);
 

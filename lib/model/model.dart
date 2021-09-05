@@ -87,6 +87,13 @@ class EventContext {
 
 class Scene {
   final List<Event> events = [];
+
+  // consider encoding the transition between events and dialog here?
+  // e.g. whether or not using F7 or FF
+
+  void addEvent(Event event) {
+    events.add(event);
+  }
 }
 
 /// A group of parallel movements

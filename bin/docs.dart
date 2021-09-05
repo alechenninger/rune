@@ -4,7 +4,7 @@ library rune_docs;
 import 'package:js/js.dart';
 import 'package:rune/gapps/document.dart';
 import 'package:rune/gapps/drive.dart';
-import 'package:rune/parser/gdocs.dart';
+import 'package:rune/parser/gdocs.dart' as gdocs;
 
 @JS()
 external set compileSceneLib(value);
@@ -37,11 +37,11 @@ void compileSceneDart() {
     return;
   }
 
-  var scene = parseScene(heading.asParagraph());
+  var scene = gdocs.compileScene(heading.asParagraph());
 
   var folder = DriveApp.getFolderById('__RUNE_DRIVE_FOLDER_ID__');
   updateFile(folder, '${scene.id}_dialog.asm', scene.asm.dialog.toString());
-  // event asm
+  updateFile(folder, '${scene.id}_event.asm', scene.asm.event.toString());
 }
 
 Paragraph? findHeadingForCursor(Position cursor) {

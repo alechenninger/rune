@@ -23,6 +23,14 @@ Asm getAndRunDialog(Address dialogId) {
   ]);
 }
 
+/// Use after F7 (see TextCtrlCode_Terminate2 and 3)
+Asm popAndRunDialog() {
+  return Asm([
+    cmd('popdlg', []),
+    jsr(Label('Event_RunDialogue').l),
+  ]);
+}
+
 /// [slot] is 1-indexed
 Asm characterBySlotToA4(int slot) {
   return lea(Constant('Character_$slot').w, a4);

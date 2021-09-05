@@ -2,8 +2,8 @@ import 'package:characters/src/extensions.dart';
 
 import '../asm/asm.dart';
 import '../gapps/document.dart';
-import '../generator/dialog.dart';
 import '../generator/event.dart';
+import '../generator/generator.dart';
 import '../model/model.dart';
 
 class CompiledScene {
@@ -13,10 +13,15 @@ class CompiledScene {
   CompiledScene(this.id, this.asm);
 }
 
-CompiledScene parseScene(Paragraph heading) {
+// Consider not also doing the generation and just spit out the model instead
+/// Parse from the provided [heading] element until the next paragraph heading.
+///
+/// The heading text will be used as the scene ID unless a [SceneId] tech is
+/// found within the heading element.
+CompiledScene compileScene(Paragraph heading) {
   var sceneId = Tech.parseFirst<SceneId>(heading) ??
       SceneId.fromString(heading.getText());
-  var dialog = <Dialog>[];
+  var scene = Scene();
 
   // now parse elements until next heading
   for (var e = heading.getNextSibling(); e != null; e = e.getNextSibling()) {
@@ -30,70 +35,79 @@ CompiledScene parseScene(Paragraph heading) {
       if (p.getText().isNotEmpty) {
         Logger.log('not dialog; not enough children: "${p.getText()}"');
       }
-
-      // Is there relevant tech though?
-      var event = Tech.parseFirst<AsmEvent>(p);
-      if (event != null) {}
-
       continue;
     }
 
-    var portrait = p.getChild(0)!;
-    var speech = p.getChild(1)!;
+    // paragraph can be event or dialog here – should allow both?
 
-    if (portrait.getType() != DocumentApp.ElementType.INLINE_IMAGE) {
-      Logger.log('First child is not an image: $portrait');
+    var event = Tech.parseFirst<AsmEvent>(p);
+    if (event != null) {
+      Logger.log('found asm event: "${p.getText()}"');
+      scene.addEvent(event);
       continue;
     }
 
-    if (speech.getType() != DocumentApp.ElementType.TEXT) {
-      Logger.log('Second child is not text: $speech');
+    var d = parseDialog(p);
+    if (d == null) {
       continue;
     }
 
-    portrait = portrait as InlineImage;
-    speech = speech as Text;
-
-    var speaker = portrait.getAltTitle();
-    var text = speech.getText();
-
-    if (speaker == null) {
-      Logger.log('Missing alt text on portrait image for dialog: "$text"');
-      continue;
-    }
-
-    var offset = text.length - text.trimLeft().length;
-    var characters = text.trim().characters;
-    var spans = <Span>[];
-    var italic = false;
-    var buffer = StringBuffer();
-
-    for (var i = 0; i < characters.length; i++) {
-      if (italic != nullToFalse(speech.isItalic(i + offset))) {
-        if (buffer.isNotEmpty) {
-          spans.add(Span(buffer.toString(), italic));
-          buffer.clear();
-        }
-        italic = !italic;
-      }
-      buffer.write(characters.elementAt(i));
-    }
-
-    if (buffer.isNotEmpty) {
-      spans.add(Span(buffer.toString(), italic));
-    }
-
-    var character = Character.byName(speaker);
-    var d = Dialog(speaker: character, spans: spans);
     Logger.log('${d.speaker}: ${d.spans}');
-    dialog.add(d);
+    scene.addEvent(d);
   }
 
-  var dialogAsm = Asm.empty();
-  dialog.forEach((d) => dialogAsm.add(d.toAsm()));
+  return CompiledScene(sceneId, scene.toAsm());
+}
 
-  var scene = CompiledScene(sceneId, SceneAsm(Asm.empty(), dialogAsm));
-  return scene;
+Dialog? parseDialog(Paragraph p) {
+  var portrait = p.getChild(0)!;
+  var speech = p.getChild(1)!;
+
+  if (portrait.getType() != DocumentApp.ElementType.INLINE_IMAGE) {
+    Logger.log('not dialog; first child is not an image: $portrait');
+    return null;
+  }
+
+  if (speech.getType() != DocumentApp.ElementType.TEXT) {
+    Logger.log('not dialog; second child is not text: $speech');
+    return null;
+  }
+
+  portrait = portrait as InlineImage;
+  speech = speech as Text;
+
+  var speaker = portrait.getAltTitle();
+  var text = speech.getText();
+
+  if (speaker == null) {
+    Logger.log(
+        'not dialog; missing alt text on portrait image for dialog: "$text"');
+    return null;
+  }
+
+  var offset = text.length - text.trimLeft().length;
+  var characters = text.trim().characters;
+  var spans = <Span>[];
+  var italic = false;
+  var buffer = StringBuffer();
+
+  for (var i = 0; i < characters.length; i++) {
+    if (italic != nullToFalse(speech.isItalic(i + offset))) {
+      if (buffer.isNotEmpty) {
+        spans.add(Span(buffer.toString(), italic));
+        buffer.clear();
+      }
+      italic = !italic;
+    }
+    buffer.write(characters.elementAt(i));
+  }
+
+  if (buffer.isNotEmpty) {
+    spans.add(Span(buffer.toString(), italic));
+  }
+
+  var character = Character.byName(speaker);
+  return Dialog(speaker: character, spans: spans);
 }
 
 bool nullToFalse(bool? b) => b ?? false;
@@ -153,10 +167,16 @@ class SceneId extends Tech {
   String toString() => id;
 }
 
-class AsmEvent extends Tech {
+class AsmEvent extends Tech implements Event {
   final Asm asm;
 
   AsmEvent(this.asm);
+
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    // raw asm a bit fragile! ctx not updated
+    return asm;
+  }
 }
 
 String _toFileSafe(String name) {

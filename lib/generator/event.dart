@@ -1,4 +1,5 @@
 import 'package:rune/asm/dialog.dart';
+import 'package:rune/asm/events.dart';
 import 'package:rune/generator/generator.dart';
 
 import '../asm/asm.dart' hide Move;
@@ -11,22 +12,34 @@ extension SceneToAsm on Scene {
 
     var event = Asm.empty();
     var dialog = Asm.empty();
-    var isDialog = true;
+    var dialogMode = true;
+    var lastEventBreak = -1;
 
     for (var e in events) {
       if (e is Dialog) {
-        isDialog = true;
+        if (!dialogMode) {
+          event.add(popAndRunDialog());
+        }
+
+        dialogMode = true;
         dialog.add(e.generateAsm(generator, ctx));
         continue;
       }
 
-      if (isDialog) {
-        isDialog = false;
+      if (dialogMode && dialog.isNotEmpty) {
+        dialogMode = false;
         // or enddialog/terminate? FF
-        dialog.add(eventBreak());
+        // note if use terminate, have to track dialog tree offset
+        lastEventBreak = dialog.add(eventBreak());
       }
 
       event.add(e.generateAsm(generator, ctx));
+    }
+
+    if (dialogMode) {
+      dialog.add(endDialog());
+    } else if (lastEventBreak >= 0) {
+      dialog.replace(lastEventBreak, endDialog());
     }
 
     return SceneAsm(event, dialog);
