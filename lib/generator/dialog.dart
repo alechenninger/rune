@@ -43,7 +43,7 @@ final _italicizedOther = {
   '?': 131,
 };
 
-final _nonItalicizedLetters = <String>{}; //{'x', 'z'};
+final _nonItalicizedLetters = <String>{}; //...Quotes.characters}; //{'x', 'z'};
 final _quotes = ['"', '“', '”'];
 
 extension SpanToAscii on Span {
@@ -94,6 +94,7 @@ extension SpanToAscii on Span {
         continue;
       }
 
+      // todo: skip double space
       builder.writeAsciiCharacter(c);
     }
 
@@ -102,14 +103,16 @@ extension SpanToAscii on Span {
 }
 
 class Quotes {
+  static final Set<String> characters = {$less_than.utf16, $greater_than.utf16};
+
   var _current = $less_than;
   var _next = $greater_than;
 
-  int next() {
+  String next() {
     var q = _current;
     _current = _next;
     _next = q;
-    return q;
+    return q.utf16;
   }
 }
 
