@@ -442,6 +442,19 @@ class BytesBuilder {
     return BytesAndAscii(_spans);
   }
 
+  int? get lastByte {
+    if (_currentSpan.isNotEmpty) {
+      return _currentSpan.last;
+    }
+
+    if (_spans.isNotEmpty) {
+      var lastSpan = _spans.last;
+      if (lastSpan.isNotEmpty) {
+        return lastSpan.bytes.last;
+      }
+    }
+  }
+
   void writeAsciiCharacter(String c) {
     if (!_ascii) {
       _finishSpan();

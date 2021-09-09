@@ -83,6 +83,7 @@ class EventContext {
   final positions = <Moveable, Point<int>>{};
   final facing = <Moveable, Direction>{};
   final slots = <Character>[];
+  bool followLead = false;
 }
 
 class Scene {
@@ -183,7 +184,12 @@ class Dialog extends Event {
   final List<Span> _spans;
   List<Span> get spans => UnmodifiableListView(_spans);
 
-  Dialog({this.speaker, List<Span> spans = const []}) : _spans = spans;
+  Dialog({this.speaker, List<Span> spans = const []}) : _spans = spans {
+    if (_spans.isEmpty) {
+      throw ArgumentError.value(
+          spans, 'spans', 'must contain at least one span');
+    }
+  }
 
   @override
   String toString() {
@@ -222,6 +228,11 @@ class Span {
 
       text.write(c);
     }
+
+    if (text.isNotEmpty) {
+      _spans.add(Span(text.toString(), italic));
+    }
+
     return _spans;
   }
 
@@ -274,4 +285,9 @@ class Direction {
   static const left = Direction._(Point(-1, 0));
   static const right = Direction._(Point(1, 0));
   static const down = Direction._(Point(0, 1));
+
+  @override
+  String toString() {
+    return 'Direction{normal: $normal}';
+  }
 }

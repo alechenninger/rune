@@ -19,4 +19,17 @@ void main() {
 	dc.b	$6F, $6C, $79, $6C, $83
 	dc.b	$FD''');
   });
+
+  test('skips repeated spaces', () {
+    var dialog = Dialog(speaker: Alys(), spans: Span.parse('Test  1 2 3'));
+
+    print(dialog);
+
+    var asm = dialog.toAsm();
+
+    expect(asm.toString(), r'''	dc.b	$F4
+	dc.b	$02
+	dc.b	"Test 1 2 3"
+	dc.b	$FD''');
+  });
 }

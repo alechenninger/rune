@@ -28,6 +28,8 @@ final _transforms = {
   '…': '...',
 };
 
+final _replacements = {RegExp('  +'): ' '};
+
 // TODO: this is a bit of a mess, clean it up
 
 final _uppercase = RegExp('[A-Z]');
@@ -56,6 +58,12 @@ extension SpanToAscii on Span {
       }
       return _transforms[e] ?? e;
     }).join();
+
+    // todo: can replace single char transforms with this i guess?
+    //   except need to deal with quotes.
+    for (var r in _replacements.entries) {
+      transformed = transformed.replaceAll(r.key, r.value);
+    }
 
     if (!italic) {
       return Bytes.ascii(transformed);
@@ -94,7 +102,6 @@ extension SpanToAscii on Span {
         continue;
       }
 
-      // todo: skip double space
       builder.writeAsciiCharacter(c);
     }
 

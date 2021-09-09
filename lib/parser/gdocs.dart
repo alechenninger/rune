@@ -31,6 +31,11 @@ CompiledScene compileScene(Paragraph heading) {
 
     var p = e.asParagraph();
 
+    if (p.getHeading() != DocumentApp.ParagraphHeading.NORMAL) {
+      Logger.log('finishing current scene; new scene detected: ${p.getText()}');
+      break;
+    }
+
     if (p.getNumChildren() < 2) {
       if (p.getText().isNotEmpty) {
         Logger.log('not dialog; not enough children: "${p.getText()}"');
