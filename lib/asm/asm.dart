@@ -70,6 +70,10 @@ class Asm extends IterableBase<Asm> {
     lines.add(line);
   }
 
+  void addNewline() {
+    lines.add('');
+  }
+
   @override
   int get length => lines.length;
 

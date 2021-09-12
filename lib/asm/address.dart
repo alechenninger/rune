@@ -1,8 +1,5 @@
 import 'asm.dart';
 
-DirectDataRegister d(int register) => Address.d(register);
-DirectAddressRegister a(int register) => Address.a(register);
-
 const d0 = DirectDataRegister._(0);
 const d1 = DirectDataRegister._(1);
 const d2 = DirectDataRegister._(2);

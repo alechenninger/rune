@@ -14,11 +14,13 @@ extension SceneToAsm on Scene {
     var dialog = Asm.empty();
     var dialogMode = true;
     var lastEventBreak = -1;
+    var eventCounter = 1;
 
     for (var e in events) {
       if (e is Dialog) {
         if (!dialogMode) {
           event.add(popAndRunDialog());
+          event.addNewline();
         }
 
         dialogMode = true;
@@ -30,10 +32,14 @@ extension SceneToAsm on Scene {
         dialogMode = false;
         // or enddialog/terminate? FF
         // note if use terminate, have to track dialog tree offset
+        dialog.addLine('; scene event $eventCounter');
         lastEventBreak = dialog.add(eventBreak());
       }
 
+      event.addLine('; scene event $eventCounter');
       event.add(e.generateAsm(generator, ctx));
+
+      eventCounter++;
     }
 
     if (dialogMode) {
