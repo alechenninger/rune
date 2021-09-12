@@ -59,7 +59,10 @@ extension MoveToAsm on Move {
 
       // TODO: in context could see if this is set already?
       // and/or have a different type of event for party movement?
-      asm.add(followLeader(!individual));
+      if (ctx.followLead == !individual) {
+        ctx.followLead = !individual;
+        asm.add(followLeader(ctx.followLead));
+      }
 
       var maxParallelSteps = now
           .map((e) => e.value.distance)
@@ -96,6 +99,7 @@ extension MoveToAsm on Move {
           var dest =
               curr + (movement.direction.normal * toTravel) * unitsPerStep;
           ctx.positions[moveable] = dest;
+          ctx.facing[moveable] = movement.direction;
 
           var x = Word(dest.x).i;
           var y = Word(dest.y).i;
@@ -117,7 +121,8 @@ extension MoveToAsm on Move {
         var moveable = next.key;
         var movement = next.value;
         if (movement is StepDirection) {
-          if (!delayed.containsKey(moveable)) {
+          if (!delayed.containsKey(moveable) &&
+              ctx.facing[moveable] != movement.direction) {
             toA4(moveable);
             asm.add(updateObjFacing(movement.direction.address));
           }
