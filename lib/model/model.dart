@@ -97,6 +97,17 @@ class Scene {
   }
 }
 
+class Pause extends Event {
+  final Duration duration;
+
+  Pause(this.duration);
+
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    return generator.pauseToAsm(this);
+  }
+}
+
 /// A group of parallel movements
 class Move extends Event {
   Map<Moveable, Movement> movements = {};

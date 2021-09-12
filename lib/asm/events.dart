@@ -9,6 +9,10 @@ const Char_Move_Flags = Constant('Char_Move_Flags');
 
 Asm popdlg = cmd('popdlg', []);
 
+Asm vIntPrepareLoop(Word frames) {
+  return Asm([move.w(frames.i, d0), jsr(Label('VInt_PrepareLoop').l)]);
+}
+
 Asm dialogTreesToRAM(Address dialogTree) {
   return Asm([
     move.l(dialogTree, d0),

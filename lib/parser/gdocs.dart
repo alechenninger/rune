@@ -43,25 +43,32 @@ CompiledScene compileScene(Paragraph heading) {
       continue;
     }
 
-    // paragraph can be event or dialog here – should allow both?
-
-    var event = Tech.parseFirst<AsmEvent>(p);
-    if (event != null) {
-      Logger.log('found asm event: "${p.getText()}"');
-      scene.addEvent(event);
-      continue;
-    }
+    // todo: how to order dialog vs tech?
 
     var d = parseDialog(p);
-    if (d == null) {
-      continue;
+    if (d != null) {
+      Logger.log('${d.speaker}: ${d.spans}');
+      scene.addEvent(d);
     }
 
-    Logger.log('${d.speaker}: ${d.spans}');
-    scene.addEvent(d);
+    var event = Tech.parseFirst<Event>(p);
+    if (event != null) {
+      Logger.log('found event: "${p.getText()}"');
+      scene.addEvent(event);
+    }
   }
 
   return CompiledScene(sceneId, scene.toAsm());
+}
+
+final RegExp _pause = RegExp(r'.*[Pp]auses? for (\d+) seconds?.*');
+Pause? parsePause(Paragraph p) {
+  var text = p.getText();
+  var match = _pause.firstMatch(text);
+  if (match == null) return null;
+  var seconds = match.group(1);
+  if (seconds == null) return null;
+  return Pause(Duration(milliseconds: (double.parse(seconds) * 1000).toInt()));
 }
 
 Dialog? parseDialog(Paragraph p) {
@@ -118,16 +125,18 @@ Dialog? parseDialog(Paragraph p) {
 bool nullToFalse(bool? b) => b ?? false;
 
 abstract class Tech {
-  static final _techs = <String, Tech Function(String?)>{
+  static final _techs = <String, Object Function(String?)>{
     'scene_id': (c) => SceneId(c!),
-    'asm_event': (c) => AsmEvent(Asm.fromMultiline(c!))
+    'asm_event': (c) => AsmEvent(Asm.fromMultiline(c!)),
+    'pause_seconds': (c) =>
+        Pause(Duration(milliseconds: (double.parse(c!) * 1000).toInt()))
   };
 
   const Tech();
 
-  static T? parseFirst<T extends Tech>(ContainerElement container) {
+  static T? parseFirst<T>(ContainerElement container) {
     for (var i = 0; i < container.getNumChildren(); i++) {
-      Tech? tech;
+      Object? tech;
 
       var child = container.getChild(i);
       if (child?.getType() == DocumentApp.ElementType.INLINE_IMAGE) {
@@ -144,12 +153,12 @@ abstract class Tech {
 
       if (tech != null && tech is T) {
         Logger.log('tech is desired type. T=$T');
-        return tech;
+        return tech as T;
       }
     }
   }
 
-  static Tech _techForType(String type, String? content) {
+  static Object _techForType(String type, String? content) {
     var factory = _techs[type];
     if (factory == null) {
       throw ArgumentError.value(type, 'type',
@@ -159,7 +168,7 @@ abstract class Tech {
   }
 }
 
-class SceneId extends Tech {
+class SceneId {
   final String id;
 
   SceneId(this.id) {
@@ -172,7 +181,7 @@ class SceneId extends Tech {
   String toString() => id;
 }
 
-class AsmEvent extends Tech implements Event {
+class AsmEvent implements Event {
   final Asm asm;
 
   AsmEvent(this.asm);
