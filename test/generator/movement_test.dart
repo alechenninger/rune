@@ -12,6 +12,7 @@ void main() {
     ctx.slots.insert(1, shay);
 
     ctx.positions[alys] = Point('230'.hex, '250'.hex);
+    ctx.positions[shay] = Point('230'.hex, '240'.hex);
 
     var move = Move();
     move.movements[alys] = StepDirection()
@@ -30,15 +31,15 @@ void main() {
     ctx.slots.insert(0, alys);
     ctx.slots.insert(1, shay);
 
-    ctx.positions[alys] = Point('2A0'.hex, '250'.hex);
-    ctx.positions[shay] = Point('230'.hex, '1F0'.hex);
+    ctx.positions[alys] = Point('230'.hex, '250'.hex);
+    ctx.positions[shay] = Point('230'.hex, '240'.hex);
 
     var move = Move();
     move.movements[alys] = StepDirection()
       ..distance = 5
-      ..direction = Direction.left;
+      ..direction = Direction.right;
     move.movements[shay] = StepDirection()
-      ..distance = 5
+      ..distance = 1
       ..direction = Direction.down;
 
     var asm = move.toAsm(ctx);

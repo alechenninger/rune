@@ -63,23 +63,23 @@ class Immediate extends _Address {
 class DirectAddressRegister extends _Address {
   final int register;
 
-  DirectAddressRegister(this.register) : super('A$register') {
+  DirectAddressRegister(this.register) : super('a$register') {
     if (register > 7 || register < 0) {
       throw AsmError(register, 'is not a valid address register');
     }
   }
 
-  const DirectAddressRegister._(this.register) : super('A$register');
+  const DirectAddressRegister._(this.register) : super('a$register');
 
   IndirectAddressRegister get indirect => IndirectAddressRegister(register);
 }
 
 class DirectDataRegister extends _Address {
-  DirectDataRegister(int num) : super('D$num') {
+  DirectDataRegister(int num) : super('d$num') {
     if (num > 7 || num < 0) throw AsmError(num, 'is not a valid data register');
   }
 
-  const DirectDataRegister._(int num) : super('D$num');
+  const DirectDataRegister._(int num) : super('d$num');
 }
 
 class IndirectAddressRegister extends _Address {

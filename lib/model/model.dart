@@ -145,6 +145,24 @@ class StepDirection extends Movement {
     ..direction = direction;
 }
 
+class StepDirections extends Movement {
+  final _directions = <StepDirection>[];
+
+  void step(StepDirection step) {
+    _directions.add(step);
+  }
+
+  @override
+  int get distance => _directions
+      .map((e) => e.distance)
+      .reduce((value, element) => value + element);
+  @override
+  var delay = 0;
+
+  // TODO: may want to define in base
+  StepDirections less(int distance) {}
+}
+
 class StepToPoint extends Movement {
   // TODO could be used to inform whether multiple characters movements need
   //   to be split up into multiple movement events
@@ -265,7 +283,7 @@ abstract class Character extends Moveable {
   const Character();
 
   /// throws if no character found by name.
-  static Character byName(String name) {
+  static Character? byName(String name) {
     switch (name.toLowerCase()) {
       case 'alys':
         return alys;

@@ -16,60 +16,74 @@ extension MoveToAsm on Move {
   Asm toAsm(EventContext ctx) {
     var asm = Asm.empty();
 
+    // Steps travelled so far
     var traveled = 0;
-    var delayed = Map<Moveable, Movement>.from(movements);
-    // Shortest distance last
-    var now = SplayTreeSet<MapEntry<Moveable, Movement>>((e1, e2) {
-      var comparison = e2.value.distance.compareTo(e1.value.distance);
-      if (comparison == 0) {
-        return e2.key.toString().compareTo(e1.key.toString());
-      }
-      return comparison;
-    });
-    var individual = false;
 
-    while (delayed.isNotEmpty) {
-      var next = Map<Moveable, Movement>.from(delayed);
-      int? stepsUntilDelayed;
+    // Set of moves to make in parallel, sorted by distance (shortest last)
+    var currentParallelMoves =
+        SplayTreeSet<MapEntry<Moveable, Movement>>(_compareDistance);
 
-      delayed.clear();
-      now.clear();
+    // If moving an individual TODO: broken
+    bool individual;
+
+    var remainingMoves = Map.of(movements);
+    while (remainingMoves.isNotEmpty) {
+      // Copy remaining to avoid concurrent modification.
+      var remaining = Map.of(remainingMoves);
+      remainingMoves.clear();
+      currentParallelMoves.clear();
+
+      // The soonest move in the remaining set may not be immediate; this tracks
+      // the number of total steps the soonest remaining move should start at.
+      int? nextRemainingStartSteps;
+
       individual = false;
 
-      // Sort next into new batch of delayed and now
-      for (var entry in next.entries) {
-        var moveable = entry.key;
-        var movement = entry.value;
+      // Of remaining, find moves we should make now
+      for (var move in remaining.entries) {
+        var moveable = move.key;
+        var movement = move.value;
         if (moveable is! Party) {
           individual = true;
         }
 
         if (movement.delay > traveled) {
-          delayed[moveable] = movement;
-          stepsUntilDelayed = stepsUntilDelayed.capTo(movement.delay);
+          remainingMoves[moveable] = movement;
+          nextRemainingStartSteps =
+              nextRemainingStartSteps.orMax(movement.delay);
         } else {
-          now.add(entry);
+          currentParallelMoves.add(move);
         }
       }
 
-      if (now.isEmpty) {
-        if (stepsUntilDelayed != null) traveled = stepsUntilDelayed;
+      if (currentParallelMoves.isEmpty) {
+        // Nothing to do now, skip ahead to next remaining
+        if (nextRemainingStartSteps != null) traveled = nextRemainingStartSteps;
         continue;
       }
 
-      // TODO: in context could see if this is set already?
-      // and/or have a different type of event for party movement?
+      // TODO: this is broken - moves are processed later and may or may not be
+      // individual
+      // have a different type of event for party movement?
       if (ctx.followLead == !individual) {
         ctx.followLead = !individual;
         asm.add(followLeader(ctx.followLead));
       }
 
-      var maxParallelSteps = now
+      // We have to break up the movements we make based on what movements are
+      // completely parallel, versus what movements are partially parallel (e.g.
+      // one character keeps moving after another has stopped. We also have to
+      // make sure we don't move too long without considering remaining moves
+      // which are just delayed.
+      var maxParallelSteps = currentParallelMoves
           .map((e) => e.value.distance)
           .reduce((maxParallel, d) => maxParallel = math.min(maxParallel, d));
-      var maxUntilDelayed =
-          stepsUntilDelayed == null ? null : stepsUntilDelayed - traveled;
-      var maxNow = maxUntilDelayed.capTo(maxParallelSteps);
+      var stepsUntilNextRemaining = nextRemainingStartSteps == null
+          ? null
+          : nextRemainingStartSteps - traveled;
+      // This is the actual amount of steps we can make in the current batch of
+      // moves.
+      var maxSteps = stepsUntilNextRemaining.orMax(maxParallelSteps);
       Moveable? a4;
 
       void toA4(Moveable moveable) {
@@ -79,10 +93,12 @@ extension MoveToAsm on Move {
         }
       }
 
-      for (var next in now) {
-        var moveable = next.key;
-        var movement = next.value;
-        var last = next.key == now.last.key;
+      // Now start actually generating movement code for current batch up until
+      // maxSteps.
+      for (var move in currentParallelMoves) {
+        var moveable = move.key;
+        var movement = move.value;
+        var isLast = move.key == currentParallelMoves.last.key;
 
         toA4(moveable);
 
@@ -90,38 +106,38 @@ extension MoveToAsm on Move {
         // time is not as smooth as setting both
 
         if (movement is StepDirection) {
-          var curr = ctx.positions[moveable];
-          if (curr == null) {
+          var current = ctx.positions[moveable];
+          if (current == null) {
             throw StateError('no current position set for $moveable');
           }
 
-          var toTravel = maxNow.capTo(movement.distance);
-          var dest =
-              curr + (movement.direction.normal * toTravel) * unitsPerStep;
-          ctx.positions[moveable] = dest;
+          var steps = movement.distance.orMax(maxSteps);
+          var destination =
+              current + (movement.direction.normal * steps) * unitsPerStep;
+          ctx.positions[moveable] = destination;
           ctx.facing[moveable] = movement.direction;
 
-          var x = Word(dest.x).i;
-          var y = Word(dest.y).i;
+          var x = Word(destination.x).i;
+          var y = Word(destination.y).i;
 
-          if (last) {
+          if (isLast) {
             asm.add(moveCharacter(x: x, y: y));
           } else {
             asm.add(setDestination(x: x, y: y));
           }
 
-          if (movement.distance > toTravel) {
-            delayed[moveable] = movement.less(toTravel);
+          if (movement.distance > steps) {
+            remainingMoves[moveable] = movement.less(steps);
           }
-        }
+        } else if (movement is StepToPoint) {}
       }
 
       // Should we wait until everything done moving for this?
-      for (var next in now.toList().reversed) {
+      for (var next in currentParallelMoves.toList().reversed) {
         var moveable = next.key;
         var movement = next.value;
         if (movement is StepDirection) {
-          if (!delayed.containsKey(moveable) &&
+          if (!remainingMoves.containsKey(moveable) &&
               ctx.facing[moveable] != movement.direction) {
             toA4(moveable);
             asm.add(updateObjFacing(movement.direction.address));
@@ -131,15 +147,28 @@ extension MoveToAsm on Move {
 
       // TODO: is it always maxNow?
       // if less was moved, it means delay is greater than actual moved spaces
-      traveled += maxNow;
+      traveled += maxSteps;
     }
 
     return asm;
   }
 }
 
+int _compareDistance(
+    MapEntry<Moveable, Movement> move1, MapEntry<Moveable, Movement> move2) {
+  var comparison = move2.value.distance.compareTo(move1.value.distance);
+  if (comparison == 0) {
+    return move2.key.toString().compareTo(move1.key.toString());
+  }
+  return comparison;
+}
+
+int minOf(int? i1, int other) {
+  return i1 == null ? other : math.min(i1, other);
+}
+
 extension Cap on int? {
-  int capTo(int other) {
+  int orMax(int other) {
     var self = this;
     return self == null ? other : math.min(self, other);
   }

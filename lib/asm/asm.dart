@@ -61,7 +61,7 @@ class Asm extends IterableBase<Asm> {
   }
 
   void replace(int index, Asm asm) {
-    lines.removeRange(index, asm.length);
+    lines.removeRange(index, index + asm.length);
     lines.insertAll(index, asm.lines);
   }
 

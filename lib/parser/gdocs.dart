@@ -36,15 +36,7 @@ CompiledScene compileScene(Paragraph heading) {
       break;
     }
 
-    if (p.getNumChildren() < 2) {
-      if (p.getText().isNotEmpty) {
-        Logger.log('not dialog; not enough children: "${p.getText()}"');
-      }
-      continue;
-    }
-
     // todo: how to order dialog vs tech?
-
     var d = parseDialog(p);
     if (d != null) {
       Logger.log('${d.speaker}: ${d.spans}');
@@ -72,6 +64,13 @@ Pause? parsePause(Paragraph p) {
 }
 
 Dialog? parseDialog(Paragraph p) {
+  if (p.getNumChildren() < 2) {
+    if (p.getText().isNotEmpty) {
+      Logger.log('not dialog; not enough children: "${p.getText()}"');
+    }
+    return null;
+  }
+
   var portrait = p.getChild(0)!;
   var speech = p.getChild(1)!;
 
@@ -94,6 +93,11 @@ Dialog? parseDialog(Paragraph p) {
   if (speaker == null) {
     Logger.log(
         'not dialog; missing alt text on portrait image for dialog: "$text"');
+    return null;
+  }
+
+  if (speaker.startsWith('tech:')) {
+    Logger.log('not dialog; inline image is tech: "$text"');
     return null;
   }
 
