@@ -32,11 +32,11 @@ extension SceneToAsm on Scene {
         dialogMode = false;
         // or enddialog/terminate? FF
         // note if use terminate, have to track dialog tree offset
-        dialog.addLine('	; scene event $eventCounter');
+        dialog.add(comment('scene event $eventCounter'));
         lastEventBreak = dialog.add(eventBreak());
       }
 
-      event.addLine('	; scene event $eventCounter');
+      event.add(comment('scene event $eventCounter'));
       event.add(e.generateAsm(generator, ctx));
 
       eventCounter++;

@@ -6,7 +6,7 @@ import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('generates asm from move', () {
+  test('generates asm from simple one directional steps', () {
     var ctx = EventContext();
     ctx.slots.insert(0, alys);
     ctx.slots.insert(1, shay);

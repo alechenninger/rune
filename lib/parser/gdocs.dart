@@ -131,7 +131,7 @@ bool nullToFalse(bool? b) => b ?? false;
 abstract class Tech {
   static final _techs = <String, Object Function(String?)>{
     'scene_id': (c) => SceneId(c!),
-    'asm_event': (c) => AsmEvent(Asm.fromMultiline(c!)),
+    'asm_event': (c) => AsmEvent(Asm.fromRaw(c!)),
     'pause_seconds': (c) =>
         Pause(Duration(milliseconds: (double.parse(c!) * 1000).toInt()))
   };

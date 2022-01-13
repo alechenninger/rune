@@ -158,9 +158,6 @@ class StepDirections extends Movement {
       .reduce((value, element) => value + element);
   @override
   var delay = 0;
-
-  // TODO: may want to define in base
-  StepDirections less(int distance) {}
 }
 
 class StepToPoint extends Movement {
