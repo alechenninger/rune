@@ -87,13 +87,19 @@ class Asm extends IterableBase<Instruction> {
     return lines.join('\n');
   }
 
+  // I originally modelled Instructions for better == but in hindsight, this
+  // is only useful if we were parsing different String representations.
+  // Equivalent asm generated from the model always has the same String
+  // representation.
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Asm && runtimeType == other.runtimeType && lines == other.lines;
+      other is Asm &&
+          runtimeType == other.runtimeType &&
+          toString() == other.toString();
 
   @override
-  int get hashCode => lines.hashCode;
+  int get hashCode => toString().hashCode;
 
   @override
   Iterator<Instruction> get iterator => lines.iterator;
