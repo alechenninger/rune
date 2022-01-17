@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:rune/asm/events.dart';
 
-import '../asm/asm.dart' hide Move;
+import '../asm/asm.dart' hide MoveMnemonic;
 import '../model/model.dart';
 
 const unitsPerStep = 16;
@@ -23,8 +23,8 @@ extension MoveToAsm on Move {
     var currentParallelMoves =
         SplayTreeSet<MapEntry<Moveable, Movement>>(_compareDistance);
 
-    // If moving an individual TODO: broken
-    bool individual;
+    // If following leader TODO: broken
+    bool followLead;
 
     var remainingMoves = Map.of(movements);
     while (remainingMoves.isNotEmpty) {
@@ -37,14 +37,14 @@ extension MoveToAsm on Move {
       // the number of total steps the soonest remaining move should start at.
       int? nextRemainingStartSteps;
 
-      individual = false;
+      followLead = true;
 
       // Of remaining, find moves we should make now
       for (var move in remaining.entries) {
         var moveable = move.key;
         var movement = move.value;
         if (moveable is! Party) {
-          individual = true;
+          followLead = false;
         }
 
         if (movement.delay > traveled) {
@@ -65,8 +65,8 @@ extension MoveToAsm on Move {
       // TODO: this is broken - moves are processed later and may or may not be
       // individual
       // have a different type of event for party movement?
-      if (ctx.followLead == !individual) {
-        ctx.followLead = !individual;
+      if (ctx.followLead != followLead) {
+        ctx.followLead = followLead;
         asm.add(followLeader(ctx.followLead));
       }
 

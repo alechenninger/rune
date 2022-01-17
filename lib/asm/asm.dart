@@ -8,26 +8,28 @@ export 'address.dart';
 export 'data.dart';
 
 /// Data constant
-const Dc dc = Dc();
-const Move move = Move();
+const DcMnemonic dc = DcMnemonic();
+const MoveMnemonic move = MoveMnemonic();
 
 Asm comment(String comment) => _Instruction(comment: comment).toAsm();
 
 Asm lea(Address src, Address dst) => cmd('lea', [src, dst]);
 Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
 Asm jsr(Address to) => cmd('jsr', [to]);
+Asm bset(Address src, Address dst) => cmd('bset', [src, dst]);
+Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
 
 // It looks like this should be limited to 32 bytes per line
-class Dc {
-  const Dc();
+class DcMnemonic {
+  const DcMnemonic();
 
   Asm b(Bytes d) => cmd('dc.b', [d]);
   Asm w(Words d) => cmd('dc.w', [d]);
   Asm l(Longwords d) => cmd('dc.l', [d]);
 }
 
-class Move {
-  const Move();
+class MoveMnemonic {
+  const MoveMnemonic();
 
   Asm b(Address from, Address to) => cmd('move.b', [from, to]);
   Asm w(Address from, Address to) => cmd('move.w', [from, to]);

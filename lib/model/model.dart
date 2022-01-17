@@ -83,7 +83,9 @@ class EventContext {
   final positions = <Moveable, Point<int>>{};
   final facing = <Moveable, Direction>{};
   final slots = <Character>[];
-  bool followLead = false;
+
+  /// Whether or not to follow character at slot[0]
+  bool followLead = true;
 }
 
 class Scene {

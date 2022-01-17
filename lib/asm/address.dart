@@ -44,6 +44,7 @@ class _Address implements Address {
   int get hashCode => _string.hashCode;
 }
 
+/// Value at a fixed memory address
 class Absolute extends _Address {
   final Expression exp;
   final Size size;
@@ -56,10 +57,12 @@ class Absolute extends _Address {
   Absolute get l => size.isL ? this : Absolute._(exp: exp, size: long);
 }
 
+/// A fixed value
 class Immediate extends _Address {
   const Immediate(Expression e) : super('#$e');
 }
 
+/// Value in one of the address registers
 class DirectAddressRegister extends _Address {
   final int register;
 
@@ -74,6 +77,7 @@ class DirectAddressRegister extends _Address {
   IndirectAddressRegister get indirect => IndirectAddressRegister(register);
 }
 
+/// Value in one of the data registers
 class DirectDataRegister extends _Address {
   DirectDataRegister(int num) : super('d$num') {
     if (num > 7 || num < 0) throw AsmError(num, 'is not a valid data register');
@@ -82,6 +86,7 @@ class DirectDataRegister extends _Address {
   const DirectDataRegister._(int num) : super('d$num');
 }
 
+/// Value in memory at an address pointed to by an address register
 class IndirectAddressRegister extends _Address {
   final int register;
   final Expression displacement;

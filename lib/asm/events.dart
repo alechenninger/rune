@@ -5,6 +5,10 @@ const dest_y_pos = Constant('dest_y_pos');
 const curr_x_pos = Constant('curr_x_pos');
 const curr_y_pos = Constant('curr_y_pos');
 
+/// bitfield
+/// bit 0 = follow lead character
+/// bit 1 = update movement order (X first, Y second or viceversa)
+/// bit 2 = lock camera
 const Char_Move_Flags = Constant('Char_Move_Flags');
 
 Asm popdlg = cmd('popdlg', []);
@@ -62,11 +66,11 @@ Asm updateObjFacing(Address direction) {
 }
 
 Asm lockCamera(bool lock) {
-  return cmd(lock ? 'bset' : 'bclr', [const Byte(2).i, Char_Move_Flags.w]);
+  return (lock ? bset : bclr)(const Byte(2).i, Char_Move_Flags.w);
 }
 
 Asm followLeader(bool follow) {
-  return cmd(follow ? 'bclr' : 'bset', [Byte.zero.i, Char_Move_Flags.w]);
+  return (follow ? bclr : bset)(Byte.zero.i, Char_Move_Flags.w);
 }
 
 /// Multiple characters can move with [moveCharacter], but they must be prepared
