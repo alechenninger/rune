@@ -144,8 +144,7 @@ class _RawInstruction extends Instruction {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other &&
-          other is _RawInstruction &&
+      other is _RawInstruction &&
           runtimeType == other.runtimeType &&
           _instruction == other._instruction;
 
@@ -167,7 +166,7 @@ class _Instruction extends Instruction {
           if (cmd != null) cmd,
           if (operands.isNotEmpty) operands.join(', '),
           if (comment != null) '; $comment'
-        ].join('	') {
+        ].join('\t') {
     if (line.length > 255) {
       throw StateError(
           'Instructions cannot be longer than 255 characters but was: $line');
@@ -181,16 +180,8 @@ class _Instruction extends Instruction {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      super == other &&
-          other is _Instruction &&
-          runtimeType == other.runtimeType &&
-          label == other.label &&
-          cmd == other.cmd &&
-          operands == other.operands &&
-          comment == other.comment;
+      identical(this, other) || other is _Instruction && line == other.line;
 
   @override
-  int get hashCode =>
-      label.hashCode ^ cmd.hashCode ^ operands.hashCode ^ comment.hashCode;
+  int get hashCode => line.hashCode;
 }

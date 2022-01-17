@@ -72,7 +72,47 @@ void main() {
           ]));
     });
 
-    test('multiple moves same distance', () {
+    test('move right different distances, previously following lead', () {
+      var ctx = EventContext();
+      ctx.slots.insert(0, alys);
+      ctx.slots.insert(1, shay);
+
+      ctx.followLead = true;
+
+      ctx.positions[alys] = Point('230'.hex, '250'.hex);
+      ctx.positions[shay] = Point('230'.hex, '240'.hex);
+
+      var moves = Move();
+      moves.movements[alys] = StepDirection()
+        ..distance = 5
+        ..direction = Direction.right;
+      moves.movements[shay] = StepDirection()
+        ..distance = 1
+        ..direction = Direction.right;
+
+      var asm = moves.toAsm(ctx);
+
+      print(asm);
+
+      expect(
+          asm,
+          Asm([
+            bset(Byte.zero.i, Char_Move_Flags.w),
+            lea(Constant('Character_1').w, a4),
+            move.w(Word('240'.hex).i, a4.indirect.plus(Constant('dest_x_pos'))),
+            move.w(Word('250'.hex).i, a4.indirect.plus(Constant('dest_y_pos'))),
+            lea(Constant('Character_2').w, a4),
+            move.w(Word('240'.hex).i, d0),
+            move.w(Word('240'.hex).i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+            lea(Constant('Character_1').w, a4),
+            move.w(Word('280'.hex).i, d0),
+            move.w(Word('250'.hex).i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+          ]));
+    });
+
+    test('multiple move same distance', () {
       var ctx = EventContext();
       ctx.slots.insert(0, alys);
       ctx.slots.insert(1, shay);
@@ -80,42 +120,30 @@ void main() {
       ctx.positions[alys] = Point('230'.hex, '250'.hex);
       ctx.positions[shay] = Point('230'.hex, '240'.hex);
 
-      var move = Move();
-      move.movements[alys] = StepDirection()
-        ..distance = 5
-        ..direction = Direction.right;
-      move.movements[shay] = StepDirection()
-        ..distance = 1
-        ..direction = Direction.down;
-
-      var asm = move.toAsm(ctx);
-
-      print(asm);
-
-      expect(asm, Asm([]));
-    });
-
-    test('multiple moves different distance', () {
-      var ctx = EventContext();
-      ctx.slots.insert(0, alys);
-      ctx.slots.insert(1, shay);
-
-      ctx.positions[alys] = Point('230'.hex, '240'.hex);
-      ctx.positions[shay] = Point('230'.hex, '250'.hex);
-
-      var move = Move();
-      move.movements[alys] = StepDirection()
+      var moves = Move();
+      moves.movements[alys] = StepDirection()
         ..distance = 4
-        ..direction = Direction.left;
-      move.movements[shay] = StepDirection()
-        ..distance = 2
-        ..direction = Direction.down;
+        ..direction = Direction.right;
+      moves.movements[shay] = StepDirection()
+        ..distance = 4
+        ..direction = Direction.right;
 
-      var asm = move.toAsm(ctx);
+      var asm = moves.toAsm(ctx);
 
       print(asm);
 
-      expect(asm, Asm([]));
+      expect(
+          asm,
+          Asm([
+            bset(Byte.zero.i, Char_Move_Flags.w),
+            lea(Constant('Character_1').w, a4),
+            move.w(Word('270'.hex).i, a4.indirect.plus(Constant('dest_x_pos'))),
+            move.w(Word('250'.hex).i, a4.indirect.plus(Constant('dest_y_pos'))),
+            lea(Constant('Character_2').w, a4),
+            move.w(Word('270'.hex).i, d0),
+            move.w(Word('240'.hex).i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+          ]));
     });
 
     test('multiple moves with some delayed', () {
@@ -126,16 +154,16 @@ void main() {
       ctx.positions[alys] = Point('2A0'.hex, '250'.hex);
       ctx.positions[shay] = Point('230'.hex, '1F0'.hex);
 
-      var move = Move();
-      move.movements[alys] = StepDirection()
+      var moves = Move();
+      moves.movements[alys] = StepDirection()
         ..distance = 5
         ..direction = Direction.left;
-      move.movements[shay] = StepDirection()
+      moves.movements[shay] = StepDirection()
         ..distance = 5
         ..delay = 2
         ..direction = Direction.down;
 
-      var asm = move.toAsm(ctx);
+      var asm = moves.toAsm(ctx);
 
       print(asm);
 
