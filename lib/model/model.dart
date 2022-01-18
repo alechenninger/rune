@@ -112,6 +112,8 @@ class Pause extends Event {
 
 /// A group of parallel movements
 class Move extends Event {
+  // TODO: what does it mean to move Party and Character?
+  // TODO: what if Slot and Character moveables refer to same Character?
   Map<Moveable, Movement> movements = {};
 
   @override
@@ -121,8 +123,25 @@ class Move extends Event {
 }
 
 // character by name? character by slot? party?
-class Moveable {
+abstract class Moveable {
   const Moveable();
+
+  int compareTo(Moveable other, EventContext ctx) {
+    var slot1 = _slotOf(this, ctx);
+    var slot2 = _slotOf(other, ctx);
+
+    if (slot1 != null && slot2 != null) {
+      return slot2.compareTo(slot1);
+    }
+
+    return toString().compareTo(other.toString());
+  }
+}
+
+int? _slotOf(Moveable m, EventContext c) {
+  if (m is Slot) return m.index;
+  if (m is Character) return c.slots.indexOf(m);
+  return null;
 }
 
 abstract class Movement {
@@ -141,10 +160,28 @@ class StepDirection extends Movement {
   var delay = 0;
 
   // TODO: may want to define in base
+  // TODO: should have bounds check
   StepDirection less(int distance) => StepDirection()
     ..distance = this.distance - distance
     ..delay = delay
     ..direction = direction;
+
+  @override
+  String toString() {
+    return 'StepDirection{direction: $direction, distance: $distance, delay: $delay}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StepDirection &&
+          runtimeType == other.runtimeType &&
+          direction == other.direction &&
+          distance == other.distance &&
+          delay == other.delay;
+
+  @override
+  int get hashCode => direction.hashCode ^ distance.hashCode ^ delay.hashCode;
 }
 
 class StepDirections extends Movement {

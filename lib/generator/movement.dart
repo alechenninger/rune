@@ -1,4 +1,3 @@
-import 'dart:collection';
 import 'dart:math' as math;
 
 import 'package:rune/asm/events.dart';
@@ -19,9 +18,8 @@ extension MoveToAsm on Move {
     // Steps travelled so far
     var traveled = 0;
 
-    // Set of moves to make in parallel, sorted by distance (shortest last)
-    var currentParallelMoves =
-        SplayTreeSet<MapEntry<Moveable, Movement>>(_compareDistance);
+    // List of moves to make in parallel
+    var currentParallelMoves = <AssignedMovement>[];
 
     // If following leader TODO: broken
     bool followLead;
@@ -52,7 +50,7 @@ extension MoveToAsm on Move {
           nextRemainingStartSteps =
               nextRemainingStartSteps.orMax(movement.delay);
         } else {
-          currentParallelMoves.add(move);
+          currentParallelMoves.add(AssignedMovement(moveable, movement));
         }
       }
 
@@ -61,6 +59,9 @@ extension MoveToAsm on Move {
         if (nextRemainingStartSteps != null) traveled = nextRemainingStartSteps;
         continue;
       }
+
+      // I tried using a sorted set but iterator was bugged
+      currentParallelMoves.sort(_shortestDistanceLast(ctx));
 
       // TODO: this is broken - moves are processed later and may or may not be
       // individual
@@ -76,7 +77,7 @@ extension MoveToAsm on Move {
       // make sure we don't move too long without considering remaining moves
       // which are just delayed.
       var maxParallelSteps = currentParallelMoves
-          .map((e) => e.value.distance)
+          .map((e) => e.movement.distance)
           .reduce((maxParallel, d) => maxParallel = math.min(maxParallel, d));
       var stepsUntilNextRemaining = nextRemainingStartSteps == null
           ? null
@@ -95,16 +96,22 @@ extension MoveToAsm on Move {
 
       // Now start actually generating movement code for current batch up until
       // maxSteps.
+
       for (var move in currentParallelMoves) {
-        var moveable = move.key;
-        var movement = move.value;
-        var isLast = move.key == currentParallelMoves.last.key;
+        var moveable = move.moveable;
+        var movement = move.movement;
+        var isLast = moveable == currentParallelMoves.last.moveable;
 
         toA4(moveable);
 
         // NOTE: each movement ends with a slight pause so one direction at a
         // time is not as smooth as setting both
 
+        // Could consider polymorphic movements by adding this signature to
+        // Movement:
+        //    Movement? move(ctx, moveable, maxSteps, asm)
+        // returns movement if it still has more to move
+        // of course can't do that with model/generator layer separation
         if (movement is StepDirection) {
           var current = ctx.positions[moveable];
           if (current == null) {
@@ -133,9 +140,9 @@ extension MoveToAsm on Move {
       }
 
       // Should we wait until everything done moving for this?
-      for (var next in currentParallelMoves.toList().reversed) {
-        var moveable = next.key;
-        var movement = next.value;
+      for (var next in currentParallelMoves.reversed) {
+        var moveable = next.moveable;
+        var movement = next.movement;
         if (movement is StepDirection) {
           if (!remainingMoves.containsKey(moveable) &&
               ctx.facing[moveable] != movement.direction) {
@@ -154,13 +161,15 @@ extension MoveToAsm on Move {
   }
 }
 
-int _compareDistance(
-    MapEntry<Moveable, Movement> move1, MapEntry<Moveable, Movement> move2) {
-  var comparison = move2.value.distance.compareTo(move1.value.distance);
-  if (comparison == 0) {
-    return move2.key.toString().compareTo(move1.key.toString());
-  }
-  return comparison;
+int Function(AssignedMovement, AssignedMovement) _shortestDistanceLast(
+    EventContext ctx) {
+  return (AssignedMovement move1, AssignedMovement move2) {
+    var comparison = move2.movement.distance.compareTo(move1.movement.distance);
+    if (comparison == 0) {
+      return move2.moveable.compareTo(move2.moveable, ctx);
+    }
+    return comparison;
+  };
 }
 
 int minOf(int? i1, int other) {
@@ -216,4 +225,27 @@ extension DirectionToAddress on Direction {
     }
     throw StateError('illegal direction $this');
   }
+}
+
+class AssignedMovement {
+  final Moveable moveable;
+  final Movement movement;
+
+  AssignedMovement(this.moveable, this.movement);
+
+  @override
+  String toString() {
+    return 'AssignedMovement{moveable: $moveable, movement: $movement}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AssignedMovement &&
+          runtimeType == other.runtimeType &&
+          moveable == other.moveable &&
+          movement == other.movement;
+
+  @override
+  int get hashCode => moveable.hashCode ^ movement.hashCode;
 }
