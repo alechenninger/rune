@@ -22,7 +22,7 @@ void main() {
       ctx.positions[alys] = Point('230'.hex, '250'.hex);
       ctx.positions[shay] = Point('230'.hex, '240'.hex);
 
-      var moveRight = Move();
+      var moveRight = IndividualMoves();
       moveRight.movements[alys] = StepDirection()
         ..distance = 5
         ..direction = Direction.right;
@@ -52,7 +52,7 @@ void main() {
       ctx.positions[alys] = Point('230'.hex, '250'.hex);
       ctx.positions[shay] = Point('230'.hex, '240'.hex);
 
-      var moveRight = Move();
+      var moveRight = IndividualMoves();
       moveRight.movements[alys] = StepDirection()
         ..distance = 5
         ..direction = Direction.right;
@@ -82,7 +82,7 @@ void main() {
       ctx.positions[alys] = Point('230'.hex, '250'.hex);
       ctx.positions[shay] = Point('230'.hex, '240'.hex);
 
-      var moves = Move();
+      var moves = IndividualMoves();
       moves.movements[alys] = StepDirection()
         ..distance = 5
         ..direction = Direction.right;
@@ -120,7 +120,7 @@ void main() {
       ctx.positions[alys] = Point('230'.hex, '250'.hex);
       ctx.positions[shay] = Point('230'.hex, '240'.hex);
 
-      var moves = Move();
+      var moves = IndividualMoves();
       moves.movements[alys] = StepDirection()
         ..distance = 4
         ..direction = Direction.right;
@@ -151,23 +151,27 @@ void main() {
       ctx.slots.insert(0, alys);
       ctx.slots.insert(1, shay);
 
-      ctx.positions[alys] = Point('2A0'.hex, '250'.hex);
-      ctx.positions[shay] = Point('230'.hex, '1F0'.hex);
+      ctx.positions[alys] = Point('230'.hex, '250'.hex);
+      ctx.positions[shay] = Point('230'.hex, '240'.hex);
 
-      var moves = Move();
+      var moves = IndividualMoves();
       moves.movements[alys] = StepDirection()
         ..distance = 5
         ..direction = Direction.left;
       moves.movements[shay] = StepDirection()
-        ..distance = 5
-        ..delay = 2
-        ..direction = Direction.down;
+        ..distance = 3
+        ..delay = 4
+        ..direction = Direction.right;
 
       var asm = moves.toAsm(ctx);
 
       print(asm);
 
-      expect(asm, Asm([]));
+      expect(
+          asm,
+          Asm([
+            bset(Byte.zero.i, Char_Move_Flags.w),
+          ]));
     });
   });
 }

@@ -110,15 +110,26 @@ class Pause extends Event {
   }
 }
 
+/// The party follows the leader
+class PartyMove extends Event {
+  Movement movement;
+
+  PartyMove(this.movement);
+
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    return generator.partyMoveToAsm(this, ctx);
+  }
+}
+
 /// A group of parallel movements
-class Move extends Event {
-  // TODO: what does it mean to move Party and Character?
+class IndividualMoves extends Event {
   // TODO: what if Slot and Character moveables refer to same Character?
   Map<Moveable, Movement> movements = {};
 
   @override
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
-    return generator.moveToAsm(this, ctx);
+    return generator.individualMovesToAsm(this, ctx);
   }
 }
 
@@ -127,11 +138,11 @@ abstract class Moveable {
   const Moveable();
 
   int compareTo(Moveable other, EventContext ctx) {
-    var slot1 = _slotOf(this, ctx);
-    var slot2 = _slotOf(other, ctx);
+    var thisSlot = _slotOf(this, ctx);
+    var otherSlot = _slotOf(other, ctx);
 
-    if (slot1 != null && slot2 != null) {
-      return slot2.compareTo(slot1);
+    if (thisSlot != null && otherSlot != null) {
+      return thisSlot.compareTo(otherSlot);
     }
 
     return toString().compareTo(other.toString());
@@ -313,7 +324,7 @@ class Slot extends Moveable {
   Slot(this.index);
 }
 
-class Party extends Moveable {}
+// class Party extends Moveable {}
 
 abstract class Character extends Moveable {
   const Character();

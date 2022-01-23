@@ -13,8 +13,12 @@ class AsmGenerator {
     return dialog.toAsm();
   }
 
-  Asm moveToAsm(Move move, EventContext ctx) {
+  Asm individualMovesToAsm(IndividualMoves move, EventContext ctx) {
     return move.toAsm(ctx);
+  }
+
+  Asm partyMoveToAsm(PartyMove move, EventContext ctx) {
+    throw UnsupportedError('partyMoveToAsm');
   }
 
   Asm pauseToAsm(Pause pause) {

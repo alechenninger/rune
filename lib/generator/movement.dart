@@ -11,7 +11,18 @@ const down = Constant('FacingDir_Down');
 const left = Constant('FacingDir_Left');
 const right = Constant('FacingDir_Right');
 
-extension MoveToAsm on Move {
+/*
+Follow lead flag notes:
+
+* Followers only move as long as it takes the leader to get into position; it
+does not guarantee followers are "behind" the leader after the leader is done
+* Followers take a direct route; whatever gets them closer based on where they
+and the leader currently are
+* Appears to have no effect if the moving character is not currently the leader
+
+ */
+
+extension MoveToAsm on IndividualMoves {
   Asm toAsm(EventContext ctx) {
     var asm = Asm.empty();
 
@@ -21,10 +32,12 @@ extension MoveToAsm on Move {
     // List of moves to make in parallel
     var currentParallelMoves = <AssignedMovement>[];
 
-    // If following leader TODO: broken
-    bool followLead;
-
     var remainingMoves = Map.of(movements);
+
+    if (ctx.followLead) {
+      asm.add(followLeader(ctx.followLead = false));
+    }
+
     while (remainingMoves.isNotEmpty) {
       // Copy remaining to avoid concurrent modification.
       var remaining = Map.of(remainingMoves);
@@ -35,15 +48,10 @@ extension MoveToAsm on Move {
       // the number of total steps the soonest remaining move should start at.
       int? nextRemainingStartSteps;
 
-      followLead = true;
-
       // Of remaining, find moves we should make now
       for (var move in remaining.entries) {
         var moveable = move.key;
         var movement = move.value;
-        if (moveable is! Party) {
-          followLead = false;
-        }
 
         if (movement.delay > traveled) {
           remainingMoves[moveable] = movement;
@@ -62,14 +70,6 @@ extension MoveToAsm on Move {
 
       // I tried using a sorted set but iterator was bugged
       currentParallelMoves.sort(_shortestDistanceLast(ctx));
-
-      // TODO: this is broken - moves are processed later and may or may not be
-      // individual
-      // have a different type of event for party movement?
-      if (ctx.followLead != followLead) {
-        ctx.followLead = followLead;
-        asm.add(followLeader(ctx.followLead));
-      }
 
       // We have to break up the movements we make based on what movements are
       // completely parallel, versus what movements are partially parallel (e.g.
