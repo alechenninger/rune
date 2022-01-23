@@ -159,6 +159,15 @@ extension ToValue on int {
     }
     throw AsmError(size, 'invalid data size (must be 1, 2, or 4)');
   }
+
+  Byte get byte => Byte(this);
+  Word get word => Word(this);
+  Longword get longword => Longword(this);
+}
+
+extension ToExpression on String {
+  Constant get constant => Constant(this);
+  Label get label => Label(this);
 }
 
 /// An arbitrary list of data.

@@ -74,6 +74,11 @@ class DirectAddressRegister extends _Address {
 
   const DirectAddressRegister._(this.register) : super('a$register');
 
+  IndirectAddressRegister plus(Expression exp) => indirect.plus(exp);
+
+  IndirectAddressRegister plusD(int dataRegister) =>
+      indirect.plusD(dataRegister);
+
   IndirectAddressRegister get indirect => IndirectAddressRegister(register);
 }
 
