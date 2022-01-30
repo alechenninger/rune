@@ -32,31 +32,38 @@ extension MoveToAsm on IndividualMoves {
 
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
-    var remainingMoves = Map.of(movements);
+    var remainingMoves = Map.of(moves);
     while (remainingMoves.isNotEmpty) {
       // I tried using a sorted set but iterator was bugged and skipped elements
-      var sortedMovements =
+      var movesList =
           remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
       // not sure if it actually needs to be sorted by distance/duration any
       // more?
       // but at least helps with predictable generated code for testing, so sort
       // by slot
-      sortedMovements.sort((m1, m2) => m1.moveable.compareTo(m2.moveable, ctx));
+      movesList.sort((m1, m2) => m1.moveable.compareTo(m2.moveable, ctx));
 
-      // We have to break up the movements we make based on what movements are
-      // completely parallel, versus what movements are partially parallel (e.g.
-      // one character keeps moving after another has stopped. We also have to
-      // make sure we don't move too long without considering remaining moves
-      // which are just delayed.
+      // Figure out what's the longest we can move continuously before we have
+      // to call the character move procedure again.
+      // This is based on two factors:
+      // 1. How many steps until there is a new character which needs to start
+      // moving (is currently delayed).
+      // 2. How many steps we can have of continuous movement along the X-then-Y
+      // axes, or Y-then-X axes (e.g. not some X, some Y, and then some X again).
+      // This is because the movement subroutine only supports changing
+      // direction once (x to y, or y to x). After that, we have to break up
+      // the movements into multiple subroutine calls.
 
-      var maxStepsXFirst = sortedMovements
+      var maxStepsXFirst = movesList
           .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.x))
           .reduce((min, s) => min = math.min(min, s));
-      var maxStepsYFirst = sortedMovements
+      var maxStepsYFirst = movesList
           .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.y))
           .reduce((min, s) => min = math.min(min, s));
 
+      // Axis we will end up moving first
       Axis firstAxis;
+
       // This is the actual amount of steps we can make in the current batch of
       // moves.
       int maxSteps;
@@ -79,11 +86,6 @@ extension MoveToAsm on IndividualMoves {
         }
       }
 
-      bool isLastOneMoving(Moveable moveable) {
-        return moveable ==
-            sortedMovements.where((m) => m.movement.delay == 0).last.moveable;
-      }
-
       if (ctx.startingAxis != firstAxis) {
         asm.add(moveAlongXAxisFirst(firstAxis == Axis.x));
         ctx.startingAxis = firstAxis;
@@ -92,13 +94,18 @@ extension MoveToAsm on IndividualMoves {
       // If no movement code is generated because all moves are delayed, we'll
       // have to add an artificial delay later.
       var allDelay = true;
+      // The ASM for the last character movement should use data registers, the
+      // others use memory
+      var lastMoveIndex =
+          movesList.lastIndexWhere((element) => element.movement.delay == 0);
 
       // Now start actually generating movement code for current batch up until
       // maxSteps.
-      for (var move in sortedMovements) {
+      for (var i = 0; i < movesList.length; i++) {
+        var move = movesList[i];
         var moveable = move.moveable;
         var movement = move.movement;
-        var steps = maxSteps;
+        var stepsTaken = maxSteps;
 
         if (movement.delay == 0) {
           allDelay = false;
@@ -109,22 +116,22 @@ extension MoveToAsm on IndividualMoves {
             throw StateError('no current position set for $moveable');
           }
 
-          steps = movement.distance.min(maxSteps);
-          var destination =
-              current + movement.relativePositionAfter(steps) * unitsPerStep;
+          stepsTaken = movement.distance.min(maxSteps);
+          var destination = current +
+              movement.relativePositionAfter(stepsTaken) * unitsPerStep;
           ctx.positions[moveable] = destination;
 
           var x = Word(destination.x).i;
           var y = Word(destination.y).i;
 
-          if (isLastOneMoving(moveable)) {
+          if (i == lastMoveIndex) {
             asm.add(moveCharacter(x: x, y: y));
           } else {
             asm.add(setDestination(x: x, y: y));
           }
         }
 
-        movement = movement.less(steps);
+        movement = movement.less(stepsTaken);
         ctx.facing[moveable] = movement.direction;
 
         if (movement.distance == 0) {
@@ -135,11 +142,13 @@ extension MoveToAsm on IndividualMoves {
       }
 
       if (allDelay) {
-        // TODO: add delay
+        // Just guessing at 8 frames per step?
+        // look at x/y_step_constant and FieldObj_Move routine
+        asm.add(vIntPrepareLoop((8 * maxSteps).word));
       }
 
       // Should we wait until everything done moving for this?
-      for (var next in sortedMovements.reversed) {
+      for (var next in movesList.reversed) {
         var moveable = next.moveable;
         var movement = next.movement;
         if (movement is StepDirection) {

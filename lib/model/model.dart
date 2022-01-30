@@ -126,7 +126,7 @@ class PartyMove extends Event {
 /// A group of parallel movements
 class IndividualMoves extends Event {
   // TODO: what if Slot and Character moveables refer to same Character?
-  Map<Moveable, Movement> movements = {};
+  Map<Moveable, Movement> moves = {};
 
   @override
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
@@ -173,7 +173,7 @@ abstract class Movement {
   Movement less(int steps);
 
   /// Movements which are continuous (there is no pause in between) and should
-  /// start immediately.
+  /// start immediately (delay should == 0).
   List<Vector> get continuousMovements;
 
   Point<int> relativePositionAfter(int steps) {
@@ -277,19 +277,6 @@ class StepDirections extends Movement {
     }
 
     return less;
-  }
-
-  Point<int> relativePositionAfter(int distance) {
-    var after = Point<int>(0, 0);
-    var totalStepped = 0;
-
-    for (var step in _steps) {
-      var stepStepped = min(distance - totalStepped, step.distance);
-      after += step.relativePositionAfter(stepStepped);
-      totalStepped + stepStepped;
-    }
-
-    return after;
   }
 
   @override

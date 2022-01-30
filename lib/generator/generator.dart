@@ -30,3 +30,18 @@ class AsmGenerator {
     return vIntPrepareLoop(Word(frames.toInt()));
   }
 }
+
+/*
+walking speed?
+
+2 units per frame
+16 units per step
+60 frames per second
+
+what is steps per second?
+
+1 / 8 steps per frame
+8 frames per step
+60 / 8 step per second (7.5)
+
+ */
