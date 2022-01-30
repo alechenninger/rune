@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:math';
+import 'dart:math' as math;
 
 import 'package:characters/src/extensions.dart';
 import 'package:rune/generator/generator.dart';
@@ -85,10 +86,10 @@ class EventContext {
   final positions = <Moveable, Point<int>>{};
   final facing = <Moveable, Direction>{};
   final slots = <Character>[];
-  final startingAxis = Axis.x;
+  var startingAxis = Axis.x;
 
   /// Whether or not to follow character at slot[0]
-  bool followLead = true;
+  var followLead = true;
 }
 
 class Scene {
@@ -159,10 +160,54 @@ abstract class Movement {
   /// Delay in steps before movement starts parallel with other movements.
   int get delay;
 
+  /// Total duration including all delays and movements
+  int get duration;
+
   /// Total distance in steps.
   int get distance;
 
-  // List<Vector> get movements;
+  /// Current facing direction
+  /// TODO: rename
+  Direction get direction;
+
+  Movement less(int steps);
+
+  /// Movements which are continuous (there is no pause in between) and should
+  /// start immediately.
+  List<Vector> get continuousMovements;
+
+  Point<int> relativePositionAfter(int steps) {
+    var stepsTaken = 0;
+    var position = Point<int>(0, 0);
+    var movements = List.of(continuousMovements);
+    for (var i = 0; stepsTaken < steps && i < movements.length; i++) {
+      var move = movements[i].min(steps - stepsTaken);
+      stepsTaken += move.steps;
+      position += move.asPoint;
+    }
+    return position;
+  }
+
+  /// Continuous movements if one axis is moved at a time, and the first must be
+  /// [axis]
+  List<Vector> continuousMovementsFirstAxis(Axis axis) {
+    if (continuousMovements.isEmpty) return [];
+    var first = continuousMovements[0];
+    if (first.direction.axis == axis) {
+      return continuousMovements.sublist(0, min(2, continuousMovements.length));
+    }
+    return [first];
+  }
+
+  /// The amount of steps in continuous movements limited to one axis at a time
+  /// where the first axis is [axis].
+  int delayOrContinuousStepsFirstAxis(Axis axis) {
+    return delay > 0
+        ? delay
+        : continuousMovementsFirstAxis(axis)
+            .map((m) => m.steps)
+            .reduce((sum, s) => sum + s);
+  }
 }
 
 class StepDirection extends Movement {
@@ -172,19 +217,27 @@ class StepDirection extends Movement {
   @override
   var delay = 0;
 
+  @override
+  int get duration => delay + distance;
+
+  @override
+  List<Vector> get continuousMovements =>
+      delay > 0 ? [] : [Vector(distance, direction)];
+
   // TODO: may want to define in base
   // TODO: should have bounds check
   StepDirection less(int distance) {
-    if (distance > this.distance) throw StateError('negative distance');
-    return StepDirection()
-      ..distance = this.distance - distance
-      ..delay = delay
-      ..direction = direction;
-  }
+    if (distance > this.distance + delay) throw StateError('negative distance');
 
-  Point<int> relativePositionAfter(int distance) {
-    if (distance > this.distance) throw StateError('negative distance');
-    return direction.normal * distance;
+    var answer = StepDirection()..direction = direction;
+
+    var lessDelay = min(distance, delay);
+    answer.delay = delay - lessDelay;
+
+    var remainingToTravel = distance - lessDelay;
+    answer.distance = this.distance - remainingToTravel;
+
+    return answer;
   }
 
   @override
@@ -245,15 +298,24 @@ class StepDirections extends Movement {
   // delay is on top of delay inside each StepDirection ?
   @override
   var delay = 0;
+
+  @override
+  // TODO: implement continuousMovements
+  List<Vector> get continuousMovements => throw UnimplementedError();
+
+  @override
+  // TODO: implement direction
+  Direction get direction => throw UnimplementedError();
+
+  @override
+  int get duration => _steps.map((s) => s.duration).reduce((sum, d) => sum + d);
 }
 
 class StepToPoint extends Movement {
   // TODO could be used to inform whether multiple characters movements need
   //   to be split up into multiple movement events
   @override
-  int get distance {
-    return movement.x.abs() + movement.y.abs();
-  }
+  int get distance => movement.steps;
 
   int facing;
   @override
@@ -297,9 +359,17 @@ class StepToPoint extends Movement {
       ..destination = destination;
   }
 
-  Point<int> relativePositionAfter(int distance) {
-    throw UnsupportedError('relativePositionAfter');
-  }
+  @override
+  // TODO: implement continuousMovements
+  List<Vector> get continuousMovements => throw UnimplementedError();
+
+  @override
+  // TODO: implement direction
+  Direction get direction => throw UnimplementedError();
+
+  @override
+  // TODO: implement duration
+  int get duration => throw UnimplementedError();
 
 // coordinates here
 // we could potentially support arbitrary x/y order rather than relying on the
@@ -432,6 +502,8 @@ class Direction {
   static const right = Direction._(Point(1, 0));
   static const down = Direction._(Point(0, 1));
 
+  Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
+
   @override
   String toString() {
     return 'Direction{normal: $normal}';
@@ -448,9 +520,15 @@ class Vector {
 
   Point<int> get asPoint => direction.normal * steps;
 
+  Vector less(int steps) => Vector(this.steps - steps, direction);
+
+  Vector max(int steps) => Vector(math.max(this.steps, steps), direction);
+
+  Vector min(int steps) => Vector(math.min(this.steps, steps), direction);
+
   @override
   String toString() {
-    return '$direction: $steps';
+    return '$direction * $steps';
   }
 
   @override
@@ -463,4 +541,8 @@ class Vector {
 
   @override
   int get hashCode => steps.hashCode ^ direction.hashCode;
+}
+
+extension PointSteps<T extends num> on Point<T> {
+  T get steps => (x.abs() + y.abs()) as T;
 }

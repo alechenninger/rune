@@ -26,77 +26,50 @@ extension MoveToAsm on IndividualMoves {
   Asm toAsm(EventContext ctx) {
     var asm = Asm.empty();
 
-    // Steps travelled so far
-    var traveled = 0;
-
-    // List of moves to make in parallel
-    var currentParallelMoves = <AssignedMovement>[];
-
-    var remainingMoves = Map.of(movements);
-
     if (ctx.followLead) {
       asm.add(followLeader(ctx.followLead = false));
     }
 
+    // We're going to loop through all movements and remove those from the map
+    // when there's nothing left to do.
+    var remainingMoves = Map.of(movements);
     while (remainingMoves.isNotEmpty) {
-      // Copy remaining to avoid concurrent modification.
-      var remaining = Map.of(remainingMoves);
-      remainingMoves.clear();
-      currentParallelMoves.clear();
-
-      // The soonest move in the remaining set may not be immediate; this tracks
-      // the number of total steps the soonest remaining move should start at.
-      int? nextRemainingStartSteps;
-
-      // Of remaining, find moves we should make now
-      for (var move in remaining.entries) {
-        var moveable = move.key;
-        var movement = move.value;
-
-        /* TODO:
-          might be able to generalize better/simplify by treating delay as just
-          a part of the "movement".
-
-          treat "delay" as "current delay"
-          tick down delay with steps traveled like movement
-          all moves are done in parallel, just only some result in any movement
-
-          finding moves in one iteration is a matter of asking each movement
-          "how many steps until you do something different" though this kind of
-          depends on the asm.
-         */
-
-        if (movement.delay > traveled) {
-          remainingMoves[moveable] = movement;
-          nextRemainingStartSteps = nextRemainingStartSteps.min(movement.delay);
-        } else {
-          currentParallelMoves.add(AssignedMovement(moveable, movement));
-        }
-      }
-
-      if (currentParallelMoves.isEmpty) {
-        // Nothing to do now, skip ahead to next remaining
-        if (nextRemainingStartSteps != null) traveled = nextRemainingStartSteps;
-        continue;
-      }
-
       // I tried using a sorted set but iterator was bugged and skipped elements
-      currentParallelMoves.sort(_shortestDistanceLast(ctx));
+      var sortedMovements =
+          remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
+      // not sure if it actually needs to be sorted by distance/duration any
+      // more?
+      // but at least helps with predictable generated code for testing, so sort
+      // by slot
+      sortedMovements.sort((m1, m2) => m1.moveable.compareTo(m2.moveable, ctx));
 
       // We have to break up the movements we make based on what movements are
       // completely parallel, versus what movements are partially parallel (e.g.
       // one character keeps moving after another has stopped. We also have to
       // make sure we don't move too long without considering remaining moves
       // which are just delayed.
-      var maxParallelSteps = currentParallelMoves
-          .map((e) => e.movement.distance)
-          .reduce((min, d) => min = math.min(min, d));
-      var stepsUntilNextRemaining = nextRemainingStartSteps == null
-          ? null
-          : nextRemainingStartSteps - traveled;
+
+      var maxStepsXFirst = sortedMovements
+          .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.x))
+          .reduce((min, s) => min = math.min(min, s));
+      var maxStepsYFirst = sortedMovements
+          .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.y))
+          .reduce((min, s) => min = math.min(min, s));
+
+      Axis firstAxis;
       // This is the actual amount of steps we can make in the current batch of
       // moves.
-      var maxSteps = stepsUntilNextRemaining.min(maxParallelSteps);
+      int maxSteps;
+
+      if (maxStepsXFirst > maxStepsYFirst) {
+        firstAxis = Axis.x;
+        maxSteps = maxStepsXFirst;
+      } else {
+        // Keep first axis from context if either is equivalent
+        firstAxis = maxStepsYFirst > maxStepsXFirst ? Axis.y : ctx.startingAxis;
+        maxSteps = maxStepsYFirst;
+      }
+
       Moveable? a4;
 
       void toA4(Moveable moveable) {
@@ -106,53 +79,67 @@ extension MoveToAsm on IndividualMoves {
         }
       }
 
+      bool isLastOneMoving(Moveable moveable) {
+        return moveable ==
+            sortedMovements.where((m) => m.movement.delay == 0).last.moveable;
+      }
+
+      if (ctx.startingAxis != firstAxis) {
+        asm.add(moveAlongXAxisFirst(firstAxis == Axis.x));
+        ctx.startingAxis = firstAxis;
+      }
+
+      // If no movement code is generated because all moves are delayed, we'll
+      // have to add an artificial delay later.
+      var allDelay = true;
+
       // Now start actually generating movement code for current batch up until
       // maxSteps.
-
-      for (var move in currentParallelMoves) {
+      for (var move in sortedMovements) {
         var moveable = move.moveable;
         var movement = move.movement;
-        var isLast = moveable == currentParallelMoves.last.moveable;
+        var steps = maxSteps;
 
-        toA4(moveable);
+        if (movement.delay == 0) {
+          allDelay = false;
+          toA4(moveable);
 
-        // NOTE: each movement ends with a slight pause so one direction at a
-        // time is not as smooth as setting both
-
-        // Could consider polymorphic movements by adding this signature to
-        // Movement:
-        //    Movement? move(ctx, moveable, maxSteps, asm)
-        // returns movement if it still has more to move
-        // of course can't do that with model/generator layer separation
-        if (movement is StepDirection) {
           var current = ctx.positions[moveable];
           if (current == null) {
             throw StateError('no current position set for $moveable');
           }
 
-          var steps = movement.distance.min(maxSteps);
+          steps = movement.distance.min(maxSteps);
           var destination =
               current + movement.relativePositionAfter(steps) * unitsPerStep;
           ctx.positions[moveable] = destination;
-          ctx.facing[moveable] = movement.direction;
 
           var x = Word(destination.x).i;
           var y = Word(destination.y).i;
 
-          if (isLast) {
+          if (isLastOneMoving(moveable)) {
             asm.add(moveCharacter(x: x, y: y));
           } else {
             asm.add(setDestination(x: x, y: y));
           }
+        }
 
-          if (movement.distance > steps) {
-            remainingMoves[moveable] = movement.less(steps);
-          }
-        } else if (movement is StepToPoint) {}
+        movement = movement.less(steps);
+        ctx.facing[moveable] = movement.direction;
+
+        if (movement.distance == 0) {
+          remainingMoves.remove(moveable);
+        } else {
+          remainingMoves[moveable] = movement;
+        }
+      }
+
+      if (allDelay) {
+        // TODO: add delay
       }
 
       // Should we wait until everything done moving for this?
-      for (var next in currentParallelMoves.reversed) {
+      for (var next in sortedMovements.reversed) {
         var moveable = next.moveable;
         var movement = next.movement;
         if (movement is StepDirection) {
@@ -163,20 +150,15 @@ extension MoveToAsm on IndividualMoves {
           }
         }
       }
-
-      // TODO: is it always maxNow?
-      // if less was moved, it means delay is greater than actual moved spaces
-      traveled += maxSteps;
     }
 
     return asm;
   }
 }
 
-int Function(AssignedMovement, AssignedMovement) _shortestDistanceLast(
-    EventContext ctx) {
-  return (AssignedMovement move1, AssignedMovement move2) {
-    var comparison = move2.movement.distance.compareTo(move1.movement.distance);
+int Function(Move, Move) _longestFirst(EventContext ctx) {
+  return (Move move1, Move move2) {
+    var comparison = move2.movement.duration.compareTo(move1.movement.duration);
     if (comparison == 0) {
       return move2.moveable.compareTo(move2.moveable, ctx);
     }
@@ -239,11 +221,11 @@ extension DirectionToAddress on Direction {
   }
 }
 
-class AssignedMovement {
+class Move {
   final Moveable moveable;
   final Movement movement;
 
-  AssignedMovement(this.moveable, this.movement);
+  Move(this.moveable, this.movement);
 
   @override
   String toString() {
@@ -253,7 +235,7 @@ class AssignedMovement {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is AssignedMovement &&
+      other is Move &&
           runtimeType == other.runtimeType &&
           moveable == other.moveable &&
           movement == other.movement;
