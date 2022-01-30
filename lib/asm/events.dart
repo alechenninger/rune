@@ -65,12 +65,16 @@ Asm updateObjFacing(Address direction) {
   ]);
 }
 
-Asm lockCamera(bool lock) {
-  return (lock ? bset : bclr)(const Byte(2).i, Char_Move_Flags.w);
-}
-
 Asm followLeader(bool follow) {
   return (follow ? bclr : bset)(Byte.zero.i, Char_Move_Flags.w);
+}
+
+Asm moveAlongXAxisFirst(bool xFirst) {
+  return (xFirst ? bclr : bset)(const Byte(1).i, Char_Move_Flags.w);
+}
+
+Asm lockCamera(bool lock) {
+  return (lock ? bset : bclr)(const Byte(2).i, Char_Move_Flags.w);
 }
 
 /// Multiple characters can move with [moveCharacter], but they must be prepared

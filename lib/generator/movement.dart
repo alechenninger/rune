@@ -53,10 +53,22 @@ extension MoveToAsm on IndividualMoves {
         var moveable = move.key;
         var movement = move.value;
 
+        /* TODO:
+          might be able to generalize better/simplify by treating delay as just
+          a part of the "movement".
+
+          treat "delay" as "current delay"
+          tick down delay with steps traveled like movement
+          all moves are done in parallel, just only some result in any movement
+
+          finding moves in one iteration is a matter of asking each movement
+          "how many steps until you do something different" though this kind of
+          depends on the asm.
+         */
+
         if (movement.delay > traveled) {
           remainingMoves[moveable] = movement;
-          nextRemainingStartSteps =
-              nextRemainingStartSteps.orMax(movement.delay);
+          nextRemainingStartSteps = nextRemainingStartSteps.min(movement.delay);
         } else {
           currentParallelMoves.add(AssignedMovement(moveable, movement));
         }
@@ -68,7 +80,7 @@ extension MoveToAsm on IndividualMoves {
         continue;
       }
 
-      // I tried using a sorted set but iterator was bugged
+      // I tried using a sorted set but iterator was bugged and skipped elements
       currentParallelMoves.sort(_shortestDistanceLast(ctx));
 
       // We have to break up the movements we make based on what movements are
@@ -78,13 +90,13 @@ extension MoveToAsm on IndividualMoves {
       // which are just delayed.
       var maxParallelSteps = currentParallelMoves
           .map((e) => e.movement.distance)
-          .reduce((maxParallel, d) => maxParallel = math.min(maxParallel, d));
+          .reduce((min, d) => min = math.min(min, d));
       var stepsUntilNextRemaining = nextRemainingStartSteps == null
           ? null
           : nextRemainingStartSteps - traveled;
       // This is the actual amount of steps we can make in the current batch of
       // moves.
-      var maxSteps = stepsUntilNextRemaining.orMax(maxParallelSteps);
+      var maxSteps = stepsUntilNextRemaining.min(maxParallelSteps);
       Moveable? a4;
 
       void toA4(Moveable moveable) {
@@ -118,9 +130,9 @@ extension MoveToAsm on IndividualMoves {
             throw StateError('no current position set for $moveable');
           }
 
-          var steps = movement.distance.orMax(maxSteps);
+          var steps = movement.distance.min(maxSteps);
           var destination =
-              current + (movement.direction.normal * steps) * unitsPerStep;
+              current + movement.relativePositionAfter(steps) * unitsPerStep;
           ctx.positions[moveable] = destination;
           ctx.facing[moveable] = movement.direction;
 
@@ -177,7 +189,7 @@ int minOf(int? i1, int other) {
 }
 
 extension Cap on int? {
-  int orMax(int other) {
+  int min(int other) {
     var self = this;
     return self == null ? other : math.min(self, other);
   }

@@ -76,6 +76,8 @@ Alys and Shay exit the house.
  */
 
 abstract class Event {
+  // TODO: should probably not have this here? creates dependency on generator
+  // from model
   Asm generateAsm(AsmGenerator generator, EventContext ctx);
 }
 
@@ -83,6 +85,7 @@ class EventContext {
   final positions = <Moveable, Point<int>>{};
   final facing = <Moveable, Direction>{};
   final slots = <Character>[];
+  final startingAxis = Axis.x;
 
   /// Whether or not to follow character at slot[0]
   bool followLead = true;
@@ -90,9 +93,6 @@ class EventContext {
 
 class Scene {
   final List<Event> events = [];
-
-  // consider encoding the transition between events and dialog here?
-  // e.g. whether or not using F7 or FF
 
   void addEvent(Event event) {
     events.add(event);
@@ -159,8 +159,10 @@ abstract class Movement {
   /// Delay in steps before movement starts parallel with other movements.
   int get delay;
 
-  /// Distance in steps.
+  /// Total distance in steps.
   int get distance;
+
+  // List<Vector> get movements;
 }
 
 class StepDirection extends Movement {
@@ -172,10 +174,18 @@ class StepDirection extends Movement {
 
   // TODO: may want to define in base
   // TODO: should have bounds check
-  StepDirection less(int distance) => StepDirection()
-    ..distance = this.distance - distance
-    ..delay = delay
-    ..direction = direction;
+  StepDirection less(int distance) {
+    if (distance > this.distance) throw StateError('negative distance');
+    return StepDirection()
+      ..distance = this.distance - distance
+      ..delay = delay
+      ..direction = direction;
+  }
+
+  Point<int> relativePositionAfter(int distance) {
+    if (distance > this.distance) throw StateError('negative distance');
+    return direction.normal * distance;
+  }
 
   @override
   String toString() {
@@ -196,16 +206,43 @@ class StepDirection extends Movement {
 }
 
 class StepDirections extends Movement {
-  final _directions = <StepDirection>[];
+  final _steps = <StepDirection>[];
 
   void step(StepDirection step) {
-    _directions.add(step);
+    _steps.add(step);
+  }
+
+  StepDirections less(int distance) {
+    if (distance > this.distance) throw StateError('negative distance');
+    var totalSubtracted = 0;
+    var less = StepDirections();
+
+    for (var step in _steps) {
+      var stepSubstracted = min(distance - totalSubtracted, step.distance);
+      less.step(step.less(stepSubstracted));
+      totalSubtracted += stepSubstracted;
+    }
+
+    return less;
+  }
+
+  Point<int> relativePositionAfter(int distance) {
+    var after = Point<int>(0, 0);
+    var totalStepped = 0;
+
+    for (var step in _steps) {
+      var stepStepped = min(distance - totalStepped, step.distance);
+      after += step.relativePositionAfter(stepStepped);
+      totalStepped + stepStepped;
+    }
+
+    return after;
   }
 
   @override
-  int get distance => _directions
-      .map((e) => e.distance)
-      .reduce((value, element) => value + element);
+  int get distance => _steps.map((e) => e.distance).reduce((sum, d) => sum + d);
+
+  // delay is on top of delay inside each StepDirection ?
   @override
   var delay = 0;
 }
@@ -215,21 +252,54 @@ class StepToPoint extends Movement {
   //   to be split up into multiple movement events
   @override
   int get distance {
-    if (destinations.isEmpty) return 0;
-    return destinations.map((d) {
-      var diff = (d - start);
-      // Characters move one axis at a time
-      return diff.x.abs() + diff.y.abs();
-    }).reduce((d1, d2) => d1 + d2);
+    return movement.x.abs() + movement.y.abs();
   }
 
   int facing;
   @override
   int delay = 0;
   Point<int> start;
-  final List<Point<int>> destinations = [];
+  Axis startAlong = Axis.x;
+  Point<int> destination = Point(0, 0);
+  Point<int> get movement => destination - start;
 
   StepToPoint(this.start, {this.facing = 0});
+
+  /// Just changes starting point because end point is set.
+  StepToPoint less(int distance) {
+    if (distance > this.distance) throw StateError('negative distance');
+
+    var newStart = start;
+
+    int subtractXUpTo(int distance) {
+      var axisSubtracted = min(movement.x.abs(), distance);
+      newStart += Point(movement.x - axisSubtracted * movement.x.sign, 0);
+      return axisSubtracted;
+    }
+
+    int subtractYUpTo(int distance) {
+      var axisSubtracted = min(movement.y.abs(), distance);
+      newStart += Point(0, movement.y - axisSubtracted * movement.y.sign);
+      return axisSubtracted;
+    }
+
+    if (startAlong == Axis.x) {
+      var traveled = subtractXUpTo(distance);
+      subtractYUpTo(distance - traveled);
+    } else {
+      var traveled = subtractYUpTo(distance);
+      subtractXUpTo(distance - traveled);
+    }
+
+    return StepToPoint(newStart, facing: facing)
+      ..delay = delay
+      ..startAlong = startAlong
+      ..destination = destination;
+  }
+
+  Point<int> relativePositionAfter(int distance) {
+    throw UnsupportedError('relativePositionAfter');
+  }
 
 // coordinates here
 // we could potentially support arbitrary x/y order rather than relying on the
@@ -366,4 +436,31 @@ class Direction {
   String toString() {
     return 'Direction{normal: $normal}';
   }
+}
+
+enum Axis { x, y }
+
+class Vector {
+  final int steps;
+  final Direction direction;
+
+  Vector(this.steps, this.direction);
+
+  Point<int> get asPoint => direction.normal * steps;
+
+  @override
+  String toString() {
+    return '$direction: $steps';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Vector &&
+          runtimeType == other.runtimeType &&
+          steps == other.steps &&
+          direction == other.direction;
+
+  @override
+  int get hashCode => steps.hashCode ^ direction.hashCode;
 }
