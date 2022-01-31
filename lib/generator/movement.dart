@@ -120,7 +120,8 @@ extension MoveToAsm on IndividualMoves {
 
           stepsToTake = movement.distance.min(maxSteps);
           var afterSteps = movement.lookahead(stepsToTake);
-          var destination = current + afterSteps.position * unitsPerStep;
+          var destination =
+              current + afterSteps.relativePosition * unitsPerStep;
           ctx.positions[moveable] = destination;
           ctx.facing[moveable] = afterSteps.facing;
 

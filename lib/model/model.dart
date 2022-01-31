@@ -177,18 +177,16 @@ abstract class Movement {
   // todo: should this just be StepDirection to include delays?
   List<Vector> get continuousMovements;
 
-  RelativePosition lookahead(int steps) {
+  RelativeMoves lookahead(int steps) {
     var stepsTaken = 0;
     var movements = List.of(continuousMovements);
-    var lastContinuous = <Vector>[];
-    var position = Point<int>(0, 0);
+    var movesMade = <Vector>[];
 
     while (stepsTaken < steps) {
       for (var i = 0; stepsTaken < steps && i < movements.length; i++) {
         var move = movements[i].min(steps - stepsTaken);
         stepsTaken += move.steps;
-        position += move.asPoint;
-        lastContinuous.add(move);
+        movesMade.add(move);
       }
 
       var remaining = steps - stepsTaken;
@@ -196,12 +194,12 @@ abstract class Movement {
         var after = less(stepsTaken);
         var delayToTake = min(remaining, after.delay);
         after = after.less(delayToTake);
+        stepsTaken += delayToTake;
         movements = List.of(after.continuousMovements);
-        lastContinuous.clear();
       }
     }
 
-    return RelativePosition(position, lastContinuous);
+    return RelativeMoves(movesMade);
   }
 
   /// Continuous movements if one axis is moved at a time, and the first must be
@@ -594,10 +592,11 @@ extension PointSteps<T extends num> on Point<T> {
   T get steps => (x.abs() + y.abs()) as T;
 }
 
-class RelativePosition {
-  final Point<int> position;
-  final List<Vector> lastContinuousMovements;
-  Direction get facing => lastContinuousMovements.last.direction;
+class RelativeMoves {
+  final List<Vector> movesMade;
+  Point<int> get relativePosition =>
+      movesMade.map((m) => m.asPoint).reduce((sum, p) => sum + p);
+  Direction get facing => movesMade.last.direction;
 
-  RelativePosition(this.position, this.lastContinuousMovements);
+  RelativeMoves(this.movesMade);
 }
