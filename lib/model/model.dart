@@ -174,18 +174,34 @@ abstract class Movement {
 
   /// Movements which are continuous (there is no pause in between) and should
   /// start immediately (delay should == 0).
+  // todo: should this just be StepDirection to include delays?
   List<Vector> get continuousMovements;
 
-  Point<int> relativePositionAfter(int steps) {
+  RelativePosition lookahead(int steps) {
     var stepsTaken = 0;
-    var position = Point<int>(0, 0);
     var movements = List.of(continuousMovements);
-    for (var i = 0; stepsTaken < steps && i < movements.length; i++) {
-      var move = movements[i].min(steps - stepsTaken);
-      stepsTaken += move.steps;
-      position += move.asPoint;
+    var lastContinuous = <Vector>[];
+    var position = Point<int>(0, 0);
+
+    while (stepsTaken < steps) {
+      for (var i = 0; stepsTaken < steps && i < movements.length; i++) {
+        var move = movements[i].min(steps - stepsTaken);
+        stepsTaken += move.steps;
+        position += move.asPoint;
+        lastContinuous.add(move);
+      }
+
+      var remaining = steps - stepsTaken;
+      if (remaining > 0) {
+        var after = less(stepsTaken);
+        var delayToTake = min(remaining, after.delay);
+        after = after.less(delayToTake);
+        movements = List.of(after.continuousMovements);
+        lastContinuous.clear();
+      }
     }
-    return position;
+
+    return RelativePosition(position, lastContinuous);
   }
 
   /// Continuous movements if one axis is moved at a time, and the first must be
@@ -211,6 +227,7 @@ abstract class Movement {
 }
 
 class StepDirection extends Movement {
+  @override
   var direction = Direction.up;
   @override
   var distance = 0;
@@ -220,12 +237,14 @@ class StepDirection extends Movement {
   @override
   int get duration => delay + distance;
 
+  Vector get asVector => Vector(distance, direction);
+
   @override
-  List<Vector> get continuousMovements =>
-      delay > 0 ? [] : [Vector(distance, direction)];
+  List<Vector> get continuousMovements => delay > 0 ? [] : [asVector];
 
   // TODO: may want to define in base
   // TODO: should have bounds check
+  @override
   StepDirection less(int distance) {
     if (distance > this.distance + delay) throw StateError('negative distance');
 
@@ -265,37 +284,75 @@ class StepDirections extends Movement {
     _steps.add(step);
   }
 
-  StepDirections less(int distance) {
-    if (distance > this.distance) throw StateError('negative distance');
-    var totalSubtracted = 0;
-    var less = StepDirections();
-
-    for (var step in _steps) {
-      var stepSubstracted = min(distance - totalSubtracted, step.distance);
-      less.step(step.less(stepSubstracted));
-      totalSubtracted += stepSubstracted;
-    }
-
-    return less;
+  void face(Direction direction) {
+    _steps.add(StepDirection()..direction = direction);
   }
 
   @override
-  int get distance => _steps.map((e) => e.distance).reduce((sum, d) => sum + d);
-
-  // delay is on top of delay inside each StepDirection ?
-  @override
-  var delay = 0;
+  int get distance => _steps.isEmpty
+      ? 0
+      : _steps.map((e) => e.distance).reduce((sum, d) => sum + d);
 
   @override
-  // TODO: implement continuousMovements
-  List<Vector> get continuousMovements => throw UnimplementedError();
+  int get delay => _steps.isEmpty ? 0 : _steps.first.delay;
 
   @override
-  // TODO: implement direction
-  Direction get direction => throw UnimplementedError();
+  int get duration => _steps.isEmpty
+      ? 0
+      : _steps.map((s) => s.duration).reduce((sum, d) => sum + d);
 
   @override
-  int get duration => _steps.map((s) => s.duration).reduce((sum, d) => sum + d);
+  Direction get direction =>
+      // TODO: what to do if no steps?
+      _steps.isEmpty ? Direction.down : _steps.first.direction;
+
+  @override
+  List<Vector> get continuousMovements => _steps
+      .takeWhile((step) => step.delay == 0)
+      .map((e) => e.asVector)
+      .toList();
+
+  @override
+  StepDirections less(int distance) {
+    if (distance > duration) throw StateError('negative distance');
+    if (distance == 0) return this;
+
+    var totalSubtracted = 0;
+    var answer = StepDirections();
+    StepDirection? lastStep;
+
+    for (var step in _steps) {
+      var canMove = min(distance - totalSubtracted, step.distance);
+      lastStep = step.less(canMove);
+
+      if (lastStep.duration > 0 || answer._steps.isNotEmpty) {
+        answer.step(lastStep);
+      }
+
+      totalSubtracted += canMove;
+    }
+
+    if (answer._steps.isEmpty && lastStep != null) {
+      answer.step(lastStep);
+    }
+
+    return answer;
+  }
+
+  @override
+  String toString() {
+    return 'StepDirections{$_steps}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StepDirections &&
+          runtimeType == other.runtimeType &&
+          _steps == other._steps;
+
+  @override
+  int get hashCode => _steps.hashCode;
 }
 
 class StepToPoint extends Movement {
@@ -315,6 +372,7 @@ class StepToPoint extends Movement {
   StepToPoint(this.start, {this.facing = 0});
 
   /// Just changes starting point because end point is set.
+  @override
   StepToPoint less(int distance) {
     if (distance > this.distance) throw StateError('negative distance');
 
@@ -473,11 +531,13 @@ const shay = Shay();
 
 class Alys extends Character {
   const Alys();
+  @override
   String toString() => 'Alys';
 }
 
 class Shay extends Character {
   const Shay();
+  @override
   String toString() => 'Shay';
 }
 
@@ -532,4 +592,12 @@ class Vector {
 
 extension PointSteps<T extends num> on Point<T> {
   T get steps => (x.abs() + y.abs()) as T;
+}
+
+class RelativePosition {
+  final Point<int> position;
+  final List<Vector> lastContinuousMovements;
+  Direction get facing => lastContinuousMovements.last.direction;
+
+  RelativePosition(this.position, this.lastContinuousMovements);
 }

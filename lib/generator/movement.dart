@@ -33,6 +33,8 @@ extension MoveToAsm on IndividualMoves {
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
     var remainingMoves = Map.of(moves);
+    var done = <Moveable, Movement>{};
+
     while (remainingMoves.isNotEmpty) {
       // I tried using a sorted set but iterator was bugged and skipped elements
       var movesList =
@@ -105,7 +107,7 @@ extension MoveToAsm on IndividualMoves {
         var move = movesList[i];
         var moveable = move.moveable;
         var movement = move.movement;
-        var stepsTaken = maxSteps;
+        var stepsToTake = maxSteps;
 
         if (movement.delay == 0) {
           allDelay = false;
@@ -116,10 +118,11 @@ extension MoveToAsm on IndividualMoves {
             throw StateError('no current position set for $moveable');
           }
 
-          stepsTaken = movement.distance.min(maxSteps);
-          var destination = current +
-              movement.relativePositionAfter(stepsTaken) * unitsPerStep;
+          stepsToTake = movement.distance.min(maxSteps);
+          var afterSteps = movement.lookahead(stepsToTake);
+          var destination = current + afterSteps.position * unitsPerStep;
           ctx.positions[moveable] = destination;
+          ctx.facing[moveable] = afterSteps.facing;
 
           var x = Word(destination.x).i;
           var y = Word(destination.y).i;
@@ -131,11 +134,11 @@ extension MoveToAsm on IndividualMoves {
           }
         }
 
-        movement = movement.less(stepsTaken);
-        ctx.facing[moveable] = movement.direction;
+        movement = movement.less(stepsToTake);
 
         if (movement.distance == 0) {
           remainingMoves.remove(moveable);
+          done[moveable] = movement;
         } else {
           remainingMoves[moveable] = movement;
         }
@@ -148,15 +151,12 @@ extension MoveToAsm on IndividualMoves {
       }
 
       // Should we wait until everything done moving for this?
-      for (var next in movesList.reversed) {
-        var moveable = next.moveable;
-        var movement = next.movement;
-        if (movement is StepDirection) {
-          if (!remainingMoves.containsKey(moveable) &&
-              ctx.facing[moveable] != movement.direction) {
-            toA4(moveable);
-            asm.add(updateObjFacing(movement.direction.address));
-          }
+      for (var move in done.entries) {
+        var moveable = move.key;
+        var movement = move.value;
+        if (ctx.facing[moveable] != movement.direction) {
+          toA4(moveable);
+          asm.add(updateObjFacing(movement.direction.address));
         }
       }
     }
