@@ -33,12 +33,13 @@ extension MoveToAsm on IndividualMoves {
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
     var remainingMoves = Map.of(moves);
-    var done = <Moveable, Movement>{};
 
     while (remainingMoves.isNotEmpty) {
       // I tried using a sorted set but iterator was bugged and skipped elements
       var movesList =
           remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
+      var done = <Moveable, Movement>{};
+
       // not sure if it actually needs to be sorted by distance/duration any
       // more?
       // but at least helps with predictable generated code for testing, so sort
@@ -151,7 +152,6 @@ extension MoveToAsm on IndividualMoves {
         asm.add(vIntPrepareLoop((8 * maxSteps).word));
       }
 
-      // Should we wait until everything done moving for this?
       for (var move in done.entries) {
         var moveable = move.key;
         var movement = move.value;
@@ -191,10 +191,10 @@ extension MoveableToA4 on Moveable {
   Asm toA4(EventContext ctx) {
     var moveable = this;
     if (moveable is Character) {
-      var slot = ctx.slots.indexOf(moveable);
-      if (slot >= 0) {
+      var slot = ctx.slots[moveable];
+      if (slot != null) {
         // Slot 1 indexed
-        return characterBySlotToA4(slot + 1);
+        return characterBySlotToA4(slot);
       } else {
         return characterByIdToA4(moveable.charId);
       }
@@ -229,27 +229,4 @@ extension DirectionToAddress on Direction {
     }
     throw StateError('illegal direction $this');
   }
-}
-
-class Move {
-  final Moveable moveable;
-  final Movement movement;
-
-  Move(this.moveable, this.movement);
-
-  @override
-  String toString() {
-    return 'AssignedMovement{moveable: $moveable, movement: $movement}';
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Move &&
-          runtimeType == other.runtimeType &&
-          moveable == other.moveable &&
-          movement == other.movement;
-
-  @override
-  int get hashCode => moveable.hashCode ^ movement.hashCode;
 }

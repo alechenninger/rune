@@ -10,45 +10,45 @@ extension SceneToAsm on Scene {
     var generator = AsmGenerator();
     var ctx = EventContext();
 
-    var event = Asm.empty();
-    var dialog = Asm.empty();
-    var dialogMode = true;
+    var eventAsm = Asm.empty();
+    var dialogAsm = Asm.empty();
+    var generatingDialog = true;
     var lastEventBreak = -1;
     var eventCounter = 1;
 
-    for (var e in events) {
-      if (e is Dialog) {
-        if (!dialogMode) {
-          event.add(popAndRunDialog());
-          event.addNewline();
+    for (var event in events) {
+      if (event is Dialog) {
+        if (!generatingDialog) {
+          eventAsm.add(popAndRunDialog());
+          eventAsm.addNewline();
         }
 
-        dialogMode = true;
-        dialog.add(e.generateAsm(generator, ctx));
+        generatingDialog = true;
+        dialogAsm.add(event.generateAsm(generator, ctx));
         continue;
       }
 
-      if (dialogMode && dialog.isNotEmpty) {
-        dialogMode = false;
+      if (generatingDialog && dialogAsm.isNotEmpty) {
+        generatingDialog = false;
         // or enddialog/terminate? FF
         // note if use terminate, have to track dialog tree offset
-        dialog.add(comment('scene event $eventCounter'));
-        lastEventBreak = dialog.add(eventBreak());
+        dialogAsm.add(comment('scene event $eventCounter'));
+        lastEventBreak = dialogAsm.add(eventBreak());
       }
 
-      event.add(comment('scene event $eventCounter'));
-      event.add(e.generateAsm(generator, ctx));
+      eventAsm.add(comment('scene event $eventCounter'));
+      eventAsm.add(event.generateAsm(generator, ctx));
 
       eventCounter++;
     }
 
-    if (dialogMode) {
-      dialog.add(endDialog());
+    if (generatingDialog) {
+      dialogAsm.add(endDialog());
     } else if (lastEventBreak >= 0) {
-      dialog.replace(lastEventBreak, endDialog());
+      dialogAsm.replace(lastEventBreak, endDialog());
     }
 
-    return SceneAsm(event, dialog);
+    return SceneAsm(eventAsm, dialogAsm);
   }
 }
 
@@ -57,4 +57,9 @@ class SceneAsm {
   final Asm dialog;
 
   SceneAsm(this.event, this.dialog);
+
+  @override
+  String toString() {
+    return '; event:\n$event\n; dialog:\n$dialog';
+  }
 }

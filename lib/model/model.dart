@@ -23,14 +23,13 @@ Alys: Maybe so.
 Alys walks 10 steps right, 10 steps up.
 After 5 steps, Shay walks 10 right, 5 steps up.
 The camera locks.
-Alys walks 5 steps up.
-Alys faces up.
+Alys walks 5 steps up and faces up.
 
 Shay: Nothing ‘maybe’ about it.
 Alys: Let us see how you get on.
 Shay: We’ll meet head-on whatever the guild throws our way.  They’ll have to go looking for new cases instead of waiting for the work to come in.
 
-Alys moves 2 steps down
+Alys moves 2 steps down.
 
 Alys: Steel yourself and do not boast.  The affairs of men weigh heavy on the spirit. And you must heed yours, Shay Ashleigh, lest this world of sand and sorrow pull you under.
 Shay: The world...I owe nothing. I owe you everything, Alys.  And, to think...partners with a hunter of your renown.
@@ -42,9 +41,8 @@ Alys: Fame. Trophies. Titles. Grains of sand in a desert with no name. Those who
 Shay: Hmmm...  But you have to admit— “She’ll make quite the mess, of a beast or any foe, an arm, a leg and every toe, in eight strokes or less.”  —That kind of reputation has a way of opening doors!
 
 Alys walks 1 step down.
-Shay is pushed 3 spaces right.
-Alys continues 3 steps down.
-Alys faces up.
+Then, Shay is pushed 3 spaces right.
+Alys continues 3 steps down and faces up.
 Shay faces down.
 
 Alys: And closing as many more.  You know I loathe that rhyme.
@@ -85,18 +83,36 @@ abstract class Event {
 class EventContext {
   final positions = <Moveable, Point<int>>{};
   final facing = <Moveable, Direction>{};
-  final slots = <Character>[];
+  final slots = <Character, int>{};
   var startingAxis = Axis.x;
 
   /// Whether or not to follow character at slot[0]
   var followLead = true;
+
+  bool cameraLock = false;
 }
 
 class Scene {
   final List<Event> events = [];
 
+  Scene([List<Event> events = const []]) {
+    this.events.addAll(events);
+  }
+
   void addEvent(Event event) {
     events.add(event);
+  }
+}
+
+class SetContext extends Event {
+  final void Function(EventContext ctx) _setCtx;
+
+  SetContext(this._setCtx);
+
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    _setCtx(ctx);
+    return Asm.empty();
   }
 }
 
@@ -108,6 +124,20 @@ class Pause extends Event {
   @override
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
     return generator.pauseToAsm(this);
+  }
+}
+
+class LockCamera extends Event {
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    return generator.lockCameraToAsm(ctx);
+  }
+}
+
+class UnockCamera extends Event {
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    return generator.unlockCameraToAsm(ctx);
   }
 }
 
@@ -132,6 +162,15 @@ class IndividualMoves extends Event {
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
     return generator.individualMovesToAsm(this, ctx);
   }
+
+  int get duration => moves.values
+      .map((m) => m.duration)
+      .reduce((longest, m) => longest = max(longest, m));
+
+  @override
+  String toString() {
+    return '$moves';
+  }
 }
 
 // character by name? character by slot? party?
@@ -152,7 +191,7 @@ abstract class Moveable {
 
 int? _slotOf(Moveable m, EventContext c) {
   if (m is Slot) return m.index;
-  if (m is Character) return c.slots.indexOf(m);
+  if (m is Character) return c.slots[m];
   return null;
 }
 
@@ -282,6 +321,9 @@ class StepDirections extends Movement {
     _steps.add(step);
   }
 
+  // TODO: this probably doesn't work at any arbitrary point, only at the end.
+  //  because distance is 0, hard to know it is actually supposed to generate
+  //  code.
   void face(Direction direction) {
     _steps.add(StepDirection()..direction = direction);
   }
@@ -520,7 +562,7 @@ abstract class Character extends Moveable {
       case 'shay':
         return shay;
     }
-    throw ArgumentError.value(name, 'name', 'does not match known character');
+    return null;
   }
 }
 
@@ -599,4 +641,27 @@ class RelativeMoves {
   Direction get facing => movesMade.last.direction;
 
   RelativeMoves(this.movesMade);
+}
+
+class Move {
+  final Moveable moveable;
+  final Movement movement;
+
+  Move(this.moveable, this.movement);
+
+  @override
+  String toString() {
+    return 'Move{moveable: $moveable, movement: $movement}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Move &&
+          runtimeType == other.runtimeType &&
+          moveable == other.moveable &&
+          movement == other.movement;
+
+  @override
+  int get hashCode => moveable.hashCode ^ movement.hashCode;
 }

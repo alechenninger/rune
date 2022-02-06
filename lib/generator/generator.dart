@@ -4,11 +4,16 @@ import 'package:rune/asm/events.dart';
 import 'package:rune/model/model.dart';
 
 import 'dialog.dart';
+import 'event.dart';
 import 'movement.dart';
 
 export '../asm/asm.dart' show Asm;
 
 class AsmGenerator {
+  SceneAsm sceneToAsm(Scene scene) {
+    return scene.toAsm();
+  }
+
   Asm dialogToAsm(Dialog dialog) {
     return dialog.toAsm();
   }
@@ -28,6 +33,14 @@ class AsmGenerator {
     // see: http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_3_6_
     var frames = pause.duration.inSeconds * 60;
     return vIntPrepareLoop(Word(frames.toInt()));
+  }
+
+  Asm lockCameraToAsm(EventContext ctx) {
+    return lockCamera(ctx.cameraLock = true);
+  }
+
+  Asm unlockCameraToAsm(EventContext ctx) {
+    return lockCamera(ctx.cameraLock = false);
   }
 }
 
