@@ -117,6 +117,12 @@ class SetContext extends Event {
     _setCtx(ctx);
     return Asm.empty();
   }
+
+  @override
+  String toString() {
+    // todo: detect if mirrors avail and output source?
+    return 'SetContext{$_setCtx}';
+  }
 }
 
 class Pause extends Event {
@@ -135,12 +141,22 @@ class LockCamera extends Event {
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
     return generator.lockCameraToAsm(ctx);
   }
+
+  @override
+  String toString() {
+    return 'LockCamera{}';
+  }
 }
 
-class UnockCamera extends Event {
+class UnlockCamera extends Event {
   @override
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
     return generator.unlockCameraToAsm(ctx);
+  }
+
+  @override
+  String toString() {
+    return 'UnlockCamera{}';
   }
 }
 

@@ -4,14 +4,20 @@ pattern matching based on context
 instruction
  */
 
-import 'dart:html';
 import 'dart:math';
 
+import 'package:logger/logger.dart';
+import 'package:rune/numbers.dart';
+
 import '../model/model.dart';
+
+// todo: see ParseContext idea
+var log = Logger();
 
 final topLevelExpressions = <EventExpression>[
   MoveableStartsAtExpression(),
   MoveableSlotExpression(),
+  LockCameraExpression(),
   IndividualMovesExpression(),
 ];
 final moveExpressions = <MoveExpression>[RelativeMoveExpression()];
@@ -20,6 +26,7 @@ final moveExpressions = <MoveExpression>[RelativeMoveExpression()];
 // do not assume buffered entire script
 // methods to lookahead which do some buffering until that part is parsed by
 // something successfully
+// it would be easier to track unparsed if i did this
 
 List<Event> parseEvents(String script) {
   var toParse = script;
@@ -31,14 +38,21 @@ List<Event> parseEvents(String script) {
       try {
         var parsed = expression.parse(toParse);
         parseable = true;
-        toParse = parsed.unparsed;
+        var parsedText =
+            toParse.substring(0, toParse.length - parsed.unparsed.length);
+        toParse = pEnd.parse(parsed.unparsed).unparsed;
         events.add(parsed.result);
-      } on FormatException {
+        log.d('<parsed>\n${parsed.result}\n<from>\n$parsedText');
+      } on FormatException catch (e) {
+        log.v(e);
         continue;
       }
     }
 
     if (!parseable) {
+      if (toParse.isNotEmpty) {
+        log.e('unparseable: $toParse');
+      }
       break;
     }
   }
@@ -60,9 +74,11 @@ abstract class EventExpression {
 
 final pMoveable = RegExp(r'^([Tt]he character in slot (\d+)|\w+) ');
 final pEnd = RegExp(r'^[. \n]*');
+final pAndThen = RegExp(r',? ?((and|then|and then) )?');
 
 class MoveableStartsAtExpression extends EventExpression {
-  static final pStartsAt = RegExp(r'^starts at (?<x>\d+),? ?(?<y>\d+)');
+  static final pStartsAt =
+      RegExp(r'^starts at (?<x_hex>#)?(?<x>\d+),? ?(?<y_hex>#)?(?<y>\d+)');
 
   @override
   ParseResult<Event> parse(String expression) {
@@ -70,7 +86,14 @@ class MoveableStartsAtExpression extends EventExpression {
     var startsAt = pStartsAt.parseValue(parseMoveable.unparsed, (match) {
       var x = match.namedGroup('x');
       var y = match.namedGroup('y');
-      return Point(int.parse(x!), int.parse(y!));
+
+      if (x == null) throw FormatException('no x value', expression, 0);
+      if (y == null) throw FormatException('no y value', expression, 0);
+
+      var xVal = match.namedGroup('x_hex') == null ? int.parse(x) : x.hex;
+      var yVal = match.namedGroup('y_hex') == null ? int.parse(y) : y.hex;
+
+      return Point(xVal, yVal);
     });
 
     var unparsed = pEnd.parse(startsAt.unparsed).unparsed;
@@ -101,6 +124,17 @@ class MoveableSlotExpression extends EventExpression {
     return ParseResult(SetContext((ctx) {
       ctx.slots[slot.result] = moveable;
     }), unparsed);
+  }
+}
+
+class LockCameraExpression extends EventExpression {
+  static final pLock = RegExp(r'^The camera (un)?locks(\W|$)');
+
+  @override
+  ParseResult<Event> parse(String expression) {
+    var parsed = pLock.parse(expression);
+    var event = parsed.result.group(1) == null ? LockCamera() : UnlockCamera();
+    return ParseResult(event, parsed.unparsed);
   }
 }
 
@@ -169,8 +203,8 @@ class RelativeMoveExpression extends MoveExpression {
   static final pDelay =
       RegExp(r'^(Then, |After (?<delay>\d+) (steps?|spaces?),? )');
   static final pSteps =
-      RegExp(r'^((walks|continues) )?(?<distance>\d+) ((step|space)s? )?'
-          r'(?<direction>\w+),? ?((and|then|and then) )?');
+      RegExp(r'^((walks|continues|moves) )?(?<distance>\d+) ((step|space)s? )?'
+          r'(?<direction>\w+)');
   static final pFace = RegExp(r'^(faces|turns) (\w+)');
 
   @override
@@ -211,6 +245,8 @@ class RelativeMoveExpression extends MoveExpression {
         }
 
         movement.step(steps);
+
+        unparsed = pAndThen.parse(unparsed).unparsed;
       }
     } on FormatException catch (e) {
       // abort; fall through
@@ -221,13 +257,16 @@ class RelativeMoveExpression extends MoveExpression {
     }
 
     var parsedFace = pFace.parseOptionalValue(unparsed, (match) {
-      var direction = match.group(3);
+      var direction = match.group(2);
       return direction == null ? null : _parseDirection(direction);
     });
 
-    var face = parsedFace?.result;
-    if (face != null) {
-      movement.face(face);
+    if (parsedFace != null) {
+      var face = parsedFace.result;
+      if (face != null) {
+        movement.face(face);
+      }
+      unparsed = parsedFace.unparsed;
     }
 
     unparsed = pEnd.parse(unparsed).unparsed;
@@ -285,6 +324,9 @@ class ParseResult<T> {
   String unparsed;
 
   ParseResult(this.result, this.unparsed);
+
+  // String parsed;
+  // continue(result, parsed, unparsed) -- cumulative parsed
 
   @override
   String toString() {

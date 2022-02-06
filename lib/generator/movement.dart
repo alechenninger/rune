@@ -155,10 +155,16 @@ extension MoveToAsm on IndividualMoves {
       for (var move in done.entries) {
         var moveable = move.key;
         var movement = move.value;
-        if (ctx.facing[moveable] != movement.direction) {
-          toA4(moveable);
-          asm.add(updateObjFacing(movement.direction.address));
-        }
+        // fixme: not setting facing can make characters appear
+        //  mid move when dialog comes up
+        // maybe we can detect when about to switch to dialog?
+        // or a way to override the optimization?
+        // maybe there is a way to express a force face because this would also
+        // solve for when we want to have just facing movements
+        // if (ctx.facing[moveable] != movement.direction) {
+        toA4(moveable);
+        asm.add(updateObjFacing(movement.direction.address));
+        // }
       }
     }
 
