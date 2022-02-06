@@ -1,4 +1,5 @@
 import 'package:characters/src/extensions.dart';
+import 'package:rune/parser/movement.dart';
 
 import '../asm/asm.dart';
 import '../gapps/document.dart';
@@ -45,7 +46,7 @@ CompiledScene compileScene(Paragraph heading) {
 
     var event = Tech.parseFirst<Event>(p);
     if (event != null) {
-      Logger.log('found event: "${p.getText()}"');
+      Logger.log('found event from: "${p.getText()}": $event');
       scene.addEvent(event);
     }
   }
@@ -133,7 +134,8 @@ abstract class Tech {
     'scene_id': (c) => SceneId(c!),
     'asm_event': (c) => AsmEvent(Asm.fromRaw(c!)),
     'pause_seconds': (c) =>
-        Pause(Duration(milliseconds: (double.parse(c!) * 1000).toInt()))
+        Pause(Duration(milliseconds: (double.parse(c!) * 1000).toInt())),
+    'event': (c) => parseEvent(c!),
   };
 
   const Tech();

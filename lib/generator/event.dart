@@ -40,6 +40,7 @@ extension SceneToAsm on Scene {
 
       if (generated.isNotEmpty) {
         eventAsm.add(comment('scene event $eventCounter'));
+        eventAsm.add(comment('generated from type: ${event.runtimeType}'));
         eventAsm.add(generated);
         eventCounter++;
       }

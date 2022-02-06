@@ -28,7 +28,7 @@ final moveExpressions = <MoveExpression>[RelativeMoveExpression()];
 // something successfully
 // it would be easier to track unparsed if i did this
 
-List<Event> parseEvents(String script) {
+Event parseEvent(String script) {
   var toParse = script;
   var events = <Event>[];
   while (toParse.isNotEmpty) {
@@ -56,7 +56,7 @@ List<Event> parseEvents(String script) {
       break;
     }
   }
-  return events;
+  return AggregateEvent(events);
 }
 
 abstract class EventExpression {
@@ -252,21 +252,23 @@ class RelativeMoveExpression extends MoveExpression {
       // abort; fall through
     }
 
-    if (!parsed) {
-      throw FormatException('not a relative movement', expression, 0);
-    }
-
     var parsedFace = pFace.parseOptionalValue(unparsed, (match) {
       var direction = match.group(2);
       return direction == null ? null : _parseDirection(direction);
     });
 
     if (parsedFace != null) {
+      parsed = true;
+
       var face = parsedFace.result;
       if (face != null) {
         movement.face(face);
       }
       unparsed = parsedFace.unparsed;
+    }
+
+    if (!parsed) {
+      throw FormatException('not a relative movement', expression, 0);
     }
 
     unparsed = pEnd.parse(unparsed).unparsed;

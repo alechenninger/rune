@@ -12,8 +12,8 @@ void main() {
     group('step in one direction', () {
       test('move right, after previously not following leader', () {
         var ctx = EventContext();
-        ctx.slots[0] = alys;
-        ctx.slots[1] = shay;
+        ctx.slots[1] = alys;
+        ctx.slots[2] = shay;
 
         ctx.followLead = false;
 
@@ -41,8 +41,8 @@ void main() {
 
       test('move right, after previously following leader', () {
         var ctx = EventContext();
-        ctx.slots[0] = alys;
-        ctx.slots[1] = shay;
+        ctx.slots[1] = alys;
+        ctx.slots[2] = shay;
 
         ctx.followLead = true;
 
@@ -71,8 +71,8 @@ void main() {
 
       test('move right different distances, previously following lead', () {
         var ctx = EventContext();
-        ctx.slots[0] = alys;
-        ctx.slots[1] = shay;
+        ctx.slots[1] = alys;
+        ctx.slots[2] = shay;
 
         ctx.followLead = true;
 

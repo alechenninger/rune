@@ -107,6 +107,37 @@ class Scene {
   }
 }
 
+class AggregateEvent extends Event {
+  final List<Event> events = [];
+
+  AggregateEvent(List<Event> events) {
+    if (events.isEmpty) {
+      throw ArgumentError('empty events', 'events');
+    }
+
+    this.events.addAll(events);
+  }
+
+  @override
+  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+    if (events.isEmpty) {
+      return Asm.empty();
+    }
+
+    return events
+        .map((e) => e.generateAsm(generator, ctx))
+        .reduce((value, element) {
+      value.add(element);
+      return value;
+    });
+  }
+
+  @override
+  String toString() {
+    return 'AggregateEvent{events: $events}';
+  }
+}
+
 class SetContext extends Event {
   final void Function(EventContext ctx) _setCtx;
 
@@ -257,6 +288,10 @@ abstract class Movement {
       }
     }
 
+    if (movesMade.isEmpty) {
+      movesMade.add(Vector(0, direction));
+    }
+
     return RelativeMoves(movesMade);
   }
 
@@ -381,7 +416,7 @@ class StepDirections extends Movement {
     StepDirection? lastStep;
 
     for (var step in _steps) {
-      var canMove = min(distance - totalSubtracted, step.distance);
+      var canMove = min(distance - totalSubtracted, step.duration);
       lastStep = step.less(canMove);
 
       if (lastStep.duration > 0 || answer._steps.isNotEmpty) {
