@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
-import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
@@ -13,8 +12,8 @@ void main() {
     group('step in one direction', () {
       test('move right, after previously not following leader', () {
         var ctx = EventContext();
-        ctx.slots.insert(0, alys);
-        ctx.slots.insert(1, shay);
+        ctx.slots[0] = alys;
+        ctx.slots[1] = shay;
 
         ctx.followLead = false;
 
@@ -42,8 +41,8 @@ void main() {
 
       test('move right, after previously following leader', () {
         var ctx = EventContext();
-        ctx.slots.insert(0, alys);
-        ctx.slots.insert(1, shay);
+        ctx.slots[0] = alys;
+        ctx.slots[1] = shay;
 
         ctx.followLead = true;
 
@@ -72,8 +71,8 @@ void main() {
 
       test('move right different distances, previously following lead', () {
         var ctx = EventContext();
-        ctx.slots.insert(0, alys);
-        ctx.slots.insert(1, shay);
+        ctx.slots[0] = alys;
+        ctx.slots[1] = shay;
 
         ctx.followLead = true;
 
@@ -114,8 +113,8 @@ void main() {
 
       test('multiple move same distance', () {
         var ctx = EventContext();
-        ctx.slots.insert(0, alys);
-        ctx.slots.insert(1, shay);
+        ctx.slots[0] = alys;
+        ctx.slots[1] = shay;
 
         ctx.positions[alys] = Point('230'.hex, '250'.hex);
         ctx.positions[shay] = Point('230'.hex, '240'.hex);
@@ -148,8 +147,8 @@ void main() {
 
       test('multiple moves with some delayed', () {
         var ctx = EventContext();
-        ctx.slots.insert(0, alys);
-        ctx.slots.insert(1, shay);
+        ctx.slots[0] = alys;
+        ctx.slots[1] = shay;
 
         ctx.positions[alys] = Point('230'.hex, '250'.hex);
         ctx.positions[shay] = Point('230'.hex, '240'.hex);
@@ -193,8 +192,8 @@ void main() {
     group('step in multiple directions', () {
       test('one character right then up', () {
         var ctx = EventContext();
-        ctx.slots.insert(0, alys);
-        ctx.slots.insert(1, shay);
+        ctx.slots[0] = alys;
+        ctx.slots[1] = shay;
 
         ctx.positions[alys] = Point('230'.hex, '250'.hex);
         ctx.positions[shay] = Point('230'.hex, '240'.hex);
@@ -225,8 +224,8 @@ void main() {
 
       test('stress test', () {
         var ctx = EventContext();
-        ctx.slots.insert(0, alys);
-        ctx.slots.insert(1, shay);
+        ctx.slots[0] = alys;
+        ctx.slots[1] = shay;
 
         ctx.positions[alys] = Point('230'.hex, '250'.hex);
         ctx.positions[shay] = Point('230'.hex, '240'.hex);

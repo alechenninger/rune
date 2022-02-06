@@ -2,7 +2,8 @@ import 'dart:collection';
 import 'dart:math';
 import 'dart:math' as math;
 
-import 'package:characters/src/extensions.dart';
+import 'package:characters/characters.dart';
+import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
 
 /*
@@ -83,13 +84,15 @@ abstract class Event {
 class EventContext {
   final positions = <Moveable, Point<int>>{};
   final facing = <Moveable, Direction>{};
-  final slots = <Character, int>{};
+  final slots = BiMap<int, Character>();
   var startingAxis = Axis.x;
 
   /// Whether or not to follow character at slot[0]
   var followLead = true;
 
   bool cameraLock = false;
+
+  int? slotFor(Character c) => slots.inverse[c];
 }
 
 class Scene {
@@ -191,7 +194,7 @@ abstract class Moveable {
 
 int? _slotOf(Moveable m, EventContext c) {
   if (m is Slot) return m.index;
-  if (m is Character) return c.slots[m];
+  if (m is Character) return c.slotFor(m);
   return null;
 }
 

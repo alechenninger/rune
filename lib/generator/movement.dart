@@ -191,7 +191,7 @@ extension MoveableToA4 on Moveable {
   Asm toA4(EventContext ctx) {
     var moveable = this;
     if (moveable is Character) {
-      var slot = ctx.slots[moveable];
+      var slot = ctx.slotFor(moveable);
       if (slot != null) {
         // Slot 1 indexed
         return characterBySlotToA4(slot);

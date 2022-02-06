@@ -4,6 +4,7 @@ pattern matching based on context
 instruction
  */
 
+import 'dart:html';
 import 'dart:math';
 
 import '../model/model.dart';
@@ -85,15 +86,20 @@ class MoveableSlotExpression extends EventExpression {
 
   @override
   ParseResult<Event> parse(String expression) {
-    var parseMoveable = _parseMoveable(expression);
-    var slot = pInSlot.parseValue(parseMoveable.unparsed, (match) {
-      return int.parse(match.namedGroup('slot')!);
-    });
+    var parsedMoveable = _parseMoveable(expression);
 
+    var moveable = parsedMoveable.result;
+    if (moveable is! Character) {
+      throw FormatException(
+          'moveable was not a character: $moveable', expression, 0);
+    }
+
+    var slot = pInSlot.parseValue(parsedMoveable.unparsed,
+        (match) => int.parse(match.namedGroup('slot')!));
     var unparsed = pEnd.parse(slot.unparsed).unparsed;
 
     return ParseResult(SetContext((ctx) {
-      ctx.slots[parseMoveable.result as Character] = slot.result;
+      ctx.slots[slot.result] = moveable;
     }), unparsed);
   }
 }
