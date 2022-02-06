@@ -36,10 +36,13 @@ extension SceneToAsm on Scene {
         lastEventBreak = dialogAsm.add(eventBreak());
       }
 
-      eventAsm.add(comment('scene event $eventCounter'));
-      eventAsm.add(event.generateAsm(generator, ctx));
+      var generated = event.generateAsm(generator, ctx);
 
-      eventCounter++;
+      if (generated.isNotEmpty) {
+        eventAsm.add(comment('scene event $eventCounter'));
+        eventAsm.add(generated);
+        eventCounter++;
+      }
     }
 
     if (generatingDialog) {
