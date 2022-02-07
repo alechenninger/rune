@@ -693,8 +693,13 @@ class RelativeMoves {
   Point<int> get relativePosition =>
       movesMade.map((m) => m.asPoint).reduce((sum, p) => sum + p);
   Direction get facing => movesMade.last.direction;
+  int get relativeDistance => relativePosition.steps;
 
-  RelativeMoves(this.movesMade);
+  RelativeMoves(this.movesMade) {
+    if (movesMade.isEmpty) {
+      throw ArgumentError('must not be empty', 'movesMade');
+    }
+  }
 }
 
 class Move {
