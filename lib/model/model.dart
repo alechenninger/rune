@@ -267,6 +267,10 @@ abstract class Movement {
   List<Vector> get continuousMovements;
 
   RelativeMoves lookahead(int steps) {
+    if (steps == 0) {
+      return RelativeMoves([Vector(0, direction)]);
+    }
+
     var stepsTaken = 0;
     var movements = List.of(continuousMovements);
     var movesMade = <Vector>[];
@@ -286,10 +290,6 @@ abstract class Movement {
         stepsTaken += delayToTake;
         movements = List.of(after.continuousMovements);
       }
-    }
-
-    if (movesMade.isEmpty) {
-      movesMade.add(Vector(0, direction));
     }
 
     return RelativeMoves(movesMade);

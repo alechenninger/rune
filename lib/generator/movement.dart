@@ -112,7 +112,6 @@ extension MoveToAsm on IndividualMoves {
 
         if (movement.delay == 0) {
           allDelay = false;
-          toA4(moveable);
 
           var current = ctx.positions[moveable];
           if (current == null) {
@@ -121,18 +120,23 @@ extension MoveToAsm on IndividualMoves {
 
           stepsToTake = movement.distance.min(maxSteps);
           var afterSteps = movement.lookahead(stepsToTake);
-          var destination =
-              current + afterSteps.relativePosition * unitsPerStep;
-          ctx.positions[moveable] = destination;
-          ctx.facing[moveable] = afterSteps.facing;
 
-          var x = Word(destination.x).i;
-          var y = Word(destination.y).i;
+          if (afterSteps.relativePosition.steps > 0) {
+            var destination =
+                current + afterSteps.relativePosition * unitsPerStep;
+            ctx.positions[moveable] = destination;
+            ctx.facing[moveable] = afterSteps.facing;
 
-          if (i == lastMoveIndex) {
-            asm.add(moveCharacter(x: x, y: y));
-          } else {
-            asm.add(setDestination(x: x, y: y));
+            var x = Word(destination.x).i;
+            var y = Word(destination.y).i;
+
+            toA4(moveable);
+
+            if (i == lastMoveIndex) {
+              asm.add(moveCharacter(x: x, y: y));
+            } else {
+              asm.add(setDestination(x: x, y: y));
+            }
           }
         }
 
