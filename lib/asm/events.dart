@@ -34,6 +34,8 @@ Asm getAndRunDialog(Address dialogId) {
 /// Use after F7 (see TextCtrlCode_Terminate2 and 3)
 Asm popAndRunDialog() {
   return Asm([
+    // appears around popdlg in one scene for some reason
+    //clr.b(Label('Render_Sprites_In_Cutscenes').w),
     cmd('popdlg', []),
     jsr(Label('Event_RunDialogue').l),
   ]);

@@ -10,6 +10,7 @@ export 'data.dart';
 /// Data constant
 const DcMnemonic dc = DcMnemonic();
 const MoveMnemonic move = MoveMnemonic();
+const ClrMnemonic clr = ClrMnemonic();
 
 Asm comment(String comment) => _Instruction(comment: comment).toAsm();
 
@@ -34,6 +35,12 @@ class MoveMnemonic {
   Asm b(Address from, Address to) => cmd('move.b', [from, to]);
   Asm w(Address from, Address to) => cmd('move.w', [from, to]);
   Asm l(Address from, Address to) => cmd('move.l', [from, to]);
+}
+
+class ClrMnemonic {
+  const ClrMnemonic();
+  //clr.b	(Render_Sprites_In_Cutscenes).w
+  Asm b(Address dst) => cmd('clr.b', [dst]);
 }
 
 class AsmError extends ArgumentError {
