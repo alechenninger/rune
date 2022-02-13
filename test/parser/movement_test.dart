@@ -49,10 +49,9 @@ void main() {
 Shay starts at #230, #240
 Alys is in slot 1
 Shay is in slot 2
-Alys walks 7 steps right, 10 steps up.
-After 5 steps, Shay walks 1 down, walks 7 right, 3 steps up.
-The camera locks.
-Alys walks 2 steps up and faces up.''');
+Alys walks 17 steps left, 11 steps up, 4 steps right, 1 step up
+After 2 steps, Shay walks 2 steps down, 14 steps left, and faces up
+After 1 step, Shay walks 6 steps up''');
 
     var scene = Scene([events]);
     var generator = AsmGenerator();

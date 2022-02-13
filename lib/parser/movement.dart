@@ -12,10 +12,10 @@ import 'package:rune/numbers.dart';
 import '../model/model.dart';
 
 // todo: see ParseContext idea
-var log = Logger();
+var log = Logger(filter: ProductionFilter(), printer: SimplePrinter());
 
 final topLevelExpressions = <EventExpression>[
-  MoveableStartsAtExpression(),
+  MoveablePositionExpression(),
   MoveableSlotExpression(),
   LockCameraExpression(),
   IndividualMovesExpression(),
@@ -76,9 +76,10 @@ final pMoveable = RegExp(r'^([Tt]he character in slot (\d+)|\w+) ');
 final pEnd = RegExp(r'^[. \n]*');
 final pAndThen = RegExp(r',? ?((and|then|and then) )?');
 
-class MoveableStartsAtExpression extends EventExpression {
-  static final pStartsAt =
-      RegExp(r'^starts at (?<x_hex>#)?(?<x>\d+),? ?(?<y_hex>#)?(?<y>\d+)');
+class MoveablePositionExpression extends EventExpression {
+  static final pStartsAt = RegExp(r'^(starts|is) at '
+      r'(?<x_hex>#)?(?<x>[A-F\d]+),? ?'
+      r'(?<y_hex>#)?(?<y>[A-F\d]+)');
 
   @override
   ParseResult<Event> parse(String expression) {
@@ -201,7 +202,7 @@ abstract class MoveExpression {
 
 class RelativeMoveExpression extends MoveExpression {
   static final pDelay =
-      RegExp(r'^(Then, |After (?<delay>\d+) (steps?|spaces?),? )');
+      RegExp(r'^([Tt]hen, |[Aa]fter (?<delay>\d+) (steps?|spaces?),? )');
   static final pSteps =
       RegExp(r'^((walks|continues|moves) )?(?<distance>\d+) ((step|space)s? )?'
           r'(?<direction>\w+)');
