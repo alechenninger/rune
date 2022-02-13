@@ -14,3 +14,6 @@ doc/api/
 
 # With secrets
 bin/_docs.dart
+compile_gs
+
+out/
