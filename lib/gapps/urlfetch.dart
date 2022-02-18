@@ -13,30 +13,37 @@
 // limitations under the License.
 
 @JS()
-library html;
+library script;
 
 import 'package:js/js.dart';
 
 @JS()
-class HtmlService {
-  // TODO: argument could also be a `BlobSource`. Don't need it yet.
-  external static HtmlOutput createHtmlOutput([String html]);
-  external static HtmlTemplate createTemplateFromFile(String file);
+class UrlFetchApp {
+  external static HTTPResponse fetch(String url, [Options options]);
 }
 
 @JS()
-class HtmlOutput {
-  external HtmlOutput setContent(String content);
-  external HtmlOutput setWidth(int width);
-  external HtmlOutput setHeight(int height);
-  external HtmlOutput setTitle(String title);
-  external int getWidth();
-  external int getHeight();
-  external String getTitle();
+class HTTPResponse {
+  external String getContentText([String charset]);
+  external int getResponseCode();
 }
 
 @JS()
-class HtmlTemplate {
-  external set url(String url);
-  external HtmlOutput evaluate();
+@anonymous
+class Options {
+  external String get method;
+  external String get contentType;
+  external get payload;
+
+  external factory Options(
+      {String method, String contentType, String payload, Headers headers});
 }
+
+@JS()
+@anonymous
+class Headers {
+  external get authorization;
+
+  external factory Headers({String authorization});
+}
+//var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, "input to hash");

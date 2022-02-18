@@ -16,18 +16,20 @@ extension SceneToAsm on Scene {
     var lastEventBreak = -1;
     var eventCounter = 1;
 
-    for (var event in events) {
-      if (event is Dialog) {
-        if (!generatingDialog) {
-          eventAsm.add(popAndRunDialog());
-          eventAsm.addNewline();
-        }
-
+    void addDialog(Dialog dialog) {
+      if (!generatingDialog) {
+        eventAsm.add(popAndRunDialog());
+        eventAsm.addNewline();
         generatingDialog = true;
-        dialogAsm.add(event.generateAsm(generator, ctx));
-        continue;
+      } else if (dialogAsm.isNotEmpty) {
+        // Consecutive dialog, new cursor in between each dialog
+        dialogAsm.add(cursor());
       }
 
+      dialogAsm.add(dialog.generateAsm(generator, ctx));
+    }
+
+    void addEvent(Event event) {
       if (generatingDialog && dialogAsm.isNotEmpty) {
         generatingDialog = false;
         // or enddialog/terminate? FF
@@ -43,6 +45,14 @@ extension SceneToAsm on Scene {
         eventAsm.add(comment('generated from type: ${event.runtimeType}'));
         eventAsm.add(generated);
         eventCounter++;
+      }
+    }
+
+    for (var event in events) {
+      if (event is Dialog) {
+        addDialog(event);
+      } else {
+        addEvent(event);
       }
     }
 

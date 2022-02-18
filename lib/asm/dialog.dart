@@ -7,7 +7,7 @@ class _ControlCodes {
   static final newLine = Bytes.hex('FC');
   static final cursor = Bytes.hex('FD');
   static final endDialog = Bytes.hex('FF');
-  static final event = Bytes.hex('F7');
+  static final event = Bytes.hex('F7'); // same as FE
 }
 
 Asm eventBreak() {
@@ -16,6 +16,10 @@ Asm eventBreak() {
 
 Asm endDialog() {
   return dc.b(_ControlCodes.endDialog);
+}
+
+Asm cursor() {
+  return dc.b(_ControlCodes.cursor);
 }
 
 Asm dialog(Bytes portrait, Bytes dialog) {
@@ -39,9 +43,9 @@ Asm dialog(Bytes portrait, Bytes dialog) {
   }
 
   for (var i = 0; i < dialog.length; i++) {
-    var c = dialog[i];
+    var char = dialog[i];
 
-    if (_isBreakable(c, dialog, i)) {
+    if (_isBreakable(char, dialog, i)) {
       breakPoint = i;
     }
 
@@ -60,8 +64,6 @@ Asm dialog(Bytes portrait, Bytes dialog) {
   if (remaining.isNotEmpty) {
     append(remaining);
   }
-
-  asm.add(dc.b(_ControlCodes.cursor));
 
   return asm;
 }

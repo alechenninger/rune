@@ -13,30 +13,18 @@
 // limitations under the License.
 
 @JS()
-library html;
+library script;
 
 import 'package:js/js.dart';
 
 @JS()
-class HtmlService {
-  // TODO: argument could also be a `BlobSource`. Don't need it yet.
-  external static HtmlOutput createHtmlOutput([String html]);
-  external static HtmlTemplate createTemplateFromFile(String file);
+class LockService {
+  external static Lock getDocumentLock();
 }
 
 @JS()
-class HtmlOutput {
-  external HtmlOutput setContent(String content);
-  external HtmlOutput setWidth(int width);
-  external HtmlOutput setHeight(int height);
-  external HtmlOutput setTitle(String title);
-  external int getWidth();
-  external int getHeight();
-  external String getTitle();
-}
-
-@JS()
-class HtmlTemplate {
-  external set url(String url);
-  external HtmlOutput evaluate();
+class Lock {
+  external bool tryLock(int timeoutInMillis);
+  external void waitLock(int timeoutInMillis);
+  external void releaseLock();
 }

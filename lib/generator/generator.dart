@@ -4,7 +4,7 @@ import 'package:rune/asm/events.dart';
 import 'package:rune/model/model.dart';
 
 import 'dialog.dart';
-import 'event.dart';
+import 'scene.dart';
 import 'movement.dart';
 
 export '../asm/asm.dart' show Asm;

@@ -1,9 +1,16 @@
 @JS()
 library rune_docs;
 
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:js/js.dart';
 import 'package:rune/gapps/document.dart';
 import 'package:rune/gapps/drive.dart';
+import 'package:rune/gapps/lock.dart';
+import 'package:rune/gapps/script.dart';
+import 'package:rune/gapps/urlfetch.dart';
+import 'package:rune/gapps/utilities.dart';
 import 'package:rune/parser/gdocs.dart' as gdocs;
 
 @JS()
@@ -39,9 +46,37 @@ void compileSceneDart() {
 
   var scene = gdocs.compileScene(heading.asParagraph());
 
+  var lock = LockService.getDocumentLock();
+  lock.waitLock(30 * 1000);
+
   var folder = DriveApp.getFolderById('__RUNE_DRIVE_FOLDER_ID__');
-  updateFile(folder, '${scene.id}_dialog.asm', scene.asm.dialog.toString());
-  updateFile(folder, '${scene.id}_event.asm', scene.asm.event.toString());
+
+  var dialogAsm = scene.asm.dialog.toString();
+  var eventAsm = scene.asm.event.toString();
+
+  var dialogFile = updateFile(folder, '${scene.id}_dialog.asm', dialogAsm);
+  var eventFile = updateFile(folder, '${scene.id}_event.asm', eventAsm);
+
+  var checksums = [hash(dialogFile, dialogAsm), hash(eventFile, eventAsm)];
+
+  var response = UrlFetchApp.fetch(
+      '__RUNE_BUILD_SERVER__',
+      Options(
+          method: 'post',
+          contentType: 'application/json',
+          payload: jsonEncode(checksums),
+          headers: Headers(
+              authorization: 'Bearer ${ScriptApp.getIdentityToken()}')));
+
+  var text = response.getContentText('UTF-8');
+
+  var object = json.decode(text);
+  var url = object['uri'];
+  var template = HtmlService.createTemplateFromFile('download.html')..url = url;
+  var html = template.evaluate().setWidth(400).setHeight(75);
+  DocumentApp.getUi().showModalDialog(html, 'Build complete');
+
+  lock.releaseLock();
 }
 
 Paragraph? findHeadingForCursor(Position cursor) {
@@ -79,4 +114,20 @@ Folder folderByName(Folder parent, String name) {
     return folders.next();
   }
   return parent.createFolder(name);
+}
+
+Checksum hash(File file, String content) {
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, content);
+  return Checksum(fileId: file.getId(), md5: Digest(digest).toString());
+}
+
+class Checksum {
+  final String fileId;
+  final String md5;
+
+  Checksum({required this.fileId, required this.md5});
+
+  Map toJson() {
+    return {'fileId': fileId, 'md5': md5};
+  }
 }

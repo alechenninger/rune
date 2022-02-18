@@ -3,8 +3,8 @@ import 'package:rune/parser/movement.dart';
 
 import '../asm/asm.dart';
 import '../gapps/document.dart';
-import '../generator/event.dart';
 import '../generator/generator.dart';
+import '../generator/scene.dart';
 import '../model/model.dart';
 
 class CompiledScene {
@@ -174,6 +174,7 @@ abstract class Tech {
   }
 }
 
+// todo: move this somewhere else? used by scene_source
 class SceneId {
   final String id;
 

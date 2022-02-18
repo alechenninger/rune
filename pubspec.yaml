@@ -1,5 +1,5 @@
 name: rune
-description: A sample command-line application.
+description: A DSL for scripting Sega PSIV disassembly cutscenes.
 # version: 1.0.0
 # homepage: https://www.example.com
 
