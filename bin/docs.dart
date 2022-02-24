@@ -5,9 +5,11 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:js/js.dart';
+import 'package:js/js_util.dart';
 import 'package:logging/logging.dart';
 import 'package:rune/gapps/console.dart';
 import 'package:rune/gapps/document.dart' hide Logger;
+import 'package:rune/gapps/document.dart' as docs show Logger;
 import 'package:rune/gapps/drive.dart';
 import 'package:rune/gapps/lock.dart';
 import 'package:rune/gapps/script.dart';
@@ -38,24 +40,30 @@ void main(List<String> arguments) {
 
 void initLogging() {
   Logger.root.level = Level.FINE;
-  Logger.root.onRecord.listen(googleCloudLogging(consolePrinter));
+  Logger.root.onRecord.listen(googleCloudLogging(logger));
+}
+
+void logger(object, Level level) {
+  docs.Logger.log(jsify(object));
 }
 
 void consolePrinter(object, Level level) {
   if (level >= Level.SEVERE) {
-    console.error(object);
+    console.error(jsify(object));
   } else if (level >= Level.WARNING) {
-    console.warn(object);
+    console.warn(jsify(object));
   } else if (level >= Level.CONFIG) {
-    console.info(object);
+    console.info(jsify(object));
   } else {
-    console.log(object);
+    console.log(jsify(object));
   }
 }
 
 var log = Logger('docs');
 
 void compileSceneDart() {
+  initLogging();
+
   var cursor = DocumentApp.getActiveDocument().getCursor();
 
   if (cursor == null) return;

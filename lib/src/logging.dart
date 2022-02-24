@@ -22,15 +22,14 @@ extension TerseLog on Logger {
   }
 }
 
-void _printPrinter(object, _) => print(object);
+var _jsonEncoder = JsonEncoder.withIndent(null, (o) {
+  if (o is Iterable) return o.toList(growable: false);
+  return o.toJson();
+});
+void _printPrinter(object, _) => print(_jsonEncoder.convert(object));
 
 void Function(LogRecord) googleCloudLogging(
     [void Function(Object, Level) printer = _printPrinter]) {
-  var jsonEncoder = JsonEncoder.withIndent(null, (o) {
-    if (o is Iterable) return o.toList(growable: false);
-    return o.toJson();
-  });
-
   return (LogRecord r) {
     var object = _toJson(r.object);
     var error = _errToJson(r.error);
@@ -40,8 +39,8 @@ void Function(LogRecord) googleCloudLogging(
       'seq': r.sequenceNumber,
       'logger': r.loggerName,
       'time': r.time.toIso8601String(),
-      if (r.message != object?.toString() && r.message != error?.toString())
-        'message': r.message,
+      'message': r.message,
+      'severity': _gcpSeverity(r.level),
       if (object != null) ...object,
       if (error != null) 'error': error,
       if (stack != null)
@@ -49,8 +48,44 @@ void Function(LogRecord) googleCloudLogging(
             .toList(growable: false)
     };
 
-    printer(jsonEncoder.convert(out), r.level);
+    printer(out, r.level);
   };
+}
+
+String _gcpSeverity(Level l) {
+  /*
+DEFAULT	(0) The log entry has no assigned severity level.
+DEBUG	(100) Debug or trace information.
+INFO	(200) Routine information, such as ongoing status or performance.
+NOTICE	(300) Normal but significant events, such as start up, shut down, or a configuration change.
+WARNING	(400) Warning events might cause problems.
+ERROR	(500) Error events are likely to cause problems.
+CRITICAL	(600) Critical events cause more severe problems or outages.
+ALERT	(700) A person must take an action immediately.
+EMERGENCY	(800) One or more systems are unusable.
+   */
+
+  if (l >= Level.SHOUT) {
+    return 'EMERGENCY';
+  }
+
+  if (l >= Level.SEVERE) {
+    return 'CRITICAL';
+  }
+
+  if (l >= Level.WARNING) {
+    return 'WARNING';
+  }
+
+  if (l >= Level.CONFIG) {
+    return 'INFO';
+  }
+
+  if (l >= Level.FINE) {
+    return 'DEBUG';
+  }
+
+  return 'DEFAULT';
 }
 
 Object? _errToJson(Object? error) {

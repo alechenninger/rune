@@ -46,13 +46,17 @@ CompiledScene compileScene(Paragraph heading) {
     // todo: how to order dialog vs tech?
     var d = parseDialog(p);
     if (d != null) {
-      log.f(e('parsed_dialog', {'speaker': d.speaker, 'spans': d.spans}));
+      log.f(e('parsed_dialog', {
+        'speaker': d.speaker.toString(),
+        'spans': d.spans.map((e) => {'text': e.text, 'italic': e.italic})
+      }));
       scene.addEvent(d);
     }
 
     var event = Tech.parseFirst<Event>(p);
     if (event != null) {
-      log.f(e('parsed_event', {'event': event, 'text': p.getText()}));
+      log.f(
+          e('parsed_event', {'event': event.toString(), 'text': p.getText()}));
       scene.addEvent(event);
     }
   }
@@ -88,7 +92,7 @@ Dialog? parseDialog(Paragraph p) {
   if (portrait.getType() != DocumentApp.ElementType.INLINE_IMAGE) {
     log.f(e('not_dialog', {
       'reason': 'first child is not an image',
-      'firstChild': portrait,
+      'firstChild': portrait.toString(),
     }));
     return null;
   }
@@ -96,7 +100,7 @@ Dialog? parseDialog(Paragraph p) {
   if (speech.getType() != DocumentApp.ElementType.TEXT) {
     log.f(e('not_dialog', {
       'reason': 'second child is not text',
-      'secondChild': speech,
+      'secondChild': speech.toString(),
     }));
     return null;
   }
@@ -169,7 +173,8 @@ abstract class Tech {
         if (img.getAltTitle()?.startsWith('tech:') == true) {
           var type = img.getAltTitle()!.substring(5).trim();
 
-          log.f(e('found_tech', {'type': type, 'container': container}));
+          log.f(e('found_tech',
+              {'type': type.toString(), 'container': container.toString()}));
 
           var content = img.getAltDescription();
           tech = _techForType(type, content);
@@ -177,7 +182,7 @@ abstract class Tech {
       }
 
       if (tech != null && tech is T) {
-        log.f(e('parsed_tech', {'type': T}));
+        log.f(e('parsed_tech', {'type': T.toString()}));
         return tech as T;
       }
     }
