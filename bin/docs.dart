@@ -5,13 +5,16 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:js/js.dart';
-import 'package:rune/gapps/document.dart';
+import 'package:logging/logging.dart';
+import 'package:rune/gapps/console.dart';
+import 'package:rune/gapps/document.dart' hide Logger;
 import 'package:rune/gapps/drive.dart';
 import 'package:rune/gapps/lock.dart';
 import 'package:rune/gapps/script.dart';
 import 'package:rune/gapps/urlfetch.dart';
 import 'package:rune/gapps/utilities.dart';
 import 'package:rune/parser/gdocs.dart' as gdocs;
+import 'package:rune/src/logging.dart';
 
 @JS()
 external set compileSceneLib(value);
@@ -24,12 +27,33 @@ void onOpenDart(e) {
       .createMenu('Rune')
       .addItem('Compile scene', 'compileScene')
       .addToUi();
+
+  initLogging();
 }
 
 void main(List<String> arguments) {
   onOpenLib = allowInterop(onOpenDart);
   compileSceneLib = allowInterop(compileSceneDart);
 }
+
+void initLogging() {
+  Logger.root.level = Level.FINE;
+  Logger.root.onRecord.listen(googleCloudLogging(consolePrinter));
+}
+
+void consolePrinter(object, Level level) {
+  if (level >= Level.SEVERE) {
+    console.error(object);
+  } else if (level >= Level.WARNING) {
+    console.warn(object);
+  } else if (level >= Level.CONFIG) {
+    console.info(object);
+  } else {
+    console.log(object);
+  }
+}
+
+var log = Logger('docs');
 
 void compileSceneDart() {
   var cursor = DocumentApp.getActiveDocument().getCursor();
@@ -40,7 +64,7 @@ void compileSceneDart() {
   var heading = findHeadingForCursor(cursor);
 
   if (heading == null) {
-    Logger.log('no starting heading found');
+    log.i(e('no_heading'));
     return;
   }
 

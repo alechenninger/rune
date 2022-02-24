@@ -6,13 +6,14 @@ instruction
 
 import 'dart:math';
 
-import 'package:logger/logger.dart';
+import 'package:logging/logging.dart';
 import 'package:rune/numbers.dart';
+import 'package:rune/src/logging.dart';
 
 import '../model/model.dart';
 
 // todo: see ParseContext idea
-var log = Logger(filter: ProductionFilter(), printer: SimplePrinter());
+var log = Logger('parser/movement');
 
 final topLevelExpressions = <EventExpression>[
   MoveablePositionExpression(),
@@ -42,16 +43,19 @@ Event parseEvent(String script) {
             toParse.substring(0, toParse.length - parsed.unparsed.length);
         toParse = pEnd.parse(parsed.unparsed).unparsed;
         events.add(parsed.result);
-        log.d('<parsed>\n${parsed.result}\n<from>\n$parsedText');
-      } on FormatException catch (e) {
-        log.v(e);
+        log.f(e(
+            'parsed_movement', {'text': parsedText, 'result': parsed.result}));
+      } on FormatException catch (err) {
+        log.finer(
+            e('unmatched_movement_expression', {'exp': expression.runtimeType}),
+            err);
         continue;
       }
     }
 
     if (!parseable) {
       if (toParse.isNotEmpty) {
-        log.e('unparseable: $toParse');
+        log.e(e('unparseable', {'text': toParse}));
       }
       break;
     }

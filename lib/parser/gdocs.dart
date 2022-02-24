@@ -1,11 +1,13 @@
 import 'package:characters/src/extensions.dart';
+import 'package:logging/logging.dart';
 import 'package:rune/parser/movement.dart';
 
 import '../asm/asm.dart';
-import '../gapps/document.dart';
+import '../gapps/document.dart' hide Logger;
 import '../generator/generator.dart';
 import '../generator/scene.dart';
 import '../model/model.dart';
+import '../src/logging.dart';
 
 class CompiledScene {
   final SceneId id;
@@ -13,6 +15,8 @@ class CompiledScene {
 
   CompiledScene(this.id, this.asm);
 }
+
+var log = Logger('parser/gdocs');
 
 // Consider not also doing the generation and just spit out the model instead
 /// Parse from the provided [heading] element until the next paragraph heading.
@@ -25,28 +29,30 @@ CompiledScene compileScene(Paragraph heading) {
   var scene = Scene();
 
   // now parse elements until next heading
-  for (var e = heading.getNextSibling(); e != null; e = e.getNextSibling()) {
-    if (e.getType() != DocumentApp.ElementType.PARAGRAPH) {
+  for (var el = heading.getNextSibling();
+      el != null;
+      el = el.getNextSibling()) {
+    if (el.getType() != DocumentApp.ElementType.PARAGRAPH) {
       continue;
     }
 
-    var p = e.asParagraph();
+    var p = el.asParagraph();
 
     if (p.getHeading() != DocumentApp.ParagraphHeading.NORMAL) {
-      Logger.log('finishing current scene; new scene detected: ${p.getText()}');
+      log.f(e('parsed_scene_end_from_heading', {'heading': p.getText()}));
       break;
     }
 
     // todo: how to order dialog vs tech?
     var d = parseDialog(p);
     if (d != null) {
-      Logger.log('${d.speaker}: ${d.spans}');
+      log.f(e('parsed_dialog', {'speaker': d.speaker, 'spans': d.spans}));
       scene.addEvent(d);
     }
 
     var event = Tech.parseFirst<Event>(p);
     if (event != null) {
-      Logger.log('found event from: "${p.getText()}": $event');
+      log.f(e('parsed_event', {'event': event, 'text': p.getText()}));
       scene.addEvent(event);
     }
   }
@@ -67,7 +73,11 @@ Pause? parsePause(Paragraph p) {
 Dialog? parseDialog(Paragraph p) {
   if (p.getNumChildren() < 2) {
     if (p.getText().isNotEmpty) {
-      Logger.log('not dialog; not enough children: "${p.getText()}"');
+      log.f(e('not_dialog', {
+        'reason': 'not enough children',
+        'text': p.getText(),
+        'children#': p.getNumChildren()
+      }));
     }
     return null;
   }
@@ -76,12 +86,18 @@ Dialog? parseDialog(Paragraph p) {
   var speech = p.getChild(1)!;
 
   if (portrait.getType() != DocumentApp.ElementType.INLINE_IMAGE) {
-    Logger.log('not dialog; first child is not an image: $portrait');
+    log.f(e('not_dialog', {
+      'reason': 'first child is not an image',
+      'firstChild': portrait,
+    }));
     return null;
   }
 
   if (speech.getType() != DocumentApp.ElementType.TEXT) {
-    Logger.log('not dialog; second child is not text: $speech');
+    log.f(e('not_dialog', {
+      'reason': 'second child is not text',
+      'secondChild': speech,
+    }));
     return null;
   }
 
@@ -92,13 +108,16 @@ Dialog? parseDialog(Paragraph p) {
   var text = speech.getText();
 
   if (speaker == null) {
-    Logger.log(
-        'not dialog; missing alt text on portrait image for dialog: "$text"');
+    log.f(e('not_dialog', {
+      'reason': 'missing alt text on portrait image for dialog',
+      'text': text
+    }));
     return null;
   }
 
   if (speaker.startsWith('tech:')) {
-    Logger.log('not dialog; inline image is tech: "$text"');
+    log.f(e('not_dialog',
+        {'reason': 'inline image is tech', 'text': text, 'tech': speaker}));
     return null;
   }
 
@@ -150,7 +169,7 @@ abstract class Tech {
         if (img.getAltTitle()?.startsWith('tech:') == true) {
           var type = img.getAltTitle()!.substring(5).trim();
 
-          Logger.log('found tech. type=$type container=$container');
+          log.f(e('found_tech', {'type': type, 'container': container}));
 
           var content = img.getAltDescription();
           tech = _techForType(type, content);
@@ -158,7 +177,7 @@ abstract class Tech {
       }
 
       if (tech != null && tech is T) {
-        Logger.log('tech is desired type. T=$T');
+        log.f(e('parsed_tech', {'type': T}));
         return tech as T;
       }
     }
