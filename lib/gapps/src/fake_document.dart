@@ -37,17 +37,13 @@ class Element {
     _indexInParent = indexInParent;
   }
 
-  InlineImage asInlineImage() {
-    return this as InlineImage;
-  }
+  InlineImage asInlineImage() => this as InlineImage;
 
-  Paragraph asParagraph() {
-    return this as Paragraph;
-  }
+  Paragraph asParagraph() => this as Paragraph;
 
-  Text asText() {
-    return this as Text;
-  }
+  Footnote asFootnote() => this as Footnote;
+
+  Text asText() => this as Text;
 
   Element? getNextSibling() {
     var parent = _parent;
@@ -83,6 +79,7 @@ class ContainerElement extends Element {
 
   ContainerElement(ElementType type) : super(type);
 
+  // TODO: use append* methods instead
   void addChild(Element el) {
     el.setParent(this, _children.length);
     _children.add(el);
@@ -195,6 +192,8 @@ class ElementTypeContainer {
   final INLINE_IMAGE = ElementType();
   final PARAGRAPH = ElementType();
   final TEXT = ElementType();
+  final FOOTNOTE = ElementType();
+  final FOOTNOTE_SECTION = ElementType();
 }
 
 class ElementType {}
@@ -239,4 +238,21 @@ class Position {
 class Logger {
   external static void log(Object? data,
       [Object? val1, Object? val2, Object? val3, Object? val5, Object? val6]);
+}
+
+class Footnote extends Element {
+  final FootnoteSection _contents;
+
+  Footnote(this._contents) : super(DocumentApp.ElementType.FOOTNOTE);
+
+  FootnoteSection getFootnoteContents() => _contents;
+}
+
+class FootnoteSection extends ContainerElement {
+  String _text = '';
+
+  FootnoteSection() : super(DocumentApp.ElementType.FOOTNOTE);
+
+  String getText() => _text;
+  void setText(String text) => _text = text;
 }

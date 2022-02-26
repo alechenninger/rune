@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:math' as math;
 
 import 'package:characters/characters.dart';
+import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
 
@@ -221,6 +222,16 @@ class IndividualMoves extends Event {
   String toString() {
     return '$moves';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IndividualMoves &&
+          runtimeType == other.runtimeType &&
+          MapEquality().equals(moves, other.moves);
+
+  @override
+  int get hashCode => MapEquality().hash(moves);
 }
 
 // character by name? character by slot? party?
@@ -443,10 +454,10 @@ class StepDirections extends Movement {
       identical(this, other) ||
       other is StepDirections &&
           runtimeType == other.runtimeType &&
-          _steps == other._steps;
+          ListEquality().equals(_steps, other._steps);
 
   @override
-  int get hashCode => _steps.hashCode;
+  int get hashCode => ListEquality().hash(_steps);
 }
 
 class StepToPoint extends Movement {

@@ -49,6 +49,7 @@ class Element {
   external Paragraph asParagraph();
   external Text asText();
   external InlineImage asInlineImage();
+  external Footnote asFootnote();
 }
 
 @JS()
@@ -105,6 +106,8 @@ class ElementTypeContainer {
   external ElementType get PARAGRAPH;
   external ElementType get INLINE_IMAGE;
   external ElementType get TEXT;
+  external ElementType get FOOTNOTE;
+  external ElementType get FOOTNOTE_SECTION;
 }
 
 @JS()
@@ -169,4 +172,14 @@ class ContainerElement extends Element {
 class InlineImage extends Element {
   external String? getAltTitle();
   external String? getAltDescription();
+}
+
+@JS()
+class Footnote extends Element {
+  external FootnoteSection getFootnoteContents();
+}
+
+@JS()
+class FootnoteSection extends ContainerElement {
+  external String getText();
 }

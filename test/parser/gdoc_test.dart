@@ -2,10 +2,11 @@ import 'package:rune/asm/asm.dart';
 import 'package:rune/gapps/document.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/parser/gdocs.dart';
+import 'package:rune/parser/movement.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('tech', () {
+  group('tech.parse', () {
     test('aggregate groups many events', () {
       var tech = Tech.parse<Event>(Paragraph()
         ..addChild(
@@ -31,6 +32,13 @@ tech:asm_event
 
       var asm = agg.events[1] as AsmEvent;
       expect(asm.asm, equals(Asm.fromRaw('; test')));
+    });
+
+    test('footnote parses as event tech', () {
+      var footnote = Footnote(FootnoteSection()..setText('Alys faces up'));
+      var tech = Tech.parse(Paragraph()..addChild(footnote));
+
+      expect(tech, equals(parseEvent('Alys faces up')));
     });
   });
 }

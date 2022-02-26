@@ -14,6 +14,8 @@
 
 library document;
 
+import 'package:rune/gapps/document.dart';
+
 import '../ui.dart';
 
 export '../html.dart';
@@ -45,6 +47,7 @@ class Element {
   Paragraph asParagraph() => throw UnsupportedError('');
   Text asText() => throw UnsupportedError('');
   InlineImage asInlineImage() => throw UnsupportedError('');
+  Footnote asFootnote() => throw UnsupportedError('');
 }
 
 class Body extends Element {
@@ -96,6 +99,8 @@ class ElementTypeContainer {
   ElementType get PARAGRAPH => throw UnsupportedError('');
   ElementType get INLINE_IMAGE => throw UnsupportedError('');
   ElementType get TEXT => throw UnsupportedError('');
+  ElementType get FOOTNOTE => throw UnsupportedError('');
+  ElementType get FOOTNOTE_SECTION => throw UnsupportedError('');
 }
 
 class ElementType {}
@@ -158,4 +163,14 @@ class InlineImage extends Element {
 
   String? getAltTitle() => throw UnsupportedError('');
   String? getAltDescription() => throw UnsupportedError('');
+}
+
+class Footnote extends Element {
+  Footnote(FootnoteSection section);
+  FootnoteSection getFootnoteContents() => throw UnsupportedError('');
+}
+
+class FootnoteSection extends ContainerElement {
+  String getText() => throw UnsupportedError('');
+  void setText(String text) => throw UnsupportedError('');
 }

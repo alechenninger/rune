@@ -156,7 +156,7 @@ Dialog? parseDialog(Paragraph p) {
 
 bool nullToFalse(bool? b) => b ?? false;
 
-abstract class Tech {
+class Tech {
   static final _inlineTechP = RegExp(r'---\ntech:(\w+)\n---\n');
 
   static final _techs = <String, Object Function(String?)>{
@@ -194,19 +194,16 @@ abstract class Tech {
     var techs = <Object>[];
 
     for (var i = 0; i < container.getNumChildren(); i++) {
-      var child = container.getChild(i);
+      var child = container.getChild(i)!;
 
-      if (child?.getType() == DocumentApp.ElementType.INLINE_IMAGE) {
-        var img = child!.asInlineImage();
-        if (img.getAltTitle()?.startsWith('tech:') == true) {
-          var type = img.getAltTitle()!.substring(5).trim();
-
-          log.f(e('found_tech',
-              {'type': type.toString(), 'container': container.toString()}));
-
-          var content = img.getAltDescription();
-          techs.add(_techForType(type, content));
-        }
+      if (child.getType() == DocumentApp.ElementType.INLINE_IMAGE) {
+        var img = child.asInlineImage();
+        var tech = _fromInlineImage(img);
+        if (tech != null) techs.add(tech);
+      } else if (child.getType() == DocumentApp.ElementType.FOOTNOTE) {
+        var fn = child.asFootnote();
+        var tech = _fromFootnote(fn);
+        if (tech != null) techs.add(tech);
       }
     }
 
@@ -218,6 +215,23 @@ abstract class Tech {
     if (AggregateEvent is T && techs.every((t) => t is Event)) {
       return AggregateEvent(techs.cast<Event>()) as T;
     }
+  }
+
+  static Object? _fromInlineImage(InlineImage img) {
+    if (img.getAltTitle()?.startsWith('tech:') == true) {
+      var type = img.getAltTitle()!.substring(5).trim();
+
+      log.f(e('found_tech',
+          {'type': type.toString(), 'container': 'inline_image'}));
+
+      var content = img.getAltDescription();
+
+      return _techForType(type, content);
+    }
+  }
+
+  static Object? _fromFootnote(Footnote fn) {
+    return _techForType('event', fn.getFootnoteContents().getText());
   }
 
   static Object _techForType(String type, String? content) {

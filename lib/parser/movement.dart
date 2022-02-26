@@ -60,6 +60,11 @@ Event parseEvent(String script) {
       break;
     }
   }
+
+  if (events.length == 1) {
+    return events[0];
+  }
+
   return AggregateEvent(events);
 }
 
