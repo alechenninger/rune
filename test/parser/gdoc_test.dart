@@ -1,3 +1,4 @@
+import 'package:rune/asm/asm.dart';
 import 'package:rune/gapps/document.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/parser/gdocs.dart';
@@ -22,6 +23,14 @@ tech:asm_event
       var agg = tech as AggregateEvent;
 
       expect(agg.events.length, equals(2));
+      expect(agg.events[0], isA<Pause>());
+      expect(agg.events[1], isA<AsmEvent>());
+
+      var pause = agg.events[0] as Pause;
+      expect(pause.duration, equals(Duration(seconds: 3)));
+
+      var asm = agg.events[1] as AsmEvent;
+      expect(asm.asm, equals(Asm.fromRaw('; test')));
     });
   });
 }
