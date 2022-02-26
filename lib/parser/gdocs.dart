@@ -23,9 +23,13 @@ var log = Logger('parser/gdocs');
 ///
 /// The heading text will be used as the scene ID unless a [SceneId] tech is
 /// found within the heading element.
-CompiledScene compileScene(Paragraph heading) {
-  var sceneId = Tech.parseFirst<SceneId>(heading) ??
-      SceneId.fromString(heading.getText());
+CompiledScene? compileSceneAtHeading(Paragraph heading) {
+  var sceneId = Tech.parseFirst<SceneId>(heading);
+
+  if (sceneId == null) {
+    return null;
+  }
+
   var scene = Scene();
 
   // now parse elements until next heading

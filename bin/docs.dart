@@ -6,10 +6,9 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:js/js.dart';
 import 'package:js/js_util.dart';
-import 'package:logging/logging.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:rune/gapps/console.dart';
-import 'package:rune/gapps/document.dart' hide Logger;
-import 'package:rune/gapps/document.dart' as docs show Logger;
+import 'package:rune/gapps/document.dart';
 import 'package:rune/gapps/drive.dart';
 import 'package:rune/gapps/lock.dart';
 import 'package:rune/gapps/script.dart';
@@ -19,7 +18,7 @@ import 'package:rune/parser/gdocs.dart' as gdocs;
 import 'package:rune/src/logging.dart';
 
 @JS()
-external set compileSceneLib(value);
+external set compileSceneAtCursorLib(value);
 
 @JS()
 external set onOpenLib(value);
@@ -27,70 +26,107 @@ external set onOpenLib(value);
 void onOpenDart(e) {
   DocumentApp.getUi()
       .createMenu('Rune')
-      .addItem('Compile scene', 'compileScene')
+      .addSubMenu(DocumentApp.getUi()
+          .createMenu('Compile')
+          .addItem('Scene at cursor', 'compileSceneAtCursor'))
       .addToUi();
-
-  initLogging();
 }
 
 void main(List<String> arguments) {
   onOpenLib = allowInterop(onOpenDart);
-  compileSceneLib = allowInterop(compileSceneDart);
+  compileSceneAtCursorLib = allowInterop(compileSceneAtCursorDart);
 }
 
 void initLogging() {
-  Logger.root.level = Level.FINE;
-  Logger.root.onRecord.listen(googleCloudLogging(logger));
+  logging.Logger.root.level = logging.Level.INFO;
+  logging.Logger.root.onRecord.listen(googleCloudLogging(logger));
 }
 
-void logger(object, Level level) {
-  docs.Logger.log(jsify(object));
+void logger(object, logging.Level level) {
+  Logger.log(jsify(object));
 }
 
-void consolePrinter(object, Level level) {
-  if (level >= Level.SEVERE) {
+void consolePrinter(object, logging.Level level) {
+  if (level >= logging.Level.SEVERE) {
     console.error(jsify(object));
-  } else if (level >= Level.WARNING) {
+  } else if (level >= logging.Level.WARNING) {
     console.warn(jsify(object));
-  } else if (level >= Level.CONFIG) {
+  } else if (level >= logging.Level.CONFIG) {
     console.info(jsify(object));
   } else {
     console.log(jsify(object));
   }
 }
 
-var log = Logger('docs');
+var log = logging.Logger('docs');
 
-void compileSceneDart() {
+void compileSceneAtCursorDart() {
   initLogging();
 
   var cursor = DocumentApp.getActiveDocument().getCursor();
 
-  if (cursor == null) return;
-
-  // find the starting element;
-  var heading = findHeadingForCursor(cursor);
-
-  if (heading == null) {
-    log.i(e('no_heading'));
+  var ui = DocumentApp.getUi();
+  if (cursor == null) {
+    log.i(e('no_cursor'));
+    ui.alert(
+        'No cursor found',
+        'Make sure your cursor is placed with a section under a heading with '
+            'a "scene_id" tech.',
+        ui.ButtonSet.OK);
     return;
   }
 
-  var scene = gdocs.compileScene(heading.asParagraph());
+  // find the starting element;
+  var heading = findHeadingForCursor(cursor);
+  gdocs.CompiledScene? scene;
 
+  if (heading == null) {
+    log.i(e('no_heading_for_cursor'));
+  } else {
+    console.time('compile_scene');
+    try {
+      scene = gdocs.compileSceneAtHeading(heading.asParagraph());
+    } finally {
+      console.timeEnd('compile_scene');
+    }
+  }
+
+  if (scene == null) {
+    log.i(e('no_scene_at_cursor'));
+    ui.alert(
+        'No scene found at cursor',
+        'Make sure your cursor is placed with a section under a heading with a '
+            '"scene_id" tech.',
+        ui.ButtonSet.OK);
+    return;
+  }
+
+  console.time('update_rom');
+
+  String url;
   var lock = LockService.getDocumentLock();
-  lock.waitLock(30 * 1000);
 
-  var folder = DriveApp.getFolderById('__RUNE_DRIVE_FOLDER_ID__');
+  try {
+    lock.waitLock(30 * 1000);
 
-  var dialogAsm = scene.asm.dialog.toString();
-  var eventAsm = scene.asm.event.toString();
+    var checksums = uploadToDrive(scene);
+    url = updateRom(checksums);
+  } finally {
+    console.timeEnd('update_rom');
+  }
 
-  var dialogFile = updateFile(folder, '${scene.id}_dialog.asm', dialogAsm);
-  var eventFile = updateFile(folder, '${scene.id}_event.asm', eventAsm);
+  showBuildComplete(url);
 
-  var checksums = [hash(dialogFile, dialogAsm), hash(eventFile, eventAsm)];
+  lock.releaseLock();
+}
 
+void showBuildComplete(url) {
+  var template = HtmlService.createTemplateFromFile('download.html')..url = url;
+  var html = template.evaluate().setWidth(400).setHeight(75);
+  DocumentApp.getUi().showModalDialog(html, 'Build complete');
+}
+
+String updateRom(List<Checksum> checksums) {
   var response = UrlFetchApp.fetch(
       '__RUNE_BUILD_SERVER__',
       Options(
@@ -101,14 +137,24 @@ void compileSceneDart() {
               authorization: 'Bearer ${ScriptApp.getIdentityToken()}')));
 
   var text = response.getContentText('UTF-8');
-
   var object = json.decode(text);
   var url = object['uri'];
-  var template = HtmlService.createTemplateFromFile('download.html')..url = url;
-  var html = template.evaluate().setWidth(400).setHeight(75);
-  DocumentApp.getUi().showModalDialog(html, 'Build complete');
 
-  lock.releaseLock();
+  return url;
+}
+
+List<Checksum> uploadToDrive(gdocs.CompiledScene scene) {
+  var folder = DriveApp.getFolderById('__RUNE_DRIVE_FOLDER_ID__');
+
+  var dialogAsm = scene.asm.dialog.toString();
+  var eventAsm = scene.asm.event.toString();
+
+  var dialogFile = updateFile(folder, '${scene.id}_dialog.asm', dialogAsm);
+  var eventFile = updateFile(folder, '${scene.id}_event.asm', eventAsm);
+
+  var checksums = [hash(dialogFile, dialogAsm), hash(eventFile, eventAsm)];
+
+  return checksums;
 }
 
 Paragraph? findHeadingForCursor(Position cursor) {
