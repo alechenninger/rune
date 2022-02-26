@@ -12,46 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-@JS()
 library ui;
 
-import 'package:js/js.dart';
-
-import 'html.dart';
-
-export 'html.dart';
-
-@JS()
-class UI {
-  external ButtonSetContainer get ButtonSet;
-
-  external void prompt(String msg);
-  external void alert(String titleOrPrompt,
-      [dynamic promptOrButtonSet, ButtonSetEnum buttonSet]);
-  external Menu createMenu(String caption);
-  external Menu createAddonMenu();
-  external void showModalDialog(HtmlOutput userInterface, String title);
-  external void showSidebar(HtmlOutput userInterface);
-}
-
-@JS()
-class Menu {
-  external Menu addItem(String caption, String functionName);
-  external Menu addSeparator();
-  external Menu addSubMenu(Menu menu);
-  external void addToUi();
-}
-
-@JS()
-class ButtonSetContainer {
-  external ButtonSetEnum get OK;
-  external ButtonSetEnum get OK_CANCEL;
-  external ButtonSetEnum get YES_NO;
-  external ButtonSetEnum get YES_NO_CANCEL;
-}
-
-@JS()
-class ButtonSetEnum {}
-
-@JS()
-class Button {}
+export 'src/stub_ui.dart' if (dart.library.html) 'src/js_ui.dart';

@@ -12,31 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-@JS()
 library html;
 
-import 'package:js/js.dart';
-
-@JS()
-class HtmlService {
-  // TODO: argument could also be a `BlobSource`. Don't need it yet.
-  external static HtmlOutput createHtmlOutput([String html]);
-  external static HtmlTemplate createTemplateFromFile(String file);
-}
-
-@JS()
-class HtmlOutput {
-  external HtmlOutput setContent(String content);
-  external HtmlOutput setWidth(int width);
-  external HtmlOutput setHeight(int height);
-  external HtmlOutput setTitle(String title);
-  external int getWidth();
-  external int getHeight();
-  external String getTitle();
-}
-
-@JS()
-class HtmlTemplate {
-  external set url(String url);
-  external HtmlOutput evaluate();
-}
+export 'src/stub_html.dart' if (dart.library.html) 'src/js_html.dart';

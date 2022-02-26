@@ -3,7 +3,7 @@ import 'package:logging/logging.dart';
 import 'package:rune/parser/movement.dart';
 
 import '../asm/asm.dart';
-import '../gapps/document.dart' hide Logger;
+import '../gapps/document.dart' hide Logger if (dart.library.io) '../gapps/fake_document.dart';
 import '../generator/generator.dart';
 import '../generator/scene.dart';
 import '../model/model.dart';
@@ -24,7 +24,7 @@ var log = Logger('parser/gdocs');
 /// The heading text will be used as the scene ID unless a [SceneId] tech is
 /// found within the heading element.
 CompiledScene? compileSceneAtHeading(Paragraph heading) {
-  var sceneId = Tech.parseFirst<SceneId>(heading);
+  var sceneId = Tech.parse<SceneId>(heading);
 
   if (sceneId == null) {
     return null;
@@ -57,7 +57,7 @@ CompiledScene? compileSceneAtHeading(Paragraph heading) {
       scene.addEvent(d);
     }
 
-    var event = Tech.parseFirst<Event>(p);
+    var event = Tech.parse<Event>(p);
     if (event != null) {
       log.f(
           e('parsed_event', {'event': event.toString(), 'text': p.getText()}));
@@ -157,21 +157,45 @@ Dialog? parseDialog(Paragraph p) {
 bool nullToFalse(bool? b) => b ?? false;
 
 abstract class Tech {
+  static final _inlineTechP = RegExp(r'---\ntech:(\w+)\n---\n');
+
   static final _techs = <String, Object Function(String?)>{
     'scene_id': (c) => SceneId(c!),
     'asm_event': (c) => AsmEvent(Asm.fromRaw(c!)),
     'pause_seconds': (c) =>
         Pause(Duration(milliseconds: (double.parse(c!) * 1000).toInt())),
     'event': (c) => parseEvent(c!),
+    'aggregate': (c) {
+      var events = <Event>[];
+
+      for (var match in _inlineTechP.allMatches(c!)) {
+        var type = match.group(1);
+        var remaining = c.substring(match.end);
+
+        var nextMatch = _inlineTechP.firstMatch(remaining);
+        if (nextMatch != null) {
+          remaining = remaining.substring(0, nextMatch.start);
+        }
+
+        var tech = _techForType(type!, remaining);
+        // TODO: else
+        if (tech is Event) {
+          events.add(tech);
+        }
+      }
+
+      return AggregateEvent(events);
+    }
   };
 
   const Tech();
 
-  static T? parseFirst<T>(ContainerElement container) {
-    for (var i = 0; i < container.getNumChildren(); i++) {
-      Object? tech;
+  static T? parse<T>(ContainerElement container) {
+    var techs = <Object>[];
 
+    for (var i = 0; i < container.getNumChildren(); i++) {
       var child = container.getChild(i);
+
       if (child?.getType() == DocumentApp.ElementType.INLINE_IMAGE) {
         var img = child!.asInlineImage();
         if (img.getAltTitle()?.startsWith('tech:') == true) {
@@ -181,14 +205,18 @@ abstract class Tech {
               {'type': type.toString(), 'container': container.toString()}));
 
           var content = img.getAltDescription();
-          tech = _techForType(type, content);
+          techs.add(_techForType(type, content));
         }
       }
+    }
 
-      if (tech != null && tech is T) {
-        log.f(e('parsed_tech', {'type': T.toString()}));
-        return tech as T;
-      }
+    if (techs.length == 1 && techs.first is T) {
+      log.f(e('parsed_tech', {'type': T.toString()}));
+      return techs.first as T;
+    }
+
+    if (AggregateEvent is T && techs.every((t) => t is Event)) {
+      return AggregateEvent(techs.cast<Event>()) as T;
     }
   }
 
@@ -230,4 +258,15 @@ class AsmEvent implements Event {
 
 String _toFileSafe(String name) {
   return name.replaceAll(RegExp('[\s().]'), '_');
+}
+
+class UnsupportedTechException implements Exception {
+  final String tech;
+
+  UnsupportedTechException(this.tech);
+
+  @override
+  String toString() {
+    return 'UnsupportedTechException{tech: $tech}';
+  }
 }
