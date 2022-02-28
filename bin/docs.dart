@@ -38,7 +38,7 @@ void main(List<String> arguments) {
 }
 
 void initLogging() {
-  logging.Logger.root.level = logging.Level.INFO;
+  logging.Logger.root.level = logging.Level.FINER;
   logging.Logger.root.onRecord.listen(googleCloudLogging(logger));
 }
 

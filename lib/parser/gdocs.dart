@@ -2,8 +2,8 @@ import 'package:characters/src/extensions.dart';
 import 'package:logging/logging.dart';
 import 'package:rune/parser/movement.dart';
 
-import '../asm/asm.dart';
-import '../gapps/document.dart' hide Logger if (dart.library.io) '../gapps/fake_document.dart';
+import '../gapps/document.dart'
+    if (dart.library.io) '../gapps/src/fake_document.dart' hide Logger;
 import '../generator/generator.dart';
 import '../generator/scene.dart';
 import '../model/model.dart';
@@ -212,7 +212,11 @@ class Tech {
       return techs.first as T;
     }
 
-    if (AggregateEvent is T && techs.every((t) => t is Event)) {
+    if (_isSubtype<AggregateEvent, T>() && techs.every((t) => t is Event)) {
+      log.f(e('parsed_tech', {
+        'type': 'aggregate_event',
+        'techs': techs.map((t) => t.toString())
+      }));
       return AggregateEvent(techs.cast<Event>()) as T;
     }
   }
@@ -268,10 +272,18 @@ class AsmEvent implements Event {
     // raw asm a bit fragile! ctx not updated
     return asm;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsmEvent && runtimeType == other.runtimeType && asm == other.asm;
+
+  @override
+  int get hashCode => asm.hashCode;
 }
 
 String _toFileSafe(String name) {
-  return name.replaceAll(RegExp('[\s().]'), '_');
+  return name.replaceAll(RegExp(r'[\s().]'), '_');
 }
 
 class UnsupportedTechException implements Exception {
@@ -284,3 +296,5 @@ class UnsupportedTechException implements Exception {
     return 'UnsupportedTechException{tech: $tech}';
   }
 }
+
+bool _isSubtype<S, T>() => <S>[] is List<T>;

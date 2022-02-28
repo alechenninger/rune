@@ -36,22 +36,32 @@ tech:asm_event
 
     test('footnote parses as event tech', () {
       var footnote = Footnote(FootnoteSection()..setText('Alys faces up'));
-      var tech = Tech.parse(Paragraph()..addChild(footnote));
+      var tech = Tech.parse<Event>(Paragraph()..addChild(footnote));
 
       expect(tech, equals(parseEvent('Alys faces up')));
     });
 
     test('parses footnotes and tech images', () {
       var footnote = Footnote(FootnoteSection()..setText('Alys faces up'));
-      var tech = Tech.parse(Paragraph()
+      var tech = Tech.parse<Event>(Paragraph()
         ..addChild(
-            InlineImage(altTitle: 'tech:pause_seconds', altDescription: '3'))
+            InlineImage(altTitle: 'tech:aggregate', altDescription: '''---
+tech:pause_seconds
+---
+3
+---
+tech:asm_event
+---
+; test'''))
         ..addChild(footnote));
 
       expect(
           tech,
-          equals(AggregateEvent(
-              [Pause(Duration(seconds: 3)), parseEvent('Alys faces up')])));
+          equals(AggregateEvent([
+            AggregateEvent(
+                [Pause(Duration(seconds: 3)), AsmEvent(Asm.fromRaw('; test'))]),
+            parseEvent('Alys faces up')
+          ])));
     });
   });
 }
