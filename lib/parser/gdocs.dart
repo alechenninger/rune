@@ -207,6 +207,8 @@ class Tech {
       }
     }
 
+    if (techs.isEmpty) return null;
+
     if (techs.length == 1 && techs.first is T) {
       log.f(e('parsed_tech', {'type': T.toString()}));
       return techs.first as T;

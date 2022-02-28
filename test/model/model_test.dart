@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:rune/generator/generator.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
@@ -267,6 +268,47 @@ void main() {
               ..step(StepDirection()
                 ..direction = down
                 ..distance = 5)));
+    });
+
+    // The party moves 5 steps down, 6 steps right, and 3 steps down.
+
+    test('bug', () {
+      var ctx = EventContext()
+        ..addCharacter(alys,
+            slot: 1, position: Point(10 * 16, 10 * 16), facing: down)
+        ..addCharacter(shay,
+            slot: 2, position: Point(13 * 16, 10 * 16), facing: left);
+
+      var move = PartyMove(StepDirections()
+        ..step(StepDirection()
+          ..direction = down
+          ..distance = 5)
+        ..step(StepDirection()
+          ..direction = right
+          ..distance = 6)
+        ..step(StepDirection()
+          ..direction = down
+          ..distance = 3));
+
+      var moves = move.toIndividualMoves(ctx);
+
+      expect(
+          moves.moves[Slot(2)],
+          StepDirections()
+            ..step(StepDirection()
+              ..direction = left
+              ..distance = 3)
+            ..step(StepDirection()
+              ..direction = down
+              ..distance = 2)
+            ..step(StepDirection()
+              ..direction = right
+              ..distance = 6)
+            ..step(StepDirection()
+              ..direction = down
+              ..distance = 3));
+
+      print(moves.generateAsm(AsmGenerator(), ctx));
     });
   });
 }

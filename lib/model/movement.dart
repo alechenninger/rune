@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/generator/movement.dart';
 
 import 'model.dart';
 
@@ -33,8 +34,8 @@ class PartyMove extends Event {
 
     for (var steps = 1; steps <= movement.duration; steps++) {
       var leaderLookahead = movement.lookahead(steps);
-      var nextLeaderPosition =
-          positions[1] = leadStartPosition + leaderLookahead.relativePosition;
+      var nextLeaderPosition = positions[1] =
+          leadStartPosition + leaderLookahead.relativePosition * unitsPerStep;
 
       // TODO: it's possible num characters is variable and not known
       // the assembly appears to be able to query this (e.g. see
@@ -59,7 +60,7 @@ class PartyMove extends Event {
             ..direction = ctx.facing[Slot(1)] ?? Direction.up; // fixme
 
           var lookahead = move.lookahead(1);
-          positions[s] = position + lookahead.relativePosition;
+          positions[s] = position + lookahead.relativePosition * unitsPerStep;
           step = StepDirection()
             ..direction = lookahead.facing
             ..distance = 1;
@@ -78,6 +79,11 @@ class PartyMove extends Event {
   @override
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
     return generator.partyMoveToAsm(this, ctx);
+  }
+
+  @override
+  String toString() {
+    return 'PartyMove{movement: $movement, startingAxis: $startingAxis}';
   }
 }
 
@@ -453,8 +459,8 @@ class StepToPoint extends Movement {
   }
 
   List<Vector> _movements() {
-    var first = startAlong * movement;
-    var second = startAlong.perpendicular * movement;
+    var first = (startAlong * movement) ~/ unitsPerStep;
+    var second = (startAlong.perpendicular * movement) ~/ unitsPerStep;
     return [if (first.steps > 0) first, if (second.steps > 0) second];
   }
 
@@ -553,12 +559,12 @@ class Axis {
   Vector operator *(Point<int> p) {
     var product = Point(p.x * _normal.x, p.y * _normal.y);
 
-    if (product.steps == 0) {
+    if (product.distance == 0) {
       // todo: eh?
       return Vector(0, Direction.ofPoint(_normal));
     }
 
-    return Direction.ofPoint(product) * product.steps;
+    return Direction.ofPoint(product) * product.distance;
   }
 
   @override
@@ -581,6 +587,8 @@ class Vector {
 
   Vector min(int steps) => Vector(math.min(this.steps, steps), direction);
 
+  Vector operator ~/(int i) => Vector(steps ~/ i, direction);
+
   @override
   String toString() {
     return '$direction * $steps';
@@ -599,7 +607,8 @@ class Vector {
 }
 
 extension PointModel<T extends num> on Point<T> {
-  T get steps => (x.abs() + y.abs()) as T;
+  T get distance => (x.abs() + y.abs()) as T;
+  int get steps => distance ~/ unitsPerStep;
 }
 
 class RelativeMoves {
@@ -607,7 +616,7 @@ class RelativeMoves {
   Point<int> get relativePosition =>
       movesMade.map((m) => m.asPoint).reduce((sum, p) => sum + p);
   Direction get facing => movesMade.last.direction;
-  int get relativeDistance => relativePosition.steps;
+  int get relativeDistance => relativePosition.distance;
 
   RelativeMoves(this.movesMade) {
     if (movesMade.isEmpty) {
