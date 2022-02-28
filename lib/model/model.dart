@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
 
@@ -115,6 +116,16 @@ class AggregateEvent extends Event {
   String toString() {
     return 'AggregateEvent{events: $events}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AggregateEvent &&
+          runtimeType == other.runtimeType &&
+          ListEquality().equals(events, other.events);
+
+  @override
+  int get hashCode => ListEquality().hash(events);
 }
 
 class SetContext extends Event {
@@ -144,6 +155,21 @@ class Pause extends Event {
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
     return generator.pauseToAsm(this);
   }
+
+  @override
+  String toString() {
+    return 'Pause{$duration}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Pause &&
+          runtimeType == other.runtimeType &&
+          duration == other.duration;
+
+  @override
+  int get hashCode => duration.hashCode;
 }
 
 class LockCamera extends Event {

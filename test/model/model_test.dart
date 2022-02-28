@@ -98,6 +98,13 @@ void main() {
     });
   });
 
+  group('step direction', () {
+    test('less steps subtracts from distance', () {
+      var step = StepDirection()..distance = 5;
+      expect(step.less(2), StepDirection()..distance = 3);
+    });
+  });
+
   group('step directions', () {
     test('combines consecutive steps in the same direction', () {
       var move = StepDirections();

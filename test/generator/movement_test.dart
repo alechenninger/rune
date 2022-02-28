@@ -113,8 +113,8 @@ void main() {
 
       test('multiple move same distance', () {
         var ctx = EventContext();
-        ctx.slots[0] = alys;
-        ctx.slots[1] = shay;
+        ctx.slots[1] = alys;
+        ctx.slots[2] = shay;
 
         ctx.positions[alys] = Point('230'.hex, '250'.hex);
         ctx.positions[shay] = Point('230'.hex, '240'.hex);
@@ -147,8 +147,8 @@ void main() {
 
       test('multiple moves with some delayed', () {
         var ctx = EventContext();
-        ctx.slots[0] = alys;
-        ctx.slots[1] = shay;
+        ctx.slots[1] = alys;
+        ctx.slots[2] = shay;
 
         ctx.positions[alys] = Point('230'.hex, '250'.hex);
         ctx.positions[shay] = Point('230'.hex, '240'.hex);
@@ -192,8 +192,8 @@ void main() {
     group('step in multiple directions', () {
       test('one character right then up', () {
         var ctx = EventContext();
-        ctx.slots[0] = alys;
-        ctx.slots[1] = shay;
+        ctx.slots[1] = alys;
+        ctx.slots[2] = shay;
 
         ctx.positions[alys] = Point('230'.hex, '250'.hex);
         ctx.positions[shay] = Point('230'.hex, '240'.hex);
@@ -224,8 +224,8 @@ void main() {
 
       test('stress test', () {
         var ctx = EventContext();
-        ctx.slots[0] = alys;
-        ctx.slots[1] = shay;
+        ctx.slots[1] = alys;
+        ctx.slots[2] = shay;
 
         ctx.positions[alys] = Point('230'.hex, '250'.hex);
         ctx.positions[shay] = Point('230'.hex, '240'.hex);

@@ -239,14 +239,14 @@ class StepDirection extends Movement {
   // TODO: should have bounds check
   @override
   StepDirection less(int steps) {
-    if (distance > distance + delay) throw StateError('negative distance');
+    if (steps > distance + delay) throw StateError('negative distance');
 
     var answer = StepDirection()..direction = direction;
 
-    var lessDelay = min(distance, delay);
+    var lessDelay = min(steps, delay);
     answer.delay = delay - lessDelay;
 
-    var remainingToTravel = distance - lessDelay;
+    var remainingToTravel = steps - lessDelay;
     answer.distance = distance - remainingToTravel;
 
     return answer;

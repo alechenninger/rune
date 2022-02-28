@@ -40,5 +40,18 @@ tech:asm_event
 
       expect(tech, equals(parseEvent('Alys faces up')));
     });
+
+    test('parses footnotes and tech images', () {
+      var footnote = Footnote(FootnoteSection()..setText('Alys faces up'));
+      var tech = Tech.parse(Paragraph()
+        ..addChild(
+            InlineImage(altTitle: 'tech:pause_seconds', altDescription: '3'))
+        ..addChild(footnote));
+
+      expect(
+          tech,
+          equals(AggregateEvent(
+              [Pause(Duration(seconds: 3)), parseEvent('Alys faces up')])));
+    });
   });
 }
