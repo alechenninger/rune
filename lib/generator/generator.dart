@@ -4,8 +4,8 @@ import 'package:rune/asm/events.dart';
 import 'package:rune/model/model.dart';
 
 import 'dialog.dart';
-import 'scene.dart';
 import 'movement.dart';
+import 'scene.dart';
 
 export '../asm/asm.dart' show Asm;
 
@@ -23,7 +23,7 @@ class AsmGenerator {
   }
 
   Asm partyMoveToAsm(PartyMove move, EventContext ctx) {
-    throw UnsupportedError('partyMoveToAsm');
+    return individualMovesToAsm(move.toIndividualMoves(ctx), ctx);
   }
 
   Asm pauseToAsm(Pause pause) {

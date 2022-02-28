@@ -58,4 +58,17 @@ After 1 step, Shay walks 6 steps up''');
 
     print(generator.sceneToAsm(scene));
   });
+
+  test('parses party move', () {
+    var events = parseEvent(r'''Alys starts at #230, #250
+Shay starts at #230, #240
+Alys is in slot 1
+Shay is in slot 2
+The party moves 3 steps right.''');
+
+    var scene = Scene([events]);
+    var generator = AsmGenerator();
+
+    print(generator.sceneToAsm(scene));
+  });
 }

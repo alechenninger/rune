@@ -16,10 +16,11 @@ import '../model/model.dart';
 var log = Logger('parser/movement');
 
 final topLevelExpressions = <EventExpression>[
-  MoveablePositionExpression(),
-  MoveableSlotExpression(),
+  FieldObjectPositionExpression(),
+  CharacterInSlotExpression(),
   LockCameraExpression(),
   IndividualMovesExpression(),
+  PartyMoveExpression(),
 ];
 final moveExpressions = <MoveExpression>[RelativeMoveExpression()];
 
@@ -30,7 +31,7 @@ final moveExpressions = <MoveExpression>[RelativeMoveExpression()];
 // it would be easier to track unparsed if i did this
 
 Event parseEvent(String script) {
-  var toParse = script;
+  var toParse = script.trimLeft();
   var events = <Event>[];
   while (toParse.isNotEmpty) {
     var parseable = false;
@@ -41,7 +42,7 @@ Event parseEvent(String script) {
         parseable = true;
         var parsedText =
             toParse.substring(0, toParse.length - parsed.unparsed.length);
-        toParse = pEnd.parse(parsed.unparsed).unparsed;
+        toParse = _pEnd.parse(parsed.unparsed).unparsed;
         events.add(parsed.result);
         log.f(e(
             'parsed_movement', {'text': parsedText, 'result': parsed.result}));
@@ -81,55 +82,44 @@ abstract class EventExpression {
   ParseResult<Event> parse(String expression);
 }
 
-final pMoveable = RegExp(r'^([Tt]he character in slot (\d+)|\w+) ');
-final pEnd = RegExp(r'^[. \n]*');
-final pAndThen = RegExp(r',? ?((and|then|and then) )?');
+final _pMoveable = RegExp(r'^(?:(?:[Tt]he character in )?[Ss]lot (?<slot>\d+)|'
+    r'(?:[Tt]he )?(?<party>[Pp]arty)|'
+    r'(?<character>\w+)) ');
+final _pEnd = RegExp(r'^[. \n]*');
+final _pAndThen = RegExp(r',? ?((and|then|and then) )?');
+final _pPoint = RegExp(r'(?<x_hex>#)?(?<x>[A-F\d]+),? ?'
+    r'(?<y_hex>#)?(?<y>[A-F\d]+)');
 
-class MoveablePositionExpression extends EventExpression {
-  static final pStartsAt = RegExp(r'^(starts|is) at '
-      r'(?<x_hex>#)?(?<x>[A-F\d]+),? ?'
-      r'(?<y_hex>#)?(?<y>[A-F\d]+)');
+class FieldObjectPositionExpression extends EventExpression {
+  static final _pStartsAt = RegExp(r'^(starts|is) at ');
 
   @override
   ParseResult<Event> parse(String expression) {
-    var parseMoveable = _parseMoveable(expression);
-    var startsAt = pStartsAt.parseValue(parseMoveable.unparsed, (match) {
-      var x = match.namedGroup('x');
-      var y = match.namedGroup('y');
+    var parseMoveable = _parseMoveable<FieldObject>(expression);
+    var parseStartsAt = _pStartsAt.parse(parseMoveable.unparsed);
+    var parsePoint = _parsePoint(parseStartsAt.unparsed);
 
-      if (x == null) throw FormatException('no x value', expression, 0);
-      if (y == null) throw FormatException('no y value', expression, 0);
-
-      var xVal = match.namedGroup('x_hex') == null ? int.parse(x) : x.hex;
-      var yVal = match.namedGroup('y_hex') == null ? int.parse(y) : y.hex;
-
-      return Point(xVal, yVal);
-    });
-
-    var unparsed = pEnd.parse(startsAt.unparsed).unparsed;
+    var unparsed = _pEnd.parse(parsePoint.unparsed).unparsed;
+    var moveable = parseMoveable.result;
 
     return ParseResult(SetContext((ctx) {
-      ctx.positions[parseMoveable.result] = startsAt.result;
+      ctx.positions[moveable] = parsePoint.result;
     }), unparsed);
   }
 }
 
-class MoveableSlotExpression extends EventExpression {
-  static final pInSlot = RegExp(r'^is in slot (?<slot>\d+)');
+class CharacterInSlotExpression extends EventExpression {
+  static final _pInSlot = RegExp(r'^is in slot (?<slot>\d+)');
 
   @override
   ParseResult<Event> parse(String expression) {
-    var parsedMoveable = _parseMoveable(expression);
+    var parsedMoveable = _parseMoveable<Character>(expression);
 
     var moveable = parsedMoveable.result;
-    if (moveable is! Character) {
-      throw FormatException(
-          'moveable was not a character: $moveable', expression, 0);
-    }
 
-    var slot = pInSlot.parseValue(parsedMoveable.unparsed,
+    var slot = _pInSlot.parseValue(parsedMoveable.unparsed,
         (match) => int.parse(match.namedGroup('slot')!));
-    var unparsed = pEnd.parse(slot.unparsed).unparsed;
+    var unparsed = _pEnd.parse(slot.unparsed).unparsed;
 
     return ParseResult(SetContext((ctx) {
       ctx.slots[slot.result] = moveable;
@@ -151,7 +141,7 @@ class LockCameraExpression extends EventExpression {
 class IndividualMovesExpression extends EventExpression {
   @override
   bool matches(String expression) {
-    return moveExpressions.any((m) => m.matches(expression));
+    return moveExpressions.any((m) => m.matches<FieldObject>(expression));
   }
 
   @override
@@ -164,7 +154,7 @@ class IndividualMovesExpression extends EventExpression {
 
       for (var expression in moveExpressions) {
         try {
-          var parsed = expression.parse(toParse, moves);
+          var parsed = expression.parse<FieldObject>(toParse, moves);
           parseable = true;
 
           var result = parsed.result;
@@ -196,17 +186,43 @@ class IndividualMovesExpression extends EventExpression {
   }
 }
 
-abstract class MoveExpression {
+class PartyMoveExpression extends EventExpression {
+  @override
   bool matches(String expression) {
+    return moveExpressions.any((m) => m.matches<Party>(expression));
+  }
+
+  @override
+  ParseResult<Event> parse(String expression) {
+    var toParse = expression;
+
+    for (var expression in moveExpressions) {
+      try {
+        var parsed = expression.parse<Party>(toParse);
+        var result = parsed.result;
+        return ParseResult(
+            result.moveable.move(result.movement), parsed.unparsed);
+      } on FormatException {
+        continue;
+      }
+    }
+
+    throw FormatException('not a party move', expression, 0);
+  }
+}
+
+abstract class MoveExpression {
+  bool matches<T extends Moveable>(String expression) {
     try {
-      parse(expression);
+      parse<T>(expression);
       return true;
     } catch (e) {
       return false;
     }
   }
 
-  ParseResult<Move> parse(String expression, [IndividualMoves? moves]);
+  ParseResult<Move<T>> parse<T extends Moveable>(String expression,
+      [IndividualMoves? moves]);
 }
 
 class RelativeMoveExpression extends MoveExpression {
@@ -218,11 +234,12 @@ class RelativeMoveExpression extends MoveExpression {
   static final pFace = RegExp(r'^(faces|turns) (\w+)');
 
   @override
-  ParseResult<Move> parse(String expression, [IndividualMoves? moves]) {
+  ParseResult<Move<T>> parse<T extends Moveable>(String expression,
+      [IndividualMoves? moves]) {
     var parsedDelay = pDelay.parseOptionalValue(expression, (match) {
       var delay = match.namedGroup('delay');
       if (delay == null) {
-        return moves == null ? 0 : moves.duration;
+        return moves?.duration ?? 0;
       }
       return int.parse(delay);
     });
@@ -230,7 +247,7 @@ class RelativeMoveExpression extends MoveExpression {
     var delay = parsedDelay?.result ?? 0;
     var unparsed = parsedDelay?.unparsed ?? expression;
 
-    var parsedMoveable = _parseMoveable(unparsed);
+    var parsedMoveable = _parseMoveable<T>(unparsed);
 
     var moveable = parsedMoveable.result;
     var movement = StepDirections();
@@ -256,7 +273,7 @@ class RelativeMoveExpression extends MoveExpression {
 
         movement.step(steps);
 
-        unparsed = pAndThen.parse(unparsed).unparsed;
+        unparsed = _pAndThen.parse(unparsed).unparsed;
       }
     } on FormatException catch (e) {
       // abort; fall through
@@ -281,7 +298,44 @@ class RelativeMoveExpression extends MoveExpression {
       throw FormatException('not a relative movement', expression, 0);
     }
 
-    unparsed = pEnd.parse(unparsed).unparsed;
+    unparsed = _pEnd.parse(unparsed).unparsed;
+
+    return ParseResult(Move(moveable, movement), unparsed);
+  }
+}
+
+// TODO: broken, doesn't set form
+// see: ContextualMovement
+// another option is to generate ASM as we parse events, which would populate
+// the event context so it can be used to inform the model that is parsed.
+class AbsoluteMoveExpression extends MoveExpression {
+  static final pDelay =
+      RegExp(r'^([Tt]hen, |[Aa]fter (?<delay>\d+) (steps?|spaces?),? )');
+  static final pSteps = RegExp(r'^((walks|continues|moves) )?to ');
+
+  @override
+  ParseResult<Move<T>> parse<T extends Moveable>(String expression,
+      [IndividualMoves? moves]) {
+    var parsedDelay = pDelay.parseOptionalValue(expression, (match) {
+      var delay = match.namedGroup('delay');
+      if (delay == null) {
+        return moves?.duration ?? 0;
+      }
+      return int.parse(delay);
+    });
+
+    var delay = parsedDelay?.result ?? 0;
+    var unparsed = parsedDelay?.unparsed ?? expression;
+    var parsedMoveable = _parseMoveable<T>(unparsed);
+    unparsed = parsedMoveable.unparsed;
+    unparsed = pSteps.parse(unparsed).unparsed;
+    var parsedPoint = _parsePoint(unparsed);
+    unparsed = _pEnd.parse(unparsed).unparsed;
+
+    var moveable = parsedMoveable.result;
+    var movement = StepToPoint()
+      ..delay = delay
+      ..to = parsedPoint.result;
 
     return ParseResult(Move(moveable, movement), unparsed);
   }
@@ -339,6 +393,7 @@ class ParseResult<T> {
 
   // String parsed;
   // continue(result, parsed, unparsed) -- cumulative parsed
+  ParseResult<U> cast<U>() => ParseResult(result as U, unparsed);
 
   @override
   String toString() {
@@ -352,20 +407,34 @@ String _firstLine(String expression) {
   return line;
 }
 
-ParseResult<Moveable> _parseMoveable(String unparsed) {
-  var parsedMoveable = pMoveable.parseValue(unparsed, (match) {
-    var slot = match.group(2);
-    if (slot == null) {
-      var character = Character.byName(match.group(1)!);
+ParseResult<T> _parseMoveable<T extends Moveable>(String unparsed) {
+  var parsedMoveable = _pMoveable.parseValue(unparsed, (match) {
+    var slot = match.namedGroup('slot');
+    if (slot != null) {
+      return Slot(int.parse(slot));
+    }
+
+    if (match.namedGroup('party') != null) {
+      return Party();
+    }
+
+    var char = match.namedGroup('character');
+    if (char != null) {
+      var character = Character.byName(char);
       if (character == null) {
         throw FormatException('not character', unparsed, 0);
       }
       return character;
-    } else {
-      return Slot(int.parse(slot));
     }
   });
-  return parsedMoveable;
+
+  var moveable = parsedMoveable.result;
+  if (moveable is! T) {
+    throw FormatException(
+        'parsed moveable is not a $T. moveable=$moveable', unparsed, 0);
+  }
+
+  return parsedMoveable.cast<T>();
 }
 
 Direction _parseDirection(String exp) {
@@ -380,4 +449,20 @@ Direction _parseDirection(String exp) {
       return Direction.right;
   }
   throw FormatException('not a direction', exp, 0);
+}
+
+ParseResult<Point<int>> _parsePoint(String expression) {
+  var point = _pPoint.parseValue(expression, (match) {
+    var x = match.namedGroup('x');
+    var y = match.namedGroup('y');
+
+    if (x == null) throw FormatException('no x value', expression, 0);
+    if (y == null) throw FormatException('no y value', expression, 0);
+
+    var xVal = match.namedGroup('x_hex') == null ? int.parse(x) : x.hex;
+    var yVal = match.namedGroup('y_hex') == null ? int.parse(y) : y.hex;
+
+    return Point(xVal, yVal);
+  });
+  return point;
 }
