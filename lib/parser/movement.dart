@@ -187,6 +187,9 @@ class IndividualMovesExpression extends EventExpression {
 }
 
 class PartyMoveExpression extends EventExpression {
+  static final _pStartingAxis =
+      RegExp(r'^\(followers? move ([XxYy])[- ]first\.?\)');
+
   @override
   bool matches(String expression) {
     return moveExpressions.any((m) => m.matches<Party>(expression));
@@ -200,8 +203,29 @@ class PartyMoveExpression extends EventExpression {
       try {
         var parsed = expression.parse<Party>(toParse);
         var result = parsed.result;
-        return ParseResult(
-            result.moveable.move(result.movement), parsed.unparsed);
+
+        var parsedAxis =
+            _pStartingAxis.parseOptionalValue(parsed.unparsed, (match) {
+          var axis = match.group(1);
+          switch (axis?.toLowerCase()) {
+            case 'x':
+              return Axis.x;
+            case 'y':
+              return Axis.y;
+          }
+        });
+
+        var unparsed = parsedAxis?.unparsed ?? parsed.unparsed;
+        unparsed = _pEnd.parse(unparsed).unparsed;
+
+        var partyMove = result.moveable.move(result.movement);
+
+        var axis = parsedAxis?.result;
+        if (axis != null) {
+          partyMove.startingAxis = axis;
+        }
+
+        return ParseResult(partyMove, unparsed);
       } on FormatException {
         continue;
       }

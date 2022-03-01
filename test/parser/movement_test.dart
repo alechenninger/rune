@@ -71,4 +71,35 @@ The party moves 3 steps right.''');
 
     print(generator.sceneToAsm(scene));
   });
+
+  test('parses party move with alt follower axis', () {
+    var events = parseEvent(r'''Alys starts at #230, #250
+Shay starts at #230, #240
+Alys is in slot 1
+Shay is in slot 2
+The party moves 3 steps right (followers move y-first).''');
+
+    var generator = AsmGenerator();
+
+    var testCtx = EventContext()
+      ..addCharacter(alys, slot: 1, position: Point('230'.hex, '250'.hex))
+      ..addCharacter(shay, slot: 2, position: Point('230'.hex, '240'.hex));
+    var expected = IndividualMoves()
+      ..moves[alys] = (StepDirections()
+        ..step(StepDirection()
+          ..direction = right
+          ..distance = 3))
+      ..moves[shay] = (StepDirections()
+        ..step(StepDirection()
+          ..direction = down
+          ..distance = 1)
+        ..step(StepDirection()
+          ..direction = right
+          ..distance = 2));
+
+    var actual = events.generateAsm(generator, EventContext());
+    expect(actual, expected.generateAsm(generator, testCtx));
+
+    print(actual);
+  });
 }

@@ -37,173 +37,151 @@ extension IndividualMovesToAsm on IndividualMoves {
       asm.add(followLeader(ctx.followLead = false));
     }
 
-    asm.add(_movementsToAsm(moves, ctx));
+    // We're going to loop through all movements and remove those from the map
+    // when there's nothing left to do.
+    var remainingMoves = Map.of(moves);
 
-    return asm;
-  }
-}
+    while (remainingMoves.isNotEmpty) {
+      // I tried using a sorted set but iterator was bugged and skipped elements
+      var movesList =
+          remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
+      var done = <FieldObject, Movement>{};
 
-Asm _movementsToAsm(Map<FieldObject, Movement> moves, EventContext ctx) {
-  var asm = Asm.empty();
+      // Sort by slot so we always start with lead character, which may allow the
+      // following movements to simply follow the leader (using the follow lead
+      // movement flag in the generated ASM).
+      movesList.sort((m1, m2) => m1.moveable.compareTo(m2.moveable, ctx));
 
-  // We're going to loop through all movements and remove those from the map
-  // when there's nothing left to do.
-  var remainingMoves = Map.of(moves);
+      // Figure out what's the longest we can move continuously before we have
+      // to call the character move procedure again.
+      // This is based on two factors:
+      // 1. How many steps until there is a new character which needs to start
+      // moving (is currently delayed).
+      // 2. How many steps we can have of continuous movement along the X-then-Y
+      // axes, or Y-then-X axes (e.g. not some X, some Y, and then some X again).
+      // This is because the movement subroutine only supports changing
+      // direction once (x to y, or y to x). After that, we have to break up
+      // the movements into multiple subroutine calls.
 
-  while (remainingMoves.isNotEmpty) {
-    // I tried using a sorted set but iterator was bugged and skipped elements
-    var movesList =
-        remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
-    var done = <FieldObject, Movement>{};
+      var maxStepsXFirst = movesList
+          .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.x))
+          .reduce((min, s) => min = math.min(min, s));
+      var maxStepsYFirst = movesList
+          .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.y))
+          .reduce((min, s) => min = math.min(min, s));
 
-    // Sort by slot so we always start with lead character, which may allow the
-    // following movements to simply follow the leader (using the follow lead
-    // movement flag in the generated ASM).
-    movesList.sort((m1, m2) => m1.moveable.compareTo(m2.moveable, ctx));
+      // Axis we will end up moving first
+      Axis firstAxis;
 
-    // Figure out what's the longest we can move continuously before we have
-    // to call the character move procedure again.
-    // This is based on two factors:
-    // 1. How many steps until there is a new character which needs to start
-    // moving (is currently delayed).
-    // 2. How many steps we can have of continuous movement along the X-then-Y
-    // axes, or Y-then-X axes (e.g. not some X, some Y, and then some X again).
-    // This is because the movement subroutine only supports changing
-    // direction once (x to y, or y to x). After that, we have to break up
-    // the movements into multiple subroutine calls.
+      // This is the actual amount of steps we can make in the current batch of
+      // moves.
+      int maxSteps;
 
-    var maxStepsXFirst = movesList
-        .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.x))
-        .reduce((min, s) => min = math.min(min, s));
-    var maxStepsYFirst = movesList
-        .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.y))
-        .reduce((min, s) => min = math.min(min, s));
-
-    // Axis we will end up moving first
-    Axis firstAxis;
-
-    // This is the actual amount of steps we can make in the current batch of
-    // moves.
-    int maxSteps;
-
-    if (maxStepsXFirst > maxStepsYFirst) {
-      firstAxis = Axis.x;
-      maxSteps = maxStepsXFirst;
-    } else {
-      // Keep first axis from context if either is equivalent
-      firstAxis = maxStepsYFirst > maxStepsXFirst ? Axis.y : ctx.startingAxis;
-      maxSteps = maxStepsYFirst;
-    }
-
-    FieldObject? a4;
-
-    void toA4(FieldObject moveable) {
-      if (a4 != moveable) {
-        asm.add(moveable.toA4(ctx));
-        a4 = moveable;
+      if (maxStepsXFirst > maxStepsYFirst) {
+        firstAxis = Axis.x;
+        maxSteps = maxStepsXFirst;
+      } else {
+        // Keep first axis from context if either is equivalent
+        firstAxis = maxStepsYFirst > maxStepsXFirst ? Axis.y : ctx.startingAxis;
+        maxSteps = maxStepsYFirst;
       }
-    }
 
-    if (ctx.startingAxis != firstAxis) {
-      asm.add(moveAlongXAxisFirst(firstAxis == Axis.x));
-      ctx.startingAxis = firstAxis;
-    }
+      FieldObject? a4;
 
-    // Check if leader is moving, in case we can optimize as party move
-    if (movesList.first.moveable.slot(ctx) == 1) {
-      // TODO
-    }
-
-    // If no movement code is generated because all moves are delayed, we'll
-    // have to add an artificial delay later.
-    var allDelay = true;
-    // The ASM for the last character movement should use data registers, the
-    // others use memory
-    var lastMoveIndex =
-        movesList.lastIndexWhere((element) => element.movement.delay == 0);
-
-    // Now start actually generating movement code for current batch up until
-    // maxSteps.
-    for (var i = 0; i < movesList.length; i++) {
-      var move = movesList[i];
-      var moveable = move.moveable;
-      var movement = move.movement;
-      var stepsToTake = maxSteps;
-
-      if (movement.delay == 0) {
-        allDelay = false;
-
-        var current = ctx.positions[moveable];
-        if (current == null) {
-          throw StateError('no current position set for $moveable');
+      void toA4(FieldObject moveable) {
+        if (a4 != moveable) {
+          asm.add(moveable.toA4(ctx));
+          a4 = moveable;
         }
+      }
 
-        stepsToTake = movement.distance.min(maxSteps);
-        var afterSteps = movement.lookahead(stepsToTake);
+      if (ctx.startingAxis != firstAxis) {
+        asm.add(moveAlongXAxisFirst(firstAxis == Axis.x));
+        ctx.startingAxis = firstAxis;
+      }
 
-        if (afterSteps.relativeDistance > 0) {
-          var destination =
-              current + afterSteps.relativePosition * unitsPerStep;
-          ctx.positions[moveable] = destination;
-          ctx.facing[moveable] = afterSteps.facing;
+      // Check if leader is moving, in case we can optimize as party move
+      if (movesList.first.moveable.slot(ctx) == 1) {
+        // TODO
+      }
 
-          var x = Word(destination.x).i;
-          var y = Word(destination.y).i;
+      // If no movement code is generated because all moves are delayed, we'll
+      // have to add an artificial delay later.
+      var allDelay = true;
+      // The ASM for the last character movement should use data registers, the
+      // others use memory
+      var lastMoveIndex =
+          movesList.lastIndexWhere((element) => element.movement.delay == 0);
 
-          toA4(moveable);
+      // Now start actually generating movement code for current batch up until
+      // maxSteps.
+      for (var i = 0; i < movesList.length; i++) {
+        var move = movesList[i];
+        var moveable = move.moveable;
+        var movement = move.movement;
+        var stepsToTake = maxSteps;
 
-          if (i == lastMoveIndex) {
-            asm.add(moveCharacter(x: x, y: y));
-          } else {
-            asm.add(setDestination(x: x, y: y));
+        if (movement.delay == 0) {
+          allDelay = false;
+
+          var current = ctx.positions[moveable];
+          if (current == null) {
+            throw StateError('no current position set for $moveable');
+          }
+
+          stepsToTake = movement.distance.min(maxSteps);
+          var afterSteps = movement.lookahead(stepsToTake);
+
+          if (afterSteps.relativeDistance > 0) {
+            var destination =
+                current + afterSteps.relativePosition * unitsPerStep;
+            ctx.positions[moveable] = destination;
+            ctx.facing[moveable] = afterSteps.facing;
+
+            var x = Word(destination.x).i;
+            var y = Word(destination.y).i;
+
+            toA4(moveable);
+
+            if (i == lastMoveIndex) {
+              asm.add(moveCharacter(x: x, y: y));
+            } else {
+              asm.add(setDestination(x: x, y: y));
+            }
           }
         }
+
+        movement = movement.less(stepsToTake);
+
+        if (movement.distance == 0) {
+          remainingMoves.remove(moveable);
+          done[moveable] = movement;
+        } else {
+          remainingMoves[moveable] = movement;
+        }
       }
 
-      movement = movement.less(stepsToTake);
+      if (allDelay) {
+        // Just guessing at 8 frames per step?
+        // look at x/y_step_constant and FieldObj_Move routine
+        asm.add(vIntPrepareLoop((8 * maxSteps).word));
+      }
 
-      if (movement.distance == 0) {
-        remainingMoves.remove(moveable);
-        done[moveable] = movement;
-      } else {
-        remainingMoves[moveable] = movement;
+      for (var move in done.entries) {
+        var moveable = move.key;
+        var movement = move.value;
+        // fixme: not setting facing can make characters appear
+        //  mid move when dialog comes up
+        // maybe we can detect when about to switch to dialog?
+        // or a way to override the optimization?
+        // maybe there is a way to express a force face because this would also
+        // solve for when we want to have just facing movements
+        // if (ctx.facing[moveable] != movement.direction) {
+        toA4(moveable);
+        asm.add(updateObjFacing(movement.direction.address));
+        // }
       }
     }
-
-    if (allDelay) {
-      // Just guessing at 8 frames per step?
-      // look at x/y_step_constant and FieldObj_Move routine
-      asm.add(vIntPrepareLoop((8 * maxSteps).word));
-    }
-
-    for (var move in done.entries) {
-      var moveable = move.key;
-      var movement = move.value;
-      // fixme: not setting facing can make characters appear
-      //  mid move when dialog comes up
-      // maybe we can detect when about to switch to dialog?
-      // or a way to override the optimization?
-      // maybe there is a way to express a force face because this would also
-      // solve for when we want to have just facing movements
-      // if (ctx.facing[moveable] != movement.direction) {
-      toA4(moveable);
-      asm.add(updateObjFacing(movement.direction.address));
-      // }
-    }
-  }
-
-  return asm;
-}
-
-extension PartyMoveToAsm on PartyMove {
-  Asm toAsm(EventContext ctx) {
-    var asm = Asm.empty();
-
-    if (!ctx.followLead) {
-      asm.add(followLeader(ctx.followLead = true));
-    }
-
-    movement.continuousMovementsFirstAxis(Axis.x);
 
     return asm;
   }
