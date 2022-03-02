@@ -4,8 +4,6 @@ pattern matching based on context
 instruction
  */
 
-import 'dart:math';
-
 import 'package:logging/logging.dart';
 import 'package:rune/numbers.dart';
 import 'package:rune/src/logging.dart';
@@ -87,7 +85,7 @@ final _pMoveable = RegExp(r'^(?:(?:[Tt]he character in )?[Ss]lot (?<slot>\d+)|'
     r'(?<character>\w+)) ');
 final _pEnd = RegExp(r'^[. \n]*');
 final _pAndThen = RegExp(r',? ?((and|then|and then) )?');
-final _pPoint = RegExp(r'(?<x_hex>#)?(?<x>[A-F\d]+),? ?'
+final _pPosition = RegExp(r'(?<x_hex>#)?(?<x>[A-F\d]+),? ?'
     r'(?<y_hex>#)?(?<y>[A-F\d]+)');
 
 class FieldObjectPositionExpression extends EventExpression {
@@ -97,7 +95,7 @@ class FieldObjectPositionExpression extends EventExpression {
   ParseResult<Event> parse(String expression) {
     var parseMoveable = _parseMoveable<FieldObject>(expression);
     var parseStartsAt = _pStartsAt.parse(parseMoveable.unparsed);
-    var parsePoint = _parsePoint(parseStartsAt.unparsed);
+    var parsePoint = _parsePosition(parseStartsAt.unparsed);
 
     var unparsed = _pEnd.parse(parsePoint.unparsed).unparsed;
     var moveable = parseMoveable.result;
@@ -270,12 +268,12 @@ class RelativeMoveExpression extends MoveExpression {
     var parsedDelay = pDelay.parseOptionalValue(expression, (match) {
       var delay = match.namedGroup('delay');
       if (delay == null) {
-        return moves?.duration ?? 0;
+        return moves?.duration ?? 0.steps;
       }
-      return int.parse(delay);
+      return int.parse(delay).steps;
     });
 
-    var delay = parsedDelay?.result ?? 0;
+    var delay = parsedDelay?.result ?? 0.steps;
     var unparsed = parsedDelay?.unparsed ?? expression;
 
     var parsedMoveable = _parseMoveable<T>(unparsed);
@@ -294,12 +292,12 @@ class RelativeMoveExpression extends MoveExpression {
         var distance = match.result.namedGroup('distance');
         var direction = match.result.namedGroup('direction');
         var steps = StepDirection()
-          ..distance = int.parse(distance!)
+          ..distance = int.parse(distance!).steps
           ..direction = _parseDirection(direction!);
 
-        if (delay > 0) {
+        if (delay > 0.steps) {
           steps.delay = delay;
-          delay = 0;
+          delay = 0.steps;
         }
 
         movement.step(steps);
@@ -350,17 +348,17 @@ class AbsoluteMoveExpression extends MoveExpression {
     var parsedDelay = pDelay.parseOptionalValue(expression, (match) {
       var delay = match.namedGroup('delay');
       if (delay == null) {
-        return moves?.duration ?? 0;
+        return moves?.duration ?? 0.steps;
       }
-      return int.parse(delay);
+      return int.parse(delay).steps;
     });
 
-    var delay = parsedDelay?.result ?? 0;
+    var delay = parsedDelay?.result ?? 0.steps;
     var unparsed = parsedDelay?.unparsed ?? expression;
     var parsedMoveable = _parseMoveable<T>(unparsed);
     unparsed = parsedMoveable.unparsed;
     unparsed = pSteps.parse(unparsed).unparsed;
-    var parsedPoint = _parsePoint(unparsed);
+    var parsedPoint = _parsePosition(unparsed);
     unparsed = _pEnd.parse(unparsed).unparsed;
 
     var moveable = parsedMoveable.result;
@@ -482,8 +480,8 @@ Direction _parseDirection(String exp) {
   throw FormatException('not a direction', exp, 0);
 }
 
-ParseResult<Point<int>> _parsePoint(String expression) {
-  var point = _pPoint.parseValue(expression, (match) {
+ParseResult<Position> _parsePosition(String expression) {
+  var pos = _pPosition.parseValue(expression, (match) {
     var x = match.namedGroup('x');
     var y = match.namedGroup('y');
 
@@ -493,7 +491,7 @@ ParseResult<Point<int>> _parsePoint(String expression) {
     var xVal = match.namedGroup('x_hex') == null ? int.parse(x) : x.hex;
     var yVal = match.namedGroup('y_hex') == null ? int.parse(y) : y.hex;
 
-    return Point(xVal, yVal);
+    return Position(xVal, yVal);
   });
-  return point;
+  return pos;
 }

@@ -36,10 +36,10 @@ class EventContext {
 
   int get numCharacters => slots.keys.reduce(max);
 
-  Point<int>? positionOfSlot(int s) => positions[slots[s]];
+  Position? positionOfSlot(int s) => positions[slots[s]];
 
   void addCharacter(Character c,
-      {int? slot, Point<int>? position, Direction? facing}) {
+      {int? slot, Position? position, Direction? facing}) {
     if (slot != null) slots[slot] = c;
     if (position != null) positions[c] = position;
     if (facing != null) this.facing[c] = facing;
@@ -48,11 +48,11 @@ class EventContext {
 
 class Positions {
   final EventContext _ctx;
-  final _positions = <FieldObject, Point<int>>{};
+  final _positions = <FieldObject, Position>{};
 
   Positions._(this._ctx);
 
-  Point<int>? operator [](FieldObject? m) {
+  Position? operator [](FieldObject? m) {
     if (m is Slot) {
       var inSlot = _ctx.slots[m.index];
       if (inSlot == null) return null;
@@ -62,7 +62,7 @@ class Positions {
     return _positions[m];
   }
 
-  void operator []=(FieldObject m, Point<int> p) {
+  void operator []=(FieldObject m, Position p) {
     if (m is Slot) {
       var inSlot = _ctx.slots[m.index];
       if (inSlot == null) {

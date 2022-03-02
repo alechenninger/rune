@@ -7,6 +7,209 @@ import 'package:rune/generator/movement.dart';
 
 import 'model.dart';
 
+class Steps implements Comparable<Steps> {
+  final int toInt;
+
+  Steps(this.toInt);
+
+  @override
+  int compareTo(Steps other) {
+    return toInt.compareTo(other.toInt);
+  }
+
+  int get toPixels => toInt * unitsPerStep;
+
+  Steps min(Steps other) => math.min(toInt, other.toInt).steps;
+  Steps max(Steps other) => math.max(toInt, other.toInt).steps;
+
+  Steps operator +(Steps other) => Steps(toInt + other.toInt);
+  Steps operator -(Steps other) => Steps(toInt - other.toInt);
+  Steps operator -() => Steps(-toInt);
+  Steps operator *(int other) => Steps(toInt * other);
+  Steps operator %(int other) => Steps(toInt % other);
+  Steps operator ~/(int other) => Steps(toInt ~/ other);
+  bool operator <(Steps other) => toInt < other.toInt;
+  bool operator <=(Steps other) => toInt <= other.toInt;
+  bool operator >(Steps other) => toInt > other.toInt;
+  bool operator >=(Steps other) => toInt >= other.toInt;
+
+  @override
+  String toString() => '$toInt';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Steps &&
+          runtimeType == other.runtimeType &&
+          toInt == other.toInt;
+
+  @override
+  int get hashCode => toInt.hashCode;
+}
+
+extension IntToSteps on int {
+  Steps get step => Steps(this);
+  Steps get steps => Steps(this);
+  Steps get pixelsToSteps => Steps(this ~/ unitsPerStep);
+}
+
+class Vector {
+  final Steps length;
+  final Direction direction;
+
+  Vector(this.length, this.direction);
+
+  Position get asPosition => direction.normal * length.toPixels;
+
+  Vector less(Steps length) => Vector(this.length - length, direction);
+
+  Vector max(Steps length) =>
+      Vector(math.max(this.length.toInt, length.toInt).steps, direction);
+
+  Vector min(Steps length) =>
+      Vector(math.min(this.length.toInt, length.toInt).steps, direction);
+
+  Vector operator ~/(int i) => Vector(length ~/ i, direction);
+
+  @override
+  String toString() {
+    return '$direction * $length';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Vector &&
+          runtimeType == other.runtimeType &&
+          length == other.length &&
+          direction == other.direction;
+
+  @override
+  int get hashCode => length.hashCode ^ direction.hashCode;
+}
+
+class Position {
+  final int x;
+  final int y;
+
+  const Position(this.x, this.y);
+
+  Position.fromSteps(Steps x, Steps y)
+      : x = x.toPixels,
+        y = y.toPixels;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Position &&
+          runtimeType == other.runtimeType &&
+          x == other.x &&
+          y == other.y;
+
+  @override
+  int get hashCode => x.hashCode ^ y.hashCode;
+
+  int get distance => (x.abs() + y.abs());
+
+  Vector stepsAlong(Axis a) {
+    var product = a * this;
+
+    if (product.distance == 0) {
+      return Vector(0.steps, a.direction);
+    }
+
+    return Direction.ofPosition(product) * product.steps;
+  }
+
+  Steps get steps => (distance ~/ unitsPerStep).steps;
+
+  /// Add [other] to `this`, as if both points were vectors.
+  ///
+  /// Returns the resulting "vector" as a Point.
+  Position operator +(Position other) {
+    return Position((x + other.x), (y + other.y));
+  }
+
+  /// Subtract [other] from `this`, as if both points were vectors.
+  ///
+  /// Returns the resulting "vector" as a Point.
+  Position operator -(Position other) {
+    return Position((x - other.x), (y - other.y));
+  }
+
+  /// Scale this point by [factor] as if it were a vector.
+  ///
+  /// *Important* *Note*: This function accepts a `num` as its argument only so
+  /// that you can scale `Point<double>` objects by an `int` factor. Because the
+  /// `*` operator always returns the same type of `Point` as it is called on,
+  /// passing in a double [factor] on a `Position` _causes_ _a_
+  /// _runtime_ _error_.
+  Position operator *(int factor) {
+    return Position((x * factor), (y * factor));
+  }
+}
+
+const up = Direction.up;
+const down = Direction.down;
+const left = Direction.left;
+const right = Direction.right;
+
+class Direction {
+  final Position normal;
+  const Direction._(this.normal);
+  static const up = Direction._(Position(0, -1));
+  static const left = Direction._(Position(-1, 0));
+  static const right = Direction._(Position(1, 0));
+  static const down = Direction._(Position(0, 1));
+
+  static Direction ofPosition(Position p) {
+    if (p.x * p.y != 0 || p.x + p.y == 0) {
+      throw ArgumentError();
+    }
+    if (p.x > 0) {
+      return right;
+    }
+    if (p.x < 0) {
+      return left;
+    }
+    if (p.y > 0) {
+      return down;
+    }
+    return up;
+  }
+
+  Vector operator *(Steps magnitude) => Vector(magnitude, this);
+
+  Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
+
+  @override
+  String toString() {
+    return 'Direction{normal: $normal}';
+  }
+}
+
+class Axis {
+  final Position _normal;
+
+  const Axis._(this._normal);
+
+  static final x = Axis._(Position(1, 0));
+  static final y = Axis._(Position(0, 1));
+
+  // todo: eh?
+  Direction get direction => Direction._(_normal);
+  Axis get perpendicular => Axis._(Position(_normal.y, _normal.x));
+
+  Position operator *(Position p) {
+    return Position(p.x * _normal.x, p.y * _normal.y);
+  }
+
+  @override
+  String toString() {
+    return 'Axis.${_normal.x > 0 ? 'x' : 'y'}';
+  }
+}
+
 /// The party follows the leader
 class PartyMove extends Event {
   Movement movement;
@@ -18,7 +221,7 @@ class PartyMove extends Event {
     var individual = IndividualMoves();
     individual.moves[Slot(1)] = movement;
 
-    var positions = <int, Point<int>>{};
+    var positions = <int, Position>{};
     var followerMovements = <FieldObject, StepDirections>{};
 
     var leadStartPosition = ctx.positions[Slot(1)];
@@ -26,16 +229,18 @@ class PartyMove extends Event {
       throw ArgumentError('ctx does not include slot 1 position');
     }
 
-    Point<int> ctxPositionForSlot(int s) {
+    Position ctxPositionForSlot(int s) {
       var p = ctx.positions[Slot(s)];
       if (p == null) throw ArgumentError('missing character in slot $s');
       return p;
     }
 
-    for (var steps = 1; steps <= movement.duration; steps++) {
+    for (var steps = 1.step;
+        steps <= movement.duration;
+        steps = steps + 1.step) {
       var leaderLookahead = movement.lookahead(steps);
-      var nextLeaderPosition = positions[1] =
-          leadStartPosition + leaderLookahead.relativePosition * unitsPerStep;
+      var nextLeaderPosition =
+          positions[1] = leadStartPosition + leaderLookahead.relativePosition;
 
       // TODO: it's possible num characters is variable and not known
       // the assembly appears to be able to query this (e.g. see
@@ -49,21 +254,21 @@ class PartyMove extends Event {
 
         StepDirection step;
 
-        if ((position - nextLeaderPosition).steps <= 1) {
+        if ((position - nextLeaderPosition).steps <= 1.step) {
           // fixme facing
-          step = StepDirection()..delay = 1;
+          step = StepDirection()..delay = 1.step;
         } else {
           var move = StepToPoint()
             ..from = position
             ..to = nextLeaderPosition
-            ..startAlong = startingAxis
+            ..firstAxis = startingAxis
             ..direction = ctx.facing[Slot(1)] ?? Direction.up; // fixme
 
-          var lookahead = move.lookahead(1);
-          positions[s] = position + lookahead.relativePosition * unitsPerStep;
+          var lookahead = move.lookahead(1.step);
+          positions[s] = position + lookahead.relativePosition;
           step = StepDirection()
             ..direction = lookahead.facing
-            ..distance = 1;
+            ..distance = 1.step;
         }
 
         followerMovements.update(Slot(s), (move) => move..step(step),
@@ -97,9 +302,9 @@ class IndividualMoves extends Event {
     return generator.individualMovesToAsm(this, ctx);
   }
 
-  int get duration => moves.values
+  Steps get duration => moves.values
       .map((m) => m.duration)
-      .reduce((longest, m) => longest = max(longest, m));
+      .reduce((longest, m) => longest = max(longest.toInt, m.toInt).steps);
 
   @override
   String toString() {
@@ -152,13 +357,13 @@ abstract class ContextualMovement {
 
 abstract class Movement extends ContextualMovement {
   /// Delay in steps before movement starts parallel with other movements.
-  int get delay;
+  Steps get delay;
 
   /// Total duration including all delays and movements
-  int get duration;
+  Steps get duration;
 
   /// Total distance in steps.
-  int get distance;
+  Steps get distance;
 
   /// Current facing direction
   /// TODO: rename
@@ -166,7 +371,7 @@ abstract class Movement extends ContextualMovement {
 
   Movement? append(Movement m) => null;
 
-  Movement less(int steps);
+  Movement less(Steps steps);
 
   /// Movements which are continuous (there is no pause in between) and should
   /// start immediately (delay should == 0).
@@ -176,26 +381,26 @@ abstract class Movement extends ContextualMovement {
   @override
   Movement movementIn(EventContext ctx) => this;
 
-  RelativeMoves lookahead(int steps) {
-    if (steps == 0) {
-      return RelativeMoves([Vector(0, direction)]);
+  RelativeMoves lookahead(Steps steps) {
+    if (steps == 0.steps) {
+      return RelativeMoves([Vector(0.steps, direction)]);
     }
 
-    var stepsTaken = 0;
+    var stepsTaken = 0.steps;
     var movements = List.of(continuousMovements);
     var movesMade = <Vector>[];
 
     while (stepsTaken < steps) {
       for (var i = 0; stepsTaken < steps && i < movements.length; i++) {
         var move = movements[i].min(steps - stepsTaken);
-        stepsTaken += move.steps;
+        stepsTaken += move.length;
         movesMade.add(move);
       }
 
       var remaining = steps - stepsTaken;
-      if (remaining > 0) {
+      if (remaining > 0.steps) {
         var after = less(stepsTaken);
-        var delayToTake = min(remaining, after.delay);
+        var delayToTake = min(remaining.toInt, after.delay.toInt).steps;
         after = after.less(delayToTake);
         stepsTaken += delayToTake;
         movements = List.of(after.continuousMovements);
@@ -218,11 +423,11 @@ abstract class Movement extends ContextualMovement {
 
   /// The amount of steps in continuous movements limited to one axis at a time
   /// where the first axis is [axis].
-  int delayOrContinuousStepsFirstAxis(Axis axis) {
-    return delay > 0
+  Steps delayOrContinuousStepsFirstAxis(Axis axis) {
+    return delay > 0.steps
         ? delay
         : continuousMovementsFirstAxis(axis)
-            .map((m) => m.steps)
+            .map((m) => m.length)
             .reduce((sum, s) => sum + s);
   }
 }
@@ -231,17 +436,17 @@ class StepDirection extends Movement {
   @override
   var direction = Direction.up;
   @override
-  var distance = 0;
+  var distance = 0.steps;
   @override
-  var delay = 0;
+  var delay = 0.steps;
 
   @override
-  int get duration => delay + distance;
+  Steps get duration => delay + distance;
 
   Vector get asVector => Vector(distance, direction);
 
   @override
-  List<Vector> get continuousMovements => delay > 0 ? [] : [asVector];
+  List<Vector> get continuousMovements => delay > 0.steps ? [] : [asVector];
 
   @override
   StepDirections? append(Movement m) {
@@ -263,12 +468,12 @@ class StepDirection extends Movement {
   // TODO: may want to define in base
   // TODO: should have bounds check
   @override
-  StepDirection less(int steps) {
+  StepDirection less(Steps steps) {
     if (steps > distance + delay) throw StateError('negative distance');
 
     var answer = StepDirection()..direction = direction;
 
-    var lessDelay = min(steps, delay);
+    var lessDelay = min(steps.toInt, delay.toInt).steps;
     answer.delay = delay - lessDelay;
 
     var remainingToTravel = steps - lessDelay;
@@ -327,10 +532,10 @@ class StepDirections extends Movement {
       var last = _steps.last;
 
       if (last.direction == step.direction) {
-        if (step.delay == 0) {
+        if (step.delay == 0.steps) {
           _steps.removeLast();
           _steps.add(last..distance = last.distance + step.distance);
-        } else if (last.delay > 0 && last.distance == 0) {
+        } else if (last.delay > 0.steps && last.distance == 0.steps) {
           _steps.removeLast();
           _steps.add(step..delay = last.delay + step.delay);
         } else {
@@ -350,16 +555,16 @@ class StepDirections extends Movement {
   }
 
   @override
-  int get distance => _steps.isEmpty
-      ? 0
+  Steps get distance => _steps.isEmpty
+      ? 0.steps
       : _steps.map((e) => e.distance).reduce((sum, d) => sum + d);
 
   @override
-  int get delay => _steps.isEmpty ? 0 : _steps.first.delay;
+  Steps get delay => _steps.isEmpty ? 0.steps : _steps.first.delay;
 
   @override
-  int get duration => _steps.isEmpty
-      ? 0
+  Steps get duration => _steps.isEmpty
+      ? 0.steps
       : _steps.map((s) => s.duration).reduce((sum, d) => sum + d);
 
   @override
@@ -369,24 +574,25 @@ class StepDirections extends Movement {
 
   @override
   List<Vector> get continuousMovements => _steps
-      .takeWhile((step) => step.delay == 0)
+      .takeWhile((step) => step.delay == 0.steps)
       .map((e) => e.asVector)
       .toList();
 
   @override
-  StepDirections less(int distance) {
-    if (distance > duration) throw StateError('negative distance');
-    if (distance == 0) return this;
+  StepDirections less(Steps steps) {
+    if (steps > duration) throw StateError('negative distance');
+    if (steps == 0.steps) return this;
 
-    var totalSubtracted = 0;
+    var totalSubtracted = 0.steps;
     var answer = StepDirections();
     StepDirection? lastStep;
 
     for (var step in _steps) {
-      var canMove = min(distance - totalSubtracted, step.duration);
+      var canMove =
+          min(steps.toInt - totalSubtracted.toInt, step.duration.toInt).steps;
       lastStep = step.less(canMove);
 
-      if (lastStep.duration > 0 || answer._steps.isNotEmpty) {
+      if (lastStep.duration > 0.steps || answer._steps.isNotEmpty) {
         answer.step(lastStep);
       }
 
@@ -423,11 +629,11 @@ class ContextualStepToPoint extends ContextualMovement {
 
   int delay = 0;
 
-  Point<int> to = Point(0, 0);
+  Position to = Position(0, 0);
 
   Axis startAlong = Axis.x;
 
-  final Point<int> Function(EventContext ctx) from;
+  final Position Function(EventContext ctx) from;
 
   ContextualStepToPoint(this.from);
 
@@ -435,9 +641,9 @@ class ContextualStepToPoint extends ContextualMovement {
   Movement movementIn(EventContext ctx) {
     return StepToPoint()
       ..direction = direction
-      ..delay = delay
+      ..delay = delay.steps
       ..to = to
-      ..startAlong = startAlong
+      ..firstAxis = startAlong
       ..from = from(ctx);
   }
 }
@@ -450,61 +656,65 @@ class StepToPoint extends Movement {
   var direction = Direction.up;
 
   @override
-  int get distance => movement.steps;
+  Steps get distance => relativePosition.steps;
 
   @override
-  int delay = 0;
+  Steps delay = 0.steps;
 
   @override
-  int get duration => delay + distance;
+  Steps get duration => delay + distance;
 
-  Point<int> from = Point(0, 0);
-  Point<int> to = Point(0, 0);
-  Point<int> get movement => to - from;
+  Position from = Position(0, 0);
+  Position to = Position(0, 0);
+  Position get relativePosition => to - from;
 
-  Axis startAlong = Axis.x;
+  Axis firstAxis = Axis.x;
+  Axis get secondAxis => firstAxis.perpendicular;
 
   /// Just changes starting point because end point is set.
   @override
-  StepToPoint less(int steps) {
+  StepToPoint less(Steps steps) {
     if (steps > duration) throw ArgumentError('negative distance');
 
-    var lessDelay = min(delay, steps);
+    var lessDelay = min(delay.toInt, steps.toInt).steps;
     var remaining = steps - lessDelay;
 
     var movements = _movements();
     var firstMove = movements[0].min(remaining);
 
-    remaining = remaining - firstMove.steps;
+    remaining = remaining - firstMove.length;
 
     var secondMove = movements[1].min(remaining);
 
     var newDelay = delay - lessDelay;
-    var newStart = from + firstMove.asPoint + secondMove.asPoint;
+    var newStart = from + firstMove.asPosition + secondMove.asPosition;
 
     return StepToPoint()
       ..delay = newDelay
       ..from = newStart
       ..to = to
-      ..startAlong = startAlong;
+      ..firstAxis = firstAxis;
   }
 
   @override
   List<Vector> get continuousMovements {
-    if (delay > 0) return [];
+    if (delay > 0.steps) return [];
     List<Vector> movesAfterDelay = _movements();
     return movesAfterDelay;
   }
 
   List<Vector> _movements() {
-    var first = (startAlong * movement) ~/ unitsPerStep;
-    var second = (startAlong.perpendicular * movement) ~/ unitsPerStep;
-    return [if (first.steps > 0) first, if (second.steps > 0) second];
+    var first = relativePosition.stepsAlong(firstAxis);
+    var second = relativePosition.stepsAlong(secondAxis);
+    return [
+      if (first.length > 0.steps) first,
+      if (second.length > 0.steps) second
+    ];
   }
 
   @override
   String toString() {
-    return 'StepToPoint{direction: $direction, delay: $delay, from: $from, to: $to, startAlong: $startAlong}';
+    return 'StepToPoint{direction: $direction, delay: $delay, from: $from, to: $to, startAlong: $firstAxis}';
   }
 
   @override
@@ -516,7 +726,7 @@ class StepToPoint extends Movement {
           delay == other.delay &&
           from == other.from &&
           to == other.to &&
-          startAlong == other.startAlong;
+          firstAxis == other.firstAxis;
 
   @override
   int get hashCode =>
@@ -524,7 +734,7 @@ class StepToPoint extends Movement {
       delay.hashCode ^
       from.hashCode ^
       to.hashCode ^
-      startAlong.hashCode;
+      firstAxis.hashCode;
 }
 
 // class Follow extends Movement {
@@ -545,116 +755,12 @@ class StepToPoint extends Movement {
 //   Follow(this.following, {this.distance = 0});
 // }
 
-const up = Direction.up;
-const down = Direction.down;
-const left = Direction.left;
-const right = Direction.right;
-
-class Direction {
-  final Point<int> normal;
-  const Direction._(this.normal);
-  static const up = Direction._(Point(0, -1));
-  static const left = Direction._(Point(-1, 0));
-  static const right = Direction._(Point(1, 0));
-  static const down = Direction._(Point(0, 1));
-
-  static Direction ofPoint(Point<int> p) {
-    if (p.x * p.y != 0 || p.x + p.y == 0) {
-      throw ArgumentError();
-    }
-    if (p.x > 0) {
-      return right;
-    }
-    if (p.x < 0) {
-      return left;
-    }
-    if (p.y > 0) {
-      return down;
-    }
-    return up;
-  }
-
-  Vector operator *(int magnitude) => Vector(magnitude, this);
-
-  Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
-
-  @override
-  String toString() {
-    return 'Direction{normal: $normal}';
-  }
-}
-
-class Axis {
-  final Point<int> _normal;
-
-  const Axis._(this._normal);
-
-  static final x = Axis._(Point(1, 0));
-  static final y = Axis._(Point(0, 1));
-
-  Axis get perpendicular => Axis._(Point(_normal.y, _normal.x));
-
-  Vector operator *(Point<int> p) {
-    var product = Point(p.x * _normal.x, p.y * _normal.y);
-
-    if (product.distance == 0) {
-      // todo: eh?
-      return Vector(0, Direction.ofPoint(_normal));
-    }
-
-    return Direction.ofPoint(product) * product.distance;
-  }
-
-  @override
-  String toString() {
-    return 'Axis.${_normal.x > 0 ? 'x' : 'y'}';
-  }
-}
-
-class Vector {
-  final int steps;
-  final Direction direction;
-
-  Vector(this.steps, this.direction);
-
-  Point<int> get asPoint => direction.normal * steps;
-
-  Vector less(int steps) => Vector(this.steps - steps, direction);
-
-  Vector max(int steps) => Vector(math.max(this.steps, steps), direction);
-
-  Vector min(int steps) => Vector(math.min(this.steps, steps), direction);
-
-  Vector operator ~/(int i) => Vector(steps ~/ i, direction);
-
-  @override
-  String toString() {
-    return '$direction * $steps';
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Vector &&
-          runtimeType == other.runtimeType &&
-          steps == other.steps &&
-          direction == other.direction;
-
-  @override
-  int get hashCode => steps.hashCode ^ direction.hashCode;
-}
-
-extension PointModel<T extends num> on Point<T> {
-  T get distance => (x.abs() + y.abs()) as T;
-  int get steps => distance ~/ unitsPerStep;
-}
-
 class RelativeMoves {
   final List<Vector> movesMade;
-  Point<int> get relativePosition =>
-      movesMade.map((m) => m.asPoint).reduce((sum, p) => sum + p);
+  Position get relativePosition =>
+      movesMade.map((m) => m.asPosition).reduce((sum, p) => sum + p);
   Direction get facing => movesMade.last.direction;
-  int get relativeDistance => relativePosition.distance;
+  Steps get relativeDistance => relativePosition.steps;
 
   RelativeMoves(this.movesMade) {
     if (movesMade.isEmpty) {

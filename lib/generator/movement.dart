@@ -65,17 +65,17 @@ extension IndividualMovesToAsm on IndividualMoves {
 
       var maxStepsXFirst = movesList
           .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.x))
-          .reduce((min, s) => min = math.min(min, s));
+          .reduce((min, s) => min = min.min(s));
       var maxStepsYFirst = movesList
           .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.y))
-          .reduce((min, s) => min = math.min(min, s));
+          .reduce((min, s) => min = min.min(s));
 
       // Axis we will end up moving first
       Axis firstAxis;
 
       // This is the actual amount of steps we can make in the current batch of
       // moves.
-      int maxSteps;
+      Steps maxSteps;
 
       if (maxStepsXFirst > maxStepsYFirst) {
         firstAxis = Axis.x;
@@ -110,8 +110,8 @@ extension IndividualMovesToAsm on IndividualMoves {
       var allDelay = true;
       // The ASM for the last character movement should use data registers, the
       // others use memory
-      var lastMoveIndex =
-          movesList.lastIndexWhere((element) => element.movement.delay == 0);
+      var lastMoveIndex = movesList
+          .lastIndexWhere((element) => element.movement.delay == 0.steps);
 
       // Now start actually generating movement code for current batch up until
       // maxSteps.
@@ -121,7 +121,7 @@ extension IndividualMovesToAsm on IndividualMoves {
         var movement = move.movement;
         var stepsToTake = maxSteps;
 
-        if (movement.delay == 0) {
+        if (movement.delay == 0.steps) {
           allDelay = false;
 
           var current = ctx.positions[moveable];
@@ -132,9 +132,8 @@ extension IndividualMovesToAsm on IndividualMoves {
           stepsToTake = movement.distance.min(maxSteps);
           var afterSteps = movement.lookahead(stepsToTake);
 
-          if (afterSteps.relativeDistance > 0) {
-            var destination =
-                current + afterSteps.relativePosition * unitsPerStep;
+          if (afterSteps.relativeDistance > 0.steps) {
+            var destination = current + afterSteps.relativePosition;
             ctx.positions[moveable] = destination;
             ctx.facing[moveable] = afterSteps.facing;
 
@@ -153,7 +152,7 @@ extension IndividualMovesToAsm on IndividualMoves {
 
         movement = movement.less(stepsToTake);
 
-        if (movement.distance == 0) {
+        if (movement.distance == 0.steps) {
           remainingMoves.remove(moveable);
           done[moveable] = movement;
         } else {
@@ -164,7 +163,7 @@ extension IndividualMovesToAsm on IndividualMoves {
       if (allDelay) {
         // Just guessing at 8 frames per step?
         // look at x/y_step_constant and FieldObj_Move routine
-        asm.add(vIntPrepareLoop((8 * maxSteps).word));
+        asm.add(vIntPrepareLoop((8 * maxSteps.toInt).word));
       }
 
       for (var move in done.entries) {

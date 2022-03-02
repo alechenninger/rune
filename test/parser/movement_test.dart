@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
@@ -19,27 +17,27 @@ After 3 steps, Shay walks 1 down, walks 7 right, 5 steps up.
     var scene = Scene([events]);
     var generator = AsmGenerator();
     var testCtx = EventContext()
-      ..addCharacter(alys, slot: 1, position: Point('230'.hex, '250'.hex))
-      ..addCharacter(shay, slot: 2, position: Point('230'.hex, '240'.hex));
+      ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
+      ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()
       ..moves[alys] = (StepDirections()
         ..step(StepDirection()
           ..direction = right
-          ..distance = 7)
+          ..distance = 7.steps)
         ..step(StepDirection()
           ..direction = up
-          ..distance = 9))
+          ..distance = 9.steps))
       ..moves[shay] = (StepDirections()
         ..step(StepDirection()
-          ..delay = 3
+          ..delay = 3.steps
           ..direction = down
-          ..distance = 1)
+          ..distance = 1.steps)
         ..step(StepDirection()
           ..direction = right
-          ..distance = 7)
+          ..distance = 7.steps)
         ..step(StepDirection()
           ..direction = up
-          ..distance = 5));
+          ..distance = 5.steps));
 
     expect(events.generateAsm(generator, EventContext()),
         expected.generateAsm(generator, testCtx));
@@ -82,20 +80,20 @@ The party moves 3 steps right (followers move y-first).''');
     var generator = AsmGenerator();
 
     var testCtx = EventContext()
-      ..addCharacter(alys, slot: 1, position: Point('230'.hex, '250'.hex))
-      ..addCharacter(shay, slot: 2, position: Point('230'.hex, '240'.hex));
+      ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
+      ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()
       ..moves[alys] = (StepDirections()
         ..step(StepDirection()
           ..direction = right
-          ..distance = 3))
+          ..distance = 3.steps))
       ..moves[shay] = (StepDirections()
         ..step(StepDirection()
           ..direction = down
-          ..distance = 1)
+          ..distance = 1.steps)
         ..step(StepDirection()
           ..direction = right
-          ..distance = 2));
+          ..distance = 2.steps));
 
     var actual = events.generateAsm(generator, EventContext());
     expect(actual, expected.generateAsm(generator, testCtx));
@@ -116,27 +114,30 @@ After 2 steps, Shay walks 2 steps down, 14 steps left, 6 steps up''');
     var actual = events.generateAsm(generator, EventContext());
 
     var testCtx = EventContext()
-      ..addCharacter(alys, slot: 1, position: Point('230'.hex, '250'.hex))
-      ..addCharacter(shay, slot: 2, position: Point('230'.hex, '240'.hex));
+      ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
+      ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()
       ..moves[alys] = (StepDirections()
         ..step(StepDirection()
           ..direction = left
-          ..distance = 17)
+          ..distance = 17.steps)
         ..step(StepDirection()
           ..direction = up
-          ..distance = 11)
+          ..distance = 11.steps)
         ..step(StepDirection()
           ..direction = right
-          ..distance = 4))
+          ..distance = 4.steps))
       ..moves[shay] = (StepDirections()
         ..step(StepDirection()
-          ..delay = 2
+          ..delay = 2.steps
           ..direction = down
-          ..distance = 1)
+          ..distance = 2.steps)
         ..step(StepDirection()
-          ..direction = right
-          ..distance = 2));
+          ..direction = left
+          ..distance = 14.steps)
+        ..step(StepDirection()
+          ..direction = up
+          ..distance = 6.steps));
 
     expect(actual, expected.generateAsm(generator, testCtx));
 

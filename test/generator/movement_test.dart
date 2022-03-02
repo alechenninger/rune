@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/movement.dart';
@@ -17,12 +15,12 @@ void main() {
 
         ctx.followLead = false;
 
-        ctx.positions[alys] = Point('230'.hex, '250'.hex);
-        ctx.positions[shay] = Point('230'.hex, '240'.hex);
+        ctx.positions[alys] = Position('230'.hex, '250'.hex);
+        ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moveRight = IndividualMoves();
         moveRight.moves[alys] = StepDirection()
-          ..distance = 5
+          ..distance = 5.steps
           ..direction = Direction.right;
 
         var asm = moveRight.toAsm(ctx);
@@ -46,12 +44,12 @@ void main() {
 
         ctx.followLead = true;
 
-        ctx.positions[alys] = Point('230'.hex, '250'.hex);
-        ctx.positions[shay] = Point('230'.hex, '240'.hex);
+        ctx.positions[alys] = Position('230'.hex, '250'.hex);
+        ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moveRight = IndividualMoves();
         moveRight.moves[alys] = StepDirection()
-          ..distance = 5
+          ..distance = 5.steps
           ..direction = Direction.right;
 
         var asm = moveRight.toAsm(ctx);
@@ -76,15 +74,15 @@ void main() {
 
         ctx.followLead = true;
 
-        ctx.positions[alys] = Point('230'.hex, '250'.hex);
-        ctx.positions[shay] = Point('230'.hex, '240'.hex);
+        ctx.positions[alys] = Position('230'.hex, '250'.hex);
+        ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
         moves.moves[alys] = StepDirection()
-          ..distance = 5
+          ..distance = 5.steps
           ..direction = Direction.right;
         moves.moves[shay] = StepDirection()
-          ..distance = 1
+          ..distance = 1.steps
           ..direction = Direction.right;
 
         var asm = moves.toAsm(ctx);
@@ -116,15 +114,15 @@ void main() {
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
-        ctx.positions[alys] = Point('230'.hex, '250'.hex);
-        ctx.positions[shay] = Point('230'.hex, '240'.hex);
+        ctx.positions[alys] = Position('230'.hex, '250'.hex);
+        ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
         moves.moves[alys] = StepDirection()
-          ..distance = 4
+          ..distance = 4.steps
           ..direction = Direction.right;
         moves.moves[shay] = StepDirection()
-          ..distance = 4
+          ..distance = 4.steps
           ..direction = Direction.right;
 
         var asm = moves.toAsm(ctx);
@@ -150,16 +148,16 @@ void main() {
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
-        ctx.positions[alys] = Point('230'.hex, '250'.hex);
-        ctx.positions[shay] = Point('230'.hex, '240'.hex);
+        ctx.positions[alys] = Position('230'.hex, '250'.hex);
+        ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
         moves.moves[alys] = StepDirection()
-          ..distance = 5
+          ..distance = 5.steps
           ..direction = Direction.left;
         moves.moves[shay] = StepDirection()
-          ..distance = 3
-          ..delay = 4
+          ..distance = 3.steps
+          ..delay = 4.steps
           ..direction = Direction.right;
 
         var asm = moves.toAsm(ctx);
@@ -195,16 +193,16 @@ void main() {
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
-        ctx.positions[alys] = Point('230'.hex, '250'.hex);
-        ctx.positions[shay] = Point('230'.hex, '240'.hex);
+        ctx.positions[alys] = Position('230'.hex, '250'.hex);
+        ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
         moves.moves[alys] = StepDirections()
           ..step(StepDirection()
-            ..distance = 5
+            ..distance = 5.steps
             ..direction = Direction.right)
           ..step(StepDirection()
-            ..distance = 5
+            ..distance = 5.steps
             ..direction = Direction.up);
 
         var asm = moves.toAsm(ctx);
@@ -227,36 +225,36 @@ void main() {
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
-        ctx.positions[alys] = Point('230'.hex, '250'.hex);
-        ctx.positions[shay] = Point('230'.hex, '240'.hex);
+        ctx.positions[alys] = Position('230'.hex, '250'.hex);
+        ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
         moves.moves[alys] = StepDirections()
           ..step(StepDirection()
-            ..delay = 3
-            ..distance = 5
+            ..delay = 3.steps
+            ..distance = 5.steps
             ..direction = Direction.right)
           ..step(StepDirection()
-            ..delay = 1
-            ..distance = 5
+            ..delay = 1.steps
+            ..distance = 5.steps
             ..direction = Direction.up)
           ..step(StepDirection()
-            ..delay = 10
-            ..distance = 4
+            ..delay = 10.steps
+            ..distance = 4.steps
             ..direction = Direction.left)
           ..face(Direction.down);
         moves.moves[shay] = StepDirections()
           ..step(StepDirection()
-            ..delay = 1
-            ..distance = 2
+            ..delay = 1.steps
+            ..distance = 2.steps
             ..direction = Direction.up)
           ..step(StepDirection()
-            ..delay = 0
-            ..distance = 7
+            ..delay = 0.steps
+            ..distance = 7.steps
             ..direction = Direction.right)
           ..step(StepDirection()
-            ..delay = 5
-            ..distance = 8
+            ..delay = 5.steps
+            ..distance = 8.steps
             ..direction = Direction.left);
 
         var asm = moves.toAsm(ctx);
