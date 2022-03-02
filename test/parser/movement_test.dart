@@ -102,4 +102,44 @@ The party moves 3 steps right (followers move y-first).''');
 
     print(actual);
   });
+
+  test('bug', () {
+    var events = parseEvent(r'''Alys starts at #230, #250
+Shay starts at #230, #240
+Alys is in slot 1
+Shay is in slot 2
+Alys walks 17 steps left, 11 steps up, 4 steps right.
+After 2 steps, Shay walks 2 steps down, 14 steps left, 6 steps up''');
+
+    var generator = AsmGenerator();
+
+    var actual = events.generateAsm(generator, EventContext());
+
+    var testCtx = EventContext()
+      ..addCharacter(alys, slot: 1, position: Point('230'.hex, '250'.hex))
+      ..addCharacter(shay, slot: 2, position: Point('230'.hex, '240'.hex));
+    var expected = IndividualMoves()
+      ..moves[alys] = (StepDirections()
+        ..step(StepDirection()
+          ..direction = left
+          ..distance = 17)
+        ..step(StepDirection()
+          ..direction = up
+          ..distance = 11)
+        ..step(StepDirection()
+          ..direction = right
+          ..distance = 4))
+      ..moves[shay] = (StepDirections()
+        ..step(StepDirection()
+          ..delay = 2
+          ..direction = down
+          ..distance = 1)
+        ..step(StepDirection()
+          ..direction = right
+          ..distance = 2));
+
+    expect(actual, expected.generateAsm(generator, testCtx));
+
+    print(actual);
+  });
 }

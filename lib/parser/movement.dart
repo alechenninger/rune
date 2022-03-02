@@ -159,15 +159,22 @@ class IndividualMovesExpression extends EventExpression {
 
           var result = parsed.result;
 
-          if (moves.moves.containsKey(result.moveable)) {
-            // Another move for same character; abort to be parsed with fresh
-            // move
-            return ParseResult(moves, toParse);
+          var existing = moves.moves[result.moveable];
+          if (existing != null) {
+            // try to append
+            var appended = existing.append(result.movement);
+            if (appended == null) {
+              // Another move for same character and can't append.
+              // Abort to be parsed with fresh move
+              return ParseResult(moves, toParse);
+            }
+
+            moves.moves[result.moveable] = appended;
+          } else {
+            moves.moves[result.moveable] = result.movement;
           }
 
           toParse = parsed.unparsed;
-
-          moves.moves[result.moveable] = result.movement;
         } on FormatException {
           continue;
         }

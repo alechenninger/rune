@@ -164,6 +164,8 @@ abstract class Movement extends ContextualMovement {
   /// TODO: rename
   Direction get direction;
 
+  Movement? append(Movement m) => null;
+
   Movement less(int steps);
 
   /// Movements which are continuous (there is no pause in between) and should
@@ -241,6 +243,23 @@ class StepDirection extends Movement {
   @override
   List<Vector> get continuousMovements => delay > 0 ? [] : [asVector];
 
+  @override
+  StepDirections? append(Movement m) {
+    if (m is StepDirection) {
+      return StepDirections()
+        ..step(this)
+        ..step(m);
+    }
+
+    if (m is StepDirections) {
+      return StepDirections()
+        ..step(this)
+        ..append(m);
+    }
+
+    return null;
+  }
+
   // TODO: may want to define in base
   // TODO: should have bounds check
   @override
@@ -281,6 +300,25 @@ class StepDirection extends Movement {
 
 class StepDirections extends Movement {
   final _steps = <StepDirection>[];
+
+  @override
+  StepDirections? append(Movement m) {
+    if (m is StepDirection) {
+      var answer = StepDirections().._steps.addAll(_steps);
+      answer.step(m);
+      return answer;
+    }
+
+    if (m is StepDirections) {
+      var answer = StepDirections().._steps.addAll(_steps);
+      for (var step in m._steps) {
+        answer.step(step);
+      }
+      return answer;
+    }
+
+    return null;
+  }
 
   void step(StepDirection step) {
     if (_steps.isEmpty) {
