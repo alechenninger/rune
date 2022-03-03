@@ -53,23 +53,24 @@ extension IntToSteps on int {
   Steps get pixelsToSteps => Steps(this ~/ unitsPerStep);
 }
 
-class Vector {
+/// A walkable path in a single direction.
+class Path {
   final Steps length;
   final Direction direction;
 
-  Vector(this.length, this.direction);
+  Path(this.length, this.direction);
 
   Position get asPosition => direction.normal * length.toPixels;
 
-  Vector less(Steps length) => Vector(this.length - length, direction);
+  Path less(Steps length) => Path(this.length - length, direction);
 
-  Vector max(Steps length) =>
-      Vector(math.max(this.length.toInt, length.toInt).steps, direction);
+  Path max(Steps length) =>
+      Path(math.max(this.length.toInt, length.toInt).steps, direction);
 
-  Vector min(Steps length) =>
-      Vector(math.min(this.length.toInt, length.toInt).steps, direction);
+  Path min(Steps length) =>
+      Path(math.min(this.length.toInt, length.toInt).steps, direction);
 
-  Vector operator ~/(int i) => Vector(length ~/ i, direction);
+  Path operator ~/(int i) => Path(length ~/ i, direction);
 
   @override
   String toString() {
@@ -79,7 +80,7 @@ class Vector {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Vector &&
+      other is Path &&
           runtimeType == other.runtimeType &&
           length == other.length &&
           direction == other.direction;
@@ -88,6 +89,7 @@ class Vector {
   int get hashCode => length.hashCode ^ direction.hashCode;
 }
 
+/// A fork of [Point] for our domain model.
 class Position {
   final int x;
   final int y;
@@ -111,11 +113,11 @@ class Position {
 
   int get distance => (x.abs() + y.abs());
 
-  Vector stepsAlong(Axis a) {
+  Path pathAlong(Axis a) {
     var product = a * this;
 
     if (product.distance == 0) {
-      return Vector(0.steps, a.direction);
+      return Path(0.steps, a.direction);
     }
 
     return Direction.ofPosition(product) * product.steps;
@@ -125,14 +127,14 @@ class Position {
 
   /// Add [other] to `this`, as if both points were vectors.
   ///
-  /// Returns the resulting "vector" as a Point.
+  /// Returns the resulting "vector" as a Position.
   Position operator +(Position other) {
     return Position((x + other.x), (y + other.y));
   }
 
-  /// Subtract [other] from `this`, as if both points were vectors.
+  /// Subtract [other] from `this`, as if both positions were vectors.
   ///
-  /// Returns the resulting "vector" as a Point.
+  /// Returns the resulting "vector" as a Position.
   Position operator -(Position other) {
     return Position((x - other.x), (y - other.y));
   }
@@ -140,9 +142,9 @@ class Position {
   /// Scale this point by [factor] as if it were a vector.
   ///
   /// *Important* *Note*: This function accepts a `num` as its argument only so
-  /// that you can scale `Point<double>` objects by an `int` factor. Because the
-  /// `*` operator always returns the same type of `Point` as it is called on,
-  /// passing in a double [factor] on a `Position` _causes_ _a_
+  /// that you can scale `Position<double>` objects by an `int` factor. Because
+  /// the `*` operator always returns the same type of `Point` as it is called
+  /// on, passing in a double [factor] on a `Position` _causes_ _a_
   /// _runtime_ _error_.
   Position operator *(int factor) {
     return Position((x * factor), (y * factor));
@@ -178,7 +180,7 @@ class Direction {
     return up;
   }
 
-  Vector operator *(Steps magnitude) => Vector(magnitude, this);
+  Path operator *(Steps magnitude) => Path(magnitude, this);
 
   Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
 
@@ -376,25 +378,27 @@ abstract class Movement extends ContextualMovement {
   /// Movements which are continuous (there is no pause in between) and should
   /// start immediately (delay should == 0).
   // todo: should this just be StepDirection to include delays?
-  List<Vector> get continuousMovements;
+  // todo: should probably be method instead of getter
+  List<Path> get continousPaths;
 
   @override
   Movement movementIn(EventContext ctx) => this;
 
-  RelativeMoves lookahead(Steps steps) {
+  // todo: consider returning stepdirections here instead
+  MovementLookahead lookahead(Steps steps) {
     if (steps == 0.steps) {
-      return RelativeMoves([Vector(0.steps, direction)]);
+      return MovementLookahead([Path(0.steps, direction)]);
     }
 
     var stepsTaken = 0.steps;
-    var movements = List.of(continuousMovements);
-    var movesMade = <Vector>[];
+    var paths = List.of(continousPaths);
+    var pathsWalked = <Path>[];
 
     while (stepsTaken < steps) {
-      for (var i = 0; stepsTaken < steps && i < movements.length; i++) {
-        var move = movements[i].min(steps - stepsTaken);
-        stepsTaken += move.length;
-        movesMade.add(move);
+      for (var i = 0; stepsTaken < steps && i < paths.length; i++) {
+        var path = paths[i].min(steps - stepsTaken);
+        stepsTaken += path.length;
+        pathsWalked.add(path);
       }
 
       var remaining = steps - stepsTaken;
@@ -403,30 +407,30 @@ abstract class Movement extends ContextualMovement {
         var delayToTake = min(remaining.toInt, after.delay.toInt).steps;
         after = after.less(delayToTake);
         stepsTaken += delayToTake;
-        movements = List.of(after.continuousMovements);
+        paths = List.of(after.continousPaths);
       }
     }
 
-    return RelativeMoves(movesMade);
+    return MovementLookahead(pathsWalked);
   }
 
-  /// Continuous movements if one axis is moved at a time, and the first must be
-  /// [axis]
-  List<Vector> continuousMovementsFirstAxis(Axis axis) {
-    if (continuousMovements.isEmpty) return [];
-    var first = continuousMovements[0];
+  /// Continuous paths walked if one axis is moved at a time, and the first must
+  /// be along [axis]
+  List<Path> continuousPathsWithFirstAxis(Axis axis) {
+    if (continousPaths.isEmpty) return [];
+    var first = continousPaths[0];
     if (first.direction.axis == axis) {
-      return continuousMovements.sublist(0, min(2, continuousMovements.length));
+      return [first, if (continousPaths.length > 1) continousPaths[0]];
     }
     return [first];
   }
 
-  /// The amount of steps in continuous movements limited to one axis at a time
-  /// where the first axis is [axis].
-  Steps delayOrContinuousStepsFirstAxis(Axis axis) {
+  /// The amount of steps in continuous paths walked limited to one axis at a
+  /// time where the first axis is [axis].
+  Steps delayOrContinuousStepsWithFirstAxis(Axis axis) {
     return delay > 0.steps
         ? delay
-        : continuousMovementsFirstAxis(axis)
+        : continuousPathsWithFirstAxis(axis)
             .map((m) => m.length)
             .reduce((sum, s) => sum + s);
   }
@@ -443,10 +447,10 @@ class StepDirection extends Movement {
   @override
   Steps get duration => delay + distance;
 
-  Vector get asVector => Vector(distance, direction);
+  Path get asPath => Path(distance, direction);
 
   @override
-  List<Vector> get continuousMovements => delay > 0.steps ? [] : [asVector];
+  List<Path> get continousPaths => delay > 0.steps ? [] : [asPath];
 
   @override
   StepDirections? append(Movement m) {
@@ -573,9 +577,9 @@ class StepDirections extends Movement {
       _steps.isEmpty ? Direction.down : _steps.first.direction;
 
   @override
-  List<Vector> get continuousMovements => _steps
+  List<Path> get continousPaths => _steps
       .takeWhile((step) => step.delay == 0.steps)
-      .map((e) => e.asVector)
+      .map((e) => e.asPath)
       .toList();
 
   @override
@@ -697,15 +701,15 @@ class StepToPoint extends Movement {
   }
 
   @override
-  List<Vector> get continuousMovements {
+  List<Path> get continousPaths {
     if (delay > 0.steps) return [];
-    List<Vector> movesAfterDelay = _movements();
+    List<Path> movesAfterDelay = _movements();
     return movesAfterDelay;
   }
 
-  List<Vector> _movements() {
-    var first = relativePosition.stepsAlong(firstAxis);
-    var second = relativePosition.stepsAlong(secondAxis);
+  List<Path> _movements() {
+    var first = relativePosition.pathAlong(firstAxis);
+    var second = relativePosition.pathAlong(secondAxis);
     return [
       if (first.length > 0.steps) first,
       if (second.length > 0.steps) second
@@ -755,16 +759,16 @@ class StepToPoint extends Movement {
 //   Follow(this.following, {this.distance = 0});
 // }
 
-class RelativeMoves {
-  final List<Vector> movesMade;
+class MovementLookahead {
+  final List<Path> pathsWalked;
   Position get relativePosition =>
-      movesMade.map((m) => m.asPosition).reduce((sum, p) => sum + p);
-  Direction get facing => movesMade.last.direction;
+      pathsWalked.map((m) => m.asPosition).reduce((sum, p) => sum + p);
+  Direction get facing => pathsWalked.last.direction;
   Steps get relativeDistance => relativePosition.steps;
 
-  RelativeMoves(this.movesMade) {
-    if (movesMade.isEmpty) {
-      throw ArgumentError('must not be empty', 'movesMade');
+  MovementLookahead(this.pathsWalked) {
+    if (pathsWalked.isEmpty) {
+      throw ArgumentError('must not be empty', 'pathsWalked');
     }
   }
 }

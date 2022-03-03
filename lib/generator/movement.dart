@@ -64,10 +64,10 @@ extension IndividualMovesToAsm on IndividualMoves {
       // the movements into multiple subroutine calls.
 
       var maxStepsXFirst = movesList
-          .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.x))
+          .map((m) => m.movement.delayOrContinuousStepsWithFirstAxis(Axis.x))
           .reduce((min, s) => min = min.min(s));
       var maxStepsYFirst = movesList
-          .map((m) => m.movement.delayOrContinuousStepsFirstAxis(Axis.y))
+          .map((m) => m.movement.delayOrContinuousStepsWithFirstAxis(Axis.y))
           .reduce((min, s) => min = min.min(s));
 
       // Axis we will end up moving first
@@ -103,6 +103,7 @@ extension IndividualMovesToAsm on IndividualMoves {
       // Check if leader is moving, in case we can optimize as party move
       if (movesList.first.moveable.slot(ctx) == 1) {
         // TODO
+        // might want to rethink this / simplify
       }
 
       // If no movement code is generated because all moves are delayed, we'll

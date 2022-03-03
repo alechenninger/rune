@@ -53,20 +53,20 @@ void main() {
 
   group('2d math', () {
     test('steps along x returns x steps of positive x position', () {
-      expect(Position.fromSteps(5.steps, 10.steps).stepsAlong(Axis.x),
-          Vector(5.steps, Direction.right));
+      expect(Position.fromSteps(5.steps, 10.steps).pathAlong(Axis.x),
+          Path(5.steps, Direction.right));
     });
     test('steps along x returns x steps of negative x position', () {
-      expect(Position.fromSteps(-5.steps, 10.steps).stepsAlong(Axis.x),
-          Vector(5.steps, Direction.left));
+      expect(Position.fromSteps(-5.steps, 10.steps).pathAlong(Axis.x),
+          Path(5.steps, Direction.left));
     });
     test('steps along y returns y steps of positive y position', () {
-      expect(Position.fromSteps(-5.steps, 10.steps).stepsAlong(Axis.y),
-          Vector(10.steps, Direction.down));
+      expect(Position.fromSteps(-5.steps, 10.steps).pathAlong(Axis.y),
+          Path(10.steps, Direction.down));
     });
     test('steps along y returns y steps of negative y position', () {
-      expect(Position.fromSteps(-5.steps, -10.steps).stepsAlong(Axis.y),
-          Vector(10.steps, Direction.up));
+      expect(Position.fromSteps(-5.steps, -10.steps).pathAlong(Axis.y),
+          Path(10.steps, Direction.up));
     });
   });
 
@@ -75,15 +75,15 @@ void main() {
       var movement = StepToPoint()
         ..to = Position(1.steps.toPixels, 2.steps.toPixels)
         ..firstAxis = Axis.x;
-      expect(movement.continuousMovements,
-          equals([Vector(1.steps, right), Vector(2.steps, down)]));
+      expect(movement.continousPaths,
+          equals([Path(1.steps, right), Path(2.steps, down)]));
     });
     test('if start axis is y moves along x then y', () {
       var movement = StepToPoint()
         ..to = Position.fromSteps(1.steps, 2.steps)
         ..firstAxis = Axis.y;
-      expect(movement.continuousMovements,
-          equals([Vector(2.steps, down), Vector(1.steps, right)]));
+      expect(movement.continousPaths,
+          equals([Path(2.steps, down), Path(1.steps, right)]));
     });
     group('less steps', () {
       test('subtracts from delay first', () {
@@ -118,7 +118,7 @@ void main() {
         ..direction = right
         ..distance = 2.steps);
 
-      expect(move.continuousMovements, hasLength(1));
+      expect(move.continousPaths, hasLength(1));
     });
     test('combines consecutive delays', () {
       var move = StepDirections();
@@ -135,7 +135,7 @@ void main() {
         ..distance = 4.steps);
 
       expect(move.delay, 3.steps);
-      expect(move.less(3.steps).continuousMovements, hasLength(1));
+      expect(move.less(3.steps).continousPaths, hasLength(1));
       expect(move.distance, 4.steps);
     });
   });
