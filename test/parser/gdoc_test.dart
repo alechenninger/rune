@@ -64,4 +64,15 @@ tech:asm_event
           ])));
     });
   });
+
+  group('dialog parse', () {
+    test('parses narrative text', () {
+      var p = Paragraph()..addChild(Text('narrative text: test 123'));
+      var dialog = parseDialog(p);
+
+      var expected = Dialog(spans: [Span('test 123', false)]);
+
+      expect(dialog, expected);
+    });
+  });
 }

@@ -25,6 +25,17 @@ class Dialog extends Event {
   Asm generateAsm(AsmGenerator generator, EventContext ctx) {
     return generator.dialogToAsm(this);
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Dialog &&
+          runtimeType == other.runtimeType &&
+          speaker == other.speaker &&
+          ListEquality().equals(_spans, other._spans);
+
+  @override
+  int get hashCode => speaker.hashCode ^ ListEquality().hash(_spans);
 }
 
 class Span {
@@ -65,4 +76,15 @@ class Span {
   String toString() {
     return 'Span{text: $text, italic: $italic}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Span &&
+          runtimeType == other.runtimeType &&
+          text == other.text &&
+          italic == other.italic;
+
+  @override
+  int get hashCode => text.hashCode ^ italic.hashCode;
 }

@@ -58,6 +58,7 @@ class Body extends Element {
 }
 
 class Paragraph extends ContainerElement {
+  Paragraph([ParagraphHeading? heading]);
   void addChild(Element element) => throw UnsupportedError('');
   String getText() => throw UnsupportedError('');
   Paragraph setAlignment(HorizontalAlignment alignment) =>
@@ -106,6 +107,8 @@ class ElementTypeContainer {
 class ElementType {}
 
 class Text extends Element {
+  Text(String text, {bool isItalic = false});
+  Text.of(List<Text> texts);
   Text setFontSize(int sizeOrStart, [int? endInclusive, int? size]) =>
       throw UnsupportedError('');
   Text setBold(dynamic valueOrStart, [int? endInclusive, bool? value]) =>
