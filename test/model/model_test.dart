@@ -138,6 +138,19 @@ void main() {
       expect(move.less(3.steps).continousPaths, hasLength(1));
       expect(move.distance, 4.steps);
     });
+
+    test('continuous steps includes both axis', () {
+      var move = StepDirections();
+      move.step(StepDirection()
+        ..direction = right
+        ..distance = 3.steps);
+      move.step(StepDirection()
+        ..direction = up
+        ..distance = 2.steps);
+
+      expect(move.continuousPathsWithFirstAxis(Axis.x),
+          [Path(3.steps, right), Path(2.steps, up)]);
+    });
   });
 
   group('party move', () {
@@ -294,9 +307,7 @@ void main() {
                 ..distance = 5.steps)));
     });
 
-    // The party moves 5 steps down, 6 steps right, and 3 steps down.
-
-    test('bug', () {
+    test('complex party move', () {
       var ctx = EventContext()
         ..addCharacter(alys,
             slot: 1, position: Position(10 * 16, 10 * 16), facing: down)

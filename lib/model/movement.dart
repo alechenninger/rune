@@ -420,7 +420,7 @@ abstract class Movement extends ContextualMovement {
     if (continousPaths.isEmpty) return [];
     var first = continousPaths[0];
     if (first.direction.axis == axis) {
-      return [first, if (continousPaths.length > 1) continousPaths[0]];
+      return [first, if (continousPaths.length > 1) continousPaths[1]];
     }
     return [first];
   }
