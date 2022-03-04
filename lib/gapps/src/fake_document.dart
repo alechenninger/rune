@@ -102,9 +102,7 @@ class ContainerElement extends Element {
 }
 
 class Paragraph extends ContainerElement {
-  ParagraphHeading? heading;
-
-  Paragraph([this.heading]) : super(DocumentApp.ElementType.PARAGRAPH);
+  Paragraph() : super(DocumentApp.ElementType.PARAGRAPH);
 
   @override
   Text editAsText() {
@@ -114,15 +112,14 @@ class Paragraph extends ContainerElement {
 
   @override
   ParagraphHeading getHeading() {
-    return heading ?? DocumentApp.ParagraphHeading.NORMAL;
+    // TODO: implement getHeading
+    throw UnimplementedError();
   }
 
   @override
   String getText() {
-    return _children
-        .whereType<Text>()
-        .map((e) => e.getText())
-        .reduce((t1, t2) => t1 + t2);
+    // TODO: implement getText
+    throw UnimplementedError();
   }
 
   @override
@@ -202,37 +199,12 @@ class ElementTypeContainer {
 class ElementType {}
 
 class Text extends Element {
-  List<TextSpan> spans = [];
+  Text() : super(DocumentApp.ElementType.TEXT);
 
-  Text(String text, {bool isItalic = false})
-      : super(DocumentApp.ElementType.TEXT) {
-    spans.add(TextSpan(text, isItalic));
-  }
-
-  Text.of(List<Text> texts) : super(DocumentApp.ElementType.TEXT) {
-    spans.addAll(texts.expand((t) => t.spans));
-  }
-
-  Text setFontSize(int sizeOrStart, [int? endInclusive, int? size]) => this;
-  Text setBold(dynamic valueOrStart, [int? endInclusive, bool? value]) => this;
-  String getText() => spans.map((e) => e.text).reduce((t1, t2) => t1 + t2);
-  bool? isItalic(int offset) {
-    var cur = 0;
-    for (var span in spans) {
-      var end = cur + span.text.length;
-      if (offset >= cur && offset < end) {
-        return span.italic;
-      }
-      cur = end;
-    }
-  }
-}
-
-class TextSpan {
-  final String text;
-  final bool italic;
-
-  TextSpan(this.text, this.italic);
+  external Text setFontSize(int sizeOrStart, [int endInclusive, int size]);
+  external Text setBold(dynamic valueOrStart, [int endInclusive, bool value]);
+  external String getText();
+  external bool? isItalic(int offset);
 }
 
 // class Table extends Element {

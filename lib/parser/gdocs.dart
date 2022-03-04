@@ -78,20 +78,11 @@ Pause? parsePause(Paragraph p) {
   return Pause(Duration(milliseconds: (double.parse(seconds) * 1000).toInt()));
 }
 
-const narrativeTextPrefix = 'narrative text:';
 Dialog? parseDialog(Paragraph p) {
   if (p.getNumChildren() < 2) {
-    var text = p.getText();
-    if (text.isNotEmpty) {
-      if (p.getNumChildren() == 1 &&
-          text.trimLeft().toLowerCase().startsWith(narrativeTextPrefix)) {
-        var speech = p.getChild(0)!;
-        return dialogForText(speech.asText(), skip: narrativeTextPrefix.length);
-      }
-
+    if (p.getText().isNotEmpty) {
       log.f(e('not_dialog', {
-        'reason':
-            'not enough children and did not start with "$narrativeTextPrefix"',
+        'reason': 'not enough children',
         'text': p.getText(),
         'children#': p.getNumChildren()
       }));
@@ -102,10 +93,6 @@ Dialog? parseDialog(Paragraph p) {
   var portrait = p.getChild(0)!;
   var speech = p.getChild(1)!;
 
-  return dialogFromPortrait(portrait, speech);
-}
-
-Dialog? dialogFromPortrait(Element portrait, Element speech) {
   if (portrait.getType() != DocumentApp.ElementType.INLINE_IMAGE) {
     log.f(e('not_dialog', {
       'reason': 'first child is not an image',
@@ -126,38 +113,30 @@ Dialog? dialogFromPortrait(Element portrait, Element speech) {
   speech = speech as Text;
 
   var speaker = portrait.getAltTitle();
+  var text = speech.getText();
 
   if (speaker == null) {
     log.f(e('not_dialog', {
       'reason': 'missing alt text on portrait image for dialog',
-      'text': speech.getText()
+      'text': text
     }));
     return null;
   }
 
   if (speaker.startsWith('tech:')) {
-    log.f(e('not_dialog', {
-      'reason': 'inline image is tech',
-      'text': speech.getText(),
-      'tech': speaker
-    }));
+    log.f(e('not_dialog',
+        {'reason': 'inline image is tech', 'text': text, 'tech': speaker}));
     return null;
   }
 
-  return dialogForText(speech, speaker: speaker);
-}
-
-Dialog dialogForText(Text speech, {String? speaker, int skip = 0}) {
-  var text = speech.getText();
-  var skippedText = text.substring(skip);
-  var offset = skip + skippedText.length - skippedText.trimLeft().length;
-  var characters = text.characters;
+  var offset = text.length - text.trimLeft().length;
+  var characters = text.trim().characters;
   var spans = <Span>[];
   var italic = false;
   var buffer = StringBuffer();
 
-  for (var i = offset; i < characters.length; i++) {
-    if (italic != nullToFalse(speech.isItalic(i))) {
+  for (var i = 0; i < characters.length; i++) {
+    if (italic != nullToFalse(speech.isItalic(i + offset))) {
       if (buffer.isNotEmpty) {
         spans.add(Span(buffer.toString(), italic));
         buffer.clear();
@@ -171,7 +150,7 @@ Dialog dialogForText(Text speech, {String? speaker, int skip = 0}) {
     spans.add(Span(buffer.toString(), italic));
   }
 
-  var character = speaker != null ? Character.byName(speaker) : null;
+  var character = Character.byName(speaker);
   return Dialog(speaker: character, spans: spans);
 }
 
