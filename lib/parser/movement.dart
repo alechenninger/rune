@@ -85,8 +85,8 @@ final _pMoveable = RegExp(r'^(?:(?:[Tt]he character in )?[Ss]lot (?<slot>\d+)|'
     r'(?<character>\w+)) ');
 final _pEnd = RegExp(r'^[. \n]*');
 final _pAndThen = RegExp(r',? ?((and|then|and then) )?');
-final _pPosition = RegExp(r'(?<x_hex>[$#])?(?<x>[A-F\d]+),? ?'
-    r'(?<y_hex>[$#])?(?<y>[A-F\d]+)');
+final _pPosition = RegExp(r'(?<x_hex>#)?(?<x>[A-F\d]+),? ?'
+    r'(?<y_hex>#)?(?<y>[A-F\d]+)');
 
 class FieldObjectPositionExpression extends EventExpression {
   static final _pStartsAt = RegExp(r'^(starts|is) at ');
