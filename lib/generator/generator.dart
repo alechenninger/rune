@@ -1,9 +1,9 @@
-import 'package:rune/asm/asm.dart' show Asm;
 import 'package:rune/asm/data.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/model/model.dart';
 
 import 'dialog.dart';
+import 'event.dart';
 import 'movement.dart';
 import 'scene.dart';
 
@@ -14,33 +14,33 @@ class AsmGenerator {
     return scene.toAsm();
   }
 
-  Asm dialogToAsm(Dialog dialog) {
+  DialogAsm dialogToAsm(Dialog dialog) {
     return dialog.toAsm();
   }
 
-  Asm individualMovesToAsm(IndividualMoves move, EventContext ctx) {
+  EventAsm individualMovesToAsm(IndividualMoves move, EventContext ctx) {
     return move.toAsm(ctx);
   }
 
-  Asm partyMoveToAsm(PartyMove move, EventContext ctx) {
+  EventAsm partyMoveToAsm(PartyMove move, EventContext ctx) {
     return individualMovesToAsm(move.toIndividualMoves(ctx), ctx);
   }
 
-  Asm pauseToAsm(Pause pause) {
+  EventAsm pauseToAsm(Pause pause) {
     // I think vertical interrupt is 60 times a second
     // but 50 in PAL
     // could use conditional pseudo-assembly if / else
     // see: http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_3_6_
     var frames = pause.duration.inSeconds * 60;
-    return vIntPrepareLoop(Word(frames.toInt()));
+    return EventAsm.of(vIntPrepareLoop(Word(frames.toInt())));
   }
 
-  Asm lockCameraToAsm(EventContext ctx) {
-    return lockCamera(ctx.cameraLock = true);
+  EventAsm lockCameraToAsm(EventContext ctx) {
+    return EventAsm.of(lockCamera(ctx.cameraLock = true));
   }
 
-  Asm unlockCameraToAsm(EventContext ctx) {
-    return lockCamera(ctx.cameraLock = false);
+  EventAsm unlockCameraToAsm(EventContext ctx) {
+    return EventAsm.of(lockCamera(ctx.cameraLock = false));
   }
 }
 

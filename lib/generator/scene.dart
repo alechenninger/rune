@@ -1,5 +1,7 @@
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/dialog.dart';
+import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 
 import '../asm/asm.dart' hide MoveMnemonic;
@@ -10,18 +12,22 @@ extension SceneToAsm on Scene {
     var generator = AsmGenerator();
     var ctx = EventContext();
 
-    var eventAsm = Asm.empty();
-    var dialogAsm = Asm.empty();
+    var eventAsm = EventAsm.empty();
+    var dialogAsm = DialogAsm.empty();
+    Event? lastEvent;
     var generatingDialog = true;
     var lastEventBreak = -1;
     var eventCounter = 1;
+
+    // TODO: think about handling non "dialog" in dialog asm (other control
+    //  codes)
 
     void addDialog(Dialog dialog) {
       if (!generatingDialog) {
         eventAsm.add(popAndRunDialog());
         eventAsm.addNewline();
         generatingDialog = true;
-      } else if (dialogAsm.isNotEmpty) {
+      } else if (lastEvent is Dialog) {
         // Consecutive dialog, new cursor in between each dialog
         dialogAsm.add(cursor());
       }
@@ -49,11 +55,15 @@ extension SceneToAsm on Scene {
     }
 
     for (var event in events) {
+      // TODO: this is a bit brittle. might be better if an event generated both
+      // DialogAsm and EventAsm
       if (event is Dialog) {
         addDialog(event);
       } else {
         addEvent(event);
       }
+
+      lastEvent = event;
     }
 
     if (generatingDialog) {

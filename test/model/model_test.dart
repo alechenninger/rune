@@ -6,7 +6,7 @@ void main() {
   group('==', () {
     test('IndividualMoves', () {
       var moves = IndividualMoves();
-      moves.moves[alys] = StepDirection()
+      moves.moves[alys] = StepPath()
         ..direction = Direction.down
         ..distance = 2.steps
         ..delay = 3.steps;
@@ -14,7 +14,7 @@ void main() {
       expect(
           moves,
           equals(IndividualMoves()
-            ..moves[alys] = (StepDirection()
+            ..moves[alys] = (StepPath()
               ..direction = Direction.down
               ..distance = 2.steps
               ..delay = 3.steps)));
@@ -26,11 +26,11 @@ void main() {
 
     test('StepDirection', () {
       expect(
-          StepDirection()
+          StepPath()
             ..direction = Direction.down
             ..distance = 2.steps
             ..delay = 3.steps,
-          equals(StepDirection()
+          equals(StepPath()
             ..direction = Direction.down
             ..distance = 2.steps
             ..delay = 3.steps));
@@ -38,13 +38,13 @@ void main() {
 
     test('StepDirections', () {
       expect(
-          StepDirections()
-            ..step(StepDirection()
+          StepPaths()
+            ..step(StepPath()
               ..direction = Direction.down
               ..distance = 2.steps
               ..delay = 3.steps),
-          equals(StepDirections()
-            ..step(StepDirection()
+          equals(StepPaths()
+            ..step(StepPath()
               ..direction = Direction.down
               ..distance = 2.steps
               ..delay = 3.steps)));
@@ -103,34 +103,34 @@ void main() {
 
   group('step direction', () {
     test('less steps subtracts from distance', () {
-      var step = StepDirection()..distance = 5.steps;
-      expect(step.less(2.steps), StepDirection()..distance = 3.steps);
+      var step = StepPath()..distance = 5.steps;
+      expect(step.less(2.steps), StepPath()..distance = 3.steps);
     });
   });
 
   group('step directions', () {
     test('combines consecutive steps in the same direction', () {
-      var move = StepDirections();
-      move.step(StepDirection()
+      var move = StepPaths();
+      move.step(StepPath()
         ..direction = right
         ..distance = 3.steps);
-      move.step(StepDirection()
+      move.step(StepPath()
         ..direction = right
         ..distance = 2.steps);
 
       expect(move.continousPaths, hasLength(1));
     });
     test('combines consecutive delays', () {
-      var move = StepDirections();
-      move.step(StepDirection()..delay = 1.steps);
-      move.step(StepDirection()..delay = 2.steps);
+      var move = StepPaths();
+      move.step(StepPath()..delay = 1.steps);
+      move.step(StepPath()..delay = 2.steps);
 
       expect(move.delay, 3.steps);
     });
     test('combines delay with delayed movement', () {
-      var move = StepDirections();
-      move.step(StepDirection()..delay = 1.steps);
-      move.step(StepDirection()
+      var move = StepPaths();
+      move.step(StepPath()..delay = 1.steps);
+      move.step(StepPath()
         ..delay = 2.steps
         ..distance = 4.steps);
 
@@ -140,11 +140,11 @@ void main() {
     });
 
     test('continuous steps includes both axis', () {
-      var move = StepDirections();
-      move.step(StepDirection()
+      var move = StepPaths();
+      move.step(StepPath()
         ..direction = right
         ..distance = 3.steps);
-      move.step(StepDirection()
+      move.step(StepPath()
         ..direction = up
         ..distance = 2.steps);
 
@@ -163,7 +163,7 @@ void main() {
         ..addCharacter(shay,
             slot: 2, position: Position(0, 2.steps.toPixels), facing: right);
 
-      var move = PartyMove(StepDirection()
+      var move = PartyMove(StepPath()
         ..direction = right
         ..distance = 3.steps);
 
@@ -172,10 +172,10 @@ void main() {
       expect(
           moves,
           IndividualMoves()
-            ..moves[Slot(1)] = (StepDirection()
+            ..moves[Slot(1)] = (StepPath()
               ..direction = right
               ..distance = 3.steps)
-            ..moves[Slot(2)] = (StepDirection()
+            ..moves[Slot(2)] = (StepPath()
               ..direction = right
               ..distance = 3.steps));
     });
@@ -191,11 +191,11 @@ void main() {
             position: Position.fromSteps(0.step, 2.steps),
             facing: right);
 
-      var move = PartyMove(StepDirections()
-        ..step(StepDirection()
+      var move = PartyMove(StepPaths()
+        ..step(StepPath()
           ..direction = right
           ..distance = 3.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = down
           ..distance = 5.steps));
 
@@ -204,18 +204,18 @@ void main() {
       expect(
           moves,
           IndividualMoves()
-            ..moves[Slot(1)] = (StepDirections()
-              ..step(StepDirection()
+            ..moves[Slot(1)] = (StepPaths()
+              ..step(StepPath()
                 ..direction = right
                 ..distance = 3.steps)
-              ..step(StepDirection()
+              ..step(StepPath()
                 ..direction = down
                 ..distance = 5.steps))
-            ..moves[Slot(2)] = (StepDirections()
-              ..step(StepDirection()
+            ..moves[Slot(2)] = (StepPaths()
+              ..step(StepPath()
                 ..direction = right
                 ..distance = 4.steps)
-              ..step(StepDirection()
+              ..step(StepPath()
                 ..direction = down
                 ..distance = 4.steps)));
     });
@@ -232,11 +232,11 @@ void main() {
             position: Position.fromSteps(0.step, 2.steps),
             facing: right);
 
-      var move = PartyMove(StepDirections()
-        ..step(StepDirection()
+      var move = PartyMove(StepPaths()
+        ..step(StepPath()
           ..direction = right
           ..distance = 3.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = down
           ..distance = 5.steps))
         ..startingAxis = Axis.x;
@@ -246,18 +246,18 @@ void main() {
       expect(
           moves,
           IndividualMoves()
-            ..moves[Slot(1)] = (StepDirections()
-              ..step(StepDirection()
+            ..moves[Slot(1)] = (StepPaths()
+              ..step(StepPath()
                 ..direction = right
                 ..distance = 3.steps)
-              ..step(StepDirection()
+              ..step(StepPath()
                 ..direction = down
                 ..distance = 5.steps))
-            ..moves[Slot(2)] = (StepDirections()
-              ..step(StepDirection()
+            ..moves[Slot(2)] = (StepPaths()
+              ..step(StepPath()
                 ..direction = right
                 ..distance = 4.steps)
-              ..step(StepDirection()
+              ..step(StepPath()
                 ..direction = down
                 ..distance = 4.steps)));
     });
@@ -274,11 +274,11 @@ void main() {
             position: Position.fromSteps(0.step, 2.steps),
             facing: right);
 
-      var move = PartyMove(StepDirections()
-        ..step(StepDirection()
+      var move = PartyMove(StepPaths()
+        ..step(StepPath()
           ..direction = right
           ..distance = 3.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = down
           ..distance = 5.steps))
         ..startingAxis = Axis.y;
@@ -288,21 +288,21 @@ void main() {
       expect(
           moves,
           IndividualMoves()
-            ..moves[Slot(1)] = (StepDirections()
-              ..step(StepDirection()
+            ..moves[Slot(1)] = (StepPaths()
+              ..step(StepPath()
                 ..direction = right
                 ..distance = 3.steps)
-              ..step(StepDirection()
+              ..step(StepPath()
                 ..direction = down
                 ..distance = 5.steps))
-            ..moves[Slot(2)] = (StepDirections()
-              ..step(StepDirection()
+            ..moves[Slot(2)] = (StepPaths()
+              ..step(StepPath()
                 ..direction = down
                 ..distance = 1.steps)
-              ..step(StepDirection()
+              ..step(StepPath()
                 ..direction = right
                 ..distance = 2.steps)
-              ..step(StepDirection()
+              ..step(StepPath()
                 ..direction = down
                 ..distance = 5.steps)));
     });
@@ -314,14 +314,14 @@ void main() {
         ..addCharacter(shay,
             slot: 2, position: Position(13 * 16, 10 * 16), facing: left);
 
-      var move = PartyMove(StepDirections()
-        ..step(StepDirection()
+      var move = PartyMove(StepPaths()
+        ..step(StepPath()
           ..direction = down
           ..distance = 5.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = right
           ..distance = 6.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = down
           ..distance = 3.steps));
 
@@ -329,17 +329,17 @@ void main() {
 
       expect(
           moves.moves[Slot(2)],
-          StepDirections()
-            ..step(StepDirection()
+          StepPaths()
+            ..step(StepPath()
               ..direction = left
               ..distance = 3.steps)
-            ..step(StepDirection()
+            ..step(StepPath()
               ..direction = down
               ..distance = 2.steps)
-            ..step(StepDirection()
+            ..step(StepPath()
               ..direction = right
               ..distance = 6.steps)
-            ..step(StepDirection()
+            ..step(StepPath()
               ..direction = down
               ..distance = 3.steps));
 

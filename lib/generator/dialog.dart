@@ -8,9 +8,14 @@ import '../asm/dialog.dart';
 import '../characters.dart';
 import '../model/model.dart';
 
+class DialogAsm extends Asm {
+  DialogAsm.empty() : super.empty();
+  DialogAsm(List<Asm> asm) : super(asm);
+}
+
 extension DialogToAsm on Dialog {
-  Asm toAsm() {
-    var asm = Asm.empty();
+  DialogAsm toAsm() {
+    var asm = DialogAsm.empty();
     var quotes = Quotes();
 
     var ascii = spans.map((s) => s.toAscii(quotes)).reduce((a1, a2) => a1 + a2);

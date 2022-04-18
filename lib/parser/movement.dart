@@ -279,7 +279,7 @@ class RelativeMoveExpression extends MoveExpression {
     var parsedMoveable = _parseMoveable<T>(unparsed);
 
     var moveable = parsedMoveable.result;
-    var movement = StepDirections();
+    var movement = StepPaths();
     var parsed = false;
     unparsed = parsedMoveable.unparsed;
 
@@ -291,7 +291,7 @@ class RelativeMoveExpression extends MoveExpression {
 
         var distance = match.result.namedGroup('distance');
         var direction = match.result.namedGroup('direction');
-        var steps = StepDirection()
+        var steps = StepPath()
           ..distance = int.parse(distance!).steps
           ..direction = _parseDirection(direction!);
 

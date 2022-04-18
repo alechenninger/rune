@@ -4,10 +4,12 @@ import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
 
+import 'map.dart';
 import 'movement.dart';
 
 export 'dialog.dart';
 export 'movement.dart';
+export 'map.dart';
 
 abstract class Event {
   // TODO: should probably not have this here? creates dependency on generator
@@ -27,6 +29,8 @@ class EventContext {
   var followLead = true;
 
   bool cameraLock = false;
+
+  GameMap? currentMap;
 
   EventContext() {
     positions = Positions._(this);

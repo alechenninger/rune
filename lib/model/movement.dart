@@ -224,7 +224,7 @@ class PartyMove extends Event {
     individual.moves[Slot(1)] = movement;
 
     var positions = <int, Position>{};
-    var followerMovements = <FieldObject, StepDirections>{};
+    var followerMovements = <FieldObject, StepPaths>{};
 
     var leadStartPosition = ctx.positions[Slot(1)];
     if (leadStartPosition == null) {
@@ -254,11 +254,11 @@ class PartyMove extends Event {
       for (var s = 2; s <= ctx.numCharacters; s++) {
         var position = positions[s] ?? ctxPositionForSlot(s);
 
-        StepDirection step;
+        StepPath step;
 
         if ((position - nextLeaderPosition).steps <= 1.step) {
           // fixme facing
-          step = StepDirection()..delay = 1.step;
+          step = StepPath()..delay = 1.step;
         } else {
           var move = StepToPoint()
             ..from = position
@@ -268,13 +268,13 @@ class PartyMove extends Event {
 
           var lookahead = move.lookahead(1.step);
           positions[s] = position + lookahead.relativePosition;
-          step = StepDirection()
+          step = StepPath()
             ..direction = lookahead.facing
             ..distance = 1.step;
         }
 
         followerMovements.update(Slot(s), (move) => move..step(step),
-            ifAbsent: () => StepDirections()..step(step));
+            ifAbsent: () => StepPaths()..step(step));
       }
     }
 
@@ -436,7 +436,7 @@ abstract class Movement extends ContextualMovement {
   }
 }
 
-class StepDirection extends Movement {
+class StepPath extends Movement {
   @override
   var direction = Direction.up;
   @override
@@ -453,15 +453,15 @@ class StepDirection extends Movement {
   List<Path> get continousPaths => delay > 0.steps ? [] : [asPath];
 
   @override
-  StepDirections? append(Movement m) {
-    if (m is StepDirection) {
-      return StepDirections()
+  StepPaths? append(Movement m) {
+    if (m is StepPath) {
+      return StepPaths()
         ..step(this)
         ..step(m);
     }
 
-    if (m is StepDirections) {
-      return StepDirections()
+    if (m is StepPaths) {
+      return StepPaths()
         ..step(this)
         ..append(m);
     }
@@ -472,10 +472,10 @@ class StepDirection extends Movement {
   // TODO: may want to define in base
   // TODO: should have bounds check
   @override
-  StepDirection less(Steps steps) {
+  StepPath less(Steps steps) {
     if (steps > distance + delay) throw StateError('negative distance');
 
-    var answer = StepDirection()..direction = direction;
+    var answer = StepPath()..direction = direction;
 
     var lessDelay = min(steps.toInt, delay.toInt).steps;
     answer.delay = delay - lessDelay;
@@ -494,33 +494,33 @@ class StepDirection extends Movement {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is StepDirection &&
+      (other is StepPath &&
           runtimeType == other.runtimeType &&
           direction == other.direction &&
           distance == other.distance &&
           delay == other.delay) ||
-      (other is StepDirections &&
-          other._steps.length == 1 &&
-          this == other._steps.first);
+      (other is StepPaths &&
+          other._paths.length == 1 &&
+          this == other._paths.first);
 
   @override
   int get hashCode => direction.hashCode ^ distance.hashCode ^ delay.hashCode;
 }
 
-class StepDirections extends Movement {
-  final _steps = <StepDirection>[];
+class StepPaths extends Movement {
+  final _paths = <StepPath>[];
 
   @override
-  StepDirections? append(Movement m) {
-    if (m is StepDirection) {
-      var answer = StepDirections().._steps.addAll(_steps);
+  StepPaths? append(Movement m) {
+    if (m is StepPath) {
+      var answer = StepPaths().._paths.addAll(_paths);
       answer.step(m);
       return answer;
     }
 
-    if (m is StepDirections) {
-      var answer = StepDirections().._steps.addAll(_steps);
-      for (var step in m._steps) {
+    if (m is StepPaths) {
+      var answer = StepPaths().._paths.addAll(_paths);
+      for (var step in m._paths) {
         answer.step(step);
       }
       return answer;
@@ -529,24 +529,24 @@ class StepDirections extends Movement {
     return null;
   }
 
-  void step(StepDirection step) {
-    if (_steps.isEmpty) {
-      _steps.add(step);
+  void step(StepPath step) {
+    if (_paths.isEmpty) {
+      _paths.add(step);
     } else {
-      var last = _steps.last;
+      var last = _paths.last;
 
       if (last.direction == step.direction) {
         if (step.delay == 0.steps) {
-          _steps.removeLast();
-          _steps.add(last..distance = last.distance + step.distance);
+          _paths.removeLast();
+          _paths.add(last..distance = last.distance + step.distance);
         } else if (last.delay > 0.steps && last.distance == 0.steps) {
-          _steps.removeLast();
-          _steps.add(step..delay = last.delay + step.delay);
+          _paths.removeLast();
+          _paths.add(step..delay = last.delay + step.delay);
         } else {
-          _steps.add(step);
+          _paths.add(step);
         }
       } else {
-        _steps.add(step);
+        _paths.add(step);
       }
     }
   }
@@ -555,55 +555,54 @@ class StepDirections extends Movement {
   //  because distance is 0, hard to know it is actually supposed to generate
   //  code.
   void face(Direction direction) {
-    step(StepDirection()..direction = direction);
+    step(StepPath()..direction = direction);
   }
 
   @override
-  Steps get distance => _steps.isEmpty
+  Steps get distance => _paths.isEmpty
       ? 0.steps
-      : _steps.map((e) => e.distance).reduce((sum, d) => sum + d);
+      : _paths.map((e) => e.distance).reduce((sum, d) => sum + d);
 
   @override
-  Steps get delay => _steps.isEmpty ? 0.steps : _steps.first.delay;
+  Steps get delay => _paths.isEmpty ? 0.steps : _paths.first.delay;
 
   @override
-  Steps get duration => _steps.isEmpty
+  Steps get duration => _paths.isEmpty
       ? 0.steps
-      : _steps.map((s) => s.duration).reduce((sum, d) => sum + d);
+      : _paths.map((s) => s.duration).reduce((sum, d) => sum + d);
 
   @override
   Direction get direction =>
       // TODO: what to do if no steps?
-      _steps.isEmpty ? Direction.down : _steps.first.direction;
+      _paths.isEmpty ? Direction.down : _paths.first.direction;
 
   @override
-  List<Path> get continousPaths => _steps
+  List<Path> get continousPaths => _paths
       .takeWhile((step) => step.delay == 0.steps)
       .map((e) => e.asPath)
       .toList();
 
   @override
-  StepDirections less(Steps steps) {
+  StepPaths less(Steps steps) {
     if (steps > duration) throw StateError('negative distance');
     if (steps == 0.steps) return this;
 
     var totalSubtracted = 0.steps;
-    var answer = StepDirections();
-    StepDirection? lastStep;
+    var answer = StepPaths();
+    StepPath? lastStep;
 
-    for (var step in _steps) {
-      var canMove =
-          min(steps.toInt - totalSubtracted.toInt, step.duration.toInt).steps;
-      lastStep = step.less(canMove);
+    for (var path in _paths) {
+      var canMove = (steps - totalSubtracted).min(path.duration);
+      lastStep = path.less(canMove);
 
-      if (lastStep.duration > 0.steps || answer._steps.isNotEmpty) {
+      if (lastStep.duration > 0.steps || answer._paths.isNotEmpty) {
         answer.step(lastStep);
       }
 
       totalSubtracted += canMove;
     }
 
-    if (answer._steps.isEmpty && lastStep != null) {
+    if (answer._paths.isEmpty && lastStep != null) {
       answer.step(lastStep);
     }
 
@@ -612,20 +611,20 @@ class StepDirections extends Movement {
 
   @override
   String toString() {
-    return 'StepDirections{$_steps}';
+    return 'StepDirections{$_paths}';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is StepDirections &&
+      (other is StepPaths &&
           runtimeType == other.runtimeType &&
-          ListEquality().equals(_steps, other._steps)) ||
-      (other is StepDirection && _steps.length == 1 && _steps.first == other);
+          ListEquality().equals(_paths, other._paths)) ||
+      (other is StepPath && _paths.length == 1 && _paths.first == other);
 
   @override
   int get hashCode =>
-      _steps.length == 1 ? _steps.first.hashCode : ListEquality().hash(_steps);
+      _paths.length == 1 ? _paths.first.hashCode : ListEquality().hash(_paths);
 }
 
 class ContextualStepToPoint extends ContextualMovement {
@@ -683,7 +682,7 @@ class StepToPoint extends Movement {
     var lessDelay = min(delay.toInt, steps.toInt).steps;
     var remaining = steps - lessDelay;
 
-    var movements = _movements();
+    var movements = _paths();
     var firstMove = movements[0].min(remaining);
 
     remaining = remaining - firstMove.length;
@@ -703,11 +702,10 @@ class StepToPoint extends Movement {
   @override
   List<Path> get continousPaths {
     if (delay > 0.steps) return [];
-    List<Path> movesAfterDelay = _movements();
-    return movesAfterDelay;
+    return _paths();
   }
 
-  List<Path> _movements() {
+  List<Path> _paths() {
     var first = relativePosition.pathAlong(firstAxis);
     var second = relativePosition.pathAlong(secondAxis);
     return [

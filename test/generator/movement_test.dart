@@ -19,7 +19,7 @@ void main() {
         ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moveRight = IndividualMoves();
-        moveRight.moves[alys] = StepDirection()
+        moveRight.moves[alys] = StepPath()
           ..distance = 5.steps
           ..direction = Direction.right;
 
@@ -48,7 +48,7 @@ void main() {
         ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moveRight = IndividualMoves();
-        moveRight.moves[alys] = StepDirection()
+        moveRight.moves[alys] = StepPath()
           ..distance = 5.steps
           ..direction = Direction.right;
 
@@ -78,10 +78,10 @@ void main() {
         ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
-        moves.moves[alys] = StepDirection()
+        moves.moves[alys] = StepPath()
           ..distance = 5.steps
           ..direction = Direction.right;
-        moves.moves[shay] = StepDirection()
+        moves.moves[shay] = StepPath()
           ..distance = 1.steps
           ..direction = Direction.right;
 
@@ -118,10 +118,10 @@ void main() {
         ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
-        moves.moves[alys] = StepDirection()
+        moves.moves[alys] = StepPath()
           ..distance = 4.steps
           ..direction = Direction.right;
-        moves.moves[shay] = StepDirection()
+        moves.moves[shay] = StepPath()
           ..distance = 4.steps
           ..direction = Direction.right;
 
@@ -152,10 +152,10 @@ void main() {
         ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
-        moves.moves[alys] = StepDirection()
+        moves.moves[alys] = StepPath()
           ..distance = 5.steps
           ..direction = Direction.left;
-        moves.moves[shay] = StepDirection()
+        moves.moves[shay] = StepPath()
           ..distance = 3.steps
           ..delay = 4.steps
           ..direction = Direction.right;
@@ -197,11 +197,11 @@ void main() {
         ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
-        moves.moves[alys] = StepDirections()
-          ..step(StepDirection()
+        moves.moves[alys] = StepPaths()
+          ..step(StepPath()
             ..distance = 5.steps
             ..direction = Direction.right)
-          ..step(StepDirection()
+          ..step(StepPath()
             ..distance = 5.steps
             ..direction = Direction.up);
 
@@ -229,30 +229,30 @@ void main() {
         ctx.positions[shay] = Position('230'.hex, '240'.hex);
 
         var moves = IndividualMoves();
-        moves.moves[alys] = StepDirections()
-          ..step(StepDirection()
+        moves.moves[alys] = StepPaths()
+          ..step(StepPath()
             ..delay = 3.steps
             ..distance = 5.steps
             ..direction = Direction.right)
-          ..step(StepDirection()
+          ..step(StepPath()
             ..delay = 1.steps
             ..distance = 5.steps
             ..direction = Direction.up)
-          ..step(StepDirection()
+          ..step(StepPath()
             ..delay = 10.steps
             ..distance = 4.steps
             ..direction = Direction.left)
           ..face(Direction.down);
-        moves.moves[shay] = StepDirections()
-          ..step(StepDirection()
+        moves.moves[shay] = StepPaths()
+          ..step(StepPath()
             ..delay = 1.steps
             ..distance = 2.steps
             ..direction = Direction.up)
-          ..step(StepDirection()
+          ..step(StepPath()
             ..delay = 0.steps
             ..distance = 7.steps
             ..direction = Direction.right)
-          ..step(StepDirection()
+          ..step(StepPath()
             ..delay = 5.steps
             ..distance = 8.steps
             ..direction = Direction.left);

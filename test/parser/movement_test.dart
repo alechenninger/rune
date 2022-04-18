@@ -20,22 +20,22 @@ After 3 steps, Shay walks 1 down, walks 7 right, 5 steps up.
       ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
       ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()
-      ..moves[alys] = (StepDirections()
-        ..step(StepDirection()
+      ..moves[alys] = (StepPaths()
+        ..step(StepPath()
           ..direction = right
           ..distance = 7.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = up
           ..distance = 9.steps))
-      ..moves[shay] = (StepDirections()
-        ..step(StepDirection()
+      ..moves[shay] = (StepPaths()
+        ..step(StepPath()
           ..delay = 3.steps
           ..direction = down
           ..distance = 1.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = right
           ..distance = 7.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = up
           ..distance = 5.steps));
 
@@ -83,15 +83,15 @@ The party moves 3 steps right (followers move y-first).''');
       ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
       ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()
-      ..moves[alys] = (StepDirections()
-        ..step(StepDirection()
+      ..moves[alys] = (StepPaths()
+        ..step(StepPath()
           ..direction = right
           ..distance = 3.steps))
-      ..moves[shay] = (StepDirections()
-        ..step(StepDirection()
+      ..moves[shay] = (StepPaths()
+        ..step(StepPath()
           ..direction = down
           ..distance = 1.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = right
           ..distance = 2.steps));
 
@@ -117,25 +117,25 @@ After 2 steps, Shay walks 2 steps down, 14 steps left, 6 steps up''');
       ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
       ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()
-      ..moves[alys] = (StepDirections()
-        ..step(StepDirection()
+      ..moves[alys] = (StepPaths()
+        ..step(StepPath()
           ..direction = left
           ..distance = 17.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = up
           ..distance = 11.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = right
           ..distance = 4.steps))
-      ..moves[shay] = (StepDirections()
-        ..step(StepDirection()
+      ..moves[shay] = (StepPaths()
+        ..step(StepPath()
           ..delay = 2.steps
           ..direction = down
           ..distance = 2.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = left
           ..distance = 14.steps)
-        ..step(StepDirection()
+        ..step(StepPath()
           ..direction = up
           ..distance = 6.steps));
 

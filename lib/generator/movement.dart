@@ -2,8 +2,9 @@ import 'dart:math' as math;
 
 import 'package:rune/asm/events.dart';
 
-import '../asm/asm.dart' hide MoveMnemonic;
+import '../asm/asm.dart';
 import '../model/model.dart';
+import 'event.dart';
 
 const unitsPerStep = 16;
 const up = Constant('FacingDir_up');
@@ -30,8 +31,8 @@ if independent moves == follow lead moves, just use follow lead flag
  */
 
 extension IndividualMovesToAsm on IndividualMoves {
-  Asm toAsm(EventContext ctx) {
-    var asm = Asm.empty();
+  EventAsm toAsm(EventContext ctx) {
+    var asm = EventAsm.empty();
 
     if (ctx.followLead) {
       asm.add(followLeader(ctx.followLead = false));
@@ -219,6 +220,15 @@ extension MoveableToA4 on FieldObject {
     } else if (moveable is Character) {
       return characterByIdToA4(moveable.charId);
     }
+
+    // We could do this for any object in a map by knowing the ordering
+    // of objects within the map.
+    // ramaddr(Field_Obj_Secondary + 0x40 * object_index)
+    // For example, Alys_Piata is at ramaddr(FFFFC4C0) and at object_index 7
+    // ramaddr(FFFFC300 + 0x40 * 7) = ramaddr(FFFFC4C0)
+    // Then load this via lea into a4
+    // e.g. lea	(Alys_Piata).w, a4
+
     throw UnsupportedError('$this.toA4');
   }
 }
