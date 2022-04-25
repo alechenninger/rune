@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
 
+import 'dialog.dart';
 import 'map.dart';
 import 'movement.dart';
 
@@ -222,7 +223,7 @@ class Slot extends FieldObject {
   int get hashCode => index.hashCode;
 }
 
-abstract class Character extends FieldObject {
+abstract class Character extends FieldObject with Speaker {
   const Character();
 
   /// throws if no character found by name.

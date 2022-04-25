@@ -1,5 +1,6 @@
 import 'package:rune/asm/data.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/map.dart';
 import 'package:rune/model/model.dart';
 
 import 'dialog.dart';
@@ -12,6 +13,10 @@ export '../asm/asm.dart' show Asm;
 class AsmGenerator {
   SceneAsm sceneToAsm(Scene scene) {
     return scene.toAsm();
+  }
+
+  MapAsm mapToAsm(GameMap map) {
+    return mapToAsm(map);
   }
 
   DialogAsm dialogToAsm(Dialog dialog) {

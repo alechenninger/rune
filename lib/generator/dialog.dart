@@ -128,7 +128,7 @@ class Quotes {
   }
 }
 
-extension Portrait on Character {
+extension Portrait on Speaker {
   static final _index = [null, Shay, Alys];
 
   Bytes get portraitCode {

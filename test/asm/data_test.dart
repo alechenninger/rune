@@ -1,8 +1,21 @@
 import 'package:charcode/ascii.dart';
 import 'package:rune/asm/asm.dart';
+import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('byte', () {
+    test('0xFF byte data to string is \$FF', () {
+      var b = Byte('FF'.hex);
+      expect(b.toString(), equals(r'$FF'));
+    });
+
+    test('254 byte data to string is \$FE', () {
+      var b = Byte(254);
+      expect(b.toString(), equals(r'$FE'));
+    });
+  });
+
   group('bytes', () {
     test('0xFF byte data to string is \$FF', () {
       var b = Bytes.hex('FF');

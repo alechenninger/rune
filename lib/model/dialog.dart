@@ -5,7 +5,7 @@ import 'package:rune/generator/generator.dart';
 import 'model.dart';
 
 class Dialog extends Event {
-  Character? speaker;
+  Speaker? speaker;
   final List<Span> _spans;
   List<Span> get spans => UnmodifiableListView(_spans);
 
@@ -42,7 +42,9 @@ class Span {
   final String text;
   final bool italic;
 
-  Span(this.text, this.italic);
+  Span(this.text, [this.italic = false]);
+
+  Span.italic(this.text) : italic = true;
 
   // TODO: markup parsing belongs in parse layer
   static List<Span> parse(String markup) {
@@ -87,4 +89,10 @@ class Span {
 
   @override
   int get hashCode => text.hashCode ^ italic.hashCode;
+}
+
+abstract class Speaker {}
+
+class Principal implements Speaker {
+  const Principal();
 }

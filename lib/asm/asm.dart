@@ -24,9 +24,9 @@ Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
 class DcMnemonic {
   const DcMnemonic();
 
-  Asm b(Bytes d) => cmd('dc.b', [d]);
-  Asm w(Words d) => cmd('dc.w', [d]);
-  Asm l(Longwords d) => cmd('dc.l', [d]);
+  Asm b(/*Byte|Bytes|Label*/ dynamic d) => cmd('dc.b', [d]);
+  Asm w(/*Word|Words|Label*/ dynamic d) => cmd('dc.w', [d]);
+  Asm l(/*Longword|Longwords|Label*/ dynamic d) => cmd('dc.l', [d]);
 }
 
 class MoveMnemonic {

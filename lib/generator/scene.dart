@@ -4,7 +4,7 @@ import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 
-import '../asm/asm.dart' hide MoveMnemonic;
+import '../asm/asm.dart';
 import '../model/model.dart';
 
 extension SceneToAsm on Scene {

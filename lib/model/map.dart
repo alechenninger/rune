@@ -8,6 +8,10 @@ import 'model.dart';
 abstract class GameMap {
   final objects = <MapObject>[];
   final onMove = <Event>[];
+
+  void addObject(MapObject obj) {
+    objects.add(obj);
+  }
 }
 
 class Aiedo extends GameMap {}
@@ -24,7 +28,6 @@ class MapObject extends FieldObject {
 
   @override
   int? slot(EventContext c) => null;
-
 }
 
 // generator will need to track labels corresponding to each sprite
@@ -84,18 +87,28 @@ class PalmanWoman3 extends Sprite {
 }
 
 abstract class MapObjectSpec {
+  MapObjectSpec();
 
+  const MapObjectSpec.constant();
+
+  Direction get startFacing;
 }
 
 class Npc extends MapObjectSpec {
   final Sprite sprite;
   final NpcBehavior behavior;
 
+  @override
+  Direction get startFacing => behavior.startFacing;
+
   Npc(this.sprite, this.behavior);
 }
 
 class AlysWaiting extends MapObjectSpec {
+  const AlysWaiting() : super.constant();
 
+  @override
+  final startFacing = Direction.down;
 }
 
 abstract class NpcBehavior {
@@ -108,6 +121,5 @@ class FacingDown extends NpcBehavior {
   const FacingDown();
 
   @override
-  Direction get startFacing => Direction.down;
+  final startFacing = Direction.down;
 }
-
