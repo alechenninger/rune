@@ -72,11 +72,11 @@ Asm followLeader(bool follow) {
 }
 
 Asm moveAlongXAxisFirst(bool xFirst) {
-  return (xFirst ? bclr : bset)(const Byte(1).i, Char_Move_Flags.w);
+  return (xFirst ? bclr : bset)(Byte.one.i, Char_Move_Flags.w);
 }
 
 Asm lockCamera(bool lock) {
-  return (lock ? bset : bclr)(const Byte(2).i, Char_Move_Flags.w);
+  return (lock ? bset : bclr)(Byte.two.i, Char_Move_Flags.w);
 }
 
 /// Multiple characters can move with [moveCharacter], but they must be prepared

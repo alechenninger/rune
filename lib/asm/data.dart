@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -71,7 +72,7 @@ class Label extends Expression {
 
 // TODO: unsigned. what about signed?
 // see: http://mrjester.hapisan.com/04_MC68/Sect04Part02/Index.html
-abstract class Value<T extends Value<T>> extends Expression {
+abstract class Value extends Expression {
   /// Value as an [int]
   final int value;
 
@@ -100,22 +101,26 @@ abstract class Value<T extends Value<T>> extends Expression {
   String toString() => hex;
 }
 
-class Byte extends Value<Byte> {
-  static const zero = Byte(0);
+class Byte extends Value {
+  static const zero = Byte._(0);
+  static const one = Byte._(1);
+  static const two = Byte._(2);
 
-  const Byte(int value) : super._(value);
+  Byte(int value) : super(value);
+
+  const Byte._(int value) : super._(value);
 
   @override
   final size = Size.b;
 }
 
-class Word extends Value<Word> {
+class Word extends Value {
   Word(int value) : super(value);
   @override
   final size = Size.w;
 }
 
-class Longword extends Value<Longword> {
+class Longword extends Value {
   Longword(int value) : super(value);
   @override
   final size = Size.l;
@@ -171,7 +176,15 @@ extension ToExpression on String {
 }
 
 /// An arbitrary list of data.
-abstract class Data<T extends List<int>, D extends Data<T, D>> {
+///
+/// [T] is the typed data list used to store the data. Size it to the right
+/// typed data list type e.g.Uint8List
+///
+/// [E] is the type of Value represented by each element in the list.
+///
+/// [D] is just a self-referential recursive type to template the class.
+abstract class Data<T extends List<int>, E extends Value,
+    D extends Data<T, E, D>> extends ListBase<E> {
   final T bytes;
   final int elementSizeInBytes;
   final int hexDigits;
@@ -181,7 +194,12 @@ abstract class Data<T extends List<int>, D extends Data<T, D>> {
 
   D _new(List<int> l);
 
+  E _newElement(int v);
+
+  List<E> get _list => bytes.map((e) => _newElement(e)).toList(growable: false);
+
   int get length => bytes.length;
+  set length(int newLength) => bytes.length = newLength;
 
   String get immediate => '';
 
@@ -198,10 +216,15 @@ abstract class Data<T extends List<int>, D extends Data<T, D>> {
     return _new(bytes.trimTrailing(value: byte));
   }
 
-  D operator +(D other) =>
-      _new(bytes.toList(growable: false) + other.bytes.toList(growable: false));
+  D operator +(List<E> other) =>
+      _new(bytes + other.map((e) => e.value).toList(growable: false));
 
-  int operator [](int index) => bytes[index];
+  E operator [](int index) => _list[index];
+
+  @override
+  void operator []=(int index, E value) {
+    bytes[index] = value.value;
+  }
 
   @override
   String toString() {
@@ -215,14 +238,14 @@ abstract class Data<T extends List<int>, D extends Data<T, D>> {
     return _new(bytes.sublist(start, end));
   }
 
-  int indexWhere(bool Function(int) test, [int? start]) {
+  int indexWhere(bool Function(E) test, [int? start]) {
     return start == null
-        ? bytes.indexWhere(test)
-        : bytes.indexWhere(test, start);
+        ? _list.indexWhere(test)
+        : _list.indexWhere(test, start);
   }
 
-  bool every(bool Function(int) test) {
-    return bytes.every(test);
+  bool every(bool Function(E) test) {
+    return _list.every(test);
   }
 
   bool get isEmpty => bytes.isEmpty;
@@ -240,7 +263,7 @@ abstract class Data<T extends List<int>, D extends Data<T, D>> {
   int get hashCode => bytes.hashCode;
 }
 
-class Bytes extends Data<Uint8List, Bytes> {
+class Bytes extends Data<Uint8List, Byte, Bytes> {
   Bytes(Uint8List bytes) : super(bytes, bytes.elementSizeInBytes);
 
   static Ascii ascii(String d) {
@@ -275,8 +298,13 @@ class Bytes extends Data<Uint8List, Bytes> {
     return Bytes.of(int.parse('0x$d'));
   }
 
+  factory Bytes.from(List<Byte> bytes) {
+    if (bytes is Bytes) return bytes;
+    return Bytes.list(bytes.map((e) => e.value).toList(growable: false));
+  }
+
   @override
-  Bytes operator +(Bytes other) {
+  Bytes operator +(List<Byte> other) {
     if (other is Ascii) {
       return BytesAndAscii(<Bytes>[this] + [other]);
     }
@@ -285,6 +313,9 @@ class Bytes extends Data<Uint8List, Bytes> {
 
   @override
   Bytes _new(List<int> bytes) => Bytes(Uint8List.fromList(bytes));
+
+  @override
+  Byte _newElement(int v) => Byte(v);
 }
 
 class Ascii extends Bytes {
@@ -303,9 +334,9 @@ class Ascii extends Bytes {
   Ascii _new(List<int> bytes) => Ascii(Uint8List.fromList(bytes));
 
   @override
-  Bytes operator +(Bytes other) {
+  Bytes operator +(List<Byte> other) {
     if (other is! Ascii) {
-      return BytesAndAscii(<Bytes>[this] + [other]);
+      return BytesAndAscii(<Bytes>[this] + [Bytes.from(other)]);
     }
 
     var concat =
@@ -369,8 +400,8 @@ class BytesAndAscii extends Bytes {
   }
 
   @override
-  BytesAndAscii operator +(Bytes other) {
-    return BytesAndAscii(_spans + [other]);
+  BytesAndAscii operator +(List<Byte> other) {
+    return BytesAndAscii(_spans + [Bytes.from(other)]);
   }
 
   @override
@@ -492,7 +523,7 @@ class BytesBuilder {
   }
 }
 
-class Words extends Data<Uint16List, Words> {
+class Words extends Data<Uint16List, Word, Words> {
   Words(Uint16List bytes) : super(bytes, bytes.elementSizeInBytes);
 
   factory Words.fromWord(int d) {
@@ -508,9 +539,12 @@ class Words extends Data<Uint16List, Words> {
 
   @override
   Words _new(List<int> bytes) => Words(Uint16List.fromList(bytes));
+
+  @override
+  Word _newElement(int v) => Word(v);
 }
 
-class Longwords extends Data<Uint32List, Longwords> {
+class Longwords extends Data<Uint32List, Longword, Longwords> {
   Longwords(Uint32List bytes) : super(bytes, bytes.elementSizeInBytes);
 
   factory Longwords.fromLongword(int d) {
@@ -526,6 +560,9 @@ class Longwords extends Data<Uint32List, Longwords> {
 
   @override
   Longwords _new(List<int> bytes) => Longwords(Uint32List.fromList(bytes));
+
+  @override
+  Longword _newElement(int v) => Longword(v);
 }
 
 extension TrimBytes on Uint8List {

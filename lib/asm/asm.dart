@@ -24,9 +24,9 @@ Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
 class DcMnemonic {
   const DcMnemonic();
 
-  Asm b(/*Byte|Bytes|Label*/ dynamic d) => cmd('dc.b', [d]);
-  Asm w(/*Word|Words|Label*/ dynamic d) => cmd('dc.w', [d]);
-  Asm l(/*Longword|Longwords|Label*/ dynamic d) => cmd('dc.l', [d]);
+  Asm b(List<Expression> c) => cmd('dc.b', c);
+  Asm w(List<Expression> c) => cmd('dc.w', c);
+  Asm l(List<Expression> c) => cmd('dc.l', c);
 }
 
 class MoveMnemonic {
@@ -171,7 +171,8 @@ class _Instruction extends Instruction {
       : line = [
           if (label == null) '' else '$label:',
           if (cmd != null) cmd,
-          if (operands.isNotEmpty) operands.join(', '),
+          if (operands.isNotEmpty)
+            if (operands is Data) operands else operands.join(', '),
           if (comment != null) '; $comment'
         ].join('\t') {
     if (line.length > 255) {

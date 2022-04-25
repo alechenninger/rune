@@ -72,7 +72,7 @@ MapAsm mapToAsm(GameMap map, int eventPointersOffset) {
             'no routine configured for npc behavior ${spec.behavior}');
       }
 
-      objectsAsm.add(dc.w(routine));
+      objectsAsm.add(dc.w([routine]));
     } else {
       var routine = _mapObjectSpecRoutines[spec];
 
@@ -80,7 +80,7 @@ MapAsm mapToAsm(GameMap map, int eventPointersOffset) {
         throw Exception('no routine configured for spec $spec');
       }
 
-      objectsAsm.add(dc.w(routine));
+      objectsAsm.add(dc.w([routine]));
     }
   }
 
@@ -122,8 +122,8 @@ Map<Sprite, Word> _generateSpriteAsm(GameMap map, Asm spritesAsm) {
     var tileNumber = Word(vramOffset + i * '48'.hex);
     vramTileNumbers[sprite] = tileNumber;
 
-    spritesAsm.add(dc.w(tileNumber));
-    spritesAsm.add(dc.l(artLbl));
+    spritesAsm.add(dc.w([tileNumber]));
+    spritesAsm.add(dc.l([artLbl]));
   }
 
   return vramTileNumbers;

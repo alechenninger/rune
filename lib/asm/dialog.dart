@@ -45,7 +45,7 @@ Asm dialog(Bytes portrait, Bytes dialog) {
   for (var i = 0; i < dialog.length; i++) {
     var char = dialog[i];
 
-    if (_isBreakable(char, dialog, i)) {
+    if (_isBreakable(char.value, dialog, i)) {
       breakPoint = i;
     }
 
@@ -53,7 +53,8 @@ Asm dialog(Bytes portrait, Bytes dialog) {
       append(dialog.sublist(lineStart, breakPoint));
 
       // Determine new line start (skip whitespace)
-      var skip = dialog.sublist(breakPoint).indexWhere((b) => b != $space);
+      var skip =
+          dialog.sublist(breakPoint).indexWhere((b) => b.value != $space);
       // If -1, then means empty or all space;
       lineStart = skip == -1 ? i : breakPoint + skip;
       if (lineStart > i) i = lineStart;
@@ -76,7 +77,7 @@ bool _isBreakable(int char, Bytes dialog, int index) {
   }
 
   for (var canBreakAfter in _canBreakAfterButNotOn) {
-    if (char != canBreakAfter && dialog[index - 1] == canBreakAfter) {
+    if (char != canBreakAfter && dialog[index - 1].value == canBreakAfter) {
       return true;
     }
   }

@@ -12,16 +12,14 @@ void main() {
 	dc.b	$01
 	dc.b	"This is a test of a long line"
 	dc.b	$FC
-	dc.b	"that should wrap."
-	dc.b	$FD'''));
+	dc.b	"that should wrap."'''));
   });
 
   test('maintains double space', () {
     var asm = dialog(portrait, Bytes.ascii('Maintains  a double space.'));
     expect(asm.toString(), equals(r'''	dc.b	$F4
 	dc.b	$01
-	dc.b	"Maintains  a double space."
-	dc.b	$FD'''));
+	dc.b	"Maintains  a double space."'''));
   });
 
   test('can end line after dash', () {
@@ -31,8 +29,7 @@ void main() {
 	dc.b	$01
 	dc.b	"It is testing a very long line--"
 	dc.b	$FC
-	dc.b	"broken by dashes."
-	dc.b	$FD'''));
+	dc.b	"broken by dashes."'''));
   });
 
   test('cannot end line between dashes', () {
@@ -42,8 +39,7 @@ void main() {
 	dc.b	$01
 	dc.b	"It's a test of a very long"
 	dc.b	$FC
-	dc.b	"line--with dashes."
-	dc.b	$FD'''));
+	dc.b	"line--with dashes."'''));
   });
 
   test('continues many lines', () {
@@ -62,7 +58,6 @@ void main() {
 	dc.b	$FC
 	dc.b	"instead of waiting for the work"
 	dc.b	$FD
-	dc.b	"to come in."
-	dc.b	$FD'''));
+	dc.b	"to come in."'''));
   });
 }
