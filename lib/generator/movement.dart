@@ -246,17 +246,21 @@ extension CharId on Character {
 }
 
 extension DirectionToAddress on Direction {
-  Address get address {
+  Constant get constant {
     switch (this) {
       case Direction.up:
-        return up.i;
+        return up;
       case Direction.left:
-        return left.i;
+        return left;
       case Direction.right:
-        return right.i;
+        return right;
       case Direction.down:
-        return down.i;
+        return down;
     }
     throw StateError('illegal direction $this');
+  }
+
+  Address get address {
+    return constant.i;
   }
 }

@@ -72,7 +72,7 @@ class Label extends Expression {
 
 // TODO: unsigned. what about signed?
 // see: http://mrjester.hapisan.com/04_MC68/Sect04Part02/Index.html
-abstract class Value extends Expression {
+abstract class Value extends Expression implements Comparable<Value> {
   /// Value as an [int]
   final int value;
 
@@ -91,6 +91,11 @@ abstract class Value extends Expression {
   bool get isZero => value == 0;
   @override
   bool get isNotZero => !isZero;
+
+  @override
+  int compareTo(Value other) {
+    return value.compareTo(other.value);
+  }
 
   /// Hex representation including $ prefix.
   String get hex =>
@@ -118,6 +123,8 @@ class Word extends Value {
   Word(int value) : super(value);
   @override
   final size = Size.w;
+
+  Word operator +(Word other) => Word(value + other.value);
 }
 
 class Longword extends Value {
