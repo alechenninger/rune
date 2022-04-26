@@ -1,4 +1,4 @@
-import 'package:characters/src/extensions.dart';
+import 'package:characters/characters.dart';
 import 'package:logging/logging.dart';
 import 'package:rune/parser/movement.dart';
 
@@ -24,7 +24,7 @@ var log = Logger('parser/gdocs');
 /// The heading text will be used as the scene ID unless a [SceneId] tech is
 /// found within the heading element.
 CompiledScene? compileSceneAtHeading(Paragraph heading) {
-  var sceneId = Tech.parse<SceneId>(heading);
+  var sceneId = Tech.parse<SceneId>(heading)?.onlyOne();
 
   if (sceneId == null) {
     return null;
@@ -57,12 +57,11 @@ CompiledScene? compileSceneAtHeading(Paragraph heading) {
       scene.addEvent(d);
     }
 
-    var event = Tech.parse<Event>(p);
-    if (event != null) {
+    Tech.parse<Event>(p)?.forEach((event) {
       log.f(
           e('parsed_event', {'event': event.toString(), 'text': p.getText()}));
       scene.addEvent(event);
-    }
+    });
   }
 
   return CompiledScene(sceneId, scene.toAsm());
@@ -180,12 +179,12 @@ bool nullToFalse(bool? b) => b ?? false;
 class Tech {
   static final _inlineTechP = RegExp(r'---\ntech:(\w+)\n---\n');
 
-  static final _techs = <String, Object Function(String?)>{
-    'scene_id': (c) => SceneId(c!),
-    'asm_event': (c) => AsmEvent(Asm.fromRaw(c!)),
+  static final _techs = <String, List<Object> Function(String?)>{
+    'scene_id': (c) => [SceneId(c!)],
+    'asm_event': (c) => [AsmEvent(Asm.fromRaw(c!))],
     'pause_seconds': (c) =>
-        Pause(Duration(milliseconds: (double.parse(c!) * 1000).toInt())),
-    'event': (c) => parseEvent(c!),
+        [Pause(Duration(milliseconds: (double.parse(c!) * 1000).toInt()))],
+    'event': (c) => parseEvents(c!),
     'aggregate': (c) {
       var events = <Event>[];
 
@@ -200,51 +199,44 @@ class Tech {
 
         var tech = _techForType(type!, remaining);
         // TODO: else
-        if (tech is Event) {
-          events.add(tech);
+        if (tech.every((t) => t is Event)) {
+          events.addAll(tech.cast<Event>());
         }
       }
 
-      return AggregateEvent(events);
+      return events;
     }
   };
 
   const Tech();
 
-  static T? parse<T>(ContainerElement container) {
-    var techs = <Object>[];
+  static List<T>? parse<T>(ContainerElement container) {
+    var techs = <T>[];
 
     for (var i = 0; i < container.getNumChildren(); i++) {
       var child = container.getChild(i)!;
+      var parsed = <Object>[];
 
       if (child.getType() == DocumentApp.ElementType.INLINE_IMAGE) {
         var img = child.asInlineImage();
-        var tech = _fromInlineImage(img);
-        if (tech != null) techs.add(tech);
+        parsed = _fromInlineImage(img);
       } else if (child.getType() == DocumentApp.ElementType.FOOTNOTE) {
         var fn = child.asFootnote();
-        var tech = _fromFootnote(fn);
-        if (tech != null) techs.add(tech);
+        parsed = _fromFootnote(fn);
+      }
+
+      if (parsed.every((t) => t is T)) {
+        techs.addAll(parsed.cast<T>());
       }
     }
 
-    if (techs.isEmpty) return null;
+    log.f(e('parsed_tech',
+        {'type': '$T', 'techs': techs.map((t) => t.toString())}));
 
-    if (techs.length == 1 && techs.first is T) {
-      log.f(e('parsed_tech', {'type': T.toString()}));
-      return techs.first as T;
-    }
-
-    if (_isSubtype<AggregateEvent, T>() && techs.every((t) => t is Event)) {
-      log.f(e('parsed_tech', {
-        'type': 'aggregate_event',
-        'techs': techs.map((t) => t.toString())
-      }));
-      return AggregateEvent(techs.cast<Event>()) as T;
-    }
+    return techs;
   }
 
-  static Object? _fromInlineImage(InlineImage img) {
+  static List<Object> _fromInlineImage(InlineImage img) {
     if (img.getAltTitle()?.startsWith('tech:') == true) {
       var type = img.getAltTitle()!.substring(5).trim();
 
@@ -255,13 +247,15 @@ class Tech {
 
       return _techForType(type, content);
     }
+
+    return [];
   }
 
-  static Object? _fromFootnote(Footnote fn) {
+  static List<Object> _fromFootnote(Footnote fn) {
     return _techForType('event', fn.getFootnoteContents().getText());
   }
 
-  static Object _techForType(String type, String? content) {
+  static List<Object> _techForType(String type, String? content) {
     var factory = _techs[type];
     if (factory == null) {
       throw ArgumentError.value(type, 'type',
@@ -320,4 +314,15 @@ class UnsupportedTechException implements Exception {
   }
 }
 
-bool _isSubtype<S, T>() => <S>[] is List<T>;
+extension OnlyOne<T> on List<T> {
+  T onlyOne({Object Function() errorIfTooMany = _tooManyElements}) {
+    if (length > 1) {
+      throw errorIfTooMany();
+    }
+    return first;
+  }
+}
+
+Object _tooManyElements() {
+  return "too many elements";
+}

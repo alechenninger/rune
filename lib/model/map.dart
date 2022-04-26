@@ -21,10 +21,14 @@ class Piata extends GameMap {}
 class MapObject extends FieldObject {
   // note: can only be in multiples of 8 pixels
   final Position startPosition;
-  final Event? onInteract;
+  final List<Event> onInteract;
   final MapObjectSpec spec;
 
-  MapObject({required this.startPosition, required this.spec, this.onInteract});
+  MapObject(
+      {required this.startPosition,
+      required this.spec,
+      List<Event> onInteract = const []})
+      : onInteract = List.unmodifiable(onInteract);
 
   @override
   int? slot(EventContext c) => null;

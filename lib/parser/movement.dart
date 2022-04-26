@@ -28,7 +28,7 @@ final moveExpressions = <MoveExpression>[RelativeMoveExpression()];
 // something successfully
 // it would be easier to track unparsed if i did this
 
-Event parseEvent(String script) {
+List<Event> parseEvents(String script) {
   var toParse = script.trimLeft();
   var events = <Event>[];
   while (toParse.isNotEmpty) {
@@ -60,11 +60,7 @@ Event parseEvent(String script) {
     }
   }
 
-  if (events.length == 1) {
-    return events[0];
-  }
-
-  return AggregateEvent(events);
+  return events;
 }
 
 abstract class EventExpression {

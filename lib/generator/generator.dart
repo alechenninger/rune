@@ -3,6 +3,7 @@ import 'package:rune/asm/events.dart';
 import 'package:rune/generator/map.dart';
 import 'package:rune/model/model.dart';
 
+import '../asm/asm.dart';
 import 'dialog.dart';
 import 'event.dart';
 import 'movement.dart';
@@ -11,6 +12,17 @@ import 'scene.dart';
 export '../asm/asm.dart' show Asm;
 
 class AsmGenerator {
+  Asm eventsToAsm(List<Event> events, EventContext ctx) {
+    if (events.isEmpty) {
+      return Asm.empty();
+    }
+
+    return events.map((e) => e.generateAsm(this, ctx)).reduce((value, element) {
+      value.add(element);
+      return value;
+    });
+  }
+
   SceneAsm sceneToAsm(Scene scene) {
     return scene.toAsm();
   }

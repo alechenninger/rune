@@ -3,7 +3,6 @@ import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
-import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/numbers.dart';
 
@@ -19,7 +18,7 @@ class MapAsm {
   final Asm cutscenes;
   final Asm cutscenePointers;
   // might also need dialogTree ASM
-  // if these labels need to be programmatically referred ot
+  // if these labels need to be programmatically referred to
 
   MapAsm({
     required this.sprites,
@@ -154,6 +153,18 @@ List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
   var dialogOffsets = <Byte>[];
 
   for (var obj in map.objects) {
+    var onInteract = obj.onInteract;
+    if (onInteract == null) {
+      dialogAsm.add(endDialog());
+    } else {
+      /*
+      problems
+      1. we don't know if event is dialog or another kind of event
+      2. event may even represent multiple "things" some which need to be
+      represented in dialog, others which are asm, and so on
+      3.
+       */
+    }
     // write dialog for each obj, may require disjoint dialogs based on
     // branching conditions, perhaps depending on other events
     // write event code
@@ -162,27 +173,6 @@ List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
   }
 
   return dialogOffsets;
-}
-
-Word _routineFor(MapObjectSpec spec) {
-  if (spec is Npc) {
-    var routine = _npcBehaviorRoutines[spec.behavior];
-
-    if (routine == null) {
-      throw Exception(
-          'no routine configured for npc behavior ${spec.behavior}');
-    }
-
-    return routine;
-  } else {
-    var routine = _mapObjectSpecRoutines[spec];
-
-    if (routine == null) {
-      throw Exception('no routine configured for spec $spec');
-    }
-
-    return routine;
-  }
 }
 
 final _vramOffsetPerSprite = '48'.hex;

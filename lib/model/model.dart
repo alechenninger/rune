@@ -92,47 +92,6 @@ class Scene {
   }
 }
 
-class AggregateEvent extends Event {
-  final List<Event> events = [];
-
-  AggregateEvent(List<Event> events) {
-    if (events.isEmpty) {
-      throw ArgumentError('empty events', 'events');
-    }
-
-    this.events.addAll(events);
-  }
-
-  @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
-    if (events.isEmpty) {
-      return Asm.empty();
-    }
-
-    return events
-        .map((e) => e.generateAsm(generator, ctx))
-        .reduce((value, element) {
-      value.add(element);
-      return value;
-    });
-  }
-
-  @override
-  String toString() {
-    return 'AggregateEvent{events: $events}';
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AggregateEvent &&
-          runtimeType == other.runtimeType &&
-          ListEquality().equals(events, other.events);
-
-  @override
-  int get hashCode => ListEquality().hash(events);
-}
-
 class SetContext extends Event {
   final void Function(EventContext ctx) _setCtx;
 

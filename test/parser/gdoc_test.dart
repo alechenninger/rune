@@ -8,7 +8,7 @@ import 'package:test/test.dart';
 void main() {
   group('tech.parse', () {
     test('aggregate groups many events', () {
-      var tech = Tech.parse<Event>(Paragraph()
+      var techs = Tech.parse<Event>(Paragraph()
         ..addChild(
             InlineImage(altTitle: 'tech:aggregate', altDescription: '''---
 tech:pause_seconds
@@ -19,18 +19,15 @@ tech:asm_event
 ---
 ; test''')));
 
-      expect(tech, isA<AggregateEvent>());
+      expect(techs, isNotNull);
+      expect(techs!.length, equals(2));
+      expect(techs[0], isA<Pause>());
+      expect(techs[1], isA<AsmEvent>());
 
-      var agg = tech as AggregateEvent;
-
-      expect(agg.events.length, equals(2));
-      expect(agg.events[0], isA<Pause>());
-      expect(agg.events[1], isA<AsmEvent>());
-
-      var pause = agg.events[0] as Pause;
+      var pause = techs[0] as Pause;
       expect(pause.duration, equals(Duration(seconds: 3)));
 
-      var asm = agg.events[1] as AsmEvent;
+      var asm = techs[1] as AsmEvent;
       expect(asm.asm, equals(Asm.fromRaw('; test')));
     });
 
@@ -38,12 +35,12 @@ tech:asm_event
       var footnote = Footnote(FootnoteSection()..setText('Alys faces up'));
       var tech = Tech.parse<Event>(Paragraph()..addChild(footnote));
 
-      expect(tech, equals(parseEvent('Alys faces up')));
+      expect(tech, equals(parseEvents('Alys faces up')));
     });
 
     test('parses footnotes and tech images', () {
       var footnote = Footnote(FootnoteSection()..setText('Alys faces up'));
-      var tech = Tech.parse<Event>(Paragraph()
+      var paragraph = Paragraph()
         ..addChild(
             InlineImage(altTitle: 'tech:aggregate', altDescription: '''---
 tech:pause_seconds
@@ -53,15 +50,17 @@ tech:pause_seconds
 tech:asm_event
 ---
 ; test'''))
-        ..addChild(footnote));
+        ..addChild(footnote);
+
+      var techs = Tech.parse<Event>(paragraph);
 
       expect(
-          tech,
-          equals(AggregateEvent([
-            AggregateEvent(
-                [Pause(Duration(seconds: 3)), AsmEvent(Asm.fromRaw('; test'))]),
-            parseEvent('Alys faces up')
-          ])));
+          techs,
+          equals([
+            Pause(Duration(seconds: 3)),
+            AsmEvent(Asm.fromRaw('; test')),
+            ...parseEvents('Alys faces up')
+          ]));
     });
   });
 
