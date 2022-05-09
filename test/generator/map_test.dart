@@ -10,7 +10,9 @@ void main() {
     var obj = MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.palmanMan1, FacingDown()),
-        onInteract: Dialog(spans: [Span('Hello world!')]));
+        onInteract: [
+          Dialog(spans: [Span('Hello world!')])
+        ]);
 
     map.addObject(obj);
 

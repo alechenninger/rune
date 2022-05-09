@@ -22,7 +22,7 @@ class Dialog extends Event {
   }
 
   @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.dialogToAsm(this);
   }
 

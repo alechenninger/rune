@@ -15,7 +15,7 @@ export 'map.dart';
 abstract class Event {
   // TODO: should probably not have this here? creates dependency on generator
   // from model
-  Asm generateAsm(AsmGenerator generator, EventContext ctx);
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx);
 }
 
 class EventContext {
@@ -24,11 +24,15 @@ class EventContext {
 
   /// 1-indexed (first is 1; 0 is invalid)
   final slots = BiMap<int, Character>();
+
+  // TODO: might need allow this to be unknown
   var startingAxis = Axis.x;
 
   /// Whether or not to follow character at slot[0]
+  // TODO: might need allow this to be unknown
   var followLead = true;
 
+  // TODO: might need allow this to be unknown
   bool cameraLock = false;
 
   GameMap? currentMap;
@@ -81,11 +85,13 @@ class Positions {
 }
 
 class Scene {
-  final List<Event> events = [];
+  final List<Event> events;
 
-  Scene([List<Event> events = const []]) {
+  Scene([List<Event> events = const []]) : events = [] {
     this.events.addAll(events);
   }
+
+  const Scene.none() : events = const [];
 
   void addEvent(Event event) {
     events.add(event);
@@ -98,8 +104,8 @@ class SetContext extends Event {
   SetContext(this._setCtx);
 
   @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
-    _setCtx(ctx);
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
+    _setCtx(ctx.model);
     return Asm.empty();
   }
 
@@ -116,7 +122,7 @@ class Pause extends Event {
   Pause(this.duration);
 
   @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.pauseToAsm(this);
   }
 
@@ -138,7 +144,7 @@ class Pause extends Event {
 
 class LockCamera extends Event {
   @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.lockCameraToAsm(ctx);
   }
 
@@ -150,7 +156,7 @@ class LockCamera extends Event {
 
 class UnlockCamera extends Event {
   @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.unlockCameraToAsm(ctx);
   }
 

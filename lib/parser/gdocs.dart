@@ -285,7 +285,7 @@ class AsmEvent implements Event {
   AsmEvent(this.asm);
 
   @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     // raw asm a bit fragile! ctx not updated
     return asm;
   }

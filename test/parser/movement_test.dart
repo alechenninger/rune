@@ -39,8 +39,8 @@ After 3 steps, Shay walks 1 down, walks 7 right, 5 steps up.
           ..direction = up
           ..distance = 5.steps));
 
-    expect(generator.eventsToAsm(events, EventContext()),
-        expected.generateAsm(generator, testCtx));
+    expect(generator.eventsToAsm(events, AsmContext.fresh()),
+        expected.generateAsm(generator, AsmContext.forEvent(testCtx)));
 
     print(generator.sceneToAsm(scene));
   });
@@ -95,8 +95,9 @@ The party moves 3 steps right (followers move y-first).''');
           ..direction = right
           ..distance = 2.steps));
 
-    var actual = generator.eventsToAsm(events, EventContext());
-    expect(actual, expected.generateAsm(generator, testCtx));
+    var actual = generator.eventsToAsm(events, AsmContext.fresh());
+    expect(
+        actual, expected.generateAsm(generator, AsmContext.forEvent(testCtx)));
 
     print(actual);
   });
@@ -111,7 +112,7 @@ After 2 steps, Shay walks 2 steps down, 14 steps left, 6 steps up''');
 
     var generator = AsmGenerator();
 
-    var actual = generator.eventsToAsm(events, EventContext());
+    var actual = generator.eventsToAsm(events, AsmContext.fresh());
 
     var testCtx = EventContext()
       ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
@@ -139,7 +140,8 @@ After 2 steps, Shay walks 2 steps down, 14 steps left, 6 steps up''');
           ..direction = up
           ..distance = 6.steps));
 
-    expect(actual, expected.generateAsm(generator, testCtx));
+    expect(
+        actual, expected.generateAsm(generator, AsmContext.forEvent(testCtx)));
 
     print(actual);
   });

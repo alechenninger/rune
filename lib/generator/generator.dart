@@ -11,8 +11,22 @@ import 'scene.dart';
 
 export '../asm/asm.dart' show Asm;
 
+class AsmContext {
+  final EventContext model;
+
+  Mode mode = Mode.event;
+
+  bool get inDialogLoop => mode == Mode.dialog;
+
+  AsmContext.fresh({this.mode = Mode.event}) : model = EventContext();
+  AsmContext.forDialog(this.model) : mode = Mode.dialog;
+  AsmContext.forEvent(this.model) : mode = Mode.event;
+}
+
+enum Mode { dialog, event }
+
 class AsmGenerator {
-  Asm eventsToAsm(List<Event> events, EventContext ctx) {
+  Asm eventsToAsm(List<Event> events, AsmContext ctx) {
     if (events.isEmpty) {
       return Asm.empty();
     }
@@ -35,12 +49,12 @@ class AsmGenerator {
     return dialog.toAsm();
   }
 
-  EventAsm individualMovesToAsm(IndividualMoves move, EventContext ctx) {
-    return move.toAsm(ctx);
+  EventAsm individualMovesToAsm(IndividualMoves move, AsmContext ctx) {
+    return move.toAsm(ctx.model);
   }
 
-  EventAsm partyMoveToAsm(PartyMove move, EventContext ctx) {
-    return individualMovesToAsm(move.toIndividualMoves(ctx), ctx);
+  EventAsm partyMoveToAsm(PartyMove move, AsmContext ctx) {
+    return individualMovesToAsm(move.toIndividualMoves(ctx.model), ctx);
   }
 
   EventAsm pauseToAsm(Pause pause) {
@@ -52,12 +66,12 @@ class AsmGenerator {
     return EventAsm.of(vIntPrepareLoop(Word(frames.toInt())));
   }
 
-  EventAsm lockCameraToAsm(EventContext ctx) {
-    return EventAsm.of(lockCamera(ctx.cameraLock = true));
+  EventAsm lockCameraToAsm(AsmContext ctx) {
+    return EventAsm.of(lockCamera(ctx.model.cameraLock = true));
   }
 
-  EventAsm unlockCameraToAsm(EventContext ctx) {
-    return EventAsm.of(lockCamera(ctx.cameraLock = false));
+  EventAsm unlockCameraToAsm(AsmContext ctx) {
+    return EventAsm.of(lockCamera(ctx.model.cameraLock = false));
   }
 }
 

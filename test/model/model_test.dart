@@ -343,7 +343,7 @@ void main() {
               ..direction = down
               ..distance = 3.steps));
 
-      print(moves.generateAsm(AsmGenerator(), ctx));
+      print(moves.generateAsm(AsmGenerator(), AsmContext.forEvent(ctx)));
     });
   });
 }

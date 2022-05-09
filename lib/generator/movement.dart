@@ -128,6 +128,10 @@ extension IndividualMovesToAsm on IndividualMoves {
 
           var current = ctx.positions[moveable];
           if (current == null) {
+            // TODO: We can do some math instead, maybe store in register
+            // e.g. look up cur position, save in data register
+            // might need to look up each time based on necessary math and
+            // available data registers
             throw StateError('no current position set for $moveable');
           }
 

@@ -284,7 +284,7 @@ class PartyMove extends Event {
   }
 
   @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.partyMoveToAsm(this, ctx);
   }
 
@@ -300,7 +300,7 @@ class IndividualMoves extends Event {
   Map<FieldObject, Movement> moves = {};
 
   @override
-  Asm generateAsm(AsmGenerator generator, EventContext ctx) {
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.individualMovesToAsm(this, ctx);
   }
 

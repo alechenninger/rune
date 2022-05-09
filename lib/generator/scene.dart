@@ -10,12 +10,11 @@ import '../model/model.dart';
 extension SceneToAsm on Scene {
   SceneAsm toAsm() {
     var generator = AsmGenerator();
-    var ctx = EventContext();
+    var ctx = AsmContext.fresh();
 
     var eventAsm = EventAsm.empty();
     var dialogAsm = DialogAsm.empty();
     Event? lastEvent;
-    var generatingDialog = true;
     var lastEventBreak = -1;
     var eventCounter = 1;
 
@@ -23,10 +22,10 @@ extension SceneToAsm on Scene {
     //  codes)
 
     void addDialog(Dialog dialog) {
-      if (!generatingDialog) {
+      if (!ctx.inDialogLoop) {
         eventAsm.add(popAndRunDialog());
         eventAsm.addNewline();
-        generatingDialog = true;
+        ctx.mode = Mode.dialog;
       } else if (lastEvent is Dialog) {
         // Consecutive dialog, new cursor in between each dialog
         dialogAsm.add(cursor());
@@ -36,8 +35,8 @@ extension SceneToAsm on Scene {
     }
 
     void addEvent(Event event) {
-      if (generatingDialog && dialogAsm.isNotEmpty) {
-        generatingDialog = false;
+      if (ctx.inDialogLoop && dialogAsm.isNotEmpty) {
+        ctx.mode = Mode.event;
         // or enddialog/terminate? FF
         // note if use terminate, have to track dialog tree offset
         dialogAsm.add(comment('scene event $eventCounter'));
@@ -66,7 +65,7 @@ extension SceneToAsm on Scene {
       lastEvent = event;
     }
 
-    if (generatingDialog) {
+    if (ctx.inDialogLoop) {
       dialogAsm.add(endDialog());
     } else if (lastEventBreak >= 0) {
       dialogAsm.replace(lastEventBreak, endDialog());

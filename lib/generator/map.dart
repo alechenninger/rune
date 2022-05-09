@@ -8,6 +8,7 @@ import 'package:rune/numbers.dart';
 
 import '../asm/asm.dart';
 import '../model/model.dart';
+import 'generator.dart';
 
 class MapAsm {
   final Asm sprites;
@@ -51,7 +52,7 @@ class MapAsm {
   }
 }
 
-MapAsm mapToAsm(GameMap map, int eventPointersOffset) {
+MapAsm mapToAsm(GameMap map, int eventPointersOffset, AsmGenerator generator) {
   var spritesAsm = Asm.empty();
   var dialogAsm = Asm.empty();
   var objectsAsm = Asm.empty();
@@ -59,8 +60,8 @@ MapAsm mapToAsm(GameMap map, int eventPointersOffset) {
   var eventPointersAsm = Asm.empty();
 
   var vramTileNumbers = _generateSpriteAsm(map, spritesAsm);
-  var dialogOffsets = _generateDialogAndEventsAsm(
-      map, dialogAsm, eventsAsm, eventPointersAsm, eventPointersOffset);
+  var dialogOffsets = _generateDialogAndEventsAsm(map, dialogAsm, eventsAsm,
+      eventPointersAsm, eventPointersOffset, generator);
 
   _generateObjectsAsm(map, objectsAsm, vramTileNumbers, dialogOffsets);
 
@@ -92,6 +93,8 @@ void _generateObjectsAsm(GameMap map, Asm objectsAsm,
       objectsAsm.add(dc.w([routine]));
       objectsAsm.add(facingAndDialog);
 
+      // TODO: i think you can use 0 for invisible / no sprite
+      // see Map_ZioFort
       var tileNumber = vramTileNumbers[spec.sprite];
       if (tileNumber == null) {
         throw Exception('no tile number for sprite ${spec.sprite}');
@@ -147,23 +150,30 @@ Map<Sprite, Word> _generateSpriteAsm(GameMap map, Asm spritesAsm) {
   return vramTileNumbers;
 }
 
-List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
-    Asm eventsAsm, Asm eventPointersAsm, int eventPointersOffset) {
+List<Byte> _generateDialogAndEventsAsm(
+    GameMap map,
+    Asm dialogAsm,
+    Asm eventsAsm,
+    Asm eventPointersAsm,
+    int eventPointersOffset,
+    AsmGenerator generator) {
   var dialogIdx = 0;
   var dialogOffsets = <Byte>[];
 
   for (var obj in map.objects) {
-    var onInteract = obj.onInteract;
-    if (onInteract == null) {
-      dialogAsm.add(endDialog());
-    } else {
-      /*
-      problems
-      1. we don't know if event is dialog or another kind of event
-      2. event may even represent multiple "things" some which need to be
-      represented in dialog, others which are asm, and so on
-      3.
-       */
+    dialogOffsets.add(Byte(dialogIdx));
+
+    // Interaction always starts with triggering dialog
+    var dialogMode = true;
+
+    for (var event in obj.onInteract) {
+      // todo: may want a factory for event context
+      var ctx = AsmContext.forDialog(EventContext()..currentMap = map);
+
+      // some events are different whether in dialog routine or event routine
+      // for example setting or checking event codes are handled differently
+
+      event.generateAsm(generator, ctx);
     }
     // write dialog for each obj, may require disjoint dialogs based on
     // branching conditions, perhaps depending on other events
