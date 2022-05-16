@@ -75,6 +75,8 @@ class Asm extends IterableBase<Instruction> {
     return lines.length - asm.length;
   }
 
+  Asm operator [](int i) => Asm.fromInstruction(lines[i]);
+
   void replace(int index, Asm asm) {
     lines.removeRange(index, index + asm.length);
     lines.insertAll(index, asm.lines);

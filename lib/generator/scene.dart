@@ -8,9 +8,18 @@ import '../asm/asm.dart';
 import '../model/model.dart';
 
 extension SceneToAsm on Scene {
-  SceneAsm toAsm() {
+  // I think this needs more context - asm context
+  // for ex:
+  // * am I in an event routine already?
+  //
+  // also needs more output
+  // if dialog branches, may need to add another event?
+  //
+  // note: jumping to another event from event code is done simply by
+  // setting the event index and returning (rts)
+  // can check event flags easily there too
+  SceneAsm toAsm(AsmContext ctx) {
     var generator = AsmGenerator();
-    var ctx = AsmContext.fresh();
 
     var eventAsm = EventAsm.empty();
     var dialogAsm = DialogAsm.empty();
@@ -25,10 +34,10 @@ extension SceneToAsm on Scene {
       if (!ctx.inDialogLoop) {
         eventAsm.add(popAndRunDialog());
         eventAsm.addNewline();
-        ctx.mode = Mode.dialog;
+        ctx.gameMode = Mode.dialog;
       } else if (lastEvent is Dialog) {
         // Consecutive dialog, new cursor in between each dialog
-        dialogAsm.add(cursor());
+        dialogAsm.add(interrupt());
       }
 
       dialogAsm.add(dialog.generateAsm(generator, ctx));
@@ -36,7 +45,7 @@ extension SceneToAsm on Scene {
 
     void addEvent(Event event) {
       if (ctx.inDialogLoop && dialogAsm.isNotEmpty) {
-        ctx.mode = Mode.event;
+        ctx.gameMode = Mode.event;
         // or enddialog/terminate? FF
         // note if use terminate, have to track dialog tree offset
         dialogAsm.add(comment('scene event $eventCounter'));
@@ -66,23 +75,52 @@ extension SceneToAsm on Scene {
     }
 
     if (ctx.inDialogLoop) {
-      dialogAsm.add(endDialog());
+      dialogAsm.add(terminateDialog());
     } else if (lastEventBreak >= 0) {
-      dialogAsm.replace(lastEventBreak, endDialog());
+      dialogAsm.replace(lastEventBreak, terminateDialog());
     }
 
-    return SceneAsm(eventAsm, dialogAsm);
+    return SceneAsm(
+        event: eventAsm, dialog: [dialogAsm], eventPtr: Asm.empty());
   }
 }
 
 class SceneAsm {
-  final Asm event;
-  final Asm dialog;
+  /*
+  should we label this?
+  in event mode, no. ... already within an event routine.
 
-  SceneAsm(this.event, this.dialog);
+  in dialog, and we generate event, it must be labeled and have an event
+  pointer.
+
+  in that case where does the output go?
+
+  i guess anywhere in the code. the dialog jump uses jsr which has 16mb of
+  range–larger than a normal rom can be.
+   */
+  final Asm event;
+  final List<Asm> dialog;
+  final Asm eventPtr;
+
+  // if empty should just be FF?
+  Asm get allDialog {
+    var all = Asm.empty();
+
+    for (var i = 0; i < dialog.length; i++) {
+      // todo: may also want some dialog index offset in the context
+      // otherwise this will only be accurate per scene
+      all.add(comment('$i'));
+      all.add(dialog[i]);
+      all.addNewline();
+    }
+
+    return all;
+  }
+
+  SceneAsm({required this.event, required this.dialog, required this.eventPtr});
 
   @override
   String toString() {
-    return '; event:\n$event\n; dialog:\n$dialog';
+    return '; event:\n$event\n; dialog:\n$allDialog\n; eventPtr:\n$eventPtr';
   }
 }

@@ -64,7 +64,7 @@ CompiledScene? compileSceneAtHeading(Paragraph heading) {
     });
   }
 
-  return CompiledScene(sceneId, scene.toAsm());
+  return CompiledScene(sceneId, scene.toAsm(AsmContext.fresh()));
 }
 
 final RegExp _pause = RegExp(r'.*[Pp]auses? for (\d+) seconds?.*');

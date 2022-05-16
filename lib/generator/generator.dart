@@ -2,6 +2,7 @@ import 'package:rune/asm/data.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/map.dart';
 import 'package:rune/model/model.dart';
+import 'package:rune/numbers.dart';
 
 import '../asm/asm.dart';
 import 'dialog.dart';
@@ -14,13 +15,20 @@ export '../asm/asm.dart' show Asm;
 class AsmContext {
   final EventContext model;
 
-  Mode mode = Mode.event;
+  Mode gameMode = Mode.event;
+  Word eventIndexOffset = 'a0'.hex.word;
 
-  bool get inDialogLoop => mode == Mode.dialog;
+  /// Returns next event index to add a new event in EventPtrs.
+  Word nextEventIndex() {
+    eventIndexOffset = (eventIndexOffset.value + 1).word;
+    return eventIndexOffset;
+  }
 
-  AsmContext.fresh({this.mode = Mode.event}) : model = EventContext();
-  AsmContext.forDialog(this.model) : mode = Mode.dialog;
-  AsmContext.forEvent(this.model) : mode = Mode.event;
+  bool get inDialogLoop => gameMode == Mode.dialog;
+
+  AsmContext.fresh({this.gameMode = Mode.event}) : model = EventContext();
+  AsmContext.forDialog(this.model) : gameMode = Mode.dialog;
+  AsmContext.forEvent(this.model) : gameMode = Mode.event;
 }
 
 enum Mode { dialog, event }
@@ -37,12 +45,12 @@ class AsmGenerator {
     });
   }
 
-  SceneAsm sceneToAsm(Scene scene) {
-    return scene.toAsm();
+  SceneAsm sceneToAsm(Scene scene, AsmContext ctx) {
+    return scene.toAsm(ctx);
   }
 
-  MapAsm mapToAsm(GameMap map) {
-    return mapToAsm(map);
+  MapAsm mapToAsm(GameMap map, AsmContext ctx) {
+    return map.toAsm(this, ctx);
   }
 
   DialogAsm dialogToAsm(Dialog dialog) {

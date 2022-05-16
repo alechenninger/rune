@@ -52,7 +52,13 @@ class MapAsm {
   }
 }
 
-MapAsm mapToAsm(GameMap map, int eventPointersOffset, AsmGenerator generator) {
+extension MapToAsm on GameMap {
+  MapAsm toAsm(AsmGenerator generator, AsmContext ctx) {
+    return mapToAsm(this, generator, ctx);
+  }
+}
+
+MapAsm mapToAsm(GameMap map, AsmGenerator generator, AsmContext ctx) {
   var spritesAsm = Asm.empty();
   var dialogAsm = Asm.empty();
   var objectsAsm = Asm.empty();
@@ -60,8 +66,8 @@ MapAsm mapToAsm(GameMap map, int eventPointersOffset, AsmGenerator generator) {
   var eventPointersAsm = Asm.empty();
 
   var vramTileNumbers = _generateSpriteAsm(map, spritesAsm);
-  var dialogOffsets = _generateDialogAndEventsAsm(map, dialogAsm, eventsAsm,
-      eventPointersAsm, eventPointersOffset, generator);
+  var dialogOffsets = _generateDialogAndEventsAsm(
+      map, dialogAsm, eventsAsm, eventPointersAsm, ctx, generator);
 
   _generateObjectsAsm(map, objectsAsm, vramTileNumbers, dialogOffsets);
 
@@ -116,7 +122,8 @@ void _generateObjectsAsm(GameMap map, Asm objectsAsm,
           dc.w([vramTileNumbers.values.max() + Word(_vramOffsetPerSprite)]));
     }
 
-    dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]);
+    objectsAsm.add(
+        dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]));
   });
 }
 
@@ -155,7 +162,7 @@ List<Byte> _generateDialogAndEventsAsm(
     Asm dialogAsm,
     Asm eventsAsm,
     Asm eventPointersAsm,
-    int eventPointersOffset,
+    AsmContext ctx,
     AsmGenerator generator) {
   var dialogIdx = 0;
   var dialogOffsets = <Byte>[];
@@ -164,22 +171,15 @@ List<Byte> _generateDialogAndEventsAsm(
     dialogOffsets.add(Byte(dialogIdx));
 
     // Interaction always starts with triggering dialog
-    var dialogMode = true;
+    ctx.gameMode = Mode.dialog;
 
-    for (var event in obj.onInteract) {
-      // todo: may want a factory for event context
-      var ctx = AsmContext.forDialog(EventContext()..currentMap = map);
+    var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx);
 
-      // some events are different whether in dialog routine or event routine
-      // for example setting or checking event codes are handled differently
+    dialogAsm.add(sceneAsm.allDialog);
+    eventsAsm.add(sceneAsm.event);
+    eventPointersAsm.add(sceneAsm.eventPtr);
 
-      event.generateAsm(generator, ctx);
-    }
-    // write dialog for each obj, may require disjoint dialogs based on
-    // branching conditions, perhaps depending on other events
-    // write event code
-    // write event pointer for each event,
-    // write the dialog offset which the obj should start with to array
+    dialogIdx += sceneAsm.dialog.length;
   }
 
   return dialogOffsets;
@@ -191,7 +191,9 @@ final _spriteVramOffsets = {Aiedo: '29A'.hex, Piata: '2D0'.hex};
 
 final _spriteArtLabels = {
   Sprite.palmanMan1: Label('Art_PalmanMan1'),
-  Sprite.palmanMan2: Label('Art_PalmanMan2')
+  Sprite.palmanMan2: Label('Art_PalmanMan2'),
+  Sprite.palmanWoman1: Label('Art_PalmanWoman1'),
+  Sprite.palmanWoman2: Label('Art_PalmanWoman2'),
 };
 
 final _mapObjectSpecRoutines = {AlysWaiting(): Word('68'.hex)};

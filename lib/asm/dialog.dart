@@ -5,21 +5,21 @@ import 'asm.dart';
 class _ControlCodes {
   static final portrait = Bytes.hex('F4');
   static final newLine = Bytes.hex('FC');
-  static final cursor = Bytes.hex('FD');
-  static final endDialog = Bytes.hex('FF');
-  static final event = Bytes.hex('F7'); // same as FE
+  static final interrupt = Bytes.hex('FD');
+  static final terminate = Bytes.hex('FF');
+  static final eventBreak = Bytes.hex('F7'); // same as FE
 }
 
 Asm eventBreak() {
-  return dc.b(_ControlCodes.event);
+  return dc.b(_ControlCodes.eventBreak);
 }
 
-Asm endDialog() {
-  return dc.b(_ControlCodes.endDialog);
+Asm terminateDialog() {
+  return dc.b(_ControlCodes.terminate);
 }
 
-Asm cursor() {
-  return dc.b(_ControlCodes.cursor);
+Asm interrupt() {
+  return dc.b(_ControlCodes.interrupt);
 }
 
 Asm dialog(Bytes portrait, Bytes dialog) {
@@ -37,7 +37,7 @@ Asm dialog(Bytes portrait, Bytes dialog) {
     if (lineOffset == 1) {
       asm.add(dc.b(_ControlCodes.newLine));
     } else if (lineOffset == 3) {
-      asm.add(dc.b(_ControlCodes.cursor));
+      asm.add(dc.b(_ControlCodes.interrupt));
     }
     asm.add(dc.b(line));
   }

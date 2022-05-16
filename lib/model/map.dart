@@ -27,8 +27,7 @@ class MapObject extends FieldObject {
   MapObject(
       {required this.startPosition,
       required this.spec,
-      Scene onInteract = const []})
-      : onInteract = List.unmodifiable(onInteract);
+      this.onInteract = const Scene.none()});
 
   @override
   int? slot(EventContext c) => null;
@@ -126,4 +125,12 @@ class FacingDown extends NpcBehavior {
 
   @override
   final startFacing = Direction.down;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FacingDown && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }

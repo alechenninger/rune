@@ -146,7 +146,7 @@ String updateRom(List<Checksum> checksums) {
 List<Checksum> uploadToDrive(gdocs.CompiledScene scene) {
   var folder = DriveApp.getFolderById('__RUNE_DRIVE_FOLDER_ID__');
 
-  var dialogAsm = scene.asm.dialog.toString();
+  var dialogAsm = scene.asm.allDialog.toString();
   var eventAsm = scene.asm.event.toString();
 
   var dialogFile = updateFile(folder, '${scene.id}_dialog.asm', dialogAsm);
