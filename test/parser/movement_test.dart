@@ -42,7 +42,7 @@ After 3 steps, Shay walks 1 down, walks 7 right, 5 steps up.
     expect(generator.eventsToAsm(events, AsmContext.fresh()),
         expected.generateAsm(generator, AsmContext.forEvent(testCtx)));
 
-    print(generator.sceneToAsm(scene));
+    print(generator.sceneToAsm(scene, AsmContext.fresh()));
   });
 
   test('parses individual moves on one line.', () {
@@ -54,7 +54,7 @@ After 1 step, Shay walks 6 steps up''');
     var scene = Scene(events);
     var generator = AsmGenerator();
 
-    print(generator.sceneToAsm(scene));
+    print(generator.sceneToAsm(scene, AsmContext.fresh()));
   });
 
   test('parses party move', () {
@@ -67,7 +67,7 @@ The party moves 3 steps right.''');
     var scene = Scene(events);
     var generator = AsmGenerator();
 
-    print(generator.sceneToAsm(scene));
+    print(generator.sceneToAsm(scene, AsmContext.fresh()));
   });
 
   test('parses party move with alt follower axis', () {

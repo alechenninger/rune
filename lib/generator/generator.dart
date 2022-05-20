@@ -1,4 +1,3 @@
-import 'package:rune/asm/data.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/map.dart';
 import 'package:rune/model/model.dart';
@@ -15,7 +14,17 @@ export '../asm/asm.dart' show Asm;
 class AsmContext {
   final EventContext model;
 
+  // todo: probably shouldn't have all of this stuff read/write
+
   Mode gameMode = Mode.event;
+
+  /// Whether or not we are generating in the context of an existing event.
+  ///
+  /// This is necessary to understand whether, when in dialog mode, we can pop
+  /// back to an event or have to trigger a new one.
+  // i think this should always be true if mode == event?
+  bool inEvent = true;
+
   Word eventIndexOffset = 'a0'.hex.word;
 
   /// Returns next event index to add a new event in EventPtrs.
@@ -24,10 +33,27 @@ class AsmContext {
     return eventIndexOffset;
   }
 
+  void startDialogInteraction() {
+    gameMode = Mode.dialog;
+    inEvent = false;
+  }
+
+  void startEvent() {
+    gameMode = Mode.event;
+    inEvent = true;
+  }
+
   bool get inDialogLoop => gameMode == Mode.dialog;
 
-  AsmContext.fresh({this.gameMode = Mode.event}) : model = EventContext();
-  AsmContext.forDialog(this.model) : gameMode = Mode.dialog;
+  AsmContext.fresh({this.gameMode = Mode.event}) : model = EventContext() {
+    if (inDialogLoop) {
+      inEvent = false;
+    }
+  }
+
+  AsmContext.forDialog(this.model)
+      : gameMode = Mode.dialog,
+        inEvent = false;
   AsmContext.forEvent(this.model) : gameMode = Mode.event;
 }
 

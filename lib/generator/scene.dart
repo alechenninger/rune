@@ -8,21 +8,12 @@ import '../asm/asm.dart';
 import '../model/model.dart';
 
 extension SceneToAsm on Scene {
-  // I think this needs more context - asm context
-  // for ex:
-  // * am I in an event routine already?
-  //
-  // also needs more output
-  // if dialog branches, may need to add another event?
-  //
-  // note: jumping to another event from event code is done simply by
-  // setting the event index and returning (rts)
-  // can check event flags easily there too
   SceneAsm toAsm(AsmContext ctx) {
     var generator = AsmGenerator();
 
     var eventAsm = EventAsm.empty();
     var dialogAsm = DialogAsm.empty();
+    var eventPtrAsm = Asm.empty();
     Event? lastEvent;
     var lastEventBreak = -1;
     var eventCounter = 1;
@@ -44,12 +35,28 @@ extension SceneToAsm on Scene {
     }
 
     void addEvent(Event event) {
-      if (ctx.inDialogLoop && dialogAsm.isNotEmpty) {
-        ctx.gameMode = Mode.event;
-        // or enddialog/terminate? FF
-        // note if use terminate, have to track dialog tree offset
-        dialogAsm.add(comment('scene event $eventCounter'));
-        lastEventBreak = dialogAsm.add(eventBreak());
+      if (ctx.inDialogLoop) {
+        if (!ctx.inEvent) {
+          var eventIndex = ctx.nextEventIndex();
+
+          lastEventBreak = dialogAsm.add(runEvent(eventIndex));
+
+          // todo: nice event name
+          var eventRoutine = Label('Event_$eventIndex');
+          eventPtrAsm.add(dc.l([eventRoutine], comment: '$eventIndex'));
+
+          eventAsm.add(setLabel(eventRoutine.name));
+        } else {
+          // todo: why did we check this before?
+          //if (dialogAsm.isNotEmpty) {
+
+          // or enddialog/terminate? FF
+          // note if use terminate, have to track dialog tree offset
+          dialogAsm.add(comment('scene event $eventCounter'));
+          lastEventBreak = dialogAsm.add(eventBreak());
+        }
+
+        ctx.startEvent();
       }
 
       var generated = event.generateAsm(generator, ctx);
@@ -81,7 +88,7 @@ extension SceneToAsm on Scene {
     }
 
     return SceneAsm(
-        event: eventAsm, dialog: [dialogAsm], eventPtr: Asm.empty());
+        event: eventAsm, dialog: [dialogAsm], eventPtr: eventPtrAsm);
   }
 }
 

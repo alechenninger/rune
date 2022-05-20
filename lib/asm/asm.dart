@@ -24,9 +24,12 @@ Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
 class DcMnemonic {
   const DcMnemonic();
 
-  Asm b(List<Expression> c) => cmd('dc.b', c);
-  Asm w(List<Expression> c) => cmd('dc.w', c);
-  Asm l(List<Expression> c) => cmd('dc.l', c);
+  Asm b(List<Expression> c, {String? comment}) =>
+      cmd('dc.b', c, comment: comment);
+  Asm w(List<Expression> c, {String? comment}) =>
+      cmd('dc.w', c, comment: comment);
+  Asm l(List<Expression> c, {String? comment}) =>
+      cmd('dc.l', c, comment: comment);
 }
 
 class MoveMnemonic {
@@ -120,9 +123,9 @@ Asm setLabel(String label) {
   return Asm.fromInstruction(_Instruction(label: label));
 }
 
-Asm cmd(String cmd, List operands, {String? label}) {
-  return Asm.fromInstruction(
-      _Instruction(label: label, cmd: cmd, operands: operands));
+Asm cmd(String cmd, List operands, {String? label, String? comment}) {
+  return Asm.fromInstruction(_Instruction(
+      label: label, cmd: cmd, operands: operands, comment: comment));
 }
 
 abstract class Instruction {

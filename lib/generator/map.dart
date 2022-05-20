@@ -147,6 +147,7 @@ Map<Sprite, Word> _generateSpriteAsm(GameMap map, Asm spritesAsm) {
     if (artLbl == null) {
       throw Exception('no art label configured for sprite: $sprite');
     }
+
     var tileNumber = Word(vramOffset + i * _vramOffsetPerSprite);
     vramTileNumbers[sprite] = tileNumber;
 
@@ -171,7 +172,7 @@ List<Byte> _generateDialogAndEventsAsm(
     dialogOffsets.add(Byte(dialogIdx));
 
     // Interaction always starts with triggering dialog
-    ctx.gameMode = Mode.dialog;
+    ctx.startDialogInteraction();
 
     var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx);
 

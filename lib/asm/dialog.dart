@@ -7,6 +7,7 @@ class _ControlCodes {
   static final newLine = Bytes.hex('FC');
   static final interrupt = Bytes.hex('FD');
   static final terminate = Bytes.hex('FF');
+  static final event = Bytes.hex('F6');
   static final eventBreak = Bytes.hex('F7'); // same as FE
 }
 
@@ -20,6 +21,13 @@ Asm terminateDialog() {
 
 Asm interrupt() {
   return dc.b(_ControlCodes.interrupt);
+}
+
+Asm runEvent(Word index) {
+  return Asm([
+    dc.b(_ControlCodes.event),
+    dc.w([index])
+  ]);
 }
 
 Asm dialog(Bytes portrait, Bytes dialog) {

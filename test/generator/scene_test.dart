@@ -12,12 +12,14 @@ void main() {
       var dialog2 = Dialog(speaker: Shay(), spans: Span.parse("Hello"));
 
       var scene = Scene([dialog1, dialog2]);
-      var sceneAsm = generator.sceneToAsm(scene);
+      var sceneAsm = generator.sceneToAsm(scene, AsmContext.fresh());
 
-      expect(sceneAsm.dialog.toString(), '''${dialog1.toAsm()}
+      expect(sceneAsm.dialog[0].toString(), '''${dialog1.toAsm()}
 	dc.b	\$FD
 ${dialog2.toAsm()}
 	dc.b	\$FF''');
     });
   });
+
+  group('dialog then event', () {});
 }
