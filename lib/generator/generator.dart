@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/map.dart';
 import 'package:rune/model/model.dart';
@@ -12,7 +14,7 @@ import 'scene.dart';
 export '../asm/asm.dart' show Asm;
 
 class AsmContext {
-  final EventContext model;
+  final EventState state;
 
   // todo: probably shouldn't have all of this stuff read/write
 
@@ -24,12 +26,15 @@ class AsmContext {
   /// back to an event or have to trigger a new one.
   // i think this should always be true if mode == event?
   bool inEvent = true;
+  bool hasSavedDialogPosition = false;
 
   Word eventIndexOffset = 'a0'.hex.word;
 
+  Word get peekNextEventIndex => (eventIndexOffset.value + 1).word;
+
   /// Returns next event index to add a new event in EventPtrs.
   Word nextEventIndex() {
-    eventIndexOffset = (eventIndexOffset.value + 1).word;
+    eventIndexOffset = peekNextEventIndex;
     return eventIndexOffset;
   }
 
@@ -45,19 +50,50 @@ class AsmContext {
 
   bool get inDialogLoop => gameMode == Mode.dialog;
 
-  AsmContext.fresh({this.gameMode = Mode.event}) : model = EventContext() {
+  AsmContext.fresh({this.gameMode = Mode.event}) : state = EventState() {
     if (inDialogLoop) {
       inEvent = false;
     }
   }
 
-  AsmContext.forDialog(this.model)
+  AsmContext.forDialog(this.state)
       : gameMode = Mode.dialog,
         inEvent = false;
-  AsmContext.forEvent(this.model) : gameMode = Mode.event;
+  AsmContext.forEvent(this.state) : gameMode = Mode.event;
 }
 
 enum Mode { dialog, event }
+
+class DialogTree extends IterableBase<DialogAsm> {
+  final _dialogs = <DialogAsm>[];
+
+  /// Adds the tree and returns its id.
+  Byte add(DialogAsm dialog) {
+    if (nextDialogId == null) {
+      throw StateError('no more dialog can fit into dialog trees');
+    }
+    _dialogs.add(dialog);
+    return (_dialogs.length - 1).byte;
+  }
+
+  Byte? get nextDialogId =>
+      _dialogs.length > Size.b.maxValue ? null : _dialogs.length.byte;
+
+  DialogAsm operator [](int index) {
+    return _dialogs[index];
+  }
+
+  @override
+  int get length => _dialogs.length;
+
+  @override
+  Iterator<DialogAsm> get iterator => _dialogs.iterator;
+
+  @override
+  String toString() {
+    return _dialogs.join('\n');
+  }
+}
 
 class AsmGenerator {
   Asm eventsToAsm(List<Event> events, AsmContext ctx) {
@@ -71,8 +107,8 @@ class AsmGenerator {
     });
   }
 
-  SceneAsm sceneToAsm(Scene scene, AsmContext ctx) {
-    return scene.toAsm(ctx);
+  SceneAsm sceneToAsm(Scene scene, AsmContext ctx, [DialogTree? dialogTrees]) {
+    return scene.toAsm(ctx, dialogTrees);
   }
 
   MapAsm mapToAsm(GameMap map, AsmContext ctx) {
@@ -84,11 +120,11 @@ class AsmGenerator {
   }
 
   EventAsm individualMovesToAsm(IndividualMoves move, AsmContext ctx) {
-    return move.toAsm(ctx.model);
+    return move.toAsm(ctx.state);
   }
 
   EventAsm partyMoveToAsm(PartyMove move, AsmContext ctx) {
-    return individualMovesToAsm(move.toIndividualMoves(ctx.model), ctx);
+    return individualMovesToAsm(move.toIndividualMoves(ctx.state), ctx);
   }
 
   EventAsm pauseToAsm(Pause pause) {
@@ -101,11 +137,11 @@ class AsmGenerator {
   }
 
   EventAsm lockCameraToAsm(AsmContext ctx) {
-    return EventAsm.of(lockCamera(ctx.model.cameraLock = true));
+    return EventAsm.of(lockCamera(ctx.state.cameraLock = true));
   }
 
   EventAsm unlockCameraToAsm(AsmContext ctx) {
-    return EventAsm.of(lockCamera(ctx.model.cameraLock = false));
+    return EventAsm.of(lockCamera(ctx.state.cameraLock = false));
   }
 }
 

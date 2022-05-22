@@ -18,7 +18,7 @@ abstract class Event {
   Asm generateAsm(AsmGenerator generator, AsmContext ctx);
 }
 
-class EventContext {
+class EventState {
   late final Positions positions;
   final facing = <FieldObject, Direction>{};
 
@@ -37,7 +37,7 @@ class EventContext {
 
   GameMap? currentMap;
 
-  EventContext() {
+  EventState() {
     positions = Positions._(this);
   }
 
@@ -56,7 +56,7 @@ class EventContext {
 }
 
 class Positions {
-  final EventContext _ctx;
+  final EventState _ctx;
   final _positions = <FieldObject, Position>{};
 
   Positions._(this._ctx);
@@ -99,13 +99,13 @@ class Scene {
 }
 
 class SetContext extends Event {
-  final void Function(EventContext ctx) _setCtx;
+  final void Function(EventState ctx) _setCtx;
 
   SetContext(this._setCtx);
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
-    _setCtx(ctx.model);
+    _setCtx(ctx.state);
     return Asm.empty();
   }
 
@@ -177,7 +177,7 @@ class Slot extends FieldObject {
   }
 
   @override
-  int slot(EventContext c) => index;
+  int slot(EventState c) => index;
 
   @override
   bool operator ==(Object other) =>
@@ -202,7 +202,7 @@ abstract class Character extends FieldObject with Speaker {
     return null;
   }
 
-  int? slot(EventContext c) => c.slotFor(this);
+  int? slot(EventState c) => c.slotFor(this);
 }
 
 const alys = Alys();

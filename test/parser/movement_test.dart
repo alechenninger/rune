@@ -16,7 +16,7 @@ After 3 steps, Shay walks 1 down, walks 7 right, 5 steps up.
 
     var scene = Scene(events);
     var generator = AsmGenerator();
-    var testCtx = EventContext()
+    var testCtx = EventState()
       ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
       ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()
@@ -79,7 +79,7 @@ The party moves 3 steps right (followers move y-first).''');
 
     var generator = AsmGenerator();
 
-    var testCtx = EventContext()
+    var testCtx = EventState()
       ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
       ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()
@@ -114,7 +114,7 @@ After 2 steps, Shay walks 2 steps down, 14 steps left, 6 steps up''');
 
     var actual = generator.eventsToAsm(events, AsmContext.fresh());
 
-    var testCtx = EventContext()
+    var testCtx = EventState()
       ..addCharacter(alys, slot: 1, position: Position('230'.hex, '250'.hex))
       ..addCharacter(shay, slot: 2, position: Position('230'.hex, '240'.hex));
     var expected = IndividualMoves()

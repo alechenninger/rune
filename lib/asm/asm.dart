@@ -71,6 +71,14 @@ class Asm extends IterableBase<Instruction> {
     LineSplitter.split(raw).map((e) => _RawInstruction(e)).forEach(addLine);
   }
 
+  Asm withoutComments() => Asm.fromInstructions(lines.expand((line) {
+        var withoutComment = line.toString().replaceFirst(RegExp(';.*'), '');
+        if (withoutComment.trim().isEmpty) {
+          return <Instruction>[];
+        }
+        return [_RawInstruction(withoutComment)];
+      }).toList(growable: false));
+
   /// returns position in list in which asm was added.
   int add(Asm asm) {
     // TODO: max length
@@ -156,9 +164,7 @@ class _RawInstruction extends Instruction {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is _RawInstruction &&
-          runtimeType == other.runtimeType &&
-          _instruction == other._instruction;
+      other is Instruction && _instruction == other.toString();
 
   @override
   int get hashCode => super.hashCode ^ _instruction.hashCode;
@@ -172,6 +178,9 @@ class _Instruction extends Instruction {
 
   final String line;
 
+  static final _lettersNumbersOrUnderscores =
+      RegExp(r'^[A-Za-z0-9_@+-]+[A-Za-z0-9_+-]*$');
+
   _Instruction({this.label, this.cmd, this.operands = const [], this.comment})
       : line = [
           if (label == null) '' else '$label:',
@@ -181,8 +190,14 @@ class _Instruction extends Instruction {
           if (comment != null) '; $comment'
         ].join('\t') {
     if (line.length > 255) {
-      throw StateError(
+      throw ArgumentError(
           'Instructions cannot be longer than 255 characters but was: $line');
+    }
+
+    var l = label;
+    if (l != null && !_lettersNumbersOrUnderscores.hasMatch(l)) {
+      throw ArgumentError.value(label, 'label',
+          'did not match allowed characters: $_lettersNumbersOrUnderscores');
     }
   }
 
@@ -193,7 +208,8 @@ class _Instruction extends Instruction {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is _Instruction && line == other.line;
+      identical(this, other) ||
+      other is Instruction && line == other.toString();
 
   @override
   int get hashCode => line.hashCode;

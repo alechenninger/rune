@@ -31,7 +31,7 @@ if independent moves == follow lead moves, just use follow lead flag
  */
 
 extension IndividualMovesToAsm on IndividualMoves {
-  EventAsm toAsm(EventContext ctx) {
+  EventAsm toAsm(EventState ctx) {
     var asm = EventAsm.empty();
 
     if (ctx.followLead) {
@@ -193,7 +193,7 @@ extension IndividualMovesToAsm on IndividualMoves {
 }
 
 int Function(Move<FieldObject>, Move<FieldObject>) _longestFirst(
-    EventContext ctx) {
+    EventState ctx) {
   return (Move<FieldObject> move1, Move<FieldObject> move2) {
     var comparison = move2.movement.duration.compareTo(move1.movement.duration);
     if (comparison == 0) {
@@ -215,7 +215,7 @@ extension Cap on int? {
 }
 
 extension MoveableToA4 on FieldObject {
-  Asm toA4(EventContext ctx) {
+  Asm toA4(EventState ctx) {
     var moveable = this;
     var slot = moveable.slot(ctx);
     if (slot != null) {

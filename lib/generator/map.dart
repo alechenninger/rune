@@ -167,6 +167,7 @@ List<Byte> _generateDialogAndEventsAsm(
     AsmGenerator generator) {
   var dialogIdx = 0;
   var dialogOffsets = <Byte>[];
+  var tree = DialogTree();
 
   for (var obj in map.objects) {
     dialogOffsets.add(Byte(dialogIdx));
@@ -174,7 +175,7 @@ List<Byte> _generateDialogAndEventsAsm(
     // Interaction always starts with triggering dialog
     ctx.startDialogInteraction();
 
-    var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx);
+    var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx, tree);
 
     dialogAsm.add(sceneAsm.allDialog);
     eventsAsm.add(sceneAsm.event);

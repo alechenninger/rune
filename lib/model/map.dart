@@ -30,7 +30,7 @@ class MapObject extends FieldObject {
       this.onInteract = const Scene.none()});
 
   @override
-  int? slot(EventContext c) => null;
+  int? slot(EventState c) => null;
 }
 
 // generator will need to track labels corresponding to each sprite

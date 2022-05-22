@@ -75,14 +75,14 @@ void main() {
       var movement = StepToPoint()
         ..to = Position(1.steps.toPixels, 2.steps.toPixels)
         ..firstAxis = Axis.x;
-      expect(movement.continousPaths,
+      expect(movement.continuousPaths,
           equals([Path(1.steps, right), Path(2.steps, down)]));
     });
     test('if start axis is y moves along x then y', () {
       var movement = StepToPoint()
         ..to = Position.fromSteps(1.steps, 2.steps)
         ..firstAxis = Axis.y;
-      expect(movement.continousPaths,
+      expect(movement.continuousPaths,
           equals([Path(2.steps, down), Path(1.steps, right)]));
     });
     group('less steps', () {
@@ -118,7 +118,7 @@ void main() {
         ..direction = right
         ..distance = 2.steps);
 
-      expect(move.continousPaths, hasLength(1));
+      expect(move.continuousPaths, hasLength(1));
     });
     test('combines consecutive delays', () {
       var move = StepPaths();
@@ -135,7 +135,7 @@ void main() {
         ..distance = 4.steps);
 
       expect(move.delay, 3.steps);
-      expect(move.less(3.steps).continousPaths, hasLength(1));
+      expect(move.less(3.steps).continuousPaths, hasLength(1));
       expect(move.distance, 4.steps);
     });
 
@@ -155,7 +155,7 @@ void main() {
 
   group('party move', () {
     test('characters follow leader in straight line', () {
-      var ctx = EventContext()
+      var ctx = EventState()
         ..addCharacter(alys,
             slot: 1,
             position: Position(1.steps.toPixels, 2.steps.toPixels),
@@ -181,7 +181,7 @@ void main() {
     });
 
     test('characters follow leader in multiple directions', () {
-      var ctx = EventContext()
+      var ctx = EventState()
         ..addCharacter(alys,
             slot: 1,
             position: Position.fromSteps(1.step, 2.steps),
@@ -222,7 +222,7 @@ void main() {
 
     test('characters follow leader in multiple directions starting along x',
         () {
-      var ctx = EventContext()
+      var ctx = EventState()
         ..addCharacter(alys,
             slot: 1,
             position: Position.fromSteps(1.step, 3.steps),
@@ -264,7 +264,7 @@ void main() {
 
     test('characters follow leader in multiple directions starting along y',
         () {
-      var ctx = EventContext()
+      var ctx = EventState()
         ..addCharacter(alys,
             slot: 1,
             position: Position.fromSteps(1.step, 3.steps),
@@ -308,7 +308,7 @@ void main() {
     });
 
     test('complex party move', () {
-      var ctx = EventContext()
+      var ctx = EventState()
         ..addCharacter(alys,
             slot: 1, position: Position(10 * 16, 10 * 16), facing: down)
         ..addCharacter(shay,

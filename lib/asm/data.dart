@@ -117,6 +117,8 @@ class Byte extends Value {
 
   @override
   final size = Size.b;
+
+  Byte operator +(Byte other) => Byte(value + other.value);
 }
 
 class Word extends Value {
@@ -140,6 +142,8 @@ class Size {
 
   final int bytes;
   final String code;
+
+  int get maxValue => (1 << (bytes * 8)) - 1;
 
   bool get isB => this == b;
   bool get isW => this == w;

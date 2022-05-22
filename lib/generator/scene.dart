@@ -8,87 +8,134 @@ import '../asm/asm.dart';
 import '../model/model.dart';
 
 extension SceneToAsm on Scene {
-  SceneAsm toAsm(AsmContext ctx) {
+  /// Generate scene assembly in context of some [dialogTrees].
+  ///
+  /// When [dialogTrees] are provided, the resulting dialog ASM will be included
+  /// in these. When none around provided, the scene has its own trees.
+  SceneAsm toAsm(AsmContext ctx, [DialogTree? dialogTrees]) {
+    // todo: should this be passed in?
     var generator = AsmGenerator();
+    var sceneDialogTrees = dialogTrees ?? DialogTree();
 
-    var eventAsm = EventAsm.empty();
-    var dialogAsm = DialogAsm.empty();
-    var eventPtrAsm = Asm.empty();
-    Event? lastEvent;
-    var lastEventBreak = -1;
-    var eventCounter = 1;
+    return _sceneToAsm(this, sceneDialogTrees, ctx, generator);
+  }
+}
 
-    // TODO: think about handling non "dialog" in dialog asm (other control
-    //  codes)
+SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
+    AsmGenerator generator) {
+  var newDialogs = <DialogAsm>[];
+  var currentDialogId = Byte.zero;
+  var currentDialog = DialogAsm.empty();
+  var lastEventBreak = -1;
 
-    void addDialog(Dialog dialog) {
-      if (!ctx.inDialogLoop) {
-        eventAsm.add(popAndRunDialog());
-        eventAsm.addNewline();
-        ctx.gameMode = Mode.dialog;
-      } else if (lastEvent is Dialog) {
-        // Consecutive dialog, new cursor in between each dialog
-        dialogAsm.add(interrupt());
-      }
+  var eventAsm = EventAsm.empty();
+  var eventPtrAsm = Asm.empty();
+  Event? lastEvent;
+  var eventCounter = 1;
 
-      dialogAsm.add(dialog.generateAsm(generator, ctx));
+  void terminateCurrentDialogTree({int? at}) {
+    // todo: this is probably only ever the last line
+    //   so we could remove parameter and just check if last line is an event
+    //   break control code and if so replace that?
+    if (at != null) {
+      currentDialog.replace(at, terminateDialog());
+    } else {
+      currentDialog.add(terminateDialog());
     }
 
-    void addEvent(Event event) {
-      if (ctx.inDialogLoop) {
-        if (!ctx.inEvent) {
-          var eventIndex = ctx.nextEventIndex();
+    newDialogs.add(currentDialog);
+    dialogTree.add(currentDialog);
+    currentDialog = DialogAsm.empty();
+    // todo: handle hitting max trees!
+    currentDialogId = dialogTree.nextDialogId!;
+    lastEventBreak = -1;
+    ctx.hasSavedDialogPosition = false;
+  }
 
-          lastEventBreak = dialogAsm.add(runEvent(eventIndex));
-
-          // todo: nice event name
-          var eventRoutine = Label('Event_$eventIndex');
-          eventPtrAsm.add(dc.l([eventRoutine], comment: '$eventIndex'));
-
-          eventAsm.add(setLabel(eventRoutine.name));
-        } else {
-          // todo: why did we check this before?
-          //if (dialogAsm.isNotEmpty) {
-
-          // or enddialog/terminate? FF
-          // note if use terminate, have to track dialog tree offset
-          dialogAsm.add(comment('scene event $eventCounter'));
-          lastEventBreak = dialogAsm.add(eventBreak());
-        }
-
-        ctx.startEvent();
-      }
-
-      var generated = event.generateAsm(generator, ctx);
-
-      if (generated.isNotEmpty) {
-        eventAsm.add(comment('scene event $eventCounter'));
-        eventAsm.add(comment('generated from type: ${event.runtimeType}'));
-        eventAsm.add(generated);
-        eventCounter++;
-      }
+  void addDialog(Dialog dialog) {
+    if (!ctx.inDialogLoop) {
+      _goToDialogFromEvent(eventAsm, ctx, currentDialogId);
+    } else if (lastEvent is Dialog) {
+      // Consecutive dialog, new cursor in between each dialog
+      currentDialog.add(interrupt());
     }
 
-    for (var event in events) {
-      // TODO: this is a bit brittle. might be better if an event generated both
-      // DialogAsm and EventAsm
-      if (event is Dialog) {
-        addDialog(event);
-      } else {
-        addEvent(event);
-      }
+    currentDialog.add(dialog.generateAsm(generator, ctx));
+  }
 
-      lastEvent = event;
+  void addEvent(Event event) {
+    if (!ctx.inEvent) {
+      throw StateError('cannot run event after dialog has started');
+    } else if (ctx.inDialogLoop) {
+      // todo: why did we check this before?
+      // i think b/c we always assumed in dialog loop to start
+      //if (dialogAsm.isNotEmpty) {
+      currentDialog.add(comment('scene event $eventCounter'));
+      lastEventBreak = currentDialog.add(eventBreak());
+      ctx.hasSavedDialogPosition = true;
     }
 
-    if (ctx.inDialogLoop) {
-      dialogAsm.add(terminateDialog());
-    } else if (lastEventBreak >= 0) {
-      dialogAsm.replace(lastEventBreak, terminateDialog());
+    var generated = event.generateAsm(generator, ctx);
+
+    if (generated.isNotEmpty) {
+      eventAsm.add(comment('scene event $eventCounter'));
+      eventAsm.add(comment('generated from type: ${event.runtimeType}'));
+      eventAsm.add(generated);
+      eventCounter++;
+    }
+  }
+
+  // todo: event code checks first
+
+  if (!ctx.inEvent && scene.events.any((event) => event is! Dialog)) {
+    _startEventFromDialog(ctx, currentDialog, eventPtrAsm, eventAsm);
+    terminateCurrentDialogTree();
+  }
+
+  for (var event in scene.events) {
+    // TODO: this is a bit brittle. might be better if an event generated both
+    // DialogAsm and EventAsm
+    if (event is Dialog) {
+      addDialog(event);
+    } else {
+      addEvent(event);
     }
 
-    return SceneAsm(
-        event: eventAsm, dialog: [dialogAsm], eventPtr: eventPtrAsm);
+    lastEvent = event;
+  }
+
+  if (lastEventBreak >= 0) {
+    terminateCurrentDialogTree(at: lastEventBreak);
+  } else if (currentDialog.isNotEmpty) {
+    terminateCurrentDialogTree();
+  }
+
+  return SceneAsm(event: eventAsm, dialog: newDialogs, eventPtr: eventPtrAsm);
+}
+
+void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialogTree,
+    Asm eventPtrAsm, EventAsm eventAsm) {
+  var eventIndex = ctx.nextEventIndex();
+
+  currentDialogTree.add(runEvent(eventIndex));
+
+  // todo: nice event name
+  var eventRoutine = Label('Event_${eventIndex.value.toRadixString(16)}');
+  eventPtrAsm.add(dc.l([eventRoutine], comment: '$eventIndex'));
+
+  eventAsm.add(setLabel(eventRoutine.name));
+
+  ctx.startEvent();
+}
+
+void _goToDialogFromEvent(
+    EventAsm eventAsm, AsmContext ctx, Byte currentDialogId) {
+  if (ctx.hasSavedDialogPosition) {
+    eventAsm.add(popAndRunDialog());
+    eventAsm.addNewline();
+    ctx.gameMode = Mode.dialog;
+  } else {
+    eventAsm.add(getAndRunDialog(currentDialogId.i));
   }
 }
 

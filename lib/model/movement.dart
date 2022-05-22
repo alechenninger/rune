@@ -219,7 +219,7 @@ class PartyMove extends Event {
 
   PartyMove(this.movement);
 
-  IndividualMoves toIndividualMoves(EventContext ctx) {
+  IndividualMoves toIndividualMoves(EventState ctx) {
     var individual = IndividualMoves();
     individual.moves[Slot(1)] = movement;
 
@@ -338,7 +338,7 @@ abstract class Moveable {
 abstract class FieldObject extends Moveable {
   const FieldObject();
 
-  int compareTo(FieldObject other, EventContext ctx) {
+  int compareTo(FieldObject other, EventState ctx) {
     var thisSlot = slot(ctx);
     var otherSlot = other.slot(ctx);
 
@@ -349,12 +349,12 @@ abstract class FieldObject extends Moveable {
     return toString().compareTo(other.toString());
   }
 
-  int? slot(EventContext c);
+  int? slot(EventState c);
 }
 
 // TODO: maybe don't do this
 abstract class ContextualMovement {
-  Movement movementIn(EventContext ctx);
+  Movement movementIn(EventState ctx);
 }
 
 abstract class Movement extends ContextualMovement {
@@ -379,10 +379,10 @@ abstract class Movement extends ContextualMovement {
   /// start immediately (delay should == 0).
   // todo: should this just be StepDirection to include delays?
   // todo: should probably be method instead of getter
-  List<Path> get continousPaths;
+  List<Path> get continuousPaths;
 
   @override
-  Movement movementIn(EventContext ctx) => this;
+  Movement movementIn(EventState ctx) => this;
 
   // todo: consider returning stepdirections here instead
   MovementLookahead lookahead(Steps steps) {
@@ -391,7 +391,7 @@ abstract class Movement extends ContextualMovement {
     }
 
     var stepsTaken = 0.steps;
-    var paths = List.of(continousPaths);
+    var paths = List.of(continuousPaths);
     var pathsWalked = <Path>[];
 
     while (stepsTaken < steps) {
@@ -407,7 +407,7 @@ abstract class Movement extends ContextualMovement {
         var delayToTake = min(remaining.toInt, after.delay.toInt).steps;
         after = after.less(delayToTake);
         stepsTaken += delayToTake;
-        paths = List.of(after.continousPaths);
+        paths = List.of(after.continuousPaths);
       }
     }
 
@@ -417,10 +417,10 @@ abstract class Movement extends ContextualMovement {
   /// Continuous paths walked if one axis is moved at a time, and the first must
   /// be along [axis]
   List<Path> continuousPathsWithFirstAxis(Axis axis) {
-    if (continousPaths.isEmpty) return [];
-    var first = continousPaths[0];
+    if (continuousPaths.isEmpty) return [];
+    var first = continuousPaths[0];
     if (first.direction.axis == axis) {
-      return [first, if (continousPaths.length > 1) continousPaths[1]];
+      return [first, if (continuousPaths.length > 1) continuousPaths[1]];
     }
     return [first];
   }
@@ -450,7 +450,7 @@ class StepPath extends Movement {
   Path get asPath => Path(distance, direction);
 
   @override
-  List<Path> get continousPaths => delay > 0.steps ? [] : [asPath];
+  List<Path> get continuousPaths => delay > 0.steps ? [] : [asPath];
 
   @override
   StepPaths? append(Movement m) {
@@ -577,7 +577,7 @@ class StepPaths extends Movement {
       _paths.isEmpty ? Direction.down : _paths.first.direction;
 
   @override
-  List<Path> get continousPaths => _paths
+  List<Path> get continuousPaths => _paths
       .takeWhile((step) => step.delay == 0.steps)
       .map((e) => e.asPath)
       .toList();
@@ -636,12 +636,12 @@ class ContextualStepToPoint extends ContextualMovement {
 
   Axis startAlong = Axis.x;
 
-  final Position Function(EventContext ctx) from;
+  final Position Function(EventState ctx) from;
 
   ContextualStepToPoint(this.from);
 
   @override
-  Movement movementIn(EventContext ctx) {
+  Movement movementIn(EventState ctx) {
     return StepToPoint()
       ..direction = direction
       ..delay = delay.steps
@@ -700,7 +700,7 @@ class StepToPoint extends Movement {
   }
 
   @override
-  List<Path> get continousPaths {
+  List<Path> get continuousPaths {
     if (delay > 0.steps) return [];
     return _paths();
   }

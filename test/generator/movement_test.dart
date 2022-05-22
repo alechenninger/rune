@@ -9,7 +9,7 @@ void main() {
   group('generates asm for individual movements', () {
     group('step in one direction', () {
       test('move right, after previously not following leader', () {
-        var ctx = EventContext();
+        var ctx = EventState();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -38,7 +38,7 @@ void main() {
       });
 
       test('move right, after previously following leader', () {
-        var ctx = EventContext();
+        var ctx = EventState();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -68,7 +68,7 @@ void main() {
       });
 
       test('move right different distances, previously following lead', () {
-        var ctx = EventContext();
+        var ctx = EventState();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -110,7 +110,7 @@ void main() {
       });
 
       test('multiple move same distance', () {
-        var ctx = EventContext();
+        var ctx = EventState();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -144,7 +144,7 @@ void main() {
       });
 
       test('multiple moves with some delayed', () {
-        var ctx = EventContext();
+        var ctx = EventState();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -189,7 +189,7 @@ void main() {
 
     group('step in multiple directions', () {
       test('one character right then up', () {
-        var ctx = EventContext();
+        var ctx = EventState();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -221,7 +221,7 @@ void main() {
       });
 
       test('stress test', () {
-        var ctx = EventContext();
+        var ctx = EventState();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
