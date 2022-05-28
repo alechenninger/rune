@@ -12,6 +12,7 @@ const DcMnemonic dc = DcMnemonic();
 const MoveMnemonic move = MoveMnemonic();
 const ClrMnemonic clr = ClrMnemonic();
 
+Asm newLine() => Asm.fromInstruction(_Instruction());
 Asm comment(String comment) => _Instruction(comment: comment).toAsm();
 
 Asm lea(Address src, Address dst) => cmd('lea', [src, dst]);
@@ -72,8 +73,9 @@ class Asm extends IterableBase<Instruction> {
   }
 
   Asm withoutComments() => Asm.fromInstructions(lines.expand((line) {
-        var withoutComment = line.toString().replaceFirst(RegExp(';.*'), '');
-        if (withoutComment.trim().isEmpty) {
+        var withoutComment =
+            line.toString().replaceFirst(RegExp(';.*'), '').trimRight();
+        if (withoutComment.trimLeft().isEmpty) {
           return <Instruction>[];
         }
         return [_RawInstruction(withoutComment)];
@@ -125,6 +127,17 @@ class Asm extends IterableBase<Instruction> {
 
   @override
   Iterator<Instruction> get iterator => lines.iterator;
+
+  Asm trim() {
+    return Asm.fromInstructions(lines
+        .skipWhile((instr) => instr.toString().trim().isEmpty)
+        .toList(growable: false)
+        .reversed
+        .skipWhile((instr) => instr.toString().trim().isEmpty)
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false));
+  }
 }
 
 Asm setLabel(String label) {
@@ -178,8 +191,7 @@ class _Instruction extends Instruction {
 
   final String line;
 
-  static final _lettersNumbersOrUnderscores =
-      RegExp(r'^[A-Za-z0-9_@+-]+[A-Za-z0-9_+-]*$');
+  static final _validLabelPattern = RegExp(r'^[A-Za-z\d_@.+-]+[A-Za-z\d_+-]*$');
 
   _Instruction({this.label, this.cmd, this.operands = const [], this.comment})
       : line = [
@@ -195,9 +207,9 @@ class _Instruction extends Instruction {
     }
 
     var l = label;
-    if (l != null && !_lettersNumbersOrUnderscores.hasMatch(l)) {
+    if (l != null && !_validLabelPattern.hasMatch(l)) {
       throw ArgumentError.value(label, 'label',
-          'did not match allowed characters: $_lettersNumbersOrUnderscores');
+          'did not match allowed characters: $_validLabelPattern');
     }
   }
 

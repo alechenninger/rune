@@ -15,12 +15,32 @@ void main() {
       var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hello'));
 
       var scene = Scene([dialog1, dialog2]);
-      var sceneAsm = generator.sceneToAsm(scene, AsmContext.fresh());
+      var sceneAsm =
+          generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
 
       expect(sceneAsm.dialog[0].toString(), '''${dialog1.toAsm()}
 	dc.b	\$FD
 ${dialog2.toAsm()}
 	dc.b	\$FF''');
+    });
+  });
+
+  group('just dialog', () {
+    test('does not run an event', () {
+      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hello'));
+
+      var scene = Scene([dialog1, dialog2]);
+      var sceneAsm =
+          generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
+
+      expect(
+          sceneAsm.allDialog.withoutComments().toString(), '''${dialog1.toAsm()}
+	dc.b	\$FD
+${dialog2.toAsm()}
+	dc.b	\$FF''');
+      expect(sceneAsm.event, Asm.empty());
+      expect(sceneAsm.eventPointers, Asm.empty());
     });
   });
 
@@ -67,6 +87,12 @@ ${dialog2.toAsm()}
             generator
                 .individualMovesToAsm(moves, AsmContext.forEvent(origState))
                 .withoutComments()
+          ]));
+
+      expect(
+          sceneAsm.eventPointers.withoutComments(),
+          Asm([
+            dc.l([Label('Event_${eventIndex.value.toRadixString(16)}')])
           ]));
     });
   });

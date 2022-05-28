@@ -24,12 +24,14 @@ extension SceneToAsm on Scene {
 SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
     AsmGenerator generator) {
   var newDialogs = <DialogAsm>[];
-  var currentDialogId = Byte.zero;
+  // todo: handle hitting max trees!
+  var currentDialogId = dialogTree.nextDialogId!,
+      dialogIdOffset = currentDialogId;
   var currentDialog = DialogAsm.empty();
   var lastEventBreak = -1;
 
   var eventAsm = EventAsm.empty();
-  var eventPtrAsm = Asm.empty();
+  var eventPtrsAsm = Asm.empty();
   Event? lastEvent;
   var eventCounter = 1;
 
@@ -88,7 +90,7 @@ SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
   // todo: event code checks first
 
   if (!ctx.inEvent && scene.events.any((event) => event is! Dialog)) {
-    _startEventFromDialog(ctx, currentDialog, eventPtrAsm, eventAsm);
+    _startEventFromDialog(ctx, currentDialog, eventPtrsAsm, eventAsm);
     terminateCurrentDialogTree();
   }
 
@@ -110,7 +112,11 @@ SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
     terminateCurrentDialogTree();
   }
 
-  return SceneAsm(event: eventAsm, dialog: newDialogs, eventPtr: eventPtrAsm);
+  return SceneAsm(
+      event: eventAsm,
+      dialog: newDialogs,
+      dialogIdOffset: dialogIdOffset,
+      eventPointers: eventPtrsAsm);
 }
 
 void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialogTree,
@@ -120,7 +126,8 @@ void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialogTree,
   currentDialogTree.add(runEvent(eventIndex));
 
   // todo: nice event name
-  var eventRoutine = Label('Event_${eventIndex.value.toRadixString(16)}');
+  var eventRoutine =
+      Label('Event_GrandCross_${eventIndex.value.toRadixString(16)}');
   eventPtrAsm.add(dc.l([eventRoutine], comment: '$eventIndex'));
 
   eventAsm.add(setLabel(eventRoutine.name));
@@ -154,16 +161,18 @@ class SceneAsm {
    */
   final Asm event;
   final List<Asm> dialog;
-  final Asm eventPtr;
+  final Byte dialogIdOffset;
+  // could have multiple in case there are multiple branches each with their own
+  // event at the top of the dialog
+  // this could also be implemented within one event itself, though
+  final Asm eventPointers;
 
   // if empty should just be FF?
   Asm get allDialog {
     var all = Asm.empty();
 
     for (var i = 0; i < dialog.length; i++) {
-      // todo: may also want some dialog index offset in the context
-      // otherwise this will only be accurate per scene
-      all.add(comment('$i'));
+      all.add(comment('${dialogIdOffset + i.byte}'));
       all.add(dialog[i]);
       all.addNewline();
     }
@@ -171,10 +180,14 @@ class SceneAsm {
     return all;
   }
 
-  SceneAsm({required this.event, required this.dialog, required this.eventPtr});
+  SceneAsm(
+      {required this.event,
+      required this.dialogIdOffset,
+      required this.dialog,
+      required this.eventPointers});
 
   @override
   String toString() {
-    return '; event:\n$event\n; dialog:\n$allDialog\n; eventPtr:\n$eventPtr';
+    return '; event:\n$event\n; dialog:\n$allDialog\n; eventPtr:\n$eventPointers';
   }
 }

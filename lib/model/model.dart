@@ -85,13 +85,14 @@ class Positions {
 }
 
 class Scene {
+  final String? name;
   final List<Event> events;
 
-  Scene([List<Event> events = const []]) : events = [] {
+  Scene([List<Event> events = const [], this.name]) : events = [] {
     this.events.addAll(events);
   }
 
-  const Scene.none() : events = const [];
+  const Scene.none({this.name}) : events = const [];
 
   void addEvent(Event event) {
     events.add(event);

@@ -124,6 +124,8 @@ void _generateObjectsAsm(GameMap map, Asm objectsAsm,
 
     objectsAsm.add(
         dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]));
+
+    objectsAsm.addNewline();
   });
 }
 
@@ -179,7 +181,8 @@ List<Byte> _generateDialogAndEventsAsm(
 
     dialogAsm.add(sceneAsm.allDialog);
     eventsAsm.add(sceneAsm.event);
-    eventPointersAsm.add(sceneAsm.eventPtr);
+    eventsAsm.addNewline();
+    eventPointersAsm.add(sceneAsm.eventPointers);
 
     dialogIdx += sceneAsm.dialog.length;
   }
