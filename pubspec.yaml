@@ -1,5 +1,5 @@
 name: rune
-description: A DSL for scripting Sega PSIV disassembly cutscenes.
+description: A DSL for scripting Sega PSIV assembly cutscenes.
 # version: 1.0.0
 # homepage: https://www.example.com
 

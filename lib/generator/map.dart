@@ -18,7 +18,7 @@ class MapAsm {
   final Asm eventPointers;
   final Asm cutscenes;
   final Asm cutscenePointers;
-  // might also need dialogTree ASM
+  // might also need dialogTrees ASM
   // if these labels need to be programmatically referred to
 
   MapAsm({
