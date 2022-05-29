@@ -192,7 +192,12 @@ List<Byte> _generateDialogAndEventsAsm(
 
 final _vramOffsetPerSprite = '48'.hex;
 
-final _spriteVramOffsets = {Aiedo: '29A'.hex, Piata: '2D0'.hex};
+final _spriteVramOffsets = {
+  Aiedo: '29A'.hex,
+  Piata: '2D0'.hex,
+  PiataAcademyF1: '27F'.hex, // Map_PiataAcademy_F1
+  PiataAcademyPrincipalOffice: '27F'.hex, // Map_AcademyPrincipalOffice
+};
 
 final _spriteArtLabels = {
   Sprite.palmanMan1: Label('Art_PalmanMan1'),

@@ -18,6 +18,10 @@ class Aiedo extends GameMap {}
 
 class Piata extends GameMap {}
 
+class PiataAcademyF1 extends GameMap {}
+
+class PiataAcademyPrincipalOffice extends GameMap {}
+
 class MapObject extends FieldObject {
   // note: can only be in multiples of 8 pixels
   final Position startPosition;
