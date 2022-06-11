@@ -1,8 +1,4 @@
 import 'package:collection/collection.dart';
-import 'package:rune/asm/dialog.dart';
-import 'package:rune/asm/events.dart';
-import 'package:rune/generator/dialog.dart';
-import 'package:rune/generator/event.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/numbers.dart';
 
@@ -65,6 +61,10 @@ MapAsm mapToAsm(GameMap map, AsmGenerator generator, AsmContext ctx) {
   var eventsAsm = Asm.empty();
   var eventPointersAsm = Asm.empty();
 
+  if (map.objects.length > 64) {
+    throw Exception('too many objects (limited ram)');
+  }
+
   var vramTileNumbers = _generateSpriteAsm(map, spritesAsm);
   var dialogOffsets = _generateDialogAndEventsAsm(
       map, dialogAsm, eventsAsm, eventPointersAsm, ctx, generator);
@@ -118,8 +118,10 @@ void _generateObjectsAsm(GameMap map, Asm objectsAsm,
       objectsAsm.add(facingAndDialog);
       // in this case we assume the vram tile does not matter?
       // TODO: if it does we need to track so do not reuse same
+      // todo: is 0 okay?
       objectsAsm.add(
-          dc.w([vramTileNumbers.values.max() + Word(_vramOffsetPerSprite)]));
+          // dc.w([vramTileNumbers.values.max() + Word(_vramOffsetPerSprite)]));
+          dc.w([0.word]));
     }
 
     objectsAsm.add(
@@ -130,10 +132,10 @@ void _generateObjectsAsm(GameMap map, Asm objectsAsm,
 }
 
 Map<Sprite, Word> _generateSpriteAsm(GameMap map, Asm spritesAsm) {
-  var vramOffset = _spriteVramOffsets[map.runtimeType];
+  var vramOffset = _spriteVramOffsets[map.id];
 
   if (vramOffset == null) {
-    throw Exception('no offset configured for map: ${map.runtimeType}');
+    throw Exception('no offset configured for map: ${map.id}');
   }
 
   var vramTileNumbers = <Sprite, Word>{};
@@ -167,9 +169,11 @@ List<Byte> _generateDialogAndEventsAsm(
     Asm eventPointersAsm,
     AsmContext ctx,
     AsmGenerator generator) {
-  var dialogIdx = 0;
+  var dialogIdx = _dialogIdOffsets[map.id] ?? 0;
   var dialogOffsets = <Byte>[];
   var tree = DialogTree();
+
+  ctx.state.currentMap = map;
 
   for (var obj in map.objects) {
     dialogOffsets.add(Byte(dialogIdx));
@@ -192,11 +196,26 @@ List<Byte> _generateDialogAndEventsAsm(
 
 final _vramOffsetPerSprite = '48'.hex;
 
+// These offsets are used to account for assembly specifics, which allows for
+// variances in maps to be coded manually (such as objects).
+// todo: it might be nice to manage these with the assembly or the compiler
+//  itself rather than hard coding here.
+
 final _spriteVramOffsets = {
-  Aiedo: '29A'.hex,
-  Piata: '2D0'.hex,
-  PiataAcademyF1: '27F'.hex, // Map_PiataAcademy_F1
-  PiataAcademyPrincipalOffice: '27F'.hex, // Map_AcademyPrincipalOffice
+  MapId.aiedo: '29A'.hex,
+  MapId.piata: '2D0'.hex,
+  MapId.piataAcademyF1: '27F'.hex, // Map_PiataAcademy_F1
+  MapId.piataAcademyPrincipalOffice: '27F'.hex, // Map_AcademyPrincipalOffice
+};
+
+// todo: this would only be used when we have events which refer to objects by
+//   their location in memory. we would have to offset that location.
+final _objectIndexOffsets = {
+  MapId.piataAcademyF1: 1,
+};
+
+final _dialogIdOffsets = {
+  MapId.piataAcademyF1: 1,
 };
 
 final _spriteArtLabels = {

@@ -1,3 +1,6 @@
+import 'dart:collection';
+import 'dart:math';
+
 import 'model.dart';
 
 // generator will need to track a vram tile number offset to start storing art
@@ -5,92 +8,82 @@ import 'model.dart';
 // note that many events refer to map objects address in memory, which means
 // ordering must be maintained for existing objects unless we find and edit
 // those addresses.
-abstract class GameMap {
-  final objects = <MapObject>[];
-  final onMove = <Event>[];
+class GameMap {
+  final MapId id;
+
+  // limited to 64 objects in ram currently
+  final _objects = <MapObject>[];
+
+  GameMap(this.id);
+
+  List<MapObject> get objects => UnmodifiableListView(_objects);
+
+  //final onMove = <Event>[];
 
   void addObject(MapObject obj) {
-    objects.add(obj);
+    _objects.add(obj);
   }
 }
 
-class Aiedo extends GameMap {}
-
-class Piata extends GameMap {}
-
-class PiataAcademyF1 extends GameMap {}
-
-class PiataAcademyPrincipalOffice extends GameMap {}
+enum MapId { aiedo, piata, piataAcademyF1, piataAcademyPrincipalOffice }
 
 class MapObject extends FieldObject {
   // note: can only be in multiples of 8 pixels
+  final MapObjectId id;
   final Position startPosition;
-  final Scene onInteract;
   final MapObjectSpec spec;
+  Scene onInteract;
 
   MapObject(
-      {required this.startPosition,
+      {String? id,
+      required this.startPosition,
       required this.spec,
-      this.onInteract = const Scene.none()});
+      this.onInteract = const Scene.none()})
+      : id = id == null ? MapObjectId.random() : MapObjectId(id);
+
+  // todo: additive conditional on interact
 
   @override
   int? slot(EventState c) => null;
 }
 
 // generator will need to track labels corresponding to each sprite
-abstract class Sprite {
-  const Sprite();
-
-  static const palmanMan1 = PalmanMan1();
-  static const palmanMan2 = PalmanMan2();
-  static const palmanMan3 = PalmanMan3();
-  static const palmanOldMan1 = PalmanOldMan1();
-  static const palmanFighter1 = PalmanFighter1();
-  static const palmanFighter2 = PalmanFighter2();
-  static const palmanFighter3 = PalmanFighter3();
-  static const palmanWoman1 = PalmanWoman1();
-  static const palmanWoman2 = PalmanWoman2();
-  static const palmanWoman3 = PalmanWoman3();
+enum Sprite {
+  palmanMan1,
+  palmanMan2,
+  palmanMan3,
+  palmanOldMan1,
+  palmanFighter1,
+  palmanFighter2,
+  palmanFighter3,
+  palmanWoman1,
+  palmanWoman2,
+  palmanWoman3,
 }
 
-class PalmanMan1 extends Sprite {
-  const PalmanMan1();
-}
+class MapObjectId {
+  final String id;
 
-class PalmanMan2 extends Sprite {
-  const PalmanMan2();
-}
+  MapObjectId(this.id);
 
-class PalmanMan3 extends Sprite {
-  const PalmanMan3();
-}
+  MapObjectId.random() : id = _randomId();
 
-class PalmanOldMan1 extends Sprite {
-  const PalmanOldMan1();
-}
+  static String _randomId() {
+    return Random().nextInt(2 ^ 32).toRadixString(25);
+  }
 
-class PalmanFighter1 extends Sprite {
-  const PalmanFighter1();
-}
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MapObjectId &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
 
-class PalmanFighter2 extends Sprite {
-  const PalmanFighter2();
-}
+  @override
+  int get hashCode => id.hashCode;
 
-class PalmanFighter3 extends Sprite {
-  const PalmanFighter3();
-}
-
-class PalmanWoman1 extends Sprite {
-  const PalmanWoman1();
-}
-
-class PalmanWoman2 extends Sprite {
-  const PalmanWoman2();
-}
-
-class PalmanWoman3 extends Sprite {
-  const PalmanWoman3();
+  @override
+  String toString() => id;
 }
 
 abstract class MapObjectSpec {
@@ -112,7 +105,10 @@ class Npc extends MapObjectSpec {
 }
 
 class AlysWaiting extends MapObjectSpec {
-  const AlysWaiting() : super.constant();
+  factory AlysWaiting() {
+    return const AlysWaiting._();
+  }
+  const AlysWaiting._() : super.constant();
 
   @override
   final startFacing = Direction.down;

@@ -34,7 +34,7 @@ extension IndividualMovesToAsm on IndividualMoves {
   EventAsm toAsm(EventState ctx) {
     var asm = EventAsm.empty();
 
-    if (ctx.followLead) {
+    if (ctx.followLead != false) {
       asm.add(followLeader(ctx.followLead = false));
     }
 

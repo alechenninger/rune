@@ -10,11 +10,11 @@ import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 void main() {
-  late Piata piata;
+  late GameMap piata;
   var generator = AsmGenerator();
 
   setUp(() {
-    piata = Piata();
+    piata = GameMap(MapId.piata);
   });
 
   test('map model generates asm', () {
@@ -269,9 +269,11 @@ void main() {
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
-      var scene1Asm = npc1Scene.toAsm(comparisonCtx, comparisonDialogTree);
+      var scene1Asm =
+          npc1Scene.toAsm(generator, comparisonCtx, comparisonDialogTree);
       comparisonCtx.startDialogInteraction();
-      var scene2Asm = npc2Scene.toAsm(comparisonCtx, comparisonDialogTree);
+      var scene2Asm =
+          npc2Scene.toAsm(generator, comparisonCtx, comparisonDialogTree);
 
       expect(mapAsm.events,
           Asm([scene1Asm.event, newLine(), scene2Asm.event, newLine()]));
@@ -283,9 +285,11 @@ void main() {
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
-      var scene1Asm = npc1Scene.toAsm(comparisonCtx, comparisonDialogTree);
+      var scene1Asm =
+          npc1Scene.toAsm(generator, comparisonCtx, comparisonDialogTree);
       comparisonCtx.startDialogInteraction();
-      var scene2Asm = npc2Scene.toAsm(comparisonCtx, comparisonDialogTree);
+      var scene2Asm =
+          npc2Scene.toAsm(generator, comparisonCtx, comparisonDialogTree);
 
       print(mapAsm.eventPointers);
 

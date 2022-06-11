@@ -30,10 +30,10 @@ class EventState {
 
   /// Whether or not to follow character at slot[0]
   // TODO: might need allow this to be unknown
-  var followLead = true;
+  bool? followLead = true;
 
   // TODO: might need allow this to be unknown
-  bool cameraLock = false;
+  bool? cameraLock = false;
 
   GameMap? currentMap;
 
@@ -60,6 +60,10 @@ class Positions {
   final _positions = <FieldObject, Position>{};
 
   Positions._(this._ctx);
+
+  void clear() {
+    _positions.clear();
+  }
 
   Position? operator [](FieldObject? m) {
     if (m is Slot) {

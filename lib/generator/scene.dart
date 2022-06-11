@@ -12,9 +12,8 @@ extension SceneToAsm on Scene {
   ///
   /// When [dialogTrees] are provided, the resulting dialog ASM will be included
   /// in these. When none around provided, the scene has its own trees.
-  SceneAsm toAsm(AsmContext ctx, [DialogTree? dialogTrees]) {
-    // todo: should this be passed in?
-    var generator = AsmGenerator();
+  SceneAsm toAsm(AsmGenerator generator, AsmContext ctx,
+      [DialogTree? dialogTrees]) {
     var sceneDialogTrees = dialogTrees ?? DialogTree();
 
     return _sceneToAsm(this, sceneDialogTrees, ctx, generator);
@@ -35,7 +34,7 @@ SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
   Event? lastEvent;
   var eventCounter = 1;
 
-  void terminateCurrentDialogTree({int? at}) {
+  void _terminateCurrentDialogTree({int? at}) {
     // todo: this is probably only ever the last line
     //   so we could remove parameter and just check if last line is an event
     //   break control code and if so replace that?
@@ -54,7 +53,7 @@ SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
     ctx.hasSavedDialogPosition = false;
   }
 
-  void addDialog(Dialog dialog) {
+  void _addDialog(Dialog dialog) {
     if (!ctx.inDialogLoop) {
       _goToDialogFromEvent(eventAsm, ctx, currentDialogId);
     } else if (lastEvent is Dialog) {
@@ -65,7 +64,7 @@ SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
     currentDialog.add(dialog.generateAsm(generator, ctx));
   }
 
-  void addEvent(Event event) {
+  void _addEvent(Event event) {
     if (!ctx.inEvent) {
       throw StateError('cannot run event after dialog has started');
     } else if (ctx.inDialogLoop) {
@@ -91,25 +90,26 @@ SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
 
   if (!ctx.inEvent && scene.events.any((event) => event is! Dialog)) {
     _startEventFromDialog(ctx, currentDialog, eventPtrsAsm, eventAsm);
-    terminateCurrentDialogTree();
+    _terminateCurrentDialogTree();
   }
 
   for (var event in scene.events) {
     // TODO: this is a bit brittle. might be better if an event generated both
     // DialogAsm and EventAsm
     if (event is Dialog) {
-      addDialog(event);
+      _addDialog(event);
     } else {
-      addEvent(event);
+      _addEvent(event);
     }
 
     lastEvent = event;
   }
 
-  if (lastEventBreak >= 0) {
-    terminateCurrentDialogTree(at: lastEventBreak);
+  // was lastEventBreak >= 0, but i think it should be this?
+  if (lastEvent is! Dialog && lastEventBreak >= 0) {
+    _terminateCurrentDialogTree(at: lastEventBreak);
   } else if (currentDialog.isNotEmpty) {
-    terminateCurrentDialogTree();
+    _terminateCurrentDialogTree();
   }
 
   return SceneAsm(
@@ -132,18 +132,22 @@ void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialogTree,
 
   eventAsm.add(setLabel(eventRoutine.name));
 
-  ctx.startEvent();
+  ctx.startEvent(ctx.state);
 }
 
 void _goToDialogFromEvent(
     EventAsm eventAsm, AsmContext ctx, Byte currentDialogId) {
+  // todo: should this be moved to ctx?
+  // todo: different dialog routines are used sometimes
+  // may depend on context
+  // for example Event_GetAndRunDialogue5 might be used in cutscenes?
   if (ctx.hasSavedDialogPosition) {
     eventAsm.add(popAndRunDialog());
     eventAsm.addNewline();
-    ctx.gameMode = Mode.dialog;
   } else {
     eventAsm.add(getAndRunDialog(currentDialogId.i));
   }
+  ctx.runDialog();
 }
 
 class SceneAsm {

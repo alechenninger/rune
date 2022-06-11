@@ -82,7 +82,7 @@ ${dialog2.toAsm()}
       expect(
           sceneAsm.event.withoutComments(),
           Asm([
-            setLabel('Event_${eventIndex.value.toRadixString(16)}'),
+            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
             getAndRunDialog(Byte.one.i),
             generator
                 .individualMovesToAsm(moves, AsmContext.forEvent(origState))
@@ -92,7 +92,9 @@ ${dialog2.toAsm()}
       expect(
           sceneAsm.eventPointers.withoutComments(),
           Asm([
-            dc.l([Label('Event_${eventIndex.value.toRadixString(16)}')])
+            dc.l([
+              Label('Event_GrandCross_${eventIndex.value.toRadixString(16)}')
+            ])
           ]));
     });
   });

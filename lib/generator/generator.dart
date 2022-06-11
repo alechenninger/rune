@@ -14,52 +14,70 @@ import 'scene.dart';
 export '../asm/asm.dart' show Asm;
 
 class AsmContext {
-  final EventState state;
+  EventState state;
 
   // todo: probably shouldn't have all of this stuff read/write
 
-  Mode gameMode = Mode.event;
+  Mode _gameMode = Mode.event;
+
+  // i think this should always be true if mode == event?
+  var _inEvent = true;
+
+  bool get inDialogLoop => _gameMode == Mode.dialog;
 
   /// Whether or not we are generating in the context of an existing event.
   ///
   /// This is necessary to understand whether, when in dialog mode, we can pop
   /// back to an event or have to trigger a new one.
-  // i think this should always be true if mode == event?
-  bool inEvent = true;
+  bool get inEvent => _inEvent;
   bool hasSavedDialogPosition = false;
 
-  Word eventIndexOffset = 'a0'.hex.word;
+  // todo: this one is a bit different. this is like, asm state. state of
+  //  generated code.
+  // the others (including eventstate) are more the state of active generation?
+  Word _eventIndexOffset = 'a0'.hex.word;
 
-  Word get peekNextEventIndex => (eventIndexOffset.value + 1).word;
+  Word get peekNextEventIndex => (_eventIndexOffset.value + 1).word;
 
   /// Returns next event index to add a new event in EventPtrs.
   Word nextEventIndex() {
-    eventIndexOffset = peekNextEventIndex;
-    return eventIndexOffset;
+    _eventIndexOffset = peekNextEventIndex;
+    return _eventIndexOffset;
   }
 
-  void startDialogInteraction() {
-    gameMode = Mode.dialog;
-    inEvent = false;
+  void startDialogInteraction([EventState? knownState]) {
+    _gameMode = Mode.dialog;
+    _inEvent = false;
+    hasSavedDialogPosition = false;
+    state = knownState ?? EventState();
   }
 
-  void startEvent() {
-    gameMode = Mode.event;
-    inEvent = true;
+  void runDialog() {
+    if (_gameMode != Mode.event) {
+      throw StateError('expected event mode');
+    }
+    _gameMode = Mode.dialog;
   }
 
-  bool get inDialogLoop => gameMode == Mode.dialog;
+  void startEvent([EventState? knownState]) {
+    _gameMode = Mode.event;
+    _inEvent = true;
+    state = knownState ?? EventState();
+    // todo: should reset saved dialog position too?
+  }
 
-  AsmContext.fresh({this.gameMode = Mode.event}) : state = EventState() {
+  AsmContext.fresh({Mode gameMode = Mode.event})
+      : _gameMode = gameMode,
+        state = EventState() {
     if (inDialogLoop) {
-      inEvent = false;
+      _inEvent = false;
     }
   }
 
   AsmContext.forDialog(this.state)
-      : gameMode = Mode.dialog,
-        inEvent = false;
-  AsmContext.forEvent(this.state) : gameMode = Mode.event;
+      : _gameMode = Mode.dialog,
+        _inEvent = false;
+  AsmContext.forEvent(this.state) : _gameMode = Mode.event;
 }
 
 enum Mode { dialog, event }
@@ -108,7 +126,7 @@ class AsmGenerator {
   }
 
   SceneAsm sceneToAsm(Scene scene, AsmContext ctx, [DialogTree? dialogTrees]) {
-    return scene.toAsm(ctx, dialogTrees);
+    return scene.toAsm(this, ctx, dialogTrees);
   }
 
   MapAsm mapToAsm(GameMap map, AsmContext ctx) {
