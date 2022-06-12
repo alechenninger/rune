@@ -1,5 +1,8 @@
 import 'dart:collection';
 import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:quiver/check.dart';
 
 import 'model.dart';
 
@@ -12,16 +15,19 @@ class GameMap {
   final MapId id;
 
   // limited to 64 objects in ram currently
-  final _objects = <MapObject>[];
+  final _objects = <MapObjectId, MapObject>{};
 
   GameMap(this.id);
 
-  List<MapObject> get objects => UnmodifiableListView(_objects);
+  List<MapObject> get objects => UnmodifiableListView(_objects.values);
 
   //final onMove = <Event>[];
 
   void addObject(MapObject obj) {
-    _objects.add(obj);
+    if (_objects.containsKey(obj.id)) {
+      throw ArgumentError('map already contains object with id: ${obj.id}');
+    }
+    _objects[obj.id] = obj;
   }
 }
 
@@ -61,15 +67,27 @@ enum Sprite {
   palmanWoman3,
 }
 
+final _random = Random();
+
 class MapObjectId {
   final String id;
 
-  MapObjectId(this.id);
+  MapObjectId(this.id) {
+    checkArgument(onlyWordCharacters.hasMatch(id),
+        message: 'id must match $onlyWordCharacters but got $id');
+  }
 
+  // todo: this kinda sucks
   MapObjectId.random() : id = _randomId();
 
   static String _randomId() {
-    return Random().nextInt(2 ^ 32).toRadixString(25);
+    final b = Uint8List(4);
+
+    for (var i = 0; i < 4; i++) {
+      b[i] = _random.nextInt(256);
+    }
+
+    return b.map((e) => e.toRadixString(25)).join();
   }
 
   @override

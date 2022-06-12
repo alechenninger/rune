@@ -181,7 +181,8 @@ List<Byte> _generateDialogAndEventsAsm(
     // Interaction always starts with triggering dialog
     ctx.startDialogInteraction();
 
-    var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx, tree);
+    var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx,
+        dialogTree: tree, id: SceneId("${map.id.name}_${obj.id}"));
 
     dialogAsm.add(sceneAsm.allDialog);
     eventsAsm.add(sceneAsm.event);

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
 
@@ -101,6 +102,20 @@ class Scene {
   void addEvent(Event event) {
     events.add(event);
   }
+}
+
+final onlyWordCharacters = RegExp(r'^\w+$');
+
+class SceneId {
+  final String id;
+
+  SceneId(this.id) {
+    checkArgument(onlyWordCharacters.hasMatch(id),
+        message: 'id must match $onlyWordCharacters but got $id');
+  }
+
+  @override
+  String toString() => id;
 }
 
 class SetContext extends Event {

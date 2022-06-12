@@ -253,11 +253,13 @@ void main() {
 
     setUp(() {
       piata.addObject(MapObject(
+          id: 'npc1',
           startPosition: Position('1e0'.hex, '2e0'.hex),
           spec: Npc(Sprite.palmanMan1, FacingDown()),
           onInteract: npc1Scene));
 
       piata.addObject(MapObject(
+          id: 'npc2',
           startPosition: Position('1f0'.hex, '2e0'.hex),
           spec: Npc(Sprite.palmanWoman1, FacingDown()),
           onInteract: npc2Scene));
@@ -269,11 +271,11 @@ void main() {
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
-      var scene1Asm =
-          npc1Scene.toAsm(generator, comparisonCtx, comparisonDialogTree);
+      var scene1Asm = npc1Scene.toAsm(generator, comparisonCtx,
+          dialogTree: comparisonDialogTree, id: SceneId('piata_npc1'));
       comparisonCtx.startDialogInteraction();
-      var scene2Asm =
-          npc2Scene.toAsm(generator, comparisonCtx, comparisonDialogTree);
+      var scene2Asm = npc2Scene.toAsm(generator, comparisonCtx,
+          dialogTree: comparisonDialogTree, id: SceneId('piata_npc2'));
 
       expect(mapAsm.events,
           Asm([scene1Asm.event, newLine(), scene2Asm.event, newLine()]));
@@ -285,11 +287,11 @@ void main() {
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
-      var scene1Asm =
-          npc1Scene.toAsm(generator, comparisonCtx, comparisonDialogTree);
+      var scene1Asm = npc1Scene.toAsm(generator, comparisonCtx,
+          dialogTree: comparisonDialogTree, id: SceneId('piata_npc1'));
       comparisonCtx.startDialogInteraction();
-      var scene2Asm =
-          npc2Scene.toAsm(generator, comparisonCtx, comparisonDialogTree);
+      var scene2Asm = npc2Scene.toAsm(generator, comparisonCtx,
+          dialogTree: comparisonDialogTree, id: SceneId('piata_npc2'));
 
       print(mapAsm.eventPointers);
 

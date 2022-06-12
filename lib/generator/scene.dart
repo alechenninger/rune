@@ -8,20 +8,20 @@ import '../asm/asm.dart';
 import '../model/model.dart';
 
 extension SceneToAsm on Scene {
-  /// Generate scene assembly in context of some [dialogTrees].
+  /// Generate scene assembly in context of some [dialogTree].
   ///
-  /// When [dialogTrees] are provided, the resulting dialog ASM will be included
+  /// When [dialogTree] are provided, the resulting dialog ASM will be included
   /// in these. When none around provided, the scene has its own trees.
   SceneAsm toAsm(AsmGenerator generator, AsmContext ctx,
-      [DialogTree? dialogTrees]) {
-    var sceneDialogTrees = dialogTrees ?? DialogTree();
+      {DialogTree? dialogTree, SceneId? id}) {
+    var sceneDialogTrees = dialogTree ?? DialogTree();
 
-    return _sceneToAsm(this, sceneDialogTrees, ctx, generator);
+    return _sceneToAsm(id, this, sceneDialogTrees, ctx, generator);
   }
 }
 
-SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
-    AsmGenerator generator) {
+SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
+    AsmContext ctx, AsmGenerator generator) {
   var newDialogs = <DialogAsm>[];
   // todo: handle hitting max trees!
   var currentDialogId = dialogTree.nextDialogId!,
@@ -89,7 +89,7 @@ SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
   // todo: event code checks first
 
   if (!ctx.inEvent && scene.events.any((event) => event is! Dialog)) {
-    _startEventFromDialog(ctx, currentDialog, eventPtrsAsm, eventAsm);
+    _startEventFromDialog(ctx, currentDialog, eventPtrsAsm, eventAsm, sceneId);
     _terminateCurrentDialogTree();
   }
 
@@ -120,14 +120,13 @@ SceneAsm _sceneToAsm(Scene scene, DialogTree dialogTree, AsmContext ctx,
 }
 
 void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialogTree,
-    Asm eventPtrAsm, EventAsm eventAsm) {
+    Asm eventPtrAsm, EventAsm eventAsm, SceneId? sceneId) {
   var eventIndex = ctx.nextEventIndex();
 
   currentDialogTree.add(runEvent(eventIndex));
 
-  // todo: nice event name
-  var eventRoutine =
-      Label('Event_GrandCross_${eventIndex.value.toRadixString(16)}');
+  var eventName = sceneId?.toString() ?? eventIndex.value.toRadixString(16);
+  var eventRoutine = Label('Event_GrandCross_$eventName');
   eventPtrAsm.add(dc.l([eventRoutine], comment: '$eventIndex'));
 
   eventAsm.add(setLabel(eventRoutine.name));

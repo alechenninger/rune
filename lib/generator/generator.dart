@@ -125,8 +125,9 @@ class AsmGenerator {
     });
   }
 
-  SceneAsm sceneToAsm(Scene scene, AsmContext ctx, [DialogTree? dialogTrees]) {
-    return scene.toAsm(this, ctx, dialogTrees);
+  SceneAsm sceneToAsm(Scene scene, AsmContext ctx,
+      {DialogTree? dialogTree, SceneId? id}) {
+    return scene.toAsm(this, ctx, dialogTree: dialogTree, id: id);
   }
 
   MapAsm mapToAsm(GameMap map, AsmContext ctx) {
