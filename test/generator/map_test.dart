@@ -14,7 +14,7 @@ void main() {
   var generator = AsmGenerator();
 
   setUp(() {
-    piata = GameMap(MapId.piata);
+    piata = GameMap(MapId.Piata);
   });
 
   test('map model generates asm', () {

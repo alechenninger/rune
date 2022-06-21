@@ -203,20 +203,20 @@ final _vramOffsetPerSprite = '48'.hex;
 //  itself rather than hard coding here.
 
 final _spriteVramOffsets = {
-  MapId.aiedo: '29A'.hex,
-  MapId.piata: '2D0'.hex,
-  MapId.piataAcademyF1: '27F'.hex, // Map_PiataAcademy_F1
-  MapId.piataAcademyPrincipalOffice: '27F'.hex, // Map_AcademyPrincipalOffice
+  MapId.Aiedo: '29A'.hex,
+  MapId.Piata: '2D0'.hex,
+  MapId.PiataAcademyF1: '27F'.hex, // Map_PiataAcademy_F1
+  MapId.PiataAcademyPrincipalOffice: '27F'.hex, // Map_AcademyPrincipalOffice
 };
 
 // todo: this would only be used when we have events which refer to objects by
 //   their location in memory. we would have to offset that location.
 final _objectIndexOffsets = {
-  MapId.piataAcademyF1: 1,
+  MapId.PiataAcademyF1: 1,
 };
 
 final _dialogIdOffsets = {
-  MapId.piataAcademyF1: 1,
+  MapId.PiataAcademyF1: 1,
 };
 
 final _spriteArtLabels = {

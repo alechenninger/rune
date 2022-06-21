@@ -126,19 +126,19 @@ extension IndividualMovesToAsm on IndividualMoves {
         if (movement.delay == 0.steps) {
           allDelay = false;
 
-          var current = ctx.positions[moveable];
-          if (current == null) {
-            // TODO: We can do some math instead, maybe store in register
-            // e.g. look up cur position, save in data register
-            // might need to look up each time based on necessary math and
-            // available data registers
-            throw StateError('no current position set for $moveable');
-          }
-
           stepsToTake = movement.distance.min(maxSteps);
           var afterSteps = movement.lookahead(stepsToTake);
 
           if (afterSteps.relativeDistance > 0.steps) {
+            var current = ctx.positions[moveable];
+            if (current == null) {
+              // TODO: We can do some math instead, maybe store in register
+              // e.g. look up cur position, save in data register
+              // might need to look up each time based on necessary math and
+              // available data registers
+              throw StateError('no current position set for $moveable');
+            }
+
             var destination = current + afterSteps.relativePosition;
             ctx.positions[moveable] = destination;
             ctx.facing[moveable] = afterSteps.facing;

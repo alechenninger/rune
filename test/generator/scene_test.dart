@@ -49,8 +49,12 @@ ${dialog2.toAsm()}
     late EventState origState;
 
     setUp(() {
-      state = EventState()..positions[alys] = Position('50'.hex, '50'.hex);
-      origState = EventState()..positions[alys] = Position('50'.hex, '50'.hex);
+      state = EventState()
+        ..positions[alys] = Position('50'.hex, '50'.hex)
+        ..positions[shay] = Position('60'.hex, '60'.hex);
+      origState = EventState()
+        ..positions[alys] = Position('50'.hex, '50'.hex)
+        ..positions[shay] = Position('60'.hex, '60'.hex);
     });
 
     test(
@@ -95,6 +99,97 @@ ${dialog2.toAsm()}
             dc.l([
               Label('Event_GrandCross_${eventIndex.value.toRadixString(16)}')
             ])
+          ]));
+    });
+
+    test('given dialog, event, dialog; event code runs dialog', () {
+      var ctx = AsmContext.forDialog(state);
+      var eventIndex = ctx.peekNextEventIndex;
+
+      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var moves = IndividualMoves();
+      moves.moves[alys] = StepPath()..distance = 1.step;
+      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hi'));
+
+      var scene = Scene([dialog1, moves, dialog2]);
+
+      var sceneAsm = generator.sceneToAsm(scene, ctx);
+
+      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
+        DialogAsm([
+          dc.b(Bytes.hex('F6')),
+          dc.w([eventIndex]),
+          dc.b(Bytes.hex('FF')),
+        ]),
+        DialogAsm([
+          dialog1.toAsm(),
+          dc.b(Bytes.hex('f7')),
+          dialog2.toAsm(),
+          dc.b(Bytes.hex('ff')),
+        ])
+      ]);
+
+      expect(
+          sceneAsm.event.withoutComments(),
+          Asm([
+            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
+            getAndRunDialog(Byte.one.i),
+            generator
+                .individualMovesToAsm(moves, AsmContext.forEvent(origState))
+                .withoutComments(),
+            popAndRunDialog,
+          ]));
+    });
+
+    test(
+        'given many exchanges between dialog and event; event code runs dialog',
+        () {
+      var ctx = AsmContext.forDialog(state);
+      var eventIndex = ctx.peekNextEventIndex;
+
+      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var move1 = IndividualMoves();
+      move1.moves[alys] = StepPath()..distance = 1.step;
+      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hi'));
+      var move2 = IndividualMoves();
+      move2.moves[shay] = StepPath()..distance = 1.step;
+      var dialog3 = Dialog(speaker: Shay(), spans: Span.parse('How are you'));
+      var pause = Pause(Duration(seconds: 1));
+
+      var scene = Scene([dialog1, move1, dialog2, move2, dialog3, pause]);
+
+      var sceneAsm = generator.sceneToAsm(scene, ctx);
+
+      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
+        DialogAsm([
+          dc.b(Bytes.hex('F6')),
+          dc.w([eventIndex]),
+          dc.b(Bytes.hex('FF')),
+        ]),
+        DialogAsm([
+          dialog1.toAsm(),
+          dc.b(Bytes.hex('f7')),
+          dialog2.toAsm(),
+          dc.b(Bytes.hex('f7')),
+          dialog3.toAsm(),
+          dc.b(Bytes.hex('ff')),
+        ])
+      ]);
+
+      expect(
+          sceneAsm.event.withoutComments(),
+          Asm([
+            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
+            getAndRunDialog(Byte.one.i),
+            generator
+                .individualMovesToAsm(move1, AsmContext.forEvent(origState))
+                .withoutComments(),
+            popAndRunDialog,
+            generator
+                .individualMovesToAsm(move2, AsmContext.forEvent(origState))
+                .withoutComments(),
+            popAndRunDialog,
+            generator.pauseToAsm(pause),
           ]));
     });
   });

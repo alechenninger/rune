@@ -52,18 +52,29 @@ class AsmContext {
     state = knownState ?? EventState();
   }
 
-  void runDialog() {
-    if (_gameMode != Mode.event) {
-      throw StateError('expected event mode');
-    }
-    _gameMode = Mode.dialog;
-  }
-
   void startEvent([EventState? knownState]) {
     _gameMode = Mode.event;
     _inEvent = true;
     state = knownState ?? EventState();
     // todo: should reset saved dialog position too?
+  }
+
+  void runDialog() {
+    if (_gameMode != Mode.event) {
+      throw StateError('expected event mode $_gameMode');
+    }
+    _gameMode = Mode.dialog;
+  }
+
+  void dialogEventBreak() {
+    if (_gameMode != Mode.dialog) {
+      throw StateError('expected event mode $_gameMode');
+    }
+    if (!_inEvent) {
+      throw StateError('cannot break to event; not in event '
+          '(dialog must first run event using f6 control code)');
+    }
+    _gameMode = Mode.event;
   }
 
   AsmContext.fresh({Mode gameMode = Mode.event})

@@ -11,7 +11,7 @@ const curr_y_pos = Constant('curr_y_pos');
 /// bit 2 = lock camera
 const Char_Move_Flags = Constant('Char_Move_Flags');
 
-Asm popdlg = cmd('popdlg', []);
+final popdlg = cmd('popdlg', []);
 
 Asm vIntPrepareLoop(Word frames) {
   return Asm([move.w(frames.i, d0), jsr(Label('VInt_PrepareLoop').l)]);
@@ -32,14 +32,12 @@ Asm getAndRunDialog(Address dialogId) {
 }
 
 /// Use after F7 (see TextCtrlCode_Terminate2 and 3)
-Asm popAndRunDialog() {
-  return Asm([
-    // appears around popdlg in one scene for some reason
-    //clr.b(Label('Render_Sprites_In_Cutscenes').w),
-    cmd('popdlg', []),
-    jsr(Label('Event_RunDialogue').l),
-  ]);
-}
+final popAndRunDialog = Asm([
+  // appears around popdlg in one scene for some reason
+  //clr.b(Label('Render_Sprites_In_Cutscenes').w),
+  cmd('popdlg', []),
+  jsr(Label('Event_RunDialogue').l),
+]);
 
 /// [slot] is 1-indexed
 Asm characterBySlotToA4(int slot) {

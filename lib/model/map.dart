@@ -31,7 +31,8 @@ class GameMap {
   }
 }
 
-enum MapId { aiedo, piata, piataAcademyF1, piataAcademyPrincipalOffice }
+// ignore: constant_identifier_names
+enum MapId { Aiedo, Piata, PiataAcademyF1, PiataAcademyPrincipalOffice }
 
 class MapObject extends FieldObject {
   // note: can only be in multiples of 8 pixels

@@ -74,6 +74,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
       currentDialog.add(comment('scene event $eventCounter'));
       lastEventBreak = currentDialog.add(eventBreak());
       ctx.hasSavedDialogPosition = true;
+      ctx.dialogEventBreak();
     }
 
     var generated = event.generateAsm(generator, ctx);
@@ -141,7 +142,7 @@ void _goToDialogFromEvent(
   // may depend on context
   // for example Event_GetAndRunDialogue5 might be used in cutscenes?
   if (ctx.hasSavedDialogPosition) {
-    eventAsm.add(popAndRunDialog());
+    eventAsm.add(popAndRunDialog);
     eventAsm.addNewline();
   } else {
     eventAsm.add(getAndRunDialog(currentDialogId.i));
