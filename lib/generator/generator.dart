@@ -158,12 +158,8 @@ class AsmGenerator {
   }
 
   EventAsm pauseToAsm(Pause pause) {
-    // I think vertical interrupt is 60 times a second
-    // but 50 in PAL
-    // could use conditional pseudo-assembly if / else
-    // see: http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_3_6_
-    var frames = pause.duration.inSeconds * 60;
-    return EventAsm.of(vIntPrepareLoop(Word(frames.toInt())));
+    var frames = pause.duration.toFrames();
+    return EventAsm.of(vIntPrepareLoop(Word(frames)));
   }
 
   EventAsm lockCameraToAsm(AsmContext ctx) {
@@ -172,6 +168,16 @@ class AsmGenerator {
 
   EventAsm unlockCameraToAsm(AsmContext ctx) {
     return EventAsm.of(lockCamera(ctx.state.cameraLock = false));
+  }
+}
+
+extension FramesPerSecond on Duration {
+  int toFrames(/*region*/) {
+    // I think vertical interrupt is 60 times a second
+    // but 50 in PAL
+    // could use conditional pseudo-assembly if / else
+    // see: http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_3_6_
+    return inSeconds * 60;
   }
 }
 

@@ -1,14 +1,31 @@
 import 'package:charcode/ascii.dart';
+import 'package:collection/collection.dart';
+import 'package:rune/generator/map.dart';
 
 import 'asm.dart';
 
 class _ControlCodes {
+  static final action = Bytes.hex('F2');
+  static final keepNpcFacingDirection = Bytes.hex('F3'); // ?
   static final portrait = Bytes.hex('F4');
+  static final yesNo = Bytes.hex('F5');
+  static final event = Bytes.hex('F6');
+  static final eventBreak = Bytes.hex('F7'); // same as FE
+  /*
+TextCtrlCode_Delay:
+	moveq	#0, d7
+	move.b	(a0)+, d7
+	subq.b	#1, d7
+loc_6A39E:
+	jsr	(DMAPlane_A_VInt).l
+	dbf	d7, loc_6A39E
+	bra.w	RunText_CharacterLoop
+   */
+  static final delay = Bytes.hex('F9');
+  static final eventCheck = Bytes.hex('FA');
   static final newLine = Bytes.hex('FC');
   static final interrupt = Bytes.hex('FD');
   static final terminate = Bytes.hex('FF');
-  static final event = Bytes.hex('F6');
-  static final eventBreak = Bytes.hex('F7'); // same as FE
 }
 
 Asm eventBreak() {
@@ -23,6 +40,10 @@ Asm interrupt() {
   return dc.b(_ControlCodes.interrupt);
 }
 
+Asm delay(Byte frames) {
+  return dc.b([..._ControlCodes.delay, frames]);
+}
+
 Asm runEvent(Word index) {
   return Asm([
     dc.b(_ControlCodes.event),
@@ -30,24 +51,54 @@ Asm runEvent(Word index) {
   ]);
 }
 
-Asm dialog(Bytes portrait, Bytes dialog) {
-  dialog = dialog.trim($space);
+Asm portrait(Byte portrait) {
+  return dc.b([..._ControlCodes.portrait, portrait]);
+}
+
+Asm dialog(Bytes dialog, [Map<int, Byte> pausePoints = const {}]) {
+  // only makes sense on _entire_ dialog but might not use this function for
+  // this now. moved to model
+  // dialog = dialog.trim($space);
+
+  if (pausePoints.keys.isNotEmpty) {
+    var maxPausePoint = pausePoints.keys.max();
+    if (maxPausePoint > dialog.length) {
+      throw ArgumentError.value(maxPausePoint, 'pausePoints',
+          'all pause points must be >= 0 and <= dialog.length');
+    }
+  }
 
   var asm = Asm.empty();
+  var dialogLines = 0;
   var lineStart = 0;
   var breakPoint = 0;
+  var pausesInLine = <MapEntry<int, Byte>>[];
 
-  asm.add(dc.b(_ControlCodes.portrait));
-  asm.add(dc.b(portrait));
+  // moving to separate function
+  // asm.add(dc.b(_ControlCodes.portrait));
+  // asm.add(dc.b(portrait));
 
   void append(Bytes line) {
-    var lineOffset = (asm.length - 2) % 4;
+    if (line.isEmpty) return;
+    // 2 lines per window.
+    var lineOffset = (dialogLines) % 2;
     if (lineOffset == 1) {
       asm.add(dc.b(_ControlCodes.newLine));
-    } else if (lineOffset == 3) {
+    } else if (lineOffset == 0 && dialogLines > 0) {
       asm.add(dc.b(_ControlCodes.interrupt));
     }
-    asm.add(dc.b(line));
+    // split line bytes up where there are pauses
+    var lastPauseChar = 0;
+    for (var pause in pausesInLine) {
+      var charOfPause = pause.key;
+      asm.add(dc.b(line.sublist(lastPauseChar, charOfPause)));
+      asm.add(delay(pause.value));
+      lastPauseChar = charOfPause;
+    }
+    // add remainder of line, if any (or whole line if no pauses)
+    asm.add(dc.b(line.sublist(lastPauseChar)));
+    dialogLines++;
+    pausesInLine.clear();
   }
 
   for (var i = 0; i < dialog.length; i++) {
@@ -55,6 +106,11 @@ Asm dialog(Bytes portrait, Bytes dialog) {
 
     if (_isBreakable(char.value, dialog, i)) {
       breakPoint = i;
+    }
+
+    var pause = pausePoints[i];
+    if (pause != null) {
+      pausesInLine.add(MapEntry(i, pause));
     }
 
     if (i - lineStart == 32) {
@@ -72,6 +128,11 @@ Asm dialog(Bytes portrait, Bytes dialog) {
   var remaining = dialog.sublist(lineStart);
   if (remaining.isNotEmpty) {
     append(remaining);
+  }
+
+  var frames = pausePoints[dialog.length];
+  if (frames != null) {
+    asm.add(delay(frames));
   }
 
   return asm;

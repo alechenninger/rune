@@ -9,7 +9,13 @@ class Dialog extends Event {
   final List<Span> _spans;
   List<Span> get spans => UnmodifiableListView(_spans);
 
-  Dialog({this.speaker, List<Span> spans = const []}) : _spans = spans {
+  Dialog({this.speaker, List<Span> spans = const []}) : _spans = [
+    if (spans.isNotEmpty) spans[0].trimLeft(),
+    if (spans.length > 1) ...[
+      ...spans.sublist(1, spans.length - 1),
+      spans.last.trimRight()
+    ]
+  ] {
     if (_spans.isEmpty) {
       throw ArgumentError.value(
           spans, 'spans', 'must contain at least one span');
@@ -32,19 +38,23 @@ class Dialog extends Event {
       other is Dialog &&
           runtimeType == other.runtimeType &&
           speaker == other.speaker &&
-          ListEquality().equals(_spans, other._spans);
+          const ListEquality().equals(_spans, other._spans);
 
   @override
-  int get hashCode => speaker.hashCode ^ ListEquality().hash(_spans);
+  int get hashCode => speaker.hashCode ^ const ListEquality().hash(_spans);
 }
 
 class Span {
   final String text;
   final bool italic;
+  final Duration pause;
 
-  Span(this.text, [this.italic = false]);
+  Span(this.text, {this.italic = false, this.pause = Duration.zero});
 
-  Span.italic(this.text) : italic = true;
+  Span.italic(String text) : this(text, italic: true);
+
+  Span trimLeft() => Span(text.trimLeft(), italic: italic, pause: pause);
+  Span trimRight() => Span(text.trimRight(), italic: italic, pause: pause);
 
   // TODO: markup parsing belongs in parse layer
   static List<Span> parse(String markup) {
@@ -57,7 +67,7 @@ class Span {
       // _ not otherwise a supported character in dialog.
       if (c == '_') {
         if (text.isNotEmpty) {
-          _spans.add(Span(text.toString(), italic));
+          _spans.add(Span(text.toString(), italic: italic));
           text.clear();
         }
         italic = !italic;
@@ -68,7 +78,7 @@ class Span {
     }
 
     if (text.isNotEmpty) {
-      _spans.add(Span(text.toString(), italic));
+      _spans.add(Span(text.toString(), italic: italic));
     }
 
     return _spans;
@@ -76,7 +86,7 @@ class Span {
 
   @override
   String toString() {
-    return 'Span{text: $text, italic: $italic}';
+    return 'Span{text: $text, italic: $italic, pause: $pause}';
   }
 
   @override
@@ -85,10 +95,11 @@ class Span {
       other is Span &&
           runtimeType == other.runtimeType &&
           text == other.text &&
-          italic == other.italic;
+          italic == other.italic &&
+          pause == other.pause;
 
   @override
-  int get hashCode => text.hashCode ^ italic.hashCode;
+  int get hashCode => text.hashCode ^ italic.hashCode ^ pause.hashCode;
 }
 
 abstract class Speaker {}

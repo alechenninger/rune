@@ -619,12 +619,12 @@ class StepPaths extends Movement {
       identical(this, other) ||
       (other is StepPaths &&
           runtimeType == other.runtimeType &&
-          ListEquality().equals(_paths, other._paths)) ||
+          const ListEquality().equals(_paths, other._paths)) ||
       (other is StepPath && _paths.length == 1 && _paths.first == other);
 
   @override
   int get hashCode =>
-      _paths.length == 1 ? _paths.first.hashCode : ListEquality().hash(_paths);
+      _paths.length == 1 ? _paths.first.hashCode : const ListEquality().hash(_paths);
 }
 
 class ContextualStepToPoint extends ContextualMovement {

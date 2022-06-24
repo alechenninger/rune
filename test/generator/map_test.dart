@@ -272,10 +272,10 @@ void main() {
       var comparisonDialogTree = DialogTree();
 
       var scene1Asm = npc1Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('piata_npc1'));
+          dialogTree: comparisonDialogTree, id: SceneId('Piata_npc1'));
       comparisonCtx.startDialogInteraction();
       var scene2Asm = npc2Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('piata_npc2'));
+          dialogTree: comparisonDialogTree, id: SceneId('Piata_npc2'));
 
       expect(mapAsm.events,
           Asm([scene1Asm.event, newLine(), scene2Asm.event, newLine()]));
@@ -288,10 +288,10 @@ void main() {
       var comparisonDialogTree = DialogTree();
 
       var scene1Asm = npc1Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('piata_npc1'));
+          dialogTree: comparisonDialogTree, id: SceneId('Piata_npc1'));
       comparisonCtx.startDialogInteraction();
       var scene2Asm = npc2Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('piata_npc2'));
+          dialogTree: comparisonDialogTree, id: SceneId('Piata_npc2'));
 
       print(mapAsm.eventPointers);
 

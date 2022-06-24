@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:characters/characters.dart';
 import 'package:charcode/ascii.dart';
+import 'package:rune/generator/generator.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -18,8 +19,25 @@ extension DialogToAsm on Dialog {
     var asm = DialogAsm.empty();
     var quotes = Quotes();
 
-    var ascii = spans.map((s) => s.toAscii(quotes)).reduce((a1, a2) => a1 + a2);
-    asm.add(dialog(speaker?.portraitCode ?? Bytes.of(0), ascii));
+    // var ascii = spans.map((s) => s.toAscii(quotes)).reduce((a1, a2) => a1 + a2);
+    // asm.add(dialog(speaker?.portraitCode ?? Bytes.of(0), ascii));
+
+    asm.add(portrait(speaker?.portraitCode ?? Byte.zero));
+
+    var ascii = Bytes.empty();
+    var pausePoints = <int, Byte>{};
+
+    for (var i = 0; i < spans.length; i++) {
+      var span = spans[i];
+      var spanAscii = span.toAscii(quotes);
+      ascii += spanAscii;
+
+      if (span.pause > Duration.zero) {
+        pausePoints[spanAscii.length] = span.pause.toFrames().byte;
+      }
+    }
+
+    asm.add(dialog(ascii, pausePoints));
 
     return asm;
   }
@@ -131,8 +149,9 @@ class Quotes {
 extension Portrait on Speaker {
   static final _index = [null, Shay, Alys];
 
-  Bytes get portraitCode {
+  Byte get portraitCode {
     var index = _index.indexOf(runtimeType);
-    return Bytes.of(max(0, index));
+
+    return Byte(max(0, index));
   }
 }

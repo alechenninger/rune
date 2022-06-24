@@ -209,7 +209,9 @@ abstract class Data<T extends List<int>, E extends Value,
 
   List<E> get _list => bytes.map((e) => _newElement(e)).toList(growable: false);
 
+  @override
   int get length => bytes.length;
+  @override
   set length(int newLength) => bytes.length = newLength;
 
   String get immediate => '';
@@ -227,9 +229,11 @@ abstract class Data<T extends List<int>, E extends Value,
     return _new(bytes.trimTrailing(value: byte));
   }
 
+  @override
   D operator +(List<E> other) =>
       _new(bytes + other.map((e) => e.value).toList(growable: false));
 
+  @override
   E operator [](int index) => _list[index];
 
   @override
@@ -245,22 +249,27 @@ abstract class Data<T extends List<int>, E extends Value,
         .join(', ');
   }
 
+  @override
   D sublist(int start, [int? end]) {
     return _new(bytes.sublist(start, end));
   }
 
+  @override
   int indexWhere(bool Function(E) test, [int? start]) {
     return start == null
         ? _list.indexWhere(test)
         : _list.indexWhere(test, start);
   }
 
+  @override
   bool every(bool Function(E) test) {
     return _list.every(test);
   }
 
+  @override
   bool get isEmpty => bytes.isEmpty;
 
+  @override
   bool get isNotEmpty => bytes.isNotEmpty;
 
   bool equivalentBytes(Data other) => other.bytes == bytes;
