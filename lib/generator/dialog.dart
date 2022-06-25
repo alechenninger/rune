@@ -19,9 +19,8 @@ extension DialogToAsm on Dialog {
     var asm = DialogAsm.empty();
     var quotes = Quotes();
 
-    // var ascii = spans.map((s) => s.toAscii(quotes)).reduce((a1, a2) => a1 + a2);
-    // asm.add(dialog(speaker?.portraitCode ?? Bytes.of(0), ascii));
-
+    // i think byte zero removes portrait if already present.
+    // todo: could optimize if we know there is no portrait
     asm.add(portrait(speaker?.portraitCode ?? Byte.zero));
 
     var ascii = Bytes.empty();

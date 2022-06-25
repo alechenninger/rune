@@ -49,4 +49,9 @@ void main() {
 	dc.b	$FD
 	dc.b	"to come in."'''));
   });
+
+  test('only pause', () {
+    var asm = dialog(Bytes.empty(), {0: Byte(60)});
+    expect(asm.toString(), equals(r'''	dc.b	$F9, $3C'''));
+  });
 }

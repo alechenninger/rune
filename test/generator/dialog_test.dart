@@ -56,13 +56,22 @@ void main() {
   });
 
   group('spans with pauses', () {
-    test('just pause', () {
+    test('just pause and speaker', () {
       var dialog = Dialog(
           speaker: Alys(), spans: [Span("", pause: Duration(seconds: 1))]);
 
       var asm = dialog.toAsm();
 
       expect(asm.toString(), r'''	dc.b	$F4, $02
+	dc.b	$F9, $3C''');
+    });
+
+    test('just pause, no speaker', () {
+      var dialog = Dialog(spans: [Span("", pause: Duration(seconds: 1))]);
+
+      var asm = dialog.toAsm();
+
+      expect(asm.toString(), r'''	dc.b	$F4, $00
 	dc.b	$F9, $3C''');
     });
 

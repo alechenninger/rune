@@ -1,4 +1,5 @@
 import 'package:rune/asm/asm.dart';
+import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
@@ -154,9 +155,10 @@ ${dialog2.toAsm()}
       var move2 = IndividualMoves();
       move2.moves[shay] = StepPath()..distance = 1.step;
       var dialog3 = Dialog(speaker: Shay(), spans: Span.parse('How are you'));
-      var pause = Pause(Duration(seconds: 1));
+      var move3 = IndividualMoves();
+      move3.moves[alys] = StepPath()..distance = 1.step;
 
-      var scene = Scene([dialog1, move1, dialog2, move2, dialog3, pause]);
+      var scene = Scene([dialog1, move1, dialog2, move2, dialog3, move3]);
 
       var sceneAsm = generator.sceneToAsm(scene, ctx);
 
@@ -189,8 +191,41 @@ ${dialog2.toAsm()}
                 .individualMovesToAsm(move2, AsmContext.forEvent(origState))
                 .withoutComments(),
             popAndRunDialog,
-            generator.pauseToAsm(pause),
+            generator
+                .individualMovesToAsm(move3, AsmContext.forEvent(origState))
+                .withoutComments()
           ]));
+    });
+
+    test(
+        'if starting from dialog with dialog then pause, '
+        'pause within dialog loop only', () {
+      var dialog = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var pause = Pause(Duration(seconds: 2));
+
+      var scene = Scene([dialog, pause]);
+      var sceneAsm =
+          generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
+
+      expect(sceneAsm.dialog[0].toString(), '''${dialog.toAsm()}
+	dc.b	\$FD
+	dc.b	\$F4, \$00
+${delay(Duration(seconds: 2).toFrames().byte)}
+	dc.b	\$FF''');
+    });
+
+    test(
+        'if starting from dialog and only pausing, '
+        'pause within dialog loop', () {
+      var pause = Pause(Duration(seconds: 2));
+
+      var scene = Scene([pause]);
+      var sceneAsm =
+          generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
+
+      expect(sceneAsm.dialog[0].toString(), '''	dc.b	\$F4, \$00
+${delay(Duration(seconds: 2).toFrames().byte)}
+	dc.b	\$FF''');
     });
   });
 }

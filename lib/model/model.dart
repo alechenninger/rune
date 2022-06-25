@@ -141,6 +141,10 @@ class Pause extends Event {
 
   Pause(this.duration);
 
+  Dialog inDialog() {
+    return Dialog(spans: [Span("", pause: duration)]);
+  }
+
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.pauseToAsm(this);

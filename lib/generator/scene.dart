@@ -89,25 +89,29 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
 
   // todo: event code checks first
 
-  if (!ctx.inEvent && scene.events.any((event) => event is! Dialog)) {
+  if (!ctx.inEvent &&
+      scene.events.any((event) => !(event is Dialog || event is Pause))) {
     _startEventFromDialog(ctx, currentDialog, eventPtrsAsm, eventAsm, sceneId);
     _terminateCurrentDialogTree();
   }
 
   for (var event in scene.events) {
-    // TODO: this is a bit brittle. might be better if an event generated both
-    // DialogAsm and EventAsm
     if (event is Dialog) {
       _addDialog(event);
     } else {
-      _addEvent(event);
+      if (event is Pause && ctx.inDialogLoop) {
+        // Optimization: stay in dialog loop for pause
+        _addDialog(event.inDialog());
+      } else {
+        _addEvent(event);
+      }
     }
 
     lastEvent = event;
   }
 
   // was lastEventBreak >= 0, but i think it should be this?
-  if (lastEvent is! Dialog && lastEventBreak >= 0) {
+  if (!ctx.inDialogLoop && lastEventBreak >= 0) {
     _terminateCurrentDialogTree(at: lastEventBreak);
   } else if (currentDialog.isNotEmpty) {
     _terminateCurrentDialogTree();
