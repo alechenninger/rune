@@ -107,6 +107,17 @@ class Scene {
   String toString() {
     return 'Scene{name: $name, events: $events}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Scene &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          const ListEquality<Event>().equals(events, other.events);
+
+  @override
+  int get hashCode => name.hashCode ^ const ListEquality<Event>().hash(events);
 }
 
 final onlyWordCharacters = RegExp(r'^\w+$');

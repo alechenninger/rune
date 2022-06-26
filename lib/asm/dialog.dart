@@ -58,10 +58,6 @@ Asm portrait(Byte portrait) {
 }
 
 Asm dialog(Bytes dialog, [List<Byte?> pausePoints = const []]) {
-  // only makes sense on _entire_ dialog but might not use this function for
-  // this now. moved to model
-  // dialog = dialog.trim($space);
-
   if (pausePoints.isNotEmpty) {
     var maxPausePoint = pausePoints.length - 1;
     if (maxPausePoint > dialog.length) {
@@ -75,13 +71,10 @@ Asm dialog(Bytes dialog, [List<Byte?> pausePoints = const []]) {
   var lineStart = 0;
   var breakPoint = 0;
 
-  // moving to separate function
-  // asm.add(dc.b(_ControlCodes.portrait));
-  // asm.add(dc.b(portrait));
-
   void append(int start, [int? end]) {
     var line = dialog.sublist(start, end);
     if (line.isEmpty) return;
+
     // 2 lines per window.
     var lineOffset = (dialogLines) % 2;
     if (lineOffset == 1) {
@@ -89,6 +82,7 @@ Asm dialog(Bytes dialog, [List<Byte?> pausePoints = const []]) {
     } else if (lineOffset == 0 && dialogLines > 0) {
       asm.add(dc.b(_ControlCodes.interrupt));
     }
+
     // split line bytes up where there are pauses
     var lastPauseChar = 0;
     if (start < pausePoints.length) {
@@ -98,13 +92,21 @@ Asm dialog(Bytes dialog, [List<Byte?> pausePoints = const []]) {
         var pause = pausesInLine[i];
         if (pause != null) {
           var charOfPause = i;
-          asm.add(dc.b(line.sublist(lastPauseChar, charOfPause)));
+          var beforePause = line.sublist(lastPauseChar, charOfPause);
+          if (beforePause.isNotEmpty) {
+            asm.add(dc.b(beforePause));
+          }
           asm.add(delay(pause));
           lastPauseChar = charOfPause;
         }
       }
     }
-    asm.add(dc.b(line.sublist(lastPauseChar)));
+
+    var afterPause = line.sublist(lastPauseChar);
+    if (afterPause.isNotEmpty) {
+      asm.add(dc.b(afterPause));
+    }
+
     dialogLines++;
   }
 
@@ -114,11 +116,6 @@ Asm dialog(Bytes dialog, [List<Byte?> pausePoints = const []]) {
     if (_isBreakable(char.value, dialog, i)) {
       breakPoint = i;
     }
-
-    // var pause = pausePoints[i];
-    // if (pause != null) {
-    //   pausesInLine.add(MapEntry(i - lineStart, pause));
-    // }
 
     if (i - lineStart == 32) {
       append(lineStart, breakPoint);

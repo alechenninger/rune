@@ -103,8 +103,14 @@ void main() {
 
       var asm = dialog.toAsm();
 
-      expect(asm.toString(), r'''	dc.b	$F4, $02
-	dc.b	"Hi I'm Alys!"
+      expect(asm.toString(), r'''	dc.b	$F4, $01
+	dc.b	"It takes and it takes. And I owe"
+	dc.b	$FC
+	dc.b	"it nothing..."
+	dc.b	$F9, $3C
+	dc.b	"nothing but a"
+	dc.b	$FD
+	dc.b	"fight."
 	dc.b	$F9, $3C''');
     });
 
@@ -123,6 +129,34 @@ void main() {
       var asm = dialog.toAsm();
 
       print(asm);
+    });
+
+    test('pause at 32 characters mid dialog', () {
+      var dialog = Dialog(speaker: shay, spans: [
+        Span("That you’ve always done this...", pause: Duration(seconds: 1)),
+        Span('alone.', pause: Duration(seconds: 1))
+      ]);
+
+      var asm = dialog.toAsm();
+
+      expect(asm.toString(), r'''	dc.b	$F4, $01
+	dc.b	"That you've always done this..."
+	dc.b	$FC
+	dc.b	$F9, $3C
+	dc.b	"alone."
+	dc.b	$F9, $3C''');
+    });
+
+    test('pause at 32 characters end of dialog', () {
+      var dialog = Dialog(speaker: shay, spans: [
+        Span("That you’ve always done this...", pause: Duration(seconds: 1)),
+      ]);
+
+      var asm = dialog.toAsm();
+
+      expect(asm.toString(), r'''	dc.b	$F4, $01
+	dc.b	"That you've always done this..."
+	dc.b	$F9, $3C''');
     });
   });
 }
