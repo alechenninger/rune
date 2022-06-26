@@ -215,7 +215,6 @@ class Slot extends FieldObject {
 abstract class Character extends FieldObject with Speaker {
   const Character();
 
-  /// throws if no character found by name.
   static Character? byName(String name) {
     switch (name.toLowerCase()) {
       case 'alys':

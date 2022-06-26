@@ -346,4 +346,8 @@ void main() {
       print(moves.generateAsm(AsmGenerator(), AsmContext.forEvent(ctx)));
     });
   });
+
+  group('dialog', () {
+    test('combines spans', () {});
+  });
 }
