@@ -197,9 +197,11 @@ ${dialog2.toAsm()}
           ]));
     });
 
-    test(
-        'if starting from dialog with dialog then pause, '
-        'pause within dialog loop only', () {
+    test('if starting from dialog with dialog then pause, pause within event',
+        () {
+      var ctx = AsmContext.forDialog(state);
+      var eventIndex = ctx.peekNextEventIndex;
+
       var dialog = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
       var pause = Pause(Duration(seconds: 2));
 
@@ -207,25 +209,53 @@ ${dialog2.toAsm()}
       var sceneAsm =
           generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
 
-      expect(sceneAsm.dialog[0].toString(), '''${dialog.toAsm()}
-	dc.b	\$FD
-	dc.b	\$F4, \$00
-${delay(Duration(seconds: 2).toFrames().byte)}
-	dc.b	\$FF''');
+      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
+        DialogAsm([
+          dc.b(Bytes.hex('F6')),
+          dc.w([eventIndex]),
+          dc.b(Bytes.hex('FF')),
+        ]),
+        DialogAsm([
+          dialog.toAsm(),
+          dc.b(Bytes.hex('ff')),
+        ])
+      ]);
+
+      expect(
+          sceneAsm.event.withoutComments(),
+          Asm([
+            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
+            getAndRunDialog(Byte.one.i),
+            generator.pauseToAsm(pause),
+          ]));
     });
 
     test(
-        'if starting from dialog and only pausing, '
-        'pause within dialog loop', () {
+        "if starting from dialog and only pausing, pause within event and don't run dialog",
+        () {
+      var ctx = AsmContext.forDialog(state);
+      var eventIndex = ctx.peekNextEventIndex;
+
       var pause = Pause(Duration(seconds: 2));
 
       var scene = Scene([pause]);
       var sceneAsm =
           generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
 
-      expect(sceneAsm.dialog[0].toString(), '''	dc.b	\$F4, \$00
-${delay(Duration(seconds: 2).toFrames().byte)}
-	dc.b	\$FF''');
+      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
+        DialogAsm([
+          dc.b(Bytes.hex('F6')),
+          dc.w([eventIndex]),
+          dc.b(Bytes.hex('FF')),
+        ]),
+      ]);
+
+      expect(
+          sceneAsm.event.withoutComments(),
+          Asm([
+            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
+            generator.pauseToAsm(pause),
+          ]));
     });
   });
 }

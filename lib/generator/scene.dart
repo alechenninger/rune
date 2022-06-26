@@ -89,8 +89,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
 
   // todo: event code checks first
 
-  if (!ctx.inEvent &&
-      scene.events.any((event) => !(event is Dialog || event is Pause))) {
+  if (!ctx.inEvent && scene.events.any((event) => event is! Dialog)) {
     _startEventFromDialog(ctx, currentDialog, eventPtrsAsm, eventAsm, sceneId);
     _terminateCurrentDialogTree();
   }
@@ -99,12 +98,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
     if (event is Dialog) {
       _addDialog(event);
     } else {
-      if (event is Pause && ctx.inDialogLoop) {
-        // Optimization: stay in dialog loop for pause
-        _addDialog(event.inDialog());
-      } else {
-        _addEvent(event);
-      }
+      _addEvent(event);
     }
 
     lastEvent = event;
