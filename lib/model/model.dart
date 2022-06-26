@@ -102,6 +102,11 @@ class Scene {
   void addEvent(Event event) {
     events.add(event);
   }
+
+  @override
+  String toString() {
+    return 'Scene{name: $name, events: $events}';
+  }
 }
 
 final onlyWordCharacters = RegExp(r'^\w+$');

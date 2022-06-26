@@ -24,7 +24,7 @@ extension DialogToAsm on Dialog {
     asm.add(portrait(speaker?.portraitCode ?? Byte.zero));
 
     var ascii = Bytes.empty();
-    var pausePoints = <int, Byte>{};
+    var pausePoints = <Byte?>[];
 
     for (var i = 0; i < spans.length; i++) {
       var span = spans[i];
@@ -32,7 +32,8 @@ extension DialogToAsm on Dialog {
       ascii += spanAscii;
 
       if (span.pause > Duration.zero) {
-        pausePoints[spanAscii.length] = span.pause.toFrames().byte;
+        pausePoints.length = ascii.length + 1;
+        pausePoints[ascii.length] = span.pause.toFrames().byte;
       }
     }
 
@@ -48,6 +49,7 @@ final _transforms = {
   '–': '=',
   '—': '=',
   '…': '...',
+  'é': 'e',
 };
 
 final _replacements = {RegExp('  +'): ' '};

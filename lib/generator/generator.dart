@@ -124,50 +124,86 @@ class DialogTree extends IterableBase<DialogAsm> {
   }
 }
 
+class AsmGenerationException {
+  final AsmContext? ctx;
+  final Object? model;
+  final Object? cause;
+
+  AsmGenerationException(this.ctx, this.model, this.cause);
+
+  @override
+  String toString() {
+    return 'AsmGenerationException{ctx: $ctx, model: $model, cause: $cause}';
+  }
+}
+
 class AsmGenerator {
+  T _wrapException<T>(T Function() generate, AsmContext? ctx, Object? model) {
+    try {
+      return generate();
+    } catch (e) {
+      throw AsmGenerationException(ctx, model, e);
+    }
+  }
+
   Asm eventsToAsm(List<Event> events, AsmContext ctx) {
     if (events.isEmpty) {
       return Asm.empty();
     }
 
-    return events.map((e) => e.generateAsm(this, ctx)).reduce((value, element) {
-      value.add(element);
-      return value;
-    });
+    return _wrapException(
+        () => events
+                .map((e) => e.generateAsm(this, ctx))
+                .reduce((value, element) {
+              value.add(element);
+              return value;
+            }),
+        ctx,
+        events);
   }
 
   SceneAsm sceneToAsm(Scene scene, AsmContext ctx,
       {DialogTree? dialogTree, SceneId? id}) {
-    return scene.toAsm(this, ctx, dialogTree: dialogTree, id: id);
+    return _wrapException(
+        () => scene.toAsm(this, ctx, dialogTree: dialogTree, id: id),
+        ctx,
+        scene);
   }
 
   MapAsm mapToAsm(GameMap map, AsmContext ctx) {
-    return map.toAsm(this, ctx);
+    return _wrapException(() => map.toAsm(this, ctx), ctx, map);
   }
 
   DialogAsm dialogToAsm(Dialog dialog) {
-    return dialog.toAsm();
+    return _wrapException(() => dialog.toAsm(), null, dialog);
   }
 
   EventAsm individualMovesToAsm(IndividualMoves move, AsmContext ctx) {
-    return move.toAsm(ctx.state);
+    return _wrapException(() => move.toAsm(ctx.state), ctx, move);
   }
 
   EventAsm partyMoveToAsm(PartyMove move, AsmContext ctx) {
-    return individualMovesToAsm(move.toIndividualMoves(ctx.state), ctx);
+    return _wrapException(
+        () => individualMovesToAsm(move.toIndividualMoves(ctx.state), ctx),
+        ctx,
+        move);
   }
 
   EventAsm pauseToAsm(Pause pause) {
-    var frames = pause.duration.toFrames();
-    return EventAsm.of(vIntPrepareLoop(Word(frames)));
+    return _wrapException(() {
+      var frames = pause.duration.toFrames();
+      return EventAsm.of(vIntPrepareLoop(Word(frames)));
+    }, null, pause);
   }
 
   EventAsm lockCameraToAsm(AsmContext ctx) {
-    return EventAsm.of(lockCamera(ctx.state.cameraLock = true));
+    return _wrapException(
+        () => EventAsm.of(lockCamera(ctx.state.cameraLock = true)), ctx, null);
   }
 
   EventAsm unlockCameraToAsm(AsmContext ctx) {
-    return EventAsm.of(lockCamera(ctx.state.cameraLock = false));
+    return _wrapException(
+        () => EventAsm.of(lockCamera(ctx.state.cameraLock = false)), ctx, null);
   }
 }
 

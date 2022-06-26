@@ -86,5 +86,43 @@ void main() {
 	dc.b	"Hi I'm Alys!"
 	dc.b	$F9, $3C''');
     });
+
+    test('bug1', () {
+      /*
+      ialog{speaker: Shay, _spans: [
+      Span{text: It takes and it takes. And I owe it nothing..., italic: false, pause: 0:00:01.000000},
+      Span{text: nothing but a fight.  , italic: false, pause: 0:00:01.000000},
+      Span{text: , italic: false, pause: 0:00:00.000000}]}}
+       */
+      var dialog = Dialog(speaker: Shay(), spans: [
+        Span('It takes and it takes. And I owe it nothing...',
+            pause: Duration(seconds: 1)),
+        Span('nothing but a fight.  ', pause: Duration(seconds: 1)),
+        Span('')
+      ]);
+
+      var asm = dialog.toAsm();
+
+      expect(asm.toString(), r'''	dc.b	$F4, $02
+	dc.b	"Hi I'm Alys!"
+	dc.b	$F9, $3C''');
+    });
+
+    test('bug2', () {
+      /*
+      Dialog{speaker: Alys, _spans: [
+      Span{text: Now take heed…, italic: false, pause: 0:00:01.000000},
+      Span{text: else I walk alone once more., italic: false, pause: 0:00:01.000000}]},
+      cause: RangeError (end): Invalid value: Not in inclusive range 0..11: 12}
+       */
+      var dialog = Dialog(speaker: Alys(), spans: [
+        Span('Now take heed…', pause: Duration(seconds: 1)),
+        Span('else I walk alone once more.', pause: Duration(seconds: 1)),
+      ]);
+
+      var asm = dialog.toAsm();
+
+      print(asm);
+    });
   });
 }

@@ -10,29 +10,52 @@ class Dialog extends Event {
   List<Span> get spans => UnmodifiableListView(_spans);
 
   Dialog({this.speaker, List<Span> spans = const []}) {
-    if (spans.isEmpty) {
-      throw ArgumentError.value(
-          spans, 'spans', 'must contain at least one span');
-    }
+    var skipped = false;
 
     for (var i = 0; i < spans.length; i++) {
       var span = spans[i];
-      if (i == 0) {
+      if (_spans.isEmpty) {
         span = span.trimLeft();
-      } else if (span.text.isEmpty) {
-        // empty span is merged or just skipped
-        if (span.pause > Duration.zero) {
-          var previous = _spans[i - 1];
-          _spans[i - 1] = previous.withPause(previous.pause + span.pause);
-        }
-        continue;
       }
 
       if (i == spans.length - 1) {
         span = span.trimRight();
       }
 
+      if (span.text.isEmpty) {
+        // empty span is merged or just skipped unless contains pause
+        if (span.pause == Duration.zero) {
+          skipped = true;
+          continue;
+        } else if (_spans.isNotEmpty) {
+          // merge
+          var previous = _spans.last;
+          _spans.last = previous.withPause(previous.pause + span.pause);
+          skipped = true;
+          continue;
+        }
+        // keep for pause
+      }
+
+      skipped = false;
       _spans.add(span);
+    }
+
+    if (skipped) {
+      for (var i = _spans.length - 1; i >= 0; i--) {
+        var span = _spans[i].trimRight();
+        if (span.text.isEmpty && span.pause == Duration.zero) {
+          _spans.removeAt(i);
+        } else {
+          _spans[i] = span;
+          break;
+        }
+      }
+    }
+
+    if (_spans.isEmpty) {
+      throw ArgumentError.value(
+          spans, 'spans', 'must contain at least one span with text');
     }
   }
 
