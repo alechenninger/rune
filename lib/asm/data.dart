@@ -385,9 +385,11 @@ class BytesAndAscii extends Bytes {
 
   BytesAndAscii._(this._spans)
       // Hack around possible bug in + operator on uint8list?
-      : super(Uint8List.fromList(_spans
-            .map((e) => e.bytes.toList(growable: false))
-            .reduce((value, element) => value + element)));
+      : super(Uint8List.fromList(_spans.isEmpty
+            ? []
+            : _spans
+                .map((e) => e.bytes.toList(growable: false))
+                .reduce((value, element) => value + element)));
 
   factory BytesAndAscii(List<Bytes> spans) {
     var normalized = <Bytes>[];

@@ -29,6 +29,22 @@ void main() {
 	dc.b	"Test 1 2 3"''');
   });
 
+  test('all italics uses ascii for non-italics characters', () {
+    var dialog = Dialog(spans: [
+      Span("Alys peered out over the Motavqian wilds, as the rising",
+          italic: true)
+    ]);
+
+    var asm = dialog.toAsm();
+
+    print(asm);
+
+    expect(asm.toString(), r'''	dc.b	$F4, $00
+	dc.b	$4E, $73, $80, $7A, " ", $77, $6C, $6C, $79, $6C, $6B, " ", $76, $7C, $7B, " ", $76, $7D, $6C, $79, " ", $7B, $6F, $6C
+	dc.b	$FC
+	dc.b	$5A, $76, $7B, $68, $7D, $70, $68, $75, " ", $7E, $70, $73, $6B, $7A, ", ", $68, $7A, " ", $7B, $6F, $6C, " ", $79, $70, $7A, $70, $75, $6E''');
+  });
+
   group('a cursor separates', () {
     test('every other line from the same dialog', () {
       var dialog = Dialog(

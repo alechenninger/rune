@@ -23,7 +23,7 @@ extension DialogToAsm on Dialog {
     // todo: could optimize if we know there is no portrait
     asm.add(portrait(speaker?.portraitCode ?? Byte.zero));
 
-    var ascii = Bytes.empty();
+    var ascii = BytesAndAscii([]);
     var pausePoints = <Byte?>[];
 
     for (var i = 0; i < spans.length; i++) {
