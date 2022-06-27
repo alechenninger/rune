@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
@@ -56,16 +58,24 @@ class MapObject extends FieldObject {
 
 // generator will need to track labels corresponding to each sprite
 enum Sprite {
-  palmanMan1,
-  palmanMan2,
-  palmanMan3,
-  palmanOldMan1,
-  palmanFighter1,
-  palmanFighter2,
-  palmanFighter3,
-  palmanWoman1,
-  palmanWoman2,
-  palmanWoman3,
+  PalmanMan1,
+  PalmanMan2,
+  PalmanMan3,
+  PalmanOldMan1,
+  PalmanFighter1,
+  PalmanFighter2,
+  PalmanFighter3,
+  PalmanWoman1,
+  PalmanWoman2,
+  PalmanWoman3,
+}
+
+Sprite? spriteByName(String name) {
+  name = name.trim().toLowerCase();
+  for (var s in Sprite.values) {
+    if (s.name.toLowerCase() == name) return s;
+  }
+  return null;
 }
 
 final _random = Random();
@@ -139,8 +149,8 @@ abstract class NpcBehavior {
   Direction get startFacing;
 }
 
-class FacingDown extends NpcBehavior {
-  const FacingDown();
+class FaceDown extends NpcBehavior {
+  const FaceDown();
 
   @override
   final startFacing = Direction.down;
@@ -148,8 +158,30 @@ class FacingDown extends NpcBehavior {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FacingDown && runtimeType == other.runtimeType;
+      other is FaceDown && runtimeType == other.runtimeType;
 
   @override
   int get hashCode => runtimeType.hashCode;
+}
+
+class WanderAround extends NpcBehavior {
+  @override
+  final Direction startFacing;
+
+  WanderAround(this.startFacing);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WanderAround &&
+          runtimeType == other.runtimeType &&
+          startFacing == other.startFacing;
+
+  @override
+  int get hashCode => startFacing.hashCode;
+
+  @override
+  String toString() {
+    return 'WanderAround{startFacing: $startFacing}';
+  }
 }

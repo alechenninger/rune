@@ -20,7 +20,7 @@ void main() {
   test('map model generates asm', () {
     var obj = MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan1, FacingDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ]));
@@ -47,7 +47,7 @@ void main() {
 
     var obj = MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan1, FacingDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ]));
@@ -66,7 +66,7 @@ void main() {
   test('sprites are defined', () {
     var obj = MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan1, FacingDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ]));
@@ -86,21 +86,21 @@ void main() {
   test('multiples sprites tile numbers are separated by 0x48', () {
     piata.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan1, FacingDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
     piata.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanWoman1, FacingDown()),
+        spec: Npc(Sprite.PalmanWoman1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
     piata.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan2, FacingDown()),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
@@ -122,21 +122,21 @@ void main() {
   test('sprites are referred to by their corresponding objects', () {
     piata.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan1, FacingDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
     piata.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanWoman1, FacingDown()),
+        spec: Npc(Sprite.PalmanWoman1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
     piata.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan2, FacingDown()),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
@@ -152,21 +152,21 @@ void main() {
   test('sprites are reused for multiple objects of the same sprite', () {
     piata.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan1, FacingDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
     piata.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan1, FacingDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
     piata.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
-        spec: Npc(Sprite.palmanMan1, FacingDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
@@ -194,14 +194,14 @@ void main() {
     setUp(() {
       piata.addObject(MapObject(
           startPosition: Position('1e0'.hex, '2e0'.hex),
-          spec: Npc(Sprite.palmanMan1, FacingDown()),
+          spec: Npc(Sprite.PalmanMan1, FaceDown()),
           onInteract: Scene([
             Dialog(spans: [Span('Hello!')])
           ])));
 
       piata.addObject(MapObject(
           startPosition: Position('1f0'.hex, '2e0'.hex),
-          spec: Npc(Sprite.palmanWoman1, FacingDown()),
+          spec: Npc(Sprite.PalmanWoman1, FaceDown()),
           onInteract: Scene([
             Dialog(spans: [Span('Goodbye!')])
           ])));
@@ -255,13 +255,13 @@ void main() {
       piata.addObject(MapObject(
           id: 'npc1',
           startPosition: Position('1e0'.hex, '2e0'.hex),
-          spec: Npc(Sprite.palmanMan1, FacingDown()),
+          spec: Npc(Sprite.PalmanMan1, FaceDown()),
           onInteract: npc1Scene));
 
       piata.addObject(MapObject(
           id: 'npc2',
           startPosition: Position('1f0'.hex, '2e0'.hex),
-          spec: Npc(Sprite.palmanWoman1, FacingDown()),
+          spec: Npc(Sprite.PalmanWoman1, FaceDown()),
           onInteract: npc2Scene));
     });
 

@@ -31,7 +31,7 @@ void main() {
 
   test('all italics uses ascii for non-italics characters', () {
     var dialog = Dialog(spans: [
-      Span("Alys peered out over the Motavqian wilds, as the rising",
+      Span("Alys peered out over the Motavian wilds, as the rising",
           italic: true)
     ]);
 

@@ -96,6 +96,15 @@ enum Mode { dialog, event }
 class DialogTree extends IterableBase<DialogAsm> {
   final _dialogs = <DialogAsm>[];
 
+  DialogTree({Byte? offset}) {
+    if (offset != null) {
+      for (var i = 0; i < offset.value; i++) {
+        // todo: or null?
+        _dialogs.add(DialogAsm([comment('hard coded (skipped)')]));
+      }
+    }
+  }
+
   /// Adds the tree and returns its id.
   Byte add(DialogAsm dialog) {
     if (nextDialogId == null) {

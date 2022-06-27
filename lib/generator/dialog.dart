@@ -148,7 +148,7 @@ class Quotes {
 }
 
 extension Portrait on Speaker {
-  static final _index = [null, Shay, Alys];
+  static final _index = [UnnamedSpeaker, Shay, Alys];
 
   Byte get portraitCode {
     var index = _index.indexOf(runtimeType);

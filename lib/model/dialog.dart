@@ -5,6 +5,7 @@ import 'package:rune/generator/generator.dart';
 import 'model.dart';
 
 class Dialog extends Event {
+  // todo: make not nullable
   Speaker? speaker;
   final List<Span> _spans = [];
   List<Span> get spans => UnmodifiableListView(_spans);
@@ -147,13 +148,43 @@ abstract class Speaker {
         return alys;
       case 'shay':
         return shay;
-      case 'principal':
-        return const Principal();
+      case 'kroft':
+        return const PrincipalKroft();
     }
     return null;
   }
 }
 
-class Principal implements Speaker {
-  const Principal();
+class UnnamedSpeaker implements Speaker {
+  const UnnamedSpeaker();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UnnamedSpeaker && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => 0;
+
+  @override
+  String toString() {
+    return 'UnnamedSpeaker{}';
+  }
+}
+
+class PrincipalKroft implements Speaker {
+  const PrincipalKroft();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PrincipalKroft && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => 0;
+
+  @override
+  String toString() {
+    return 'PrincipalKroft{}';
+  }
 }
