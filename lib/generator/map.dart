@@ -89,7 +89,7 @@ void _generateObjectsAsm(GameMap map, Asm objectsAsm,
     var facingAndDialog = dc.b([spec.startFacing.constant, dialogOffsets[i]]);
 
     if (spec is Npc) {
-      var routine = _npcBehaviorRoutines[spec.behavior];
+      var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
 
       if (routine == null) {
         throw Exception(
@@ -218,7 +218,7 @@ final _spriteVramOffsets = {
 
 // todo: this would only be used when we have events which refer to objects by
 //   their location in memory. we would have to offset that location.
-final _objectIndexOffsets = {MapId.PiataAcademyF1: 1, MapId.Piata: 9};
+final _objectIndexOffsets = {MapId.PiataAcademyF1: 1, MapId.Piata: 7};
 
 final _dialogIdOffsets = {
   MapId.PiataAcademyF1: 1,
@@ -234,7 +234,10 @@ final _spriteArtLabels = {
 
 final _mapObjectSpecRoutines = {AlysWaiting(): Word('68'.hex)};
 
-final _npcBehaviorRoutines = {FaceDown(): Word('38'.hex)};
+final _npcBehaviorRoutines = {
+  FaceDown: Word('38'.hex), // FieldObj_NPCType1
+  WanderAround: Word('3C'.hex) // FieldObj_NPCType2
+};
 
 extension ReduceMax<E extends Comparable> on Iterable<E> {
   E max() {
