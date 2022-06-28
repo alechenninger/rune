@@ -33,6 +33,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
   var eventPtrsAsm = Asm.empty();
   Event? lastEvent;
   var eventCounter = 1;
+  var startInEvent = ctx.inEvent;
 
   void _terminateCurrentDialogTree({int? at}) {
     // todo: this is probably only ever the last line
@@ -109,6 +110,10 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
     _terminateCurrentDialogTree(at: lastEventBreak);
   } else if (currentDialog.isNotEmpty) {
     _terminateCurrentDialogTree();
+  }
+
+  if (!startInEvent && ctx.inEvent) {
+    eventAsm.add(returnFromDialogEvent());
   }
 
   return SceneAsm(

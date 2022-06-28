@@ -10,7 +10,10 @@ export 'data.dart';
 /// Data constant
 const DcMnemonic dc = DcMnemonic();
 const MoveMnemonic move = MoveMnemonic();
+const MoveaMnemonic movea = MoveaMnemonic();
 const ClrMnemonic clr = ClrMnemonic();
+
+final rts = cmd('rts', []);
 
 Asm newLine() => Asm.fromInstruction(_Instruction());
 Asm comment(String comment) => _Instruction(comment: comment).toAsm();
@@ -39,6 +42,13 @@ class MoveMnemonic {
   Asm b(Address from, Address to) => cmd('move.b', [from, to]);
   Asm w(Address from, Address to) => cmd('move.w', [from, to]);
   Asm l(Address from, Address to) => cmd('move.l', [from, to]);
+}
+
+class MoveaMnemonic {
+  const MoveaMnemonic();
+
+  Asm w(Address from, Address to) => cmd('movea.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('movea.l', [from, to]);
 }
 
 class ClrMnemonic {

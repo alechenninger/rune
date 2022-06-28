@@ -91,7 +91,8 @@ ${dialog2.toAsm()}
             getAndRunDialog(Byte.one.i),
             generator
                 .individualMovesToAsm(moves, AsmContext.forEvent(origState))
-                .withoutComments()
+                .withoutComments(),
+            returnFromDialogEvent()
           ]));
 
       expect(
@@ -139,6 +140,7 @@ ${dialog2.toAsm()}
                 .individualMovesToAsm(moves, AsmContext.forEvent(origState))
                 .withoutComments(),
             popAndRunDialog,
+            returnFromDialogEvent()
           ]));
     });
 
@@ -193,7 +195,8 @@ ${dialog2.toAsm()}
             popAndRunDialog,
             generator
                 .individualMovesToAsm(move3, AsmContext.forEvent(origState))
-                .withoutComments()
+                .withoutComments(),
+            returnFromDialogEvent()
           ]));
     });
 
@@ -227,6 +230,7 @@ ${dialog2.toAsm()}
             setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
             getAndRunDialog(Byte.one.i),
             generator.pauseToAsm(pause),
+            returnFromDialogEvent()
           ]));
     });
 
@@ -255,6 +259,7 @@ ${dialog2.toAsm()}
           Asm([
             setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
             generator.pauseToAsm(pause),
+            returnFromDialogEvent()
           ]));
     });
   });

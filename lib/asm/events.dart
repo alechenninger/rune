@@ -31,6 +31,21 @@ Asm getAndRunDialog(Address dialogId) {
   ]);
 }
 
+Asm returnFromDialogEvent() {
+  /*
+	move.w	#0, (Game_Mode_Routine).w
+	movea.l	(Map_Chunk_Addr).w, a0
+	jsr	(Map_LoadChunks).l
+	rts
+   */
+  return Asm([
+    move.w(0.word.i, Constant('Game_Mode_Routine').w),
+    movea.l(Constant('Map_Chunk_Addr').w, a0),
+    jsr(Label('Map_LoadChunks').l),
+    rts,
+  ]);
+}
+
 /// Use after F7 (see TextCtrlCode_Terminate2 and 3)
 final popAndRunDialog = Asm([
   // appears around popdlg in one scene for some reason
