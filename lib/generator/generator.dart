@@ -31,6 +31,7 @@ class AsmContext {
   /// back to an event or have to trigger a new one.
   bool get inEvent => _inEvent;
   bool hasSavedDialogPosition = false;
+  bool hasSavedNpc = false;
 
   // todo: this one is a bit different. this is like, asm state. state of
   //  generated code.

@@ -119,6 +119,11 @@ class IndirectAddressRegister extends _Address {
           variableDisplacement: DirectDataRegister(dataRegister));
 }
 
+extension Displacement on int {
+  IndirectAddressRegister call(DirectAddressRegister a) =>
+      a.indirect.plus(value);
+}
+
 class PostIncAddress extends _Address {
   final int register;
   PostIncAddress(this.register) : super('(A$register)+') {

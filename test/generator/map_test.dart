@@ -265,7 +265,7 @@ void main() {
           onInteract: npc2Scene));
     });
 
-    test('produce event code', () {
+    test('produce event code with npc facing player', () {
       var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
 
       var comparisonCtx = AsmContext.forDialog(EventState());

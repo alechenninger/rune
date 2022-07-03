@@ -28,6 +28,31 @@ abstract class Expression {
   String toString();
 }
 
+class Value extends Expression implements Comparable<Value> {
+  final int value;
+
+  Value(this.value);
+
+  @override
+  bool get isZero => value == 0;
+
+  @override
+  int compareTo(Value other) => value.compareTo(other.value);
+
+  @override
+  String toString() => value.toString();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Value &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
+}
+
 class Constant extends Expression {
   final String constant;
 
@@ -72,17 +97,17 @@ class Label extends Expression {
 
 // TODO: unsigned. what about signed?
 // see: http://mrjester.hapisan.com/04_MC68/Sect04Part02/Index.html
-abstract class Value extends Expression implements Comparable<Value> {
+abstract class SizedValue extends Expression implements Comparable<SizedValue> {
   /// Value as an [int]
   final int value;
 
-  Value(this.value) {
+  SizedValue(this.value) {
     if (value >= (1 << (size.bytes * 8))) {
       throw AsmError(value, 'too large to fit in $size bytes');
     }
   }
 
-  const Value._(this.value) : super.constant();
+  const SizedValue._(this.value) : super.constant();
 
   /// Size in bytes
   Size get size;
@@ -93,7 +118,7 @@ abstract class Value extends Expression implements Comparable<Value> {
   bool get isNotZero => !isZero;
 
   @override
-  int compareTo(Value other) {
+  int compareTo(SizedValue other) {
     return value.compareTo(other.value);
   }
 
@@ -106,7 +131,7 @@ abstract class Value extends Expression implements Comparable<Value> {
   String toString() => hex;
 }
 
-class Byte extends Value {
+class Byte extends SizedValue {
   static const zero = Byte._(0);
   static const one = Byte._(1);
   static const two = Byte._(2);
@@ -121,7 +146,7 @@ class Byte extends Value {
   Byte operator +(Byte other) => Byte(value + other.value);
 }
 
-class Word extends Value {
+class Word extends SizedValue {
   Word(int value) : super(value);
   @override
   final size = Size.w;
@@ -129,7 +154,7 @@ class Word extends Value {
   Word operator +(Word other) => Word(value + other.value);
 }
 
-class Longword extends Value {
+class Longword extends SizedValue {
   Longword(int value) : super(value);
   @override
   final size = Size.l;
@@ -164,7 +189,7 @@ class Size {
 }
 
 extension ToValue on int {
-  Value toValue({required int size}) {
+  SizedValue toValue({required int size}) {
     switch (size) {
       case 1:
         return Byte(this);
@@ -176,6 +201,7 @@ extension ToValue on int {
     throw AsmError(size, 'invalid data size (must be 1, 2, or 4)');
   }
 
+  Value get value => Value(this);
   Byte get byte => Byte(this);
   Word get word => Word(this);
   Longword get longword => Longword(this);
@@ -194,7 +220,7 @@ extension ToExpression on String {
 /// [E] is the type of Value represented by each element in the list.
 ///
 /// [D] is just a self-referential recursive type to template the class.
-abstract class Data<T extends List<int>, E extends Value,
+abstract class Data<T extends List<int>, E extends SizedValue,
     D extends Data<T, E, D>> extends ListBase<E> {
   final T bytes;
   final int elementSizeInBytes;

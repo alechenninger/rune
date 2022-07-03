@@ -1,3 +1,5 @@
+import 'package:rune/numbers.dart';
+
 import 'asm.dart';
 
 const dest_x_pos = Constant('dest_x_pos');
@@ -132,4 +134,34 @@ Asm moveCamera(
     move.l(speed, d2),
     jsr(Label('Event_MoveCamera').l),
   ]);
+}
+
+Asm addCharacterToParty({
+  required Address charId,
+  required int slot,
+  required Address charRoutineIndex,
+  required Address charRoutine,
+  required Address facingDir,
+  required Address artTile,
+  required Address x,
+  required Address y,
+}) {
+  return Asm([
+    move.b(charId, 'Current_Party_Slot_$slot'.constant.w),
+    lea('Character_$slot'.constant.w, a4),
+    move.w(charRoutineIndex, a4.indirect),
+    move.w(facingDir, 0x6(a4)),
+    move.w(artTile, 0x16(a4)),
+    move.w(x, 0x30(a4)),
+    move.w(y, 0x34(a4)),
+    jsr(charRoutine),
+    moveq(charId, d0),
+    jsr('Event_AddMacro'.label.l)
+  ]);
+}
+
+/// Clear the addresses from [clear] to [clear] plus [range] (not inclusive I
+/// think).
+Asm clearUninterrupted({required Address clear, required Address range}) {
+  return Asm([lea(clear, a0), move.w(range, d7), trap(0.byte.i)]);
 }

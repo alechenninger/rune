@@ -23,6 +23,7 @@ Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
 Asm jsr(Address to) => cmd('jsr', [to]);
 Asm bset(Address src, Address dst) => cmd('bset', [src, dst]);
 Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
+Asm trap(Immediate vector) => cmd('trap', [vector]);
 
 // It looks like this should be limited to 32 bytes per line
 class DcMnemonic {
