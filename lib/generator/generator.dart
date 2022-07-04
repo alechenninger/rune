@@ -37,13 +37,23 @@ class AsmContext {
   //  generated code.
   // the others (including eventstate) are more the state of active generation?
   Word _eventIndexOffset = 'a0'.hex.word;
-
+  final Asm _eventPointers = Asm.empty();
+  Asm get eventPointers => Asm([_eventPointers]);
   Word get peekNextEventIndex => (_eventIndexOffset.value + 1).word;
 
   /// Returns next event index to add a new event in EventPtrs.
-  Word nextEventIndex() {
+  Word _nextEventIndex() {
     _eventIndexOffset = peekNextEventIndex;
     return _eventIndexOffset;
+  }
+
+  /// Returns event index by which [routine] can be referenced.
+  ///
+  /// The event code must be added separate with the exact label of [routine].
+  Word addEventPointer(Label routine) {
+    var eventIndex = _nextEventIndex();
+    _eventPointers.add(dc.l([routine], comment: '$eventIndex'));
+    return eventIndex;
   }
 
   void startDialogInteraction([EventState? knownState]) {

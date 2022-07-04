@@ -2,6 +2,46 @@ import 'package:rune/numbers.dart';
 
 import 'asm.dart';
 
+/*
+; Properties and constants applicable to both field and battle objects
+obj_id = 0
+render_flags = 2	; byte	; bit 2 = if set, animation is finished
+mappings_addr = 8	; longword
+mappings = $C		; longword
+mappings_duration = $11	; byte
+timer = $1C			; word
+
+obj_size = $40
+next_obj = $40
+prev_obj = -$40
+; ---------------------------------------------------------------------------
+
+; ---------------------------------------------------------------------------
+; Common field object properties
+facing_dir = 6	; word ; 0 = DOWN;    4 = UP;     8 = RIGHT;    $C = LEFT
+mappings_idx = $10	; byte ; index for Sprite mappings
+offscreen_flag = $12 ; byte ; 0 = on-screen; 1 = off-screen
+dialogue_id = $14 ; byte ; ID of dialogue
+art_tile = $16		; word ; tile number in VRAM
+art_ptr = $18		; longword ; ROM art pointer
+x_step_constant = $20	; longword ; constant that changes objects' x position when moving; value is generally 2 or $FFFE
+y_step_constant = $24	; longword ; constant that changes objects' y position when moving; value is generally 2 or $FFFE
+x_step_duration = $28	; word ; updates characters' x position (one step) automatically until it becomes 0; it's generally 16 when moving from one tile to another
+y_step_duration = $2A	; word ; updates characters' y position (one step) automatically until it becomes 0; it's generally 16 when moving from one tile to another
+sprite_x_pos = $2C	; word	; used for the Sprite table
+sprite_y_pos = $2E	; word	; used for the Sprite table
+curr_x_pos = $30	; longword
+curr_y_pos = $34	; longword
+dest_x_pos = $38	; word ; used as destination when updating objects' x position
+dest_y_pos = $3A	; word ; used as destination when updating objects' y position
+x_max_move_boundary = $3C	; byte ; boundary which NPC's cannot move past when randomly updating their x position
+y_max_move_boundary = $3D	; byte ; boundary which NPC's cannot move past when randomly updating their y position
+x_move_boundary = $3E	; byte ; number of steps NPC's can take between 0 and the max boundary (x position)
+y_move_boundary = $3F	; byte ; number of steps NPC's can take between 0 and the max boundary (y position)
+ */
+
+const facing_dir = Constant('facing_dir');
+const art_tile = Constant('art_tile');
 const dest_x_pos = Constant('dest_x_pos');
 const dest_y_pos = Constant('dest_y_pos');
 const curr_x_pos = Constant('curr_x_pos');
@@ -136,6 +176,26 @@ Asm moveCamera(
   ]);
 }
 
+Asm addCharacterBySlot({required Address charId, required int slot}) {
+  return Asm([
+    move.b(charId, 'Current_Party_Slot_$slot'.constant.w),
+    moveq(charId, d0),
+    jsr('Event_AddMacro'.label.l)
+  ]);
+}
+
+/*
+load map
+	move.w	#MapID_Motavia, (Field_Map_Index).w
+	move.w	#$FFFF, (Field_Map_Index_2).w
+	move.w	#$EE, (Map_Start_X_Pos).w
+	move.w	#$136, (Map_Start_Y_Pos).w
+	move.w	#0, (Map_Start_Facing_Dir).w
+	move.w	#0, (Map_Start_Char_Align).w
+	bclr	#3, (Map_Load_Flags).w
+	jsr	(RefreshMap).l
+ */
+
 Asm addCharacterToParty({
   required Address charId,
   required int slot,
@@ -150,10 +210,10 @@ Asm addCharacterToParty({
     move.b(charId, 'Current_Party_Slot_$slot'.constant.w),
     lea('Character_$slot'.constant.w, a4),
     move.w(charRoutineIndex, a4.indirect),
-    move.w(facingDir, 0x6(a4)),
-    move.w(artTile, 0x16(a4)),
-    move.w(x, 0x30(a4)),
-    move.w(y, 0x34(a4)),
+    move.w(facingDir, facing_dir(a4)),
+    move.w(artTile, art_tile(a4)),
+    move.w(x, curr_x_pos(a4)),
+    move.w(y, curr_y_pos(a4)),
     jsr(charRoutine),
     moveq(charId, d0),
     jsr('Event_AddMacro'.label.l)

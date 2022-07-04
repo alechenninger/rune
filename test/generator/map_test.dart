@@ -282,25 +282,21 @@ void main() {
     });
 
     test('produce event pointers', () {
-      var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+      var ctx = AsmContext.fresh();
+      generator.mapToAsm(piata, ctx);
 
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
-      var scene1Asm = npc1Scene.toAsm(generator, comparisonCtx,
+      npc1Scene.toAsm(generator, comparisonCtx,
           dialogTree: comparisonDialogTree, id: SceneId('Piata_npc1'));
       comparisonCtx.startDialogInteraction();
-      var scene2Asm = npc2Scene.toAsm(generator, comparisonCtx,
+      npc2Scene.toAsm(generator, comparisonCtx,
           dialogTree: comparisonDialogTree, id: SceneId('Piata_npc2'));
 
-      print(mapAsm.eventPointers);
+      print(ctx.eventPointers);
 
-      expect(
-          mapAsm.eventPointers,
-          Asm([
-            scene1Asm.eventPointers,
-            scene2Asm.eventPointers,
-          ]));
+      expect(ctx.eventPointers, comparisonCtx.eventPointers);
     });
   });
 }

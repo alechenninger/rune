@@ -119,7 +119,12 @@ class IndirectAddressRegister extends _Address {
           variableDisplacement: DirectDataRegister(dataRegister));
 }
 
-extension Displacement on int {
+extension ExpressionDisplacement on Expression {
+  IndirectAddressRegister call(DirectAddressRegister a) =>
+      a.indirect.plus(this);
+}
+
+extension IntDisplacement on int {
   IndirectAddressRegister call(DirectAddressRegister a) =>
       a.indirect.plus(value);
 }

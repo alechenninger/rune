@@ -11,9 +11,7 @@ class MapAsm {
   final Asm objects;
   final Asm dialog;
   final Asm events;
-  final Asm eventPointers;
   final Asm cutscenes;
-  final Asm cutscenePointers;
   // might also need dialogTrees ASM
   // if these labels need to be programmatically referred to
 
@@ -22,9 +20,7 @@ class MapAsm {
     required this.objects,
     required this.dialog,
     required this.events,
-    required this.eventPointers,
     required this.cutscenes,
-    required this.cutscenePointers,
   });
 
   @override
@@ -38,12 +34,8 @@ class MapAsm {
       dialog,
       '; events',
       events,
-      '; eventPointers',
-      eventPointers,
       '; cutscenes',
       cutscenes,
-      '; cutscenePointers',
-      cutscenePointers
     ].join('\n');
   }
 }
@@ -59,15 +51,14 @@ MapAsm mapToAsm(GameMap map, AsmGenerator generator, AsmContext ctx) {
   var dialogAsm = Asm.empty();
   var objectsAsm = Asm.empty();
   var eventsAsm = Asm.empty();
-  var eventPointersAsm = Asm.empty();
 
   if (map.objects.length > 64) {
     throw Exception('too many objects (limited ram)');
   }
 
   var vramTileNumbers = _generateSpriteAsm(map, spritesAsm);
-  var dialogOffsets = _generateDialogAndEventsAsm(
-      map, dialogAsm, eventsAsm, eventPointersAsm, ctx, generator);
+  var dialogOffsets =
+      _generateDialogAndEventsAsm(map, dialogAsm, eventsAsm, ctx, generator);
 
   _generateObjectsAsm(map, objectsAsm, vramTileNumbers, dialogOffsets);
 
@@ -76,9 +67,7 @@ MapAsm mapToAsm(GameMap map, AsmGenerator generator, AsmContext ctx) {
       objects: objectsAsm,
       dialog: dialogAsm,
       events: eventsAsm,
-      eventPointers: eventPointersAsm,
-      cutscenes: Asm.empty(),
-      cutscenePointers: Asm.empty());
+      cutscenes: Asm.empty());
 }
 
 void _generateObjectsAsm(GameMap map, Asm objectsAsm,
@@ -162,13 +151,8 @@ Map<Sprite, Word> _generateSpriteAsm(GameMap map, Asm spritesAsm) {
   return vramTileNumbers;
 }
 
-List<Byte> _generateDialogAndEventsAsm(
-    GameMap map,
-    Asm dialogAsm,
-    Asm eventsAsm,
-    Asm eventPointersAsm,
-    AsmContext ctx,
-    AsmGenerator generator) {
+List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
+    Asm eventsAsm, AsmContext ctx, AsmGenerator generator) {
   var dialogOffsets = <Byte>[];
   var tree = DialogTree(offset: Byte(_dialogIdOffsets[map.id] ?? 0));
 
@@ -196,7 +180,6 @@ List<Byte> _generateDialogAndEventsAsm(
     dialogAsm.add(sceneAsm.allDialog);
     eventsAsm.add(sceneAsm.event);
     eventsAsm.addNewline();
-    eventPointersAsm.add(sceneAsm.eventPointers);
   }
 
   return dialogOffsets;

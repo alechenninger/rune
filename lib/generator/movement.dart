@@ -237,15 +237,44 @@ extension MoveableToA4 on FieldObject {
   }
 }
 
-extension CharId on Character {
+extension CharacterData on Character {
   Address get charId {
     switch (runtimeType) {
       case Shay:
         return Constant('CharID_Chaz').i;
-      case Alys:
-        return Constant('CharID_Alys').i;
+      default:
+        return Constant('CharID_$this}').i;
     }
-    throw UnsupportedError('$this.charId');
+  }
+
+  Address get fieldObjectRoutine {
+    switch (runtimeType) {
+      case Shay:
+        return Label('FieldObj_Chaz').l;
+      default:
+        return Label('FieldObj_$this}').l;
+    }
+  }
+
+  /*
+	bra.w	FieldObj_Hahn	; $C
+	bra.w	FieldObj_Rune	; $10
+	bra.w	FieldObj_Gryz	; $14
+	bra.w	FieldObj_Rika	; $18
+	bra.w	FieldObj_Demi	; $1C
+	bra.w	FieldObj_Wren	; $20
+	bra.w	FieldObj_Raja	; $24
+	bra.w	FieldObj_Kyra	; $28
+	bra.w	FieldObj_Seth	; $2C
+   */
+  Value get fieldObjectIndex {
+    switch (runtimeType) {
+      case Shay:
+        return 4.value;
+      case Alys:
+        return 8.value;
+    }
+    throw UnsupportedError('$this.fieldObjectIndex');
   }
 }
 

@@ -32,8 +32,8 @@ ${dialog2.toAsm()}
       var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hello'));
 
       var scene = Scene([dialog1, dialog2]);
-      var sceneAsm =
-          generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
+      var ctx = AsmContext.fresh(gameMode: Mode.dialog);
+      var sceneAsm = generator.sceneToAsm(scene, ctx);
 
       expect(
           sceneAsm.allDialog.withoutComments().toString(), '''${dialog1.toAsm()}
@@ -41,7 +41,7 @@ ${dialog2.toAsm()}
 ${dialog2.toAsm()}
 	dc.b	\$FF''');
       expect(sceneAsm.event, Asm.empty());
-      expect(sceneAsm.eventPointers, Asm.empty());
+      expect(ctx.eventPointers, Asm.empty());
     });
   });
 
@@ -96,7 +96,7 @@ ${dialog2.toAsm()}
           ]));
 
       expect(
-          sceneAsm.eventPointers.withoutComments(),
+          ctx.eventPointers.withoutComments(),
           Asm([
             dc.l([
               Label('Event_GrandCross_${eventIndex.value.toRadixString(16)}')

@@ -1,11 +1,10 @@
-import 'package:rune/asm/dialog.dart';
-import 'package:rune/asm/events.dart';
-import 'package:rune/generator/dialog.dart';
-import 'package:rune/generator/event.dart';
-import 'package:rune/generator/generator.dart';
-
 import '../asm/asm.dart';
+import '../asm/dialog.dart';
+import '../asm/events.dart';
 import '../model/model.dart';
+import 'dialog.dart';
+import 'event.dart';
+import 'generator.dart';
 
 extension SceneToAsm on Scene {
   /// Generate scene assembly in context of some [dialogTree].
@@ -30,7 +29,6 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
   var lastEventBreak = -1;
 
   var eventAsm = EventAsm.empty();
-  var eventPtrsAsm = Asm.empty();
   Event? lastEvent;
   var eventCounter = 1;
   var startInEvent = ctx.inEvent;
@@ -91,7 +89,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
   // todo: event code checks first
 
   if (!ctx.inEvent && scene.events.any((event) => event is! Dialog)) {
-    _startEventFromDialog(ctx, currentDialog, eventPtrsAsm, eventAsm, sceneId);
+    _startEventFromDialog(ctx, currentDialog, eventAsm, sceneId);
     _terminateCurrentDialogTree();
   }
 
@@ -117,21 +115,17 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
   }
 
   return SceneAsm(
-      event: eventAsm,
-      dialog: newDialogs,
-      dialogIdOffset: dialogIdOffset,
-      eventPointers: eventPtrsAsm);
+      event: eventAsm, dialog: newDialogs, dialogIdOffset: dialogIdOffset);
 }
 
 void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialogTree,
-    Asm eventPtrAsm, EventAsm eventAsm, SceneId? sceneId) {
-  var eventIndex = ctx.nextEventIndex();
+    EventAsm eventAsm, SceneId? sceneId) {
+  var eventName =
+      sceneId?.toString() ?? ctx.peekNextEventIndex.value.toRadixString(16);
+  var eventRoutine = Label('Event_GrandCross_$eventName');
+  var eventIndex = ctx.addEventPointer(eventRoutine);
 
   currentDialogTree.add(runEvent(eventIndex));
-
-  var eventName = sceneId?.toString() ?? eventIndex.value.toRadixString(16);
-  var eventRoutine = Label('Event_GrandCross_$eventName');
-  eventPtrAsm.add(dc.l([eventRoutine], comment: '$eventIndex'));
 
   eventAsm.add(setLabel(eventRoutine.name));
 
@@ -169,10 +163,6 @@ class SceneAsm {
   final Asm event;
   final List<Asm> dialog;
   final Byte dialogIdOffset;
-  // could have multiple in case there are multiple branches each with their own
-  // event at the top of the dialog
-  // this could also be implemented within one event itself, though
-  final Asm eventPointers;
 
   // if empty should just be FF?
   Asm get allDialog {
@@ -190,11 +180,10 @@ class SceneAsm {
   SceneAsm(
       {required this.event,
       required this.dialogIdOffset,
-      required this.dialog,
-      required this.eventPointers});
+      required this.dialog});
 
   @override
   String toString() {
-    return '; event:\n$event\n; dialog:\n$allDialog\n; eventPtr:\n$eventPointers';
+    return '; event:\n$event\n; dialog:\n$allDialog';
   }
 }
