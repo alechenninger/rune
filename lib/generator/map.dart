@@ -194,14 +194,14 @@ final _vramOffsetPerSprite = '48'.hex;
 
 final _spriteVramOffsets = {
   MapId.Aiedo: '29A'.hex,
-  MapId.Piata: '480'.hex, // Map_Pata, normally 2D0
+  MapId.Piata: '360'.hex, // Map_Pata, normally 2D0
   MapId.PiataAcademyF1: '27F'.hex, // Map_PiataAcademy_F1
   MapId.PiataAcademyPrincipalOffice: '27F'.hex, // Map_AcademyPrincipalOffice
 };
 
 // todo: this would only be used when we have events which refer to objects by
 //   their location in memory. we would have to offset that location.
-final _objectIndexOffsets = {MapId.PiataAcademyF1: 1, MapId.Piata: 7};
+final _objectIndexOffsets = {MapId.PiataAcademyF1: 1, MapId.Piata: 3};
 
 final _dialogIdOffsets = {
   MapId.PiataAcademyF1: 1,
@@ -211,8 +211,14 @@ final _dialogIdOffsets = {
 final _spriteArtLabels = {
   Sprite.PalmanMan1: Label('Art_PalmanMan1'),
   Sprite.PalmanMan2: Label('Art_PalmanMan2'),
+  Sprite.PalmanMan3: Label('Art_PalmanMan2'),
   Sprite.PalmanWoman1: Label('Art_PalmanWoman1'),
   Sprite.PalmanWoman2: Label('Art_PalmanWoman2'),
+  Sprite.PalmanWoman3: Label('Art_PalmanWoman3'),
+  Sprite.PalmanFighter1: Label('Art_PalmanFighter1'),
+  Sprite.PalmanFighter2: Label('Art_PalmanFighter2'),
+  Sprite.PalmanFighter3: Label('Art_PalmanFighter3'),
+  Sprite.PalmanStudent1: Label('Art_PalmanStudent1'),
 };
 
 final _mapObjectSpecRoutines = {AlysWaiting(): Word('68'.hex)};

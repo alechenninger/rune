@@ -74,6 +74,7 @@ enum Sprite {
   PalmanWoman1,
   PalmanWoman2,
   PalmanWoman3,
+  PalmanStudent1,
 }
 
 Sprite? spriteByName(String name) {
