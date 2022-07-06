@@ -221,6 +221,11 @@ class FacePlayer extends Event {
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.facePlayerToAsm(this, ctx);
   }
+
+  @override
+  String toString() {
+    return 'FacePlayer{object: $object}';
+  }
 }
 
 /// The party follows the leader

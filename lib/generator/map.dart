@@ -158,8 +158,6 @@ List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
   var dialogOffsets = <Byte>[];
   var tree = DialogTree(offset: Byte(_dialogIdOffsets[map.id] ?? 0));
 
-  ctx.state.currentMap = map;
-
   // hard coded dialog
   switch (map.id) {
     case MapId.Piata:
@@ -175,6 +173,7 @@ List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
 
     // Interaction always starts with triggering dialog
     ctx.startDialogInteraction();
+    ctx.state.currentMap = map;
     ctx.putInAddress(a3, obj);
 
     var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx,

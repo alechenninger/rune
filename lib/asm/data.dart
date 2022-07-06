@@ -102,8 +102,8 @@ abstract class SizedValue extends Expression implements Comparable<SizedValue> {
   final int value;
 
   SizedValue(this.value) {
-    if (value >= (1 << (size.bytes * 8))) {
-      throw AsmError(value, 'too large to fit in $size bytes');
+    if (value >= size.maxValue) {
+      throw AsmError(value, 'too large to fit in ${size.bytes} bytes');
     }
   }
 
@@ -161,20 +161,19 @@ class Longword extends SizedValue {
 }
 
 class Size {
-  static const b = Size._(1, 'b');
-  static const w = Size._(2, 'w');
-  static const l = Size._(4, 'l');
+  static const b = Size._(1, 'b', 0xFF);
+  static const w = Size._(2, 'w', 0xFFFF);
+  static const l = Size._(4, 'l', 0xFFFFFFFF);
 
   final int bytes;
+  final int maxValue;
   final String code;
-
-  int get maxValue => (1 << (bytes * 8)) - 1;
 
   bool get isB => this == b;
   bool get isW => this == w;
   bool get isL => this == l;
 
-  const Size._(this.bytes, this.code);
+  const Size._(this.bytes, this.code, this.maxValue);
 
   @override
   String toString() => code;
