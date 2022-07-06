@@ -1,5 +1,7 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/generator.dart';
+import 'package:rune/generator/map.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
@@ -271,6 +273,48 @@ void main() {
               jsr(Label('Event_MoveCharacter').l),
             ]));
       });
+    });
+  });
+
+  group('generates asm for FacePlayer', () {
+    late AsmGenerator generator;
+    late AsmContext ctx;
+
+    setUp(() {
+      generator = AsmGenerator();
+      ctx = AsmContext.forEvent(EventState());
+    });
+
+    test('delegates to Interaction_UpdateObj', () {
+      var npc = MapObject(
+          startPosition: Position(0x200, 0x200),
+          spec: Npc(Sprite.PalmanMan1, FaceDown()));
+      var map = GameMap(MapId.Piata)..addObject(npc);
+      ctx.state.currentMap = map;
+
+      var asm = generator.facePlayerToAsm(FacePlayer(npc), ctx);
+
+      print(asm);
+
+      expect(
+          asm,
+          Asm([
+            lea(Absolute.long(map.addressOf(npc)), a3),
+            jsr('Interaction_UpdateObj'.label.l)
+          ]));
+    });
+
+    test('reuses a3 in context', () {
+      var npc = MapObject(
+          startPosition: Position(0x200, 0x200),
+          spec: Npc(Sprite.PalmanMan1, FaceDown()));
+      var map = GameMap(MapId.Piata)..addObject(npc);
+      ctx.state.currentMap = map;
+      ctx.putInAddress(a3, npc);
+
+      var asm = generator.facePlayerToAsm(FacePlayer(npc), ctx);
+
+      expect(asm, Asm([jsr('Interaction_UpdateObj'.label.l)]));
     });
   });
 }

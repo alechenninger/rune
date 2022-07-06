@@ -77,6 +77,8 @@ void _generateObjectsAsm(GameMap map, Asm objectsAsm,
 
     var facingAndDialog = dc.b([spec.startFacing.constant, dialogOffsets[i]]);
 
+    objectsAsm.add(comment(obj.id.toString()));
+
     if (spec is Npc) {
       var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
 
@@ -173,6 +175,7 @@ List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
 
     // Interaction always starts with triggering dialog
     ctx.startDialogInteraction();
+    ctx.putInAddress(a3, obj);
 
     var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx,
         dialogTree: tree, id: SceneId("${map.id.name}_${obj.id}"));
@@ -180,6 +183,10 @@ List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
     dialogAsm.add(sceneAsm.allDialog);
     eventsAsm.add(sceneAsm.event);
     eventsAsm.addNewline();
+
+    // todo: this is a bit hacky, but avoiding hanging on to that
+    // for too long
+    ctx.putInAddress(a3, null);
   }
 
   return dialogOffsets;
@@ -193,6 +200,7 @@ final _vramOffsetPerSprite = '48'.hex;
 //  itself rather than hard coding here.
 
 final _spriteVramOffsets = {
+  MapId.Test: 0x2d0,
   MapId.Aiedo: '29A'.hex,
   MapId.Piata: '360'.hex, // Map_Pata, normally 2D0
   MapId.PiataAcademyF1: '27F'.hex, // Map_PiataAcademy_F1
@@ -227,6 +235,22 @@ final _npcBehaviorRoutines = {
   FaceDown: Word('38'.hex), // FieldObj_NPCType1
   WanderAround: Word('3C'.hex) // FieldObj_NPCType2
 };
+
+extension ObjectAddress on GameMap {
+  Longword addressOf(MapObject obj) {
+    var index =
+        objects.map((e) => e.id).toList(growable: false).indexOf(obj.id);
+
+    if (index == -1) {
+      throw StateError('map object not found in map. obj=$obj map=$this');
+    }
+
+    var offset = _objectIndexOffsets[id] ?? 0;
+    // field object secondary address + object size * index
+    var address = 0xFFFFC300 + 0x40 * (index + offset);
+    return Longword(address);
+  }
+}
 
 extension ReduceMax<E extends Comparable> on Iterable<E> {
   E max() {

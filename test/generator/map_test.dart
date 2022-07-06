@@ -10,11 +10,11 @@ import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 void main() {
-  late GameMap piata;
+  late GameMap testMap;
   var generator = AsmGenerator();
 
   setUp(() {
-    piata = GameMap(MapId.Piata);
+    testMap = GameMap(MapId.Test);
   });
 
   test('map model generates asm', () {
@@ -25,12 +25,12 @@ void main() {
           Dialog(spans: [Span('Hello world!')])
         ]));
 
-    piata.addObject(obj);
+    testMap.addObject(obj);
 
-    var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
 
     expect(
-        mapAsm.objects.trim(),
+        mapAsm.objects.trim().withoutComments(),
         Asm([
           dc.w(['38'.hex.word]),
           dc.b([Constant('FacingDir_Down'), 0.byte]),
@@ -52,12 +52,12 @@ void main() {
           Dialog(spans: [Span('Hello world!')])
         ]));
 
-    piata.addObject(obj);
+    testMap.addObject(obj);
 
-    var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
 
     expect(
-        mapAsm.objects.first,
+        mapAsm.objects.withoutComments().first,
         Asm([
           dc.w(['38'.hex.word])
         ]).first);
@@ -71,9 +71,9 @@ void main() {
           Dialog(spans: [Span('Hello world!')])
         ]));
 
-    piata.addObject(obj);
+    testMap.addObject(obj);
 
-    var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
 
     expect(
         mapAsm.sprites,
@@ -84,28 +84,28 @@ void main() {
   });
 
   test('multiples sprites tile numbers are separated by 0x48', () {
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanWoman1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan2, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
 
     expect(
         mapAsm.sprites,
@@ -120,58 +120,58 @@ void main() {
   });
 
   test('sprites are referred to by their corresponding objects', () {
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanWoman1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan2, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
-
+    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+    var objectsAsm = mapAsm.objects.withoutComments();
     // todo: this is kind of brittle
-    expect(mapAsm.objects[2], dc.w(['2d0'.hex.word]));
-    expect(mapAsm.objects[7], dc.w(['318'.hex.word]));
-    expect(mapAsm.objects[12], dc.w(['360'.hex.word]));
+    expect(objectsAsm[2], dc.w(['2d0'.hex.word]));
+    expect(objectsAsm[7], dc.w(['318'.hex.word]));
+    expect(objectsAsm[12], dc.w(['360'.hex.word]));
   });
 
   test('sprites are reused for multiple objects of the same sprite', () {
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    piata.addObject(MapObject(
+    testMap.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
           Dialog(spans: [Span('Hello world!')])
         ])));
 
-    var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
 
     expect(
         mapAsm.sprites,
@@ -181,9 +181,10 @@ void main() {
         ]));
 
     // todo: this is kind of brittle
-    expect(mapAsm.objects[2], dc.w(['2d0'.hex.word]));
-    expect(mapAsm.objects[7], dc.w(['2d0'.hex.word]));
-    expect(mapAsm.objects[12], dc.w(['2d0'.hex.word]));
+    var objectsAsm = mapAsm.objects.withoutComments();
+    expect(objectsAsm[2], dc.w(['2d0'.hex.word]));
+    expect(objectsAsm[7], dc.w(['2d0'.hex.word]));
+    expect(objectsAsm[12], dc.w(['2d0'.hex.word]));
   });
 
   test('objects use position divided by 8', () {});
@@ -192,14 +193,14 @@ void main() {
 
   group('objects with dialog', () {
     setUp(() {
-      piata.addObject(MapObject(
+      testMap.addObject(MapObject(
           startPosition: Position('1e0'.hex, '2e0'.hex),
           spec: Npc(Sprite.PalmanMan1, FaceDown()),
           onInteract: Scene([
             Dialog(spans: [Span('Hello!')])
           ])));
 
-      piata.addObject(MapObject(
+      testMap.addObject(MapObject(
           startPosition: Position('1f0'.hex, '2e0'.hex),
           spec: Npc(Sprite.PalmanWoman1, FaceDown()),
           onInteract: Scene([
@@ -208,7 +209,7 @@ void main() {
     });
 
     test('objects with dialog produce dialog asm', () {
-      var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+      var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
 
       expect(
           mapAsm.dialog,
@@ -225,15 +226,15 @@ void main() {
     });
 
     test('objects with interaction refer to correct dialog offset', () {
-      var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+      var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
 
       expect(
-          mapAsm.objects[1],
+          mapAsm.objects.withoutComments()[1],
           Asm([
             dc.b([Constant('FacingDir_Down'), 0.byte]),
           ]));
       expect(
-          mapAsm.objects[6],
+          mapAsm.objects.withoutComments()[6],
           Asm([
             dc.b([Constant('FacingDir_Down'), 1.byte]),
           ]));
@@ -252,13 +253,13 @@ void main() {
     ]);
 
     setUp(() {
-      piata.addObject(MapObject(
+      testMap.addObject(MapObject(
           id: 'npc1',
           startPosition: Position('1e0'.hex, '2e0'.hex),
           spec: Npc(Sprite.PalmanMan1, FaceDown()),
           onInteract: npc1Scene));
 
-      piata.addObject(MapObject(
+      testMap.addObject(MapObject(
           id: 'npc2',
           startPosition: Position('1f0'.hex, '2e0'.hex),
           spec: Npc(Sprite.PalmanWoman1, FaceDown()),
@@ -266,16 +267,16 @@ void main() {
     });
 
     test('produce event code with npc facing player', () {
-      var mapAsm = generator.mapToAsm(piata, AsmContext.fresh());
+      var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
 
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
       var scene1Asm = npc1Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('Piata_npc1'));
+          dialogTree: comparisonDialogTree, id: SceneId('Test_npc1'));
       comparisonCtx.startDialogInteraction();
       var scene2Asm = npc2Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('Piata_npc2'));
+          dialogTree: comparisonDialogTree, id: SceneId('Test_npc2'));
 
       expect(mapAsm.events,
           Asm([scene1Asm.event, newLine(), scene2Asm.event, newLine()]));
@@ -283,16 +284,16 @@ void main() {
 
     test('produce event pointers', () {
       var ctx = AsmContext.fresh();
-      generator.mapToAsm(piata, ctx);
+      generator.mapToAsm(testMap, ctx);
 
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
       npc1Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('Piata_npc1'));
+          dialogTree: comparisonDialogTree, id: SceneId('Test_npc1'));
       comparisonCtx.startDialogInteraction();
       npc2Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('Piata_npc2'));
+          dialogTree: comparisonDialogTree, id: SceneId('Test_npc2'));
 
       print(ctx.eventPointers);
 

@@ -39,7 +39,8 @@ ${dialog2.toAsm()}
           sceneAsm.allDialog.withoutComments().toString(), '''${dialog1.toAsm()}
 	dc.b	\$FD
 ${dialog2.toAsm()}
-	dc.b	\$FF''');
+	dc.b	\$FF
+''');
       expect(sceneAsm.event, Asm.empty());
       expect(ctx.eventPointers, Asm.empty());
     });
@@ -140,6 +141,7 @@ ${dialog2.toAsm()}
                 .individualMovesToAsm(moves, AsmContext.forEvent(origState))
                 .withoutComments(),
             popAndRunDialog,
+            newLine(),
             returnFromDialogEvent()
           ]));
     });
@@ -189,10 +191,12 @@ ${dialog2.toAsm()}
                 .individualMovesToAsm(move1, AsmContext.forEvent(origState))
                 .withoutComments(),
             popAndRunDialog,
+            newLine(),
             generator
                 .individualMovesToAsm(move2, AsmContext.forEvent(origState))
                 .withoutComments(),
             popAndRunDialog,
+            newLine(),
             generator
                 .individualMovesToAsm(move3, AsmContext.forEvent(origState))
                 .withoutComments(),

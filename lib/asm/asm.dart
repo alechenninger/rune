@@ -84,9 +84,11 @@ class Asm extends IterableBase<Instruction> {
   }
 
   Asm withoutComments() => Asm.fromInstructions(lines.expand((line) {
+        var stringed = line.toString();
         var withoutComment =
-            line.toString().replaceFirst(RegExp(';.*'), '').trimRight();
-        if (withoutComment.trimLeft().isEmpty) {
+            stringed.replaceFirst(RegExp(';.*'), '').trimRight();
+        if (withoutComment.trimLeft().isEmpty &&
+            stringed.trimLeft().isNotEmpty) {
           return <Instruction>[];
         }
         return [_RawInstruction(withoutComment)];

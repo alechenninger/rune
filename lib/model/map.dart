@@ -39,7 +39,8 @@ enum MapId {
   Piata,
   PiataAcademyF1,
   PiataAcademyPrincipalOffice,
-  ShayHouse
+  ShayHouse,
+  Test
 }
 
 class MapObject extends FieldObject {
@@ -60,6 +61,23 @@ class MapObject extends FieldObject {
 
   @override
   int? slot(EventState c) => null;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MapObject &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          startPosition == other.startPosition &&
+          spec == other.spec &&
+          onInteract == other.onInteract;
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      startPosition.hashCode ^
+      spec.hashCode ^
+      onInteract.hashCode;
 }
 
 // generator will need to track labels corresponding to each sprite
@@ -138,6 +156,17 @@ class Npc extends MapObjectSpec {
   Direction get startFacing => behavior.startFacing;
 
   Npc(this.sprite, this.behavior);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Npc &&
+          runtimeType == other.runtimeType &&
+          sprite == other.sprite &&
+          behavior == other.behavior;
+
+  @override
+  int get hashCode => sprite.hashCode ^ behavior.hashCode;
 }
 
 class AlysWaiting extends MapObjectSpec {
@@ -157,7 +186,10 @@ abstract class NpcBehavior {
 }
 
 class FaceDown extends NpcBehavior {
-  const FaceDown();
+  factory FaceDown() {
+    return const FaceDown._();
+  }
+  const FaceDown._();
 
   @override
   final startFacing = Direction.down;

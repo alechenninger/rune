@@ -212,6 +212,17 @@ class Axis {
   }
 }
 
+class FacePlayer extends Event {
+  final FieldObject object;
+
+  FacePlayer(this.object);
+
+  @override
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
+    return generator.facePlayerToAsm(this, ctx);
+  }
+}
+
 /// The party follows the leader
 class PartyMove extends Event {
   Movement movement;
@@ -623,8 +634,9 @@ class StepPaths extends Movement {
       (other is StepPath && _paths.length == 1 && _paths.first == other);
 
   @override
-  int get hashCode =>
-      _paths.length == 1 ? _paths.first.hashCode : const ListEquality().hash(_paths);
+  int get hashCode => _paths.length == 1
+      ? _paths.first.hashCode
+      : const ListEquality().hash(_paths);
 }
 
 class ContextualStepToPoint extends ContextualMovement {

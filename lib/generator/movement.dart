@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/map.dart';
 
 import '../asm/asm.dart';
 import '../model/model.dart';
@@ -225,6 +226,24 @@ extension MoveableToA4 on FieldObject {
       return characterByIdToA4(moveable.charId);
     }
 
+    /*
+    notes:
+	jsr	(Event_GetCharacter).l
+	bmi.s	loc_6E212
+
+    i.e. bmi branch if char id not found in party
+
+    if don't want to load to a4, do something like
+
+	bsr.w	FindCharacterSlot
+	bmi.s	+
+	lsl.w	#6, d1
+	lea	(Character_1).w, a3
+	lea	(a3,d1.w), a3
+
+    that is, just use findcharslot directly.
+     */
+
     // We could do this for any object in a map by knowing the ordering
     // of objects within the map.
     // ramaddr(Field_Obj_Secondary + 0x40 * object_index)
@@ -234,6 +253,22 @@ extension MoveableToA4 on FieldObject {
     // e.g. lea	(Alys_Piata).w, a4
 
     throw UnsupportedError('$this.toA4');
+  }
+
+  Asm toA3(EventState ctx) {
+    var obj = this;
+    if (obj is! MapObject) {
+      throw UnsupportedError('must be field obj in map');
+    }
+
+    var map = ctx.currentMap;
+    if (map == null) {
+      // todo: support, see above
+      throw UnsupportedError('must be field obj in map, but map was null');
+    }
+
+    var address = map.addressOf(obj);
+    return lea(Absolute.long(address), a3);
   }
 }
 

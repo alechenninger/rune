@@ -31,7 +31,20 @@ class AsmContext {
   /// back to an event or have to trigger a new one.
   bool get inEvent => _inEvent;
   bool hasSavedDialogPosition = false;
-  bool hasSavedNpc = false;
+
+  final _inAddress = <DirectAddressRegister, AddressOf>{};
+
+  AddressOf? inAddress(DirectAddressRegister a) {
+    return _inAddress[a];
+  }
+
+  void putInAddress(DirectAddressRegister a, Object? obj) {
+    if (obj == null) {
+      _inAddress.remove(a);
+    } else {
+      _inAddress[a] = AddressOf(obj);
+    }
+  }
 
   // todo: this one is a bit different. this is like, asm state. state of
   //  generated code.
@@ -100,6 +113,27 @@ class AsmContext {
       : _gameMode = Mode.dialog,
         _inEvent = false;
   AsmContext.forEvent(this.state) : _gameMode = Mode.event;
+}
+
+class AddressOf {
+  final Object obj;
+
+  AddressOf(this.obj);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AddressOf &&
+          runtimeType == other.runtimeType &&
+          obj == other.obj;
+
+  @override
+  int get hashCode => obj.hashCode;
+
+  @override
+  String toString() {
+    return 'AddressOf{$obj}';
+  }
 }
 
 enum Mode { dialog, event }
@@ -207,6 +241,21 @@ class AsmGenerator {
         () => individualMovesToAsm(move.toIndividualMoves(ctx.state), ctx),
         ctx,
         move);
+  }
+
+  EventAsm facePlayerToAsm(FacePlayer face, AsmContext ctx) {
+    return _wrapException(() {
+      var asm = EventAsm.empty();
+
+      if (ctx.inAddress(a3) != AddressOf(face.object)) {
+        asm.add(face.object.toA3(ctx.state));
+        // could set a3 in context, but not clearing it everywhere
+      }
+
+      asm.add(jsr(Label('Interaction_UpdateObj').l));
+
+      return asm;
+    }, ctx, face);
   }
 
   EventAsm pauseToAsm(Pause pause) {
