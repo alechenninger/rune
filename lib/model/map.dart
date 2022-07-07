@@ -44,18 +44,23 @@ enum MapId {
 }
 
 class MapObject extends FieldObject {
-  // note: can only be in multiples of 8 pixels
   final MapObjectId id;
+  // note: can only be in multiples of 8 pixels
   final Position startPosition;
   final MapObjectSpec spec;
-  Scene onInteract;
+  late Scene onInteract;
 
   MapObject(
       {String? id,
       required this.startPosition,
       required this.spec,
-      this.onInteract = const Scene.none()})
-      : id = id == null ? MapObjectId.random() : MapObjectId(id);
+      Scene onInteract = const Scene.none(),
+      bool onInteractFacePlayer = true})
+      : id = id == null ? MapObjectId.random() : MapObjectId(id) {
+    this.onInteract = onInteractFacePlayer
+        ? onInteract.startingWith([FacePlayer(this)])
+        : onInteract;
+  }
 
   // todo: additive conditional on interact
 

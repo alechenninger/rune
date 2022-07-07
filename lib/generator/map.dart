@@ -172,9 +172,7 @@ List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
     dialogOffsets.add(tree.nextDialogId!);
 
     // Interaction always starts with triggering dialog
-    ctx.startDialogInteraction();
-    ctx.state.currentMap = map;
-    ctx.putInAddress(a3, obj);
+    ctx.startDialogInteractionWith(obj, state: EventState()..currentMap = map);
 
     var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx,
         dialogTree: tree, id: SceneId("${map.id.name}_${obj.id}"));

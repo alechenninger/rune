@@ -88,12 +88,27 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
 
   // todo: event code checks first
 
-  if (!ctx.inEvent && scene.events.any((event) => event is! Dialog)) {
-    _startEventFromDialog(ctx, currentDialog, eventAsm, sceneId);
-    _terminateCurrentDialogTree();
+  var events = scene.events;
+
+  if (!ctx.inEvent) {
+    if (!_processableInDialogLoop(scene, ctx)) {
+      _startEventFromDialog(ctx, currentDialog, eventAsm, sceneId);
+      _terminateCurrentDialogTree();
+    } else if (ctx.isProcessingInteraction) {
+      // todo: isn't this always true if not in event?
+      var first = events.first;
+      // because processable, we assume FacePlayer must mean obj being
+      // interacted with, which is what dialog normally does. so skip it.
+      if (first is FacePlayer) {
+        events = events.skip(1).toList(growable: false);
+      } else {
+        // otherwise, have to tell dialog loop to not face player.
+        currentDialog.add(dc.b(Bytes.of(0xf3)));
+      }
+    }
   }
 
-  for (var event in scene.events) {
+  for (var event in events) {
     if (event is Dialog) {
       _addDialog(event);
     } else {
@@ -116,6 +131,19 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
 
   return SceneAsm(
       event: eventAsm, dialog: newDialogs, dialogIdOffset: dialogIdOffset);
+}
+
+bool _processableInDialogLoop(Scene scene, AsmContext ctx) {
+  var first = scene.events.first;
+  return (_isInteractionObjFacePlayer(first, ctx) &&
+          scene.events.skip(1).every((event) => event is Dialog)) ||
+      scene.events.every((event) => event is Dialog);
+}
+
+bool _isInteractionObjFacePlayer(Event event, AsmContext ctx) {
+  if (!ctx.isProcessingInteraction) return false;
+  if (event is! FacePlayer) return false;
+  return event.object == ctx.inAddress(a3)?.obj;
 }
 
 void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialogTree,

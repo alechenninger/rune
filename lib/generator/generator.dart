@@ -32,6 +32,9 @@ class AsmContext {
   bool get inEvent => _inEvent;
   bool hasSavedDialogPosition = false;
 
+  bool _isProcessingInteraction = false;
+  bool get isProcessingInteraction => _isProcessingInteraction;
+
   final _inAddress = <DirectAddressRegister, AddressOf>{};
 
   AddressOf? inAddress(DirectAddressRegister a) {
@@ -44,6 +47,10 @@ class AsmContext {
     } else {
       _inAddress[a] = AddressOf(obj);
     }
+  }
+
+  void clearRegisters() {
+    _inAddress.clear();
   }
 
   // todo: this one is a bit different. this is like, asm state. state of
@@ -69,11 +76,13 @@ class AsmContext {
     return eventIndex;
   }
 
-  void startDialogInteraction([EventState? knownState]) {
+  void startDialogInteractionWith(FieldObject obj, {EventState? state}) {
     _gameMode = Mode.dialog;
     _inEvent = false;
+    _isProcessingInteraction = true;
+    putInAddress(a3, obj);
     hasSavedDialogPosition = false;
-    state = knownState ?? EventState();
+    state = state ?? EventState();
   }
 
   void startEvent([EventState? knownState]) {
@@ -107,6 +116,10 @@ class AsmContext {
     if (inDialogLoop) {
       _inEvent = false;
     }
+  }
+
+  AsmContext.forInteractionWith(FieldObject obj, this.state) {
+    startDialogInteractionWith(obj, state: state);
   }
 
   AsmContext.forDialog(this.state)
@@ -182,12 +195,14 @@ class AsmGenerationException {
   final AsmContext? ctx;
   final Object? model;
   final Object? cause;
+  final StackTrace? causeTrace;
 
-  AsmGenerationException(this.ctx, this.model, this.cause);
+  AsmGenerationException(this.ctx, this.model, this.cause, this.causeTrace);
 
   @override
   String toString() {
-    return 'AsmGenerationException{ctx: $ctx, model: $model, cause: $cause}';
+    return 'AsmGenerationException{ctx: $ctx, model: $model, cause: $cause, '
+        'causeTrace: $causeTrace}';
   }
 }
 
@@ -195,8 +210,8 @@ class AsmGenerator {
   T _wrapException<T>(T Function() generate, AsmContext? ctx, Object? model) {
     try {
       return generate();
-    } catch (e) {
-      throw AsmGenerationException(ctx, model, e);
+    } catch (e, stack) {
+      throw AsmGenerationException(ctx, model, e, stack);
     }
   }
 

@@ -44,6 +44,24 @@ ${dialog2.toAsm()}
       expect(sceneAsm.event, Asm.empty());
       expect(ctx.eventPointers, Asm.empty());
     });
+
+    test('if first event is FacePlayer, also does not run an event', () {
+      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hello'));
+
+      var scene = Scene([dialog1, dialog2]);
+      var ctx = AsmContext.fresh(gameMode: Mode.dialog);
+      var sceneAsm = generator.sceneToAsm(scene, ctx);
+
+      expect(
+          sceneAsm.allDialog.withoutComments().toString(), '''${dialog1.toAsm()}
+	dc.b	\$FD
+${dialog2.toAsm()}
+	dc.b	\$FF
+''');
+      expect(sceneAsm.event, Asm.empty());
+      expect(ctx.eventPointers, Asm.empty());
+    });
   });
 
   group('dialog with event', () {
@@ -103,6 +121,43 @@ ${dialog2.toAsm()}
               Label('Event_GrandCross_${eventIndex.value.toRadixString(16)}')
             ])
           ]));
+    });
+
+    group('during interaction', () {
+      test(
+          'when facing player is first but there are other events, faces player from within event',
+          () {
+        var obj = MapObject(
+            startPosition: Position(0x200, 0x200),
+            spec: AlysWaiting(),
+            onInteractFacePlayer: true,
+            onInteract: Scene([
+              Dialog(spans: [Span('Hi')]),
+              IndividualMoves()..moves[alys] = (StepPath()..distance = 1.step)
+            ]));
+
+        var ctx = AsmContext.forInteractionWith(obj, state);
+        var sceneId = SceneId('Interact');
+
+        var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx, id: sceneId);
+
+        print(sceneAsm);
+
+        expect(
+            sceneAsm.event.withoutComments(),
+            Asm([
+              setLabel('Event_GrandCross_Interact'),
+              FacePlayer(obj).generateAsm(generator, ctx),
+              getAndRunDialog(Byte.one.i),
+              generator
+                  .individualMovesToAsm(
+                      IndividualMoves()
+                        ..moves[alys] = (StepPath()..distance = 1.step),
+                      AsmContext.forEvent(origState))
+                  .withoutComments(),
+              returnFromDialogEvent()
+            ]));
+      });
     });
 
     test('given dialog, event, dialog; event code runs dialog', () {

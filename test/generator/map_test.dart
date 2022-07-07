@@ -239,6 +239,29 @@ void main() {
             dc.b([Constant('FacingDir_Down'), 1.byte]),
           ]));
     });
+
+    test("when not starting with faceplayer, starts with f3 control code", () {
+      var testMap = GameMap(MapId.Test);
+      testMap.addObject(MapObject(
+          startPosition: Position('1e0'.hex, '2e0'.hex),
+          spec: Npc(Sprite.PalmanMan1, FaceDown()),
+          onInteract: Scene([
+            Dialog(spans: [Span('Hello!')])
+          ]),
+          onInteractFacePlayer: false));
+
+      var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+
+      expect(
+          mapAsm.dialog,
+          Asm([
+            comment(r'$00'),
+            dc.b(Bytes.of(0xF3)),
+            Dialog(spans: [Span('Hello!')]).toAsm(),
+            terminateDialog(),
+            newLine(),
+          ]));
+    });
   });
 
   group('objects with events', () {
@@ -252,18 +275,21 @@ void main() {
       Pause(Duration(seconds: 2)),
     ]);
 
-    setUp(() {
-      testMap.addObject(MapObject(
-          id: 'npc1',
-          startPosition: Position('1e0'.hex, '2e0'.hex),
-          spec: Npc(Sprite.PalmanMan1, FaceDown()),
-          onInteract: npc1Scene));
+    var npc1 = MapObject(
+        id: 'npc1',
+        startPosition: Position('1e0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
+        onInteract: npc1Scene);
 
-      testMap.addObject(MapObject(
-          id: 'npc2',
-          startPosition: Position('1f0'.hex, '2e0'.hex),
-          spec: Npc(Sprite.PalmanWoman1, FaceDown()),
-          onInteract: npc2Scene));
+    var npc2 = MapObject(
+        id: 'npc2',
+        startPosition: Position('1f0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanWoman1, FaceDown()),
+        onInteract: npc2Scene);
+
+    setUp(() {
+      testMap.addObject(npc1);
+      testMap.addObject(npc2);
     });
 
     test('produce event code with npc facing player', () {
@@ -272,10 +298,12 @@ void main() {
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
-      var scene1Asm = npc1Scene.toAsm(generator, comparisonCtx,
+      comparisonCtx.startDialogInteractionWith(npc1);
+      var scene1Asm = npc1.onInteract.toAsm(generator, comparisonCtx,
           dialogTree: comparisonDialogTree, id: SceneId('Test_npc1'));
-      comparisonCtx.startDialogInteraction();
-      var scene2Asm = npc2Scene.toAsm(generator, comparisonCtx,
+
+      comparisonCtx.startDialogInteractionWith(npc2);
+      var scene2Asm = npc2.onInteract.toAsm(generator, comparisonCtx,
           dialogTree: comparisonDialogTree, id: SceneId('Test_npc2'));
 
       expect(mapAsm.events,
@@ -289,9 +317,10 @@ void main() {
       var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
 
+      comparisonCtx.startDialogInteractionWith(npc1);
       npc1Scene.toAsm(generator, comparisonCtx,
           dialogTree: comparisonDialogTree, id: SceneId('Test_npc1'));
-      comparisonCtx.startDialogInteraction();
+      comparisonCtx.startDialogInteractionWith(npc2);
       npc2Scene.toAsm(generator, comparisonCtx,
           dialogTree: comparisonDialogTree, id: SceneId('Test_npc2'));
 

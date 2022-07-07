@@ -102,7 +102,7 @@ abstract class SizedValue extends Expression implements Comparable<SizedValue> {
   final int value;
 
   SizedValue(this.value) {
-    if (value >= size.maxValue) {
+    if (value > size.maxValue) {
       throw AsmError(value, 'too large to fit in ${size.bytes} bytes');
     }
   }

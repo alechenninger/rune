@@ -257,18 +257,23 @@ extension MoveableToA4 on FieldObject {
 
   Asm toA3(EventState ctx) {
     var obj = this;
-    if (obj is! MapObject) {
-      throw UnsupportedError('must be field obj in map');
+    if (obj is MapObject) {
+      var map = ctx.currentMap;
+      if (map == null) {
+        // todo: support, see above
+        throw UnsupportedError('must be field obj in map, but map was null');
+      }
+
+      var address = map.addressOf(obj);
+      return lea(Absolute.long(address), a3);
     }
 
-    var map = ctx.currentMap;
-    if (map == null) {
-      // todo: support, see above
-      throw UnsupportedError('must be field obj in map, but map was null');
+    if (obj is Slot) {
+      // why word? this is what asm appears to do
+      return lea('Character_${obj.index}'.constant.w, a3);
     }
 
-    var address = map.addressOf(obj);
-    return lea(Absolute.long(address), a3);
+    throw UnsupportedError('must be mapobject or slot');
   }
 }
 
