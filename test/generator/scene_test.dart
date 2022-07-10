@@ -12,8 +12,8 @@ void main() {
 
   group('a cursor separates', () {
     test('between dialogs', () {
-      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
-      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hello'));
+      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
+      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hello'));
 
       var scene = Scene([dialog1, dialog2]);
       var sceneAsm =
@@ -28,8 +28,8 @@ ${dialog2.toAsm()}
 
   group('just dialog', () {
     test('does not run an event', () {
-      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
-      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hello'));
+      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
+      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hello'));
 
       var scene = Scene([dialog1, dialog2]);
       var ctx = AsmContext.fresh(gameMode: Mode.dialog);
@@ -46,8 +46,8 @@ ${dialog2.toAsm()}
     });
 
     test('if first event is FacePlayer, also does not run an event', () {
-      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
-      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hello'));
+      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
+      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hello'));
 
       var scene = Scene([dialog1, dialog2]);
       var ctx = AsmContext.fresh(gameMode: Mode.dialog);
@@ -83,7 +83,7 @@ ${dialog2.toAsm()}
       var ctx = AsmContext.forDialog(state);
       var eventIndex = ctx.peekNextEventIndex;
 
-      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
       var moves = IndividualMoves();
       moves.moves[alys] = StepPath()..distance = 1.step;
 
@@ -132,7 +132,7 @@ ${dialog2.toAsm()}
             spec: AlysWaiting(),
             onInteractFacePlayer: true,
             onInteract: Scene([
-              Dialog(spans: [Span('Hi')]),
+              Dialog(spans: [DialogSpan('Hi')]),
               IndividualMoves()..moves[alys] = (StepPath()..distance = 1.step)
             ]));
 
@@ -164,10 +164,10 @@ ${dialog2.toAsm()}
       var ctx = AsmContext.forDialog(state);
       var eventIndex = ctx.peekNextEventIndex;
 
-      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
       var moves = IndividualMoves();
       moves.moves[alys] = StepPath()..distance = 1.step;
-      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hi'));
+      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hi'));
 
       var scene = Scene([dialog1, moves, dialog2]);
 
@@ -207,13 +207,14 @@ ${dialog2.toAsm()}
       var ctx = AsmContext.forDialog(state);
       var eventIndex = ctx.peekNextEventIndex;
 
-      var dialog1 = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
       var move1 = IndividualMoves();
       move1.moves[alys] = StepPath()..distance = 1.step;
-      var dialog2 = Dialog(speaker: Shay(), spans: Span.parse('Hi'));
+      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hi'));
       var move2 = IndividualMoves();
       move2.moves[shay] = StepPath()..distance = 1.step;
-      var dialog3 = Dialog(speaker: Shay(), spans: Span.parse('How are you'));
+      var dialog3 =
+          Dialog(speaker: Shay(), spans: DialogSpan.parse('How are you'));
       var move3 = IndividualMoves();
       move3.moves[alys] = StepPath()..distance = 1.step;
 
@@ -264,7 +265,7 @@ ${dialog2.toAsm()}
       var ctx = AsmContext.forDialog(state);
       var eventIndex = ctx.peekNextEventIndex;
 
-      var dialog = Dialog(speaker: Alys(), spans: Span.parse('Hi'));
+      var dialog = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
       var pause = Pause(Duration(seconds: 2));
 
       var scene = Scene([dialog, pause]);

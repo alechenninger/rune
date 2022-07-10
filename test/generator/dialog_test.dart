@@ -6,7 +6,7 @@ void main() {
   test('generates asm from dialog', () {
     var dialog = Dialog(
         speaker: Alys(),
-        spans: Span.parse("Hi I'm Alys! _What are you doing here?_"));
+        spans: DialogSpan.parse("Hi I'm Alys! _What are you doing here?_"));
 
     print(dialog);
 
@@ -19,7 +19,8 @@ void main() {
   });
 
   test('skips repeated spaces', () {
-    var dialog = Dialog(speaker: Alys(), spans: Span.parse('Test  1 2 3'));
+    var dialog =
+        Dialog(speaker: Alys(), spans: DialogSpan.parse('Test  1 2 3'));
 
     print(dialog);
 
@@ -31,7 +32,7 @@ void main() {
 
   test('all italics uses ascii for non-italics characters', () {
     var dialog = Dialog(spans: [
-      Span("Alys peered out over the Motavian wilds, as the rising",
+      DialogSpan("Alys peered out over the Motavian wilds, as the rising",
           italic: true)
     ]);
 
@@ -49,7 +50,7 @@ void main() {
     test('every other line from the same dialog', () {
       var dialog = Dialog(
           speaker: Alys(),
-          spans: Span.parse(
+          spans: DialogSpan.parse(
               "Hi I'm Alys! Lots of words take up lots of lines. You can "
               "only have 32 characters per line! How fascinating it is to "
               "deal with assembly."));
@@ -74,7 +75,8 @@ void main() {
   group('spans with pauses', () {
     test('just pause and speaker', () {
       var dialog = Dialog(
-          speaker: Alys(), spans: [Span("", pause: Duration(seconds: 1))]);
+          speaker: Alys(),
+          spans: [DialogSpan("", pause: Duration(seconds: 1))]);
 
       var asm = dialog.toAsm();
 
@@ -83,7 +85,7 @@ void main() {
     });
 
     test('just pause, no speaker', () {
-      var dialog = Dialog(spans: [Span("", pause: Duration(seconds: 1))]);
+      var dialog = Dialog(spans: [DialogSpan("", pause: Duration(seconds: 1))]);
 
       var asm = dialog.toAsm();
 
@@ -94,7 +96,7 @@ void main() {
     test('pauses come at the end of spans', () {
       var dialog = Dialog(
           speaker: Alys(),
-          spans: [Span("Hi I'm Alys!", pause: Duration(seconds: 1))]);
+          spans: [DialogSpan("Hi I'm Alys!", pause: Duration(seconds: 1))]);
 
       var asm = dialog.toAsm();
 
@@ -111,10 +113,10 @@ void main() {
       Span{text: , italic: false, pause: 0:00:00.000000}]}}
        */
       var dialog = Dialog(speaker: Shay(), spans: [
-        Span('It takes and it takes. And I owe it nothing...',
+        DialogSpan('It takes and it takes. And I owe it nothing...',
             pause: Duration(seconds: 1)),
-        Span('nothing but a fight.  ', pause: Duration(seconds: 1)),
-        Span('')
+        DialogSpan('nothing but a fight.  ', pause: Duration(seconds: 1)),
+        DialogSpan('')
       ]);
 
       var asm = dialog.toAsm();
@@ -138,8 +140,8 @@ void main() {
       cause: RangeError (end): Invalid value: Not in inclusive range 0..11: 12}
        */
       var dialog = Dialog(speaker: Alys(), spans: [
-        Span('Now take heed…', pause: Duration(seconds: 1)),
-        Span('else I walk alone once more.', pause: Duration(seconds: 1)),
+        DialogSpan('Now take heed…', pause: Duration(seconds: 1)),
+        DialogSpan('else I walk alone once more.', pause: Duration(seconds: 1)),
       ]);
 
       var asm = dialog.toAsm();
@@ -149,8 +151,9 @@ void main() {
 
     test('pause at 32 characters mid dialog', () {
       var dialog = Dialog(speaker: shay, spans: [
-        Span("That you’ve always done this...", pause: Duration(seconds: 1)),
-        Span('alone.', pause: Duration(seconds: 1))
+        DialogSpan("That you’ve always done this...",
+            pause: Duration(seconds: 1)),
+        DialogSpan('alone.', pause: Duration(seconds: 1))
       ]);
 
       var asm = dialog.toAsm();
@@ -165,7 +168,8 @@ void main() {
 
     test('pause at 32 characters end of dialog', () {
       var dialog = Dialog(speaker: shay, spans: [
-        Span("That you’ve always done this...", pause: Duration(seconds: 1)),
+        DialogSpan("That you’ve always done this...",
+            pause: Duration(seconds: 1)),
       ]);
 
       var asm = dialog.toAsm();

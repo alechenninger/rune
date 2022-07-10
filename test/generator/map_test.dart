@@ -22,7 +22,7 @@ void main() {
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ]));
 
     testMap.addObject(obj);
@@ -49,7 +49,7 @@ void main() {
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ]));
 
     testMap.addObject(obj);
@@ -68,7 +68,7 @@ void main() {
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ]));
 
     testMap.addObject(obj);
@@ -88,21 +88,21 @@ void main() {
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     testMap.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanWoman1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     testMap.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan2, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
@@ -124,21 +124,21 @@ void main() {
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     testMap.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanWoman1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     testMap.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan2, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
@@ -154,21 +154,21 @@ void main() {
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     testMap.addObject(MapObject(
         startPosition: Position('1f0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     testMap.addObject(MapObject(
         startPosition: Position('200'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
         onInteract: Scene([
-          Dialog(spans: [Span('Hello world!')])
+          Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
     var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
@@ -197,14 +197,14 @@ void main() {
           startPosition: Position('1e0'.hex, '2e0'.hex),
           spec: Npc(Sprite.PalmanMan1, FaceDown()),
           onInteract: Scene([
-            Dialog(spans: [Span('Hello!')])
+            Dialog(spans: [DialogSpan('Hello!')])
           ])));
 
       testMap.addObject(MapObject(
           startPosition: Position('1f0'.hex, '2e0'.hex),
           spec: Npc(Sprite.PalmanWoman1, FaceDown()),
           onInteract: Scene([
-            Dialog(spans: [Span('Goodbye!')])
+            Dialog(spans: [DialogSpan('Goodbye!')])
           ])));
     });
 
@@ -215,11 +215,11 @@ void main() {
           mapAsm.dialog,
           Asm([
             comment(r'$00'),
-            Dialog(spans: [Span('Hello!')]).toAsm(),
+            Dialog(spans: [DialogSpan('Hello!')]).toAsm(),
             terminateDialog(),
             newLine(),
             comment(r'$01'),
-            Dialog(spans: [Span('Goodbye!')]).toAsm(),
+            Dialog(spans: [DialogSpan('Goodbye!')]).toAsm(),
             terminateDialog(),
             newLine()
           ]));
@@ -246,7 +246,7 @@ void main() {
           startPosition: Position('1e0'.hex, '2e0'.hex),
           spec: Npc(Sprite.PalmanMan1, FaceDown()),
           onInteract: Scene([
-            Dialog(spans: [Span('Hello!')])
+            Dialog(spans: [DialogSpan('Hello!')])
           ]),
           onInteractFacePlayer: false));
 
@@ -257,7 +257,7 @@ void main() {
           Asm([
             comment(r'$00'),
             dc.b(Bytes.of(0xF3)),
-            Dialog(spans: [Span('Hello!')]).toAsm(),
+            Dialog(spans: [DialogSpan('Hello!')]).toAsm(),
             terminateDialog(),
             newLine(),
           ]));
@@ -266,12 +266,12 @@ void main() {
 
   group('objects with events', () {
     var npc1Scene = Scene([
-      Dialog(spans: [Span('Hello!')]),
+      Dialog(spans: [DialogSpan('Hello!')]),
       Pause(Duration(seconds: 1)),
     ]);
 
     var npc2Scene = Scene([
-      Dialog(spans: [Span('Goodbye!')]),
+      Dialog(spans: [DialogSpan('Goodbye!')]),
       Pause(Duration(seconds: 2)),
     ]);
 

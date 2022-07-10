@@ -7,10 +7,10 @@ import 'model.dart';
 class Dialog extends Event {
   // todo: make not nullable
   Speaker? speaker;
-  final List<Span> _spans = [];
-  List<Span> get spans => UnmodifiableListView(_spans);
+  final List<DialogSpan> _spans = [];
+  List<DialogSpan> get spans => UnmodifiableListView(_spans);
 
-  Dialog({this.speaker, List<Span> spans = const []}) {
+  Dialog({this.speaker, List<DialogSpan> spans = const []}) {
     var skipped = false;
 
     for (var i = 0; i < spans.length; i++) {
@@ -82,18 +82,57 @@ class Dialog extends Event {
   int get hashCode => speaker.hashCode ^ const ListEquality().hash(_spans);
 }
 
+class DialogSpan {
+  final Span span;
+  final Duration pause;
+
+  String get text => span.text;
+  bool get italic => span.italic;
+
+  DialogSpan(String text, {bool italic = false, this.pause = Duration.zero})
+      : span = Span(text, italic: italic);
+
+  DialogSpan.italic(String text) : this(text, italic: true);
+
+  DialogSpan.fromSpan(this.span, {this.pause = Duration.zero});
+
+  DialogSpan trimLeft() => DialogSpan.fromSpan(span.trimLeft(), pause: pause);
+  DialogSpan trimRight() => DialogSpan.fromSpan(span.trimRight(), pause: pause);
+  DialogSpan withPause(Duration pause) =>
+      DialogSpan.fromSpan(span, pause: pause);
+
+  // TODO: markup parsing belongs in parse layer
+  static List<DialogSpan> parse(String markup) {
+    return Span.parse(markup).map((e) => DialogSpan.fromSpan(e)).toList();
+  }
+
+  @override
+  String toString() {
+    return 'DialogSpan{text: $text, italic: $italic, pause: $pause}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DialogSpan &&
+          runtimeType == other.runtimeType &&
+          span == other.span &&
+          pause == other.pause;
+
+  @override
+  int get hashCode => span.hashCode ^ pause.hashCode;
+}
+
 class Span {
   final String text;
   final bool italic;
-  final Duration pause;
 
-  Span(this.text, {this.italic = false, this.pause = Duration.zero});
+  Span(this.text, {this.italic = false});
 
   Span.italic(String text) : this(text, italic: true);
 
-  Span trimLeft() => Span(text.trimLeft(), italic: italic, pause: pause);
-  Span trimRight() => Span(text.trimRight(), italic: italic, pause: pause);
-  Span withPause(Duration pause) => Span(text, italic: italic, pause: pause);
+  Span trimLeft() => Span(text.trimLeft(), italic: italic);
+  Span trimRight() => Span(text.trimRight(), italic: italic);
 
   // TODO: markup parsing belongs in parse layer
   static List<Span> parse(String markup) {
@@ -125,7 +164,7 @@ class Span {
 
   @override
   String toString() {
-    return 'Span{text: $text, italic: $italic, pause: $pause}';
+    return 'Span{text: $text, italic: $italic}';
   }
 
   @override
@@ -134,11 +173,10 @@ class Span {
       other is Span &&
           runtimeType == other.runtimeType &&
           text == other.text &&
-          italic == other.italic &&
-          pause == other.pause;
+          italic == other.italic;
 
   @override
-  int get hashCode => text.hashCode ^ italic.hashCode ^ pause.hashCode;
+  int get hashCode => text.hashCode ^ italic.hashCode;
 }
 
 abstract class Speaker {

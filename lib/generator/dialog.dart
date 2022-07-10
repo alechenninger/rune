@@ -72,7 +72,7 @@ final _italicizedOther = {
 final _nonItalicizedLetters = <String>{}; //...Quotes.characters}; //{'x', 'z'};
 final _quotes = ['"', '“', '”'];
 
-extension SpanToAscii on Span {
+extension SpanToAscii on DialogSpan {
   Bytes toAscii([Quotes? q]) {
     var quotes = q ?? Quotes();
 

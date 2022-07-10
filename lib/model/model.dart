@@ -165,7 +165,7 @@ class Pause extends Event {
   Pause(this.duration);
 
   Dialog inDialog() {
-    return Dialog(spans: [Span("", pause: duration)]);
+    return Dialog(spans: [DialogSpan("", pause: duration)]);
   }
 
   @override
