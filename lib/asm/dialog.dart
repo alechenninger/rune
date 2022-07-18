@@ -57,7 +57,68 @@ Asm portrait(Byte portrait) {
   return dc.b([..._ControlCodes.portrait, portrait]);
 }
 
-Asm dialog(Bytes dialog, [List<Byte?> pausePoints = const []]) {
+List<LineAsm> dialogLines(Bytes dialog,
+    {int outputWidth = 40, Byte dialogIdOffset = Byte.zero}) {
+  var lines = List<LineAsm>.empty(growable: true);
+  var lineNum = 0;
+  var lineStart = 0;
+  var breakPoint = 0;
+
+  void append(int start, [int? end]) {
+    var line = dialog.sublist(start, end);
+    if (line.isEmpty) return;
+
+    // can only express 32 characters per data line
+    for (var split in line.split(32)) {
+      lines.add(LineAsm(
+          dialogId: dialogIdOffset,
+          length: split.length,
+          outputLineNumber: lineNum,
+          asm: Asm([dc.b(split), dc.b(_ControlCodes.terminate)])));
+      dialogIdOffset = (dialogIdOffset + 1.toByte) as Byte;
+    }
+
+    lineNum++;
+  }
+
+  for (var i = 0; i < dialog.length; i++) {
+    var char = dialog[i];
+
+    if (_isBreakable(char.value, dialog, i)) {
+      breakPoint = i;
+    }
+
+    if (i - lineStart == outputWidth) {
+      append(lineStart, breakPoint);
+
+      // Determine new line start (skip whitespace)
+      var skip =
+          dialog.sublist(breakPoint).indexWhere((b) => b.value != $space);
+      // If -1, then means empty or all space;
+      lineStart = skip == -1 ? i : breakPoint + skip;
+      if (lineStart > i) i = lineStart;
+    }
+  }
+
+  append(lineStart);
+
+  return lines;
+}
+
+class LineAsm {
+  Byte dialogId;
+  int length;
+  int outputLineNumber;
+  Asm asm;
+
+  LineAsm(
+      {required this.dialogId,
+      required this.length,
+      required this.outputLineNumber,
+      required this.asm});
+}
+
+Asm dialog(Bytes dialog, {List<Byte?> pausePoints = const []}) {
   if (pausePoints.isNotEmpty) {
     var maxPausePoint = pausePoints.length - 1;
     if (maxPausePoint > dialog.length) {

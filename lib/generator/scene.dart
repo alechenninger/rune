@@ -13,9 +13,9 @@ extension SceneToAsm on Scene {
   /// in these. When none around provided, the scene has its own trees.
   SceneAsm toAsm(AsmGenerator generator, AsmContext ctx,
       {DialogTree? dialogTree, SceneId? id}) {
-    var sceneDialogTrees = dialogTree ?? DialogTree();
+    var sceneDialogTree = dialogTree ?? DialogTree();
 
-    return _sceneToAsm(id, this, sceneDialogTrees, ctx, generator);
+    return _sceneToAsm(id, this, sceneDialogTree, ctx, generator);
   }
 }
 
@@ -197,7 +197,7 @@ class SceneAsm {
     var all = Asm.empty();
 
     for (var i = 0; i < dialog.length; i++) {
-      all.add(comment('${dialogIdOffset + i.byte}'));
+      all.add(comment('${dialogIdOffset + i.toByte}'));
       all.add(dialog[i]);
       all.addNewline();
     }

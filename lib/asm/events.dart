@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 import 'package:rune/numbers.dart';
 
 import 'asm.dart';
@@ -81,7 +83,7 @@ Asm returnFromDialogEvent() {
 	rts
    */
   return Asm([
-    move.w(0.word.i, Constant('Game_Mode_Routine').w),
+    move.w(0.toWord.i, Constant('Game_Mode_Routine').w),
     movea.l(Constant('Map_Chunk_Addr').w, a0),
     jsr(Label('Map_LoadChunks').l),
     rts,
@@ -178,9 +180,9 @@ Asm moveCamera(
 
 Asm addCharacterBySlot({required Address charId, required int slot}) {
   return Asm([
-    move.b(charId, 'Current_Party_Slot_$slot'.constant.w),
+    move.b(charId, 'Current_Party_Slot_$slot'.toConstant.w),
     moveq(charId, d0),
-    jsr('Event_AddMacro'.label.l)
+    jsr('Event_AddMacro'.toLabel.l)
   ]);
 }
 
@@ -207,8 +209,8 @@ Asm addCharacterToParty({
   required Address y,
 }) {
   return Asm([
-    move.b(charId, 'Current_Party_Slot_$slot'.constant.w),
-    lea('Character_$slot'.constant.w, a4),
+    move.b(charId, 'Current_Party_Slot_$slot'.toConstant.w),
+    lea('Character_$slot'.toConstant.w, a4),
     move.w(charRoutineIndex, a4.indirect),
     move.w(facingDir, facing_dir(a4)),
     move.w(artTile, art_tile(a4)),
@@ -216,12 +218,12 @@ Asm addCharacterToParty({
     move.w(y, curr_y_pos(a4)),
     jsr(charRoutine),
     moveq(charId, d0),
-    jsr('Event_AddMacro'.label.l)
+    jsr('Event_AddMacro'.toLabel.l)
   ]);
 }
 
 /// Clear the addresses from [clear] to [clear] plus [range] (not inclusive I
 /// think).
 Asm clearUninterrupted({required Address clear, required Address range}) {
-  return Asm([lea(clear, a0), move.w(range, d7), trap(0.byte.i)]);
+  return Asm([lea(clear, a0), move.w(range, d7), trap(0.toByte.i)]);
 }

@@ -112,7 +112,7 @@ void _generateObjectsAsm(GameMap map, Asm objectsAsm,
       // todo: is 0 okay?
       objectsAsm.add(
           // dc.w([vramTileNumbers.values.max() + Word(_vramOffsetPerSprite)]));
-          dc.w([0.word]));
+          dc.w([0.toWord]));
     }
 
     objectsAsm.add(

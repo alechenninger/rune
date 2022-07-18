@@ -12,6 +12,10 @@ const DcMnemonic dc = DcMnemonic();
 const MoveMnemonic move = MoveMnemonic();
 const MoveaMnemonic movea = MoveaMnemonic();
 const ClrMnemonic clr = ClrMnemonic();
+const AndiMnemonic andi = AndiMnemonic();
+const BccMnemonic bne = BccMnemonic('bne');
+const BccMnemonic beq = BccMnemonic('beq');
+const AddiMnemonic addi = AddiMnemonic();
 
 final rts = cmd('rts', []);
 
@@ -24,6 +28,8 @@ Asm jsr(Address to) => cmd('jsr', [to]);
 Asm bset(Address src, Address dst) => cmd('bset', [src, dst]);
 Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
 Asm trap(Immediate vector) => cmd('trap', [vector]);
+Asm dbf(Address src, Address dst) => cmd('dbf', [src, dst]);
+Asm btst(Address src, Address dst) => cmd('btst', [src, dst]);
 
 // It looks like this should be limited to 32 bytes per line
 class DcMnemonic {
@@ -56,6 +62,30 @@ class ClrMnemonic {
   const ClrMnemonic();
   //clr.b	(Render_Sprites_In_Cutscenes).w
   Asm b(Address dst) => cmd('clr.b', [dst]);
+}
+
+class AndiMnemonic {
+  const AndiMnemonic();
+
+  Asm b(Address from, Address to) => cmd('andi.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('andi.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('andi.l', [from, to]);
+}
+
+class BccMnemonic {
+  final String _branch;
+  const BccMnemonic(this._branch);
+
+  Asm s(Address to) => cmd('$_branch.s', [to]);
+  Asm w(Address to) => cmd('$_branch.w', [to]);
+}
+
+class AddiMnemonic {
+  const AddiMnemonic();
+
+  Asm b(Address from, Address to) => cmd('addi.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('addi.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('addi.l', [from, to]);
 }
 
 class AsmError extends ArgumentError {

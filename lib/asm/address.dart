@@ -100,7 +100,7 @@ class IndirectAddressRegister extends _Address {
   IndirectAddressRegister(this.register,
       {this.displacement = Byte.zero, this.variableDisplacement})
       : super('(${[
-          if (displacement.isNotZero) displacement,
+          if (displacement.isKnownNotZero) displacement,
           'A$register',
           if (variableDisplacement != null) variableDisplacement,
         ].join(',')})') {
@@ -126,7 +126,7 @@ extension ExpressionDisplacement on Expression {
 
 extension IntDisplacement on int {
   IndirectAddressRegister call(DirectAddressRegister a) =>
-      a.indirect.plus(value);
+      a.indirect.plus(toValue);
 }
 
 class PostIncAddress extends _Address {

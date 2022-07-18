@@ -106,12 +106,6 @@ void main() {
     });
 
     test('bug1', () {
-      /*
-      ialog{speaker: Shay, _spans: [
-      Span{text: It takes and it takes. And I owe it nothing..., italic: false, pause: 0:00:01.000000},
-      Span{text: nothing but a fight.  , italic: false, pause: 0:00:01.000000},
-      Span{text: , italic: false, pause: 0:00:00.000000}]}}
-       */
       var dialog = Dialog(speaker: Shay(), spans: [
         DialogSpan('It takes and it takes. And I owe it nothing...',
             pause: Duration(seconds: 1)),

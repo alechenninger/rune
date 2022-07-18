@@ -171,20 +171,20 @@ void main() {
             Asm([
               bset(Byte.zero.i, Char_Move_Flags.w),
               lea(Constant('Character_1').w, a4),
-              move.w('1f0'.hex.word.i, d0),
-              move.w('250'.hex.word.i, d1),
+              move.w('1f0'.hex.toWord.i, d0),
+              move.w('250'.hex.toWord.i, d1),
               jsr(Label('Event_MoveCharacter').l),
-              lea('Character_1'.constant.w, a4),
-              move.w('1e0'.hex.word.i, a4.plus('dest_x_pos'.constant)),
-              move.w('250'.hex.word.i, a4.plus('dest_y_pos'.constant)),
+              lea('Character_1'.toConstant.w, a4),
+              move.w('1e0'.hex.toWord.i, a4.plus('dest_x_pos'.toConstant)),
+              move.w('250'.hex.toWord.i, a4.plus('dest_y_pos'.toConstant)),
               lea(Constant('Character_2').w, a4),
-              move.w('240'.hex.word.i, d0),
-              move.w('240'.hex.word.i, d1),
-              jsr('Event_MoveCharacter'.label.l),
-              lea('Character_2'.constant.w, a4),
-              move.w('260'.hex.word.i, d0),
-              move.w('240'.hex.word.i, d1),
-              jsr('Event_MoveCharacter'.label.l)
+              move.w('240'.hex.toWord.i, d0),
+              move.w('240'.hex.toWord.i, d1),
+              jsr('Event_MoveCharacter'.toLabel.l),
+              lea('Character_2'.toConstant.w, a4),
+              move.w('260'.hex.toWord.i, d0),
+              move.w('240'.hex.toWord.i, d1),
+              jsr('Event_MoveCharacter'.toLabel.l)
             ]));
       });
     });
@@ -216,8 +216,8 @@ void main() {
             Asm([
               bset(Byte.zero.i, Char_Move_Flags.w),
               lea(Constant('Character_1').w, a4),
-              move.w('280'.hex.word.i, d0),
-              move.w('200'.hex.word.i, d1),
+              move.w('280'.hex.toWord.i, d0),
+              move.w('200'.hex.toWord.i, d1),
               jsr(Label('Event_MoveCharacter').l),
             ]));
       });
@@ -268,8 +268,8 @@ void main() {
             Asm([
               bset(Byte.zero.i, Char_Move_Flags.w),
               lea(Constant('Character_1').w, a4),
-              move.w('280'.hex.word.i, d0),
-              move.w('200'.hex.word.i, d1),
+              move.w('280'.hex.toWord.i, d0),
+              move.w('200'.hex.toWord.i, d1),
               jsr(Label('Event_MoveCharacter').l),
             ]));
       });
@@ -300,7 +300,7 @@ void main() {
           asm,
           Asm([
             lea(Absolute.long(map.addressOf(npc)), a3),
-            jsr('Interaction_UpdateObj'.label.l)
+            jsr('Interaction_UpdateObj'.toLabel.l)
           ]));
     });
 
@@ -314,7 +314,7 @@ void main() {
 
       var asm = generator.facePlayerToAsm(FacePlayer(npc), ctx);
 
-      expect(asm, Asm([jsr('Interaction_UpdateObj'.label.l)]));
+      expect(asm, Asm([jsr('Interaction_UpdateObj'.toLabel.l)]));
     });
   });
 }

@@ -32,12 +32,12 @@ void main() {
     expect(
         mapAsm.objects.trim().withoutComments(),
         Asm([
-          dc.w(['38'.hex.word]),
-          dc.b([Constant('FacingDir_Down'), 0.byte]),
-          dc.w(['2D0'.hex.word]),
+          dc.w(['38'.hex.toWord]),
+          dc.b([Constant('FacingDir_Down'), 0.toByte]),
+          dc.w(['2D0'.hex.toWord]),
           dc.w([
-            '3c'.hex.word,
-            '5c'.hex.word,
+            '3c'.hex.toWord,
+            '5c'.hex.toWord,
           ])
         ]));
   });
@@ -59,7 +59,7 @@ void main() {
     expect(
         mapAsm.objects.withoutComments().first,
         Asm([
-          dc.w(['38'.hex.word])
+          dc.w(['38'.hex.toWord])
         ]).first);
   });
 
@@ -78,7 +78,7 @@ void main() {
     expect(
         mapAsm.sprites,
         Asm([
-          dc.w(['2d0'.hex.word]),
+          dc.w(['2d0'.hex.toWord]),
           dc.l([Constant('Art_PalmanMan1')])
         ]));
   });
@@ -110,11 +110,11 @@ void main() {
     expect(
         mapAsm.sprites,
         Asm([
-          dc.w(['2d0'.hex.word]),
+          dc.w(['2d0'.hex.toWord]),
           dc.l([Constant('Art_PalmanMan1')]),
-          dc.w(['318'.hex.word]),
+          dc.w(['318'.hex.toWord]),
           dc.l([Constant('Art_PalmanWoman1')]),
-          dc.w(['360'.hex.word]),
+          dc.w(['360'.hex.toWord]),
           dc.l([Constant('Art_PalmanMan2')]),
         ]));
   });
@@ -144,9 +144,9 @@ void main() {
     var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
     var objectsAsm = mapAsm.objects.withoutComments();
     // todo: this is kind of brittle
-    expect(objectsAsm[2], dc.w(['2d0'.hex.word]));
-    expect(objectsAsm[7], dc.w(['318'.hex.word]));
-    expect(objectsAsm[12], dc.w(['360'.hex.word]));
+    expect(objectsAsm[2], dc.w(['2d0'.hex.toWord]));
+    expect(objectsAsm[7], dc.w(['318'.hex.toWord]));
+    expect(objectsAsm[12], dc.w(['360'.hex.toWord]));
   });
 
   test('sprites are reused for multiple objects of the same sprite', () {
@@ -176,15 +176,15 @@ void main() {
     expect(
         mapAsm.sprites,
         Asm([
-          dc.w(['2d0'.hex.word]),
+          dc.w(['2d0'.hex.toWord]),
           dc.l([Constant('Art_PalmanMan1')]),
         ]));
 
     // todo: this is kind of brittle
     var objectsAsm = mapAsm.objects.withoutComments();
-    expect(objectsAsm[2], dc.w(['2d0'.hex.word]));
-    expect(objectsAsm[7], dc.w(['2d0'.hex.word]));
-    expect(objectsAsm[12], dc.w(['2d0'.hex.word]));
+    expect(objectsAsm[2], dc.w(['2d0'.hex.toWord]));
+    expect(objectsAsm[7], dc.w(['2d0'.hex.toWord]));
+    expect(objectsAsm[12], dc.w(['2d0'.hex.toWord]));
   });
 
   test('objects use position divided by 8', () {});
@@ -231,12 +231,12 @@ void main() {
       expect(
           mapAsm.objects.withoutComments()[1],
           Asm([
-            dc.b([Constant('FacingDir_Down'), 0.byte]),
+            dc.b([Constant('FacingDir_Down'), 0.toByte]),
           ]));
       expect(
           mapAsm.objects.withoutComments()[6],
           Asm([
-            dc.b([Constant('FacingDir_Down'), 1.byte]),
+            dc.b([Constant('FacingDir_Down'), 1.toByte]),
           ]));
     });
 

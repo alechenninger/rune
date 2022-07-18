@@ -33,11 +33,11 @@ extension DialogToAsm on Dialog {
 
       if (span.pause > Duration.zero) {
         pausePoints.length = ascii.length + 1;
-        pausePoints[ascii.length] = span.pause.toFrames().byte;
+        pausePoints[ascii.length] = span.pause.toFrames().toByte;
       }
     }
 
-    asm.add(dialog(ascii, pausePoints));
+    asm.add(dialog(ascii, pausePoints: pausePoints));
 
     return asm;
   }
@@ -72,7 +72,13 @@ final _italicizedOther = {
 final _nonItalicizedLetters = <String>{}; //...Quotes.characters}; //{'x', 'z'};
 final _quotes = ['"', '“', '”'];
 
-extension SpanToAscii on DialogSpan {
+extension DialogSpanToAscii on DialogSpan {
+  Bytes toAscii([Quotes? q]) {
+    return span.toAscii(q);
+  }
+}
+
+extension SpanToAscii on Span {
   Bytes toAscii([Quotes? q]) {
     var quotes = q ?? Quotes();
 

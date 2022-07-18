@@ -170,7 +170,7 @@ extension IndividualMovesToAsm on IndividualMoves {
       if (allDelay) {
         // Just guessing at 8 frames per step?
         // look at x/y_step_constant and FieldObj_Move routine
-        asm.add(vIntPrepareLoop((8 * maxSteps.toInt).word));
+        asm.add(vIntPrepareLoop((8 * maxSteps.toInt).toWord));
       }
 
       for (var move in done.entries) {
@@ -270,7 +270,7 @@ extension MoveableToA4 on FieldObject {
 
     if (obj is Slot) {
       // why word? this is what asm appears to do
-      return lea('Character_${obj.index}'.constant.w, a3);
+      return lea('Character_${obj.index}'.toConstant.w, a3);
     }
 
     throw UnsupportedError('must be mapobject or slot');
@@ -310,9 +310,9 @@ extension CharacterData on Character {
   Value get fieldObjectIndex {
     switch (runtimeType) {
       case Shay:
-        return 4.value;
+        return 4.toValue;
       case Alys:
-        return 8.value;
+        return 8.toValue;
     }
     throw UnsupportedError('$this.fieldObjectIndex');
   }

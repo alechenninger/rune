@@ -2,6 +2,8 @@ import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:quiver/check.dart';
+
 import '../characters.dart';
 import 'asm.dart';
 
@@ -10,8 +12,9 @@ const word = Size.w;
 const long = Size.l;
 
 abstract class Expression {
-  bool get isZero;
-  bool get isNotZero => !isZero;
+  // todo: maybe remove?
+  bool get isKnownZero;
+  bool get isKnownNotZero => !isKnownZero;
 
   Expression();
 
@@ -23,9 +26,28 @@ abstract class Expression {
 
   Absolute get l => Absolute.long(this);
 
+  Expression operator +(Expression other) {
+    return AdditionExpression(this, other);
+  }
+
   /// Assembly representation of the expression.
   @override
   String toString();
+}
+
+class AdditionExpression extends Expression {
+  final Expression operand1;
+  final Expression operand2;
+
+  AdditionExpression(this.operand1, this.operand2);
+
+  @override
+  bool get isKnownZero => false;
+
+  @override
+  String toString() {
+    return '($operand1+$operand2)';
+  }
 }
 
 class Value extends Expression implements Comparable<Value> {
@@ -33,11 +55,29 @@ class Value extends Expression implements Comparable<Value> {
 
   Value(this.value);
 
+  const Value.constant(this.value) : super.constant();
+
   @override
-  bool get isZero => value == 0;
+  bool get isKnownZero => value == 0;
 
   @override
   int compareTo(Value other) => value.compareTo(other.value);
+
+  @override
+  Expression operator +(Expression other) {
+    if (other is Value) {
+      return Value(value + other.value);
+    }
+    return super + other;
+  }
+
+  bool operator >(Value other) {
+    return value > other.value;
+  }
+
+  bool operator >=(Value other) {
+    return value >= other.value;
+  }
 
   @override
   String toString() => value.toString();
@@ -57,7 +97,7 @@ class Constant extends Expression {
   final String constant;
 
   @override
-  final bool isZero = false;
+  final bool isKnownZero = false;
 
   const Constant(this.constant) : super.constant();
 
@@ -79,7 +119,7 @@ class Label extends Expression {
   final String name;
 
   @override
-  final bool isZero = false;
+  final bool isKnownZero = false;
 
   const Label(this.name) : super.constant();
 
@@ -97,30 +137,22 @@ class Label extends Expression {
 
 // TODO: unsigned. what about signed?
 // see: http://mrjester.hapisan.com/04_MC68/Sect04Part02/Index.html
-abstract class SizedValue extends Expression implements Comparable<SizedValue> {
-  /// Value as an [int]
-  final int value;
-
-  SizedValue(this.value) {
+abstract class SizedValue extends Value {
+  SizedValue(int value) : super(value) {
     if (value > size.maxValue) {
       throw AsmError(value, 'too large to fit in ${size.bytes} bytes');
     }
   }
 
-  const SizedValue._(this.value) : super.constant();
+  const SizedValue._(int value) : super.constant(value);
 
   /// Size in bytes
   Size get size;
 
   @override
-  bool get isZero => value == 0;
+  bool get isKnownZero => value == 0;
   @override
-  bool get isNotZero => !isZero;
-
-  @override
-  int compareTo(SizedValue other) {
-    return value.compareTo(other.value);
-  }
+  bool get isKnownNotZero => !isKnownZero;
 
   /// Hex representation including $ prefix.
   String get hex =>
@@ -143,15 +175,19 @@ class Byte extends SizedValue {
   @override
   final size = Size.b;
 
-  Byte operator +(Byte other) => Byte(value + other.value);
+  @override
+  Expression operator +(Expression other) {
+    if (other is Byte) {
+      return Byte(value + other.value);
+    }
+    return super + other;
+  }
 }
 
 class Word extends SizedValue {
   Word(int value) : super(value);
   @override
   final size = Size.w;
-
-  Word operator +(Word other) => Word(value + other.value);
 }
 
 class Longword extends SizedValue {
@@ -188,7 +224,7 @@ class Size {
 }
 
 extension ToValue on int {
-  SizedValue toValue({required int size}) {
+  SizedValue toSizedValue({required int size}) {
     switch (size) {
       case 1:
         return Byte(this);
@@ -200,15 +236,15 @@ extension ToValue on int {
     throw AsmError(size, 'invalid data size (must be 1, 2, or 4)');
   }
 
-  Value get value => Value(this);
-  Byte get byte => Byte(this);
-  Word get word => Word(this);
-  Longword get longword => Longword(this);
+  Value get toValue => Value(this);
+  Byte get toByte => Byte(this);
+  Word get toWord => Word(this);
+  Longword get toLongword => Longword(this);
 }
 
 extension ToExpression on String {
-  Constant get constant => Constant(this);
-  Label get label => Label(this);
+  Constant get toConstant => Constant(this);
+  Label get toLabel => Label(this);
 }
 
 /// An arbitrary list of data.
@@ -236,10 +272,23 @@ abstract class Data<T extends List<int>, E extends SizedValue,
 
   @override
   int get length => bytes.length;
+
   @override
   set length(int newLength) => bytes.length = newLength;
 
-  String get immediate => '';
+  List<D> split(int splitLength) {
+    checkArgument(splitLength > 0,
+        message: 'length must be greater than 0 but was $splitLength');
+    var taken = 0;
+    var splits = <D>[];
+    while (taken < splitLength) {
+      var take = min(length - taken, splitLength);
+      if (take == 0) break;
+      splits.add(_new(bytes.sublist(taken, take)));
+      taken += take;
+    }
+    return splits;
+  }
 
   /// Trims both trailing and leading bytes equal to [byte].
   D trim(int byte) {

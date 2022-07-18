@@ -56,10 +56,10 @@ class AsmContext {
   // todo: this one is a bit different. this is like, asm state. state of
   //  generated code.
   // the others (including eventstate) are more the state of active generation?
-  Word _eventIndexOffset = 'a0'.hex.word;
+  Word _eventIndexOffset = 'a0'.hex.toWord;
   final Asm _eventPointers = Asm.empty();
   Asm get eventPointers => Asm([_eventPointers]);
-  Word get peekNextEventIndex => (_eventIndexOffset.value + 1).word;
+  Word get peekNextEventIndex => (_eventIndexOffset.value + 1).toWord;
 
   /// Returns next event index to add a new event in EventPtrs.
   Word _nextEventIndex() {
@@ -169,11 +169,11 @@ class DialogTree extends IterableBase<DialogAsm> {
       throw StateError('no more dialog can fit into dialog trees');
     }
     _dialogs.add(dialog);
-    return (_dialogs.length - 1).byte;
+    return (_dialogs.length - 1).toByte;
   }
 
   Byte? get nextDialogId =>
-      _dialogs.length > Size.b.maxValue ? null : _dialogs.length.byte;
+      _dialogs.length > Size.b.maxValue ? null : _dialogs.length.toByte;
 
   DialogAsm operator [](int index) {
     return _dialogs[index];
