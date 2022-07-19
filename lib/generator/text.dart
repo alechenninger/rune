@@ -55,12 +55,6 @@ SceneAsm _displayText(
   var quotes = Quotes();
 
   for (var text in column.texts) {
-    var palette = palettes.putIfAbsent(
-        text.groupSet.group, () => 1 + (palettes.values.firstOrNull ?? 0));
-    if (palettes.length > 2) {
-      throw ArgumentError('text must not have more that 2 text groups');
-    }
-
     var ascii = text.spans
         .map((s) => s.toAscii(quotes))
         .reduceOr((s1, s2) => s1 + s2, ifEmpty: Bytes.empty());
@@ -81,6 +75,7 @@ SceneAsm _displayText(
           dialogId: line.dialogId, length: line.length, position: position));
 
       cursor.advanceCharactersWithinLine(line.length);
+      dialogIdOffset = (line.dialogId + 1.toByte) as Byte;
       // assumes lines only ever advance by 1...
       if (lastLine != null && line.outputLineNumber > lastLine) {
         cursor.advanceLine();
@@ -123,15 +118,16 @@ SceneAsm _displayText(
     if (paletteEventIndex >= set.paletteEvents.length) {
       setIndexByGroup[forGroup] = setIndex + 1;
       paletteEventIndexByGroup[forGroup] = 0;
+      // todo: eventTimeByGroup[forGroup] = time; ?
       return nextEvent(forGroup: forGroup);
     }
 
     var paletteEvent = set.paletteEvents[paletteEventIndex];
 
-    if (time >=
-        paletteEvent.duration +
-            eventTimeByGroup.putIfAbsent(forGroup, () => Duration.zero)) {
+    var eventTime = eventTimeByGroup.putIfAbsent(forGroup, () => Duration.zero);
+    if (time >= paletteEvent.duration + eventTime) {
       paletteEventIndexByGroup[forGroup] = paletteEventIndex + 1;
+      eventTimeByGroup[forGroup] = time;
       return nextEvent(forGroup: forGroup);
     }
 
@@ -143,10 +139,23 @@ SceneAsm _displayText(
   var loadedTilesByGroup = <int, List<int>>{};
   PaletteEvent? event0;
   PaletteEvent? event1;
-  while (
-      // only 2 simultaneous are supported for now
-      (event0 = nextEvent(forGroup: 0)) != null ||
-          (event1 = nextEvent(forGroup: 1)) != null) {
+  while (true) {
+    // only 2 simultaneous are supported for now
+    event0 = nextEvent(forGroup: 0);
+    event1 = nextEvent(forGroup: 1);
+
+    var maxGroup = -1;
+    if (event0 != null) {
+      maxGroup = 0;
+    }
+    if (event1 != null) {
+      maxGroup = 1;
+    }
+
+    if (maxGroup == -1) {
+      break;
+    }
+
     // first see if we need to load new text
     for (var groupI = 0; groupI < 2; groupI++) {
       var setIndex = setIndexByGroup[groupI];
@@ -154,13 +163,20 @@ SceneAsm _displayText(
 
       var loadedSetIndex = loadedSetByGroup[groupI];
       if (setIndex != loadedSetIndex) {
+        loadedSetByGroup[groupI] = setIndex;
+
         for (var tile in loadedTilesByGroup.putIfAbsent(groupI, () => [])) {
           vramTileRanges.releaseRange(startingAt: tile, forGroup: groupI);
         }
 
-        loadedSetIndex = setIndex;
-        var set = column.groups[groupI].sets[setIndex];
-        for (var text in set.texts) {
+        var group = column.groups[groupI];
+        if (group.sets.length <= setIndex) {
+          continue;
+        }
+        var set = group.sets[setIndex];
+        for (var i = 0; i < set.texts.length; i++) {
+          var text = set.texts[i];
+
           var asmRefs = textAsmRefs[text];
           if (asmRefs == null) {
             throw StateError(
@@ -176,53 +192,58 @@ SceneAsm _displayText(
             // each dialog has a length and id
             eventAsm.add(getDialogueByID(asmRef.dialogId));
             eventAsm.add(runText2(asmRef.position.i, tileNumber.i));
-            eventAsm.add(vIntPrepare());
+            if (groupI == maxGroup && i + 1 == set.texts.length) {
+              eventAsm.add(dmaPlaneAVInt());
+            } else {
+              eventAsm.add(vIntPrepare());
+            }
             eventAsm.addNewline();
           }
         }
       }
     }
 
-    eventAsm.replace(eventAsm.length - 2, dmaPlaneAVInt());
-
     var shortestFirst = {0: event0, 1: event1}
         .entries
         .where((entry) => entry.value != null)
         .sorted((a, b) => a.value!.duration.compareTo(b.value!.duration));
 
-    var first = shortestFirst.first.value!;
-    if (first.state == FadeState.fadeIn) {
-      if (!loadedEvents.contains(first)) {
-        var paletteOffset = 0x5e + 0x20 * shortestFirst.first.key;
-        fadeRoutines.add(Asm([
-          setLabel('${first.hashCode}_fade'),
-          move.b((Main_Frame_Count + 1.toValue).w, d1),
-          // TODO: figure out value for this
-          andi.w(3.toValue.i, d1),
-          bne.s('.ret'.toLabel.l),
-          // todo: do we have to load this every loop?
-          lea((Palette_Table_Buffer + paletteOffset.toByte).w, a0),
-          move.w(a0.indirect, d1),
-          addi.w(0x222.toWord.i, d1),
-          btst(0xC.toValue.i, d1),
-          bne.s('.ret'.toLabel.l),
-          move.w(d1, a0.indirect),
-          setLabel('.ret'),
-          rts
-        ]));
-      }
+    var firstEvent = shortestFirst.first;
+    var first = firstEvent.value!;
+    var firstGroup = firstEvent.key;
+    var secondEvent = shortestFirst.skip(1).firstOrNull;
+    var second = secondEvent?.value;
+    var secondGroup = secondEvent?.key;
 
-      var loop = '${first.hashCode}_in';
-      var frames = first.duration.toFrames();
-      eventAsm.add(Asm([
-        moveq(frames.toByte.i, d0),
-        setLabel(loop),
-        // can potentially use bsr
-        jsr('${first.hashCode}_fade'.toLabel.l),
-        vIntPrepare(),
-        dbf(d0, loop.toLabel.l)
-      ]));
+    if (first.state != FadeState.wait && !loadedEvents.contains(first)) {
+      fadeRoutines.add(first.fadeRoutine(groupIndex: firstGroup));
+      fadeRoutines.addNewline();
+      loadedEvents.add(first);
     }
+
+    if (second != null &&
+        second.state != FadeState.wait &&
+        !loadedEvents.contains(second)) {
+      fadeRoutines.add(second.fadeRoutine(groupIndex: secondGroup!));
+      fadeRoutines.addNewline();
+      loadedEvents.add(second);
+    }
+
+    var eventTime =
+        eventTimeByGroup.putIfAbsent(firstGroup, () => Duration.zero);
+    var remainingDuration = eventTime + first.duration - time;
+    var frames = remainingDuration.toFrames();
+    var loopRoutine = '${display.hashCode}_t${time.inMilliseconds}_loop';
+    eventAsm.add(Asm([
+      moveq(frames.toByte.i, d0),
+      setLabel(loopRoutine),
+      // can potentially use bsr
+      jsr(first.fadeRoutineLbl.l),
+      if (second != null) jsr(second.fadeRoutineLbl.l),
+      vIntPrepare(),
+      dbf(d0, loopRoutine.toLabel.l)
+    ]));
+    eventAsm.addNewline();
 
     time += first.duration;
   }
@@ -268,11 +289,42 @@ SceneAsm _displayText(
   //   }
   // }
   // TODO: need to skip these routines so they only get run during fades
-  eventAsm.addNewline();
   eventAsm.add(fadeRoutines);
 
   return SceneAsm(
       event: eventAsm, dialogIdOffset: dialogIdOffset, dialog: newDialogs);
+}
+
+extension _PaletteEventAsm on PaletteEvent {
+  String loopRoutineAt(Duration time) =>
+      '${hashCode}_t${time.inMilliseconds}_fade_in_loop';
+
+  Label get fadeRoutineLbl => '${hashCode}_fade'.toLabel;
+
+  Asm fadeRoutine({required int groupIndex}) {
+    if (groupIndex > 1) {
+      throw ArgumentError('text must not have more that 2 text groups');
+    }
+
+    var paletteOffset = 0x5e + 0x20 * groupIndex;
+
+    return Asm([
+      setLabel(fadeRoutineLbl.name),
+      move.b((Main_Frame_Count + 1.toValue).w, d1),
+      // TODO: figure out value for this
+      andi.w(3.i, d1),
+      bne.s('.ret'.toLabel),
+      // todo: do we have to load this every loop?
+      lea((Palette_Table_Buffer + paletteOffset.toByte).w, a0),
+      move.w(a0.indirect, d1),
+      addi.w(0x222.i, d1),
+      btst(0xC.i, d1),
+      bne.s('.ret'.toLabel),
+      move.w(d1, a0.indirect),
+      setLabel('.ret'),
+      rts
+    ]);
+  }
 }
 
 class _TextEvent {

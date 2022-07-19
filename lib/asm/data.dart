@@ -115,7 +115,7 @@ class Constant extends Expression {
   int get hashCode => constant.hashCode;
 }
 
-class Label extends Expression {
+class Label extends Expression implements Address {
   final String name;
 
   @override
@@ -236,6 +236,7 @@ extension ToValue on int {
     throw AsmError(size, 'invalid data size (must be 1, 2, or 4)');
   }
 
+  Immediate get i => toValue.i;
   Value get toValue => Value(this);
   Byte get toByte => Byte(this);
   Word get toWord => Word(this);

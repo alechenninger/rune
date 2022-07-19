@@ -111,6 +111,21 @@ class Text {
   String toString() {
     return 'Text{spans: $spans, lineBreak: $lineBreak}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Text &&
+          runtimeType == other.runtimeType &&
+          groupSet == other.groupSet &&
+          const ListEquality<Span>().equals(spans, other.spans) &&
+          lineBreak == other.lineBreak;
+
+  @override
+  int get hashCode =>
+      groupSet.hashCode ^
+      const ListEquality<Span>().hash(spans) ^
+      lineBreak.hashCode;
 }
 
 enum HorizontalAlignment { left, center, right }
@@ -138,6 +153,11 @@ class TextGroup {
     sets.add(set);
     return set;
   }
+
+  @override
+  String toString() {
+    return 'TextGroup{$hashCode, sets: $sets}';
+  }
 }
 
 class TextGroupSet {
@@ -160,7 +180,12 @@ class TextGroupSet {
     addDefaultEvents(showFor: showFor);
   }
 
-  /*
+  @override
+  String toString() {
+    return 'TextGroupSet{$hashCode, paletteEvents: $_paletteEvents}';
+  }
+
+/*
   FadeState? fadeAt(Duration time) {
     if (delay > time) return null;
     var doneFadeIn = delay + fadeIn;
