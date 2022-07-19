@@ -58,7 +58,7 @@ SceneAsm _displayText(
     var ascii = text.spans
         .map((s) => s.toAscii(quotes))
         .reduceOr((s1, s2) => s1 + s2, ifEmpty: Bytes.empty());
-    var lines = dialogLines(ascii, dialogIdOffset: dialogIdOffset);
+    var lines = dialogLines(ascii, dialogIdOffset: currentDialogId);
     int? lastLine;
 
     for (var line in lines) {
@@ -75,7 +75,7 @@ SceneAsm _displayText(
           dialogId: line.dialogId, length: line.length, position: position));
 
       cursor.advanceCharactersWithinLine(line.length);
-      dialogIdOffset = (line.dialogId + 1.toByte) as Byte;
+      currentDialogId = (line.dialogId + 1.toByte) as Byte;
       // assumes lines only ever advance by 1...
       if (lastLine != null && line.outputLineNumber > lastLine) {
         cursor.advanceLine();
@@ -88,13 +88,6 @@ SceneAsm _displayText(
 
   // cant just go group by group, need to figure out what to do in parallel.
   // so we do rounds
-  /*
-  look at each sequence
-  each duration represents a breakpoint
-  ...iii...oooiii...oo
-  iiiii...oo...ii...oo
-  ^  ^ ^^ ^^^ ^^ ^  ^
-   */
   // todo: consolidate all of these "by group" map values into a class with each
   // GroupCursor with time, set index, pal event index, etc.
   var time = Duration.zero;
@@ -141,6 +134,8 @@ SceneAsm _displayText(
   PaletteEvent? event1;
   while (true) {
     // only 2 simultaneous are supported for now
+    // to do more would have to figure out how to use more palette cells for
+    // text
     event0 = nextEvent(forGroup: 0);
     event1 = nextEvent(forGroup: 1);
 
@@ -248,46 +243,6 @@ SceneAsm _displayText(
     time += first.duration;
   }
 
-  // for (var group in column.groups) {
-  //   // figure out what text to run and where somehow
-  //   // cursor stuff actually a bit harder
-  //   // have to run through and collect spans in two dimensions
-  //   // cursor (where they should render) and fade group (the states of the
-  //   // palettes)
-  //
-  //   // this should be out of the loop, just for first element i think?
-  //   // eventAsm.add(setPaletteColor(fadeGroup.paletteRow, fadeGroup.paletteCol, fadeGroup.startColor));
-  //
-  //   // replace last with dmaplaneint if this should be displayed?
-  //
-  //   if (fadeGroup.fadeInFrames > 0.toByte) {
-  //     var loop = '${fadeGroup.id}_in';
-  //     eventAsm.add(Asm([
-  //       moveq(fadeGroup.fadeInFrames.i, d0),
-  //       setLabel(loop),
-  //       // can potentially use bsr
-  //       jsr(fadeGroup.fadeInRoutine.l),
-  //       vIntPrepare(),
-  //       dbf(d0, loop.toLabel.l)
-  //     ]));
-  //   }
-  //
-  //   if (fadeGroup.maintainFrames > 0.toWord) {
-  //     eventAsm.add(vIntPrepareLoop(fadeGroup.maintainFrames));
-  //   }
-  //
-  //   if (fadeGroup.fadeOutFrames > 0.toByte) {
-  //     var loop = '${fadeGroup.id}_out';
-  //     eventAsm.add(Asm([
-  //       moveq(fadeGroup.fadeOutFrames.i, d0),
-  //       setLabel(loop),
-  //       // can potentially use bsr
-  //       jsr(fadeGroup.fadeOutRoutine.l),
-  //       vIntPrepare(),
-  //       dbf(d0, loop.toLabel.l)
-  //     ]));
-  //   }
-  // }
   // TODO: need to skip these routines so they only get run during fades
   eventAsm.add(fadeRoutines);
 
