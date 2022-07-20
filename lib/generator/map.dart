@@ -249,13 +249,6 @@ extension ObjectAddress on GameMap {
   }
 }
 
-extension ReduceMax<E extends Comparable> on Iterable<E> {
-  E max() {
-    return reduce(
-        (value, element) => value.compareTo(element) > 0 ? value : element);
-  }
-}
-
 const _piataDialog = r'''
 ; $40
 	dc.b	$FA
