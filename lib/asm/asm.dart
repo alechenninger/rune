@@ -16,6 +16,8 @@ const AndiMnemonic andi = AndiMnemonic();
 const BccMnemonic bne = BccMnemonic('bne');
 const BccMnemonic beq = BccMnemonic('beq');
 const AddiMnemonic addi = AddiMnemonic();
+const SubiMnemonic subi = SubiMnemonic();
+const CmpiMnemonic cmpi = CmpiMnemonic();
 
 final rts = cmd('rts', []);
 
@@ -25,6 +27,7 @@ Asm comment(String comment) => _Instruction(comment: comment).toAsm();
 Asm lea(Address src, Address dst) => cmd('lea', [src, dst]);
 Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
 Asm jsr(Address to) => cmd('jsr', [to]);
+Asm jmp(Address to) => cmd('jmp', [to]);
 Asm bset(Address src, Address dst) => cmd('bset', [src, dst]);
 Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
 Asm trap(Immediate vector) => cmd('trap', [vector]);
@@ -86,6 +89,22 @@ class AddiMnemonic {
   Asm b(Address from, Address to) => cmd('addi.b', [from, to]);
   Asm w(Address from, Address to) => cmd('addi.w', [from, to]);
   Asm l(Address from, Address to) => cmd('addi.l', [from, to]);
+}
+
+class SubiMnemonic {
+  const SubiMnemonic();
+
+  Asm b(Address from, Address to) => cmd('subi.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('subi.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('subi.l', [from, to]);
+}
+
+class CmpiMnemonic {
+  const CmpiMnemonic();
+
+  Asm b(Address from, Address to) => cmd('cmpi.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('cmpi.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('cmpi.l', [from, to]);
 }
 
 class AsmError extends ArgumentError {

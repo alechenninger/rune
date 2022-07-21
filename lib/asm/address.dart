@@ -48,10 +48,10 @@ class _Address implements Address {
 class Absolute extends _Address {
   final Expression exp;
   final Size size;
-  const Absolute._({required this.exp, required this.size})
-      : super('$exp.$size');
-  const Absolute.word(Expression e) : this._(exp: e, size: word);
-  const Absolute.long(Expression e) : this._(exp: e, size: long);
+  Absolute._({required this.exp, required this.size})
+      : super('${exp.withParenthesis()}.$size');
+  Absolute.word(Expression e) : this._(exp: e, size: word);
+  Absolute.long(Expression e) : this._(exp: e, size: long);
 
   Absolute get w => size.isW ? this : Absolute._(exp: exp, size: word);
   Absolute get l => size.isL ? this : Absolute._(exp: exp, size: long);

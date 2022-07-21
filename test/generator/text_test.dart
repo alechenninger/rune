@@ -10,9 +10,9 @@ void main() {
     var g1 = TextGroup();
     var g2 = TextGroup();
     var fadeIn1 = g1.addSet()
-      ..add(PaletteEvent(FadeState.fadeIn, Duration(milliseconds: 500)));
+      ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 2)));
     var fadeIn2 = g2.addSet()
-      ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 1)));
+      ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 2)));
     var ctx = AsmContext.fresh();
     var asm = dislayText(
         DisplayText(

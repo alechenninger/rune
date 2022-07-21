@@ -33,6 +33,14 @@ abstract class Expression {
   /// Assembly representation of the expression.
   @override
   String toString();
+
+  String withParenthesis() {
+    var str = toString();
+    if (str.startsWith('(') && str.endsWith(')')) {
+      return str;
+    }
+    return '($str)';
+  }
 }
 
 class AdditionExpression extends Expression {
