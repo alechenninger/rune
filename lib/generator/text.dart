@@ -102,20 +102,33 @@ SceneAsm _displayText(
           // clear buffer
           for (var text in previousSet.texts) {
             for (var asmRef in textAsmRefs[text]!) {
-              eventAsm.add(Asm([
-                // why w?
-                lea(asmRef.position.w, a0),
-                move.w((asmRef.length * 2).toWord.i, d7),
-                trap(0.i),
+              var words = asmRef.length;
+              var longwords = words ~/ 2;
+              var remainingWords = words % 2;
 
-                lea((asmRef.position + _perLineOffset.toValue).w, a0),
-                move.w((asmRef.length * 2).toWord.i, d7),
-                trap(0.i),
+              for (var offset = 0;
+                  offset < _perLine;
+                  offset += _perLineOffset) {
+                if (longwords > 0) {
+                  eventAsm.add(Asm([
+                    // why w?
+                    lea((asmRef.position + offset.toValue).w, a0),
+                    // trap 0 deletes 1 + argument, but we have the number of
+                    // longs to delete total, so subtract one.
+                    move.w((longwords - 1).toWord.i, d7),
+                    trap(0.i)
+                  ]));
+                }
 
-                lea((asmRef.position + (_perLineOffset * 2).toValue).w, a0),
-                move.w((asmRef.length * 2).toWord.i, d7),
-                trap(0.i),
-              ]));
+                if (remainingWords > 0) {
+                  // only ever 1
+                  eventAsm.add(Asm([
+                    // if we deleted any longwords, d0 will already be 0
+                    if (longwords == 0) moveq(0.i, d0),
+                    move.w(d0, a0.indirect)
+                  ]));
+                }
+              }
             }
           }
         }

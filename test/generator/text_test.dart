@@ -13,9 +13,9 @@ void main() {
       ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 1)))
       ..add(PaletteEvent(FadeState.wait, Duration(seconds: 1)))
       ..add(PaletteEvent(FadeState.fadeOut, Duration(seconds: 1)));
-    // var fadeIn3 = g1.addSet()
-    //   ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 1)))
-    //   ..add(PaletteEvent(FadeState.fadeOut, Duration(seconds: 1)));
+    var fadeIn3 = g1.addSet()
+      ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 1)))
+      ..add(PaletteEvent(FadeState.fadeOut, Duration(seconds: 1)));
     var fadeIn2 = g2.addSet()
       ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 3)))
       ..add(PaletteEvent(FadeState.fadeOut, Duration(seconds: 3)));
@@ -26,7 +26,7 @@ void main() {
             column: TextColumn(texts: [
               Text(spans: Span.parse('Hello world! '), groupSet: fadeIn1),
               Text(spans: Span.parse('Bye! '), groupSet: fadeIn2),
-              // Text(spans: Span.parse('Hi again!'), groupSet: fadeIn3),
+              Text(spans: Span.parse('Hi again!'), groupSet: fadeIn3),
             ])),
         ctx);
 
