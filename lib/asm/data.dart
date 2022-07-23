@@ -310,7 +310,7 @@ abstract class Data<T extends List<int>, E extends SizedValue,
     while (taken < splitLength) {
       var take = min(length - taken, splitLength);
       if (take == 0) break;
-      splits.add(_new(bytes.sublist(taken, take)));
+      splits.add(sublist(taken, take));
       taken += take;
     }
     return splits;
