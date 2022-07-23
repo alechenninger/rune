@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:ffi';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -185,7 +186,7 @@ class Byte extends SizedValue {
 
   @override
   Expression operator +(Expression other) {
-    if (other is Byte) {
+    if (other is Value) {
       return Byte(value + other.value);
     }
     return super + other;
@@ -196,12 +197,28 @@ class Word extends SizedValue {
   Word(int value) : super(value);
   @override
   final size = Size.w;
+
+  @override
+  Expression operator +(Expression other) {
+    if (other is Value) {
+      return Word(value + other.value);
+    }
+    return super + other;
+  }
 }
 
 class Longword extends SizedValue {
   Longword(int value) : super(value);
   @override
   final size = Size.l;
+
+  @override
+  Expression operator +(Expression other) {
+    if (other is Value) {
+      return Longword(value + other.value);
+    }
+    return super + other;
+  }
 }
 
 class Size {

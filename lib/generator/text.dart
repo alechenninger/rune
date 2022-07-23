@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:collection/collection.dart';
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/text.dart';
@@ -43,10 +45,16 @@ SceneAsm _displayText(
   var column = display.column;
 
   // first associate all the asm with each Text, regardless of text group
-  var textAsmRefs = generateDialogs(currentDialogId, display, newDialogs);
+  var textAsmRefs = _generateDialogs(currentDialogId, display, newDialogs);
 
   var vramTileRanges = _VramTileRanges();
   var eventCursor = _ColumnEventIterator(column);
+
+  for (var i = 0; i < column.groups.length; i++) {
+    eventAsm.add(clr.w((Palette_Table_Buffer + (0x5e + 0x20 * i).toByte).w));
+  }
+
+  eventAsm.addNewline();
 
   while (!eventCursor.isDone) {
     // only 2 simultaneous are supported for now
@@ -56,6 +64,7 @@ SceneAsm _displayText(
     var currentGroups = eventCursor.currentGroups;
 
     // setup text or fade routines if necessary
+    var lastVint = -1;
     for (var i = 0; i < currentGroups.length; i++) {
       var group = currentGroups[i];
       var event = group.event!;
@@ -71,11 +80,44 @@ SceneAsm _displayText(
       }
 
       if (!group.loadedSet) {
+        // can we reload everything?
+        // clearplaneabuf
+        // reload all text
+        // keep going with current palette values?
+        // or have to precisely clear planea buffer
+        // lea position
+        // move.b width, d7
+        // trap 0
+        // repeat 2 more times at +0x80 offset
+
         group.loadedSet = true;
 
         for (var tile in group.loadedTiles) {
           vramTileRanges.releaseRange(startingAt: tile, forGroup: groupIndex);
           group.unloadTile(tile);
+        }
+
+        var previousSet = group.previousSet;
+        if (previousSet != null) {
+          // clear buffer
+          for (var text in previousSet.texts) {
+            for (var asmRef in textAsmRefs[text]!) {
+              eventAsm.add(Asm([
+                // why w?
+                lea(asmRef.position.w, a0),
+                move.w((asmRef.length * 2).toWord.i, d7),
+                trap(0.i),
+
+                lea((asmRef.position + _perLineOffset.toValue).w, a0),
+                move.w((asmRef.length * 2).toWord.i, d7),
+                trap(0.i),
+
+                lea((asmRef.position + (_perLineOffset * 2).toValue).w, a0),
+                move.w((asmRef.length * 2).toWord.i, d7),
+                trap(0.i),
+              ]));
+            }
+          }
         }
 
         var set = group.set!;
@@ -99,17 +141,18 @@ SceneAsm _displayText(
                 0x200);
 
             // each dialog has a length and id
+            // each block takes about 0x22 bytes
             eventAsm.add(getDialogueByID(asmRef.dialogId));
             eventAsm.add(runText2(asmRef.position.l, tileNumber.i));
-            if (i + 1 == currentGroups.length && j + 1 == set.texts.length) {
-              eventAsm.add(dmaPlaneAVInt());
-            } else {
-              eventAsm.add(vIntPrepare());
-            }
+            lastVint = eventAsm.add(vIntPrepare());
             eventAsm.addNewline();
           }
         }
       }
+    }
+
+    if (lastVint > -1) {
+      eventAsm.replace(lastVint, dmaPlaneAVInt());
     }
 
     // now loop until next event
@@ -121,11 +164,14 @@ SceneAsm _displayText(
         ? currentGroups[1].event?.fadeRoutineLbl
         : null;
     eventAsm.add(Asm([
-      moveq(frames.toByte.i, d0),
+      if (frames < 128)
+        moveq(frames.toByte.i, d0)
+      else
+        move.l(frames.toLongword.i, d0),
       setLabel(loopRoutine.name),
       // can potentially use bsr
-      if (routine1 != null) jsr(routine1.l),
-      if (routine2 != null) jsr(routine2.l),
+      if (routine1 != null) bsr.w(routine1),
+      if (routine2 != null) bsr.w(routine2),
       vIntPrepare(),
       dbf(d0, loopRoutine)
     ]));
@@ -138,7 +184,7 @@ SceneAsm _displayText(
   var done = 'done_${display.hashCode}';
   // todo: would be nice to use bra i guess? but we don't know how much fade
   //   routine ASM we have.
-  eventAsm.add(jmp(done.toLabel.l));
+  eventAsm.add(bra.w(done.toLabel));
   eventAsm.addNewline();
 
   eventAsm.add(fadeRoutines);
@@ -148,7 +194,7 @@ SceneAsm _displayText(
       event: eventAsm, dialogIdOffset: dialogIdOffset, dialog: newDialogs);
 }
 
-Map<Text, List<TextAsmRef>> generateDialogs(
+Map<Text, List<TextAsmRef>> _generateDialogs(
     Byte currentDialogId, DisplayText display, List<DialogAsm> newDialogs) {
   var column = display.column;
   var textAsmRefs = <Text, List<TextAsmRef>>{};
@@ -198,13 +244,15 @@ class _GroupCursor {
   int _setIndex = 0;
   int _eventIndex = 0;
 
+  TextGroupSet? previousSet;
   TextGroupSet? set;
   PaletteEvent? event;
   Duration? timeLeftInEvent;
 
   bool loadedSet = false;
   bool loadedEvent = false;
-  Set<int> loadedTiles = {};
+  final Set<int> _loadedTiles = {};
+  Set<int> get loadedTiles => Set.unmodifiable(_loadedTiles);
 
   _GroupCursor(this.index, this.group) {
     set = group.sets.firstOrNull;
@@ -213,11 +261,11 @@ class _GroupCursor {
   }
 
   void loadedTile(int tile) {
-    loadedTiles.add(tile);
+    _loadedTiles.add(tile);
   }
 
   void unloadTile(int tile) {
-    loadedTiles.remove(tile);
+    _loadedTiles.remove(tile);
   }
 
   /// returns true if there is still a current event
@@ -240,12 +288,14 @@ class _GroupCursor {
       _setIndex++;
       var sets = group.sets;
       if (_setIndex >= sets.length) {
+        previousSet = set;
         set = null;
         loadedSet = false;
         loadedEvent = false;
         event = null;
         return false;
       }
+      previousSet = set;
       set = sets[_setIndex];
       loadedSet = false;
       events = set!.paletteEvents;
@@ -304,7 +354,18 @@ class _ColumnEventIterator {
 extension _PaletteEventAsm on PaletteEvent {
   Label? get fadeRoutineLbl {
     if (state == FadeState.wait) return null;
-    return 'fade_$hashCode'.toLabel;
+    return '${state.name}_$hashCode'.toLabel;
+  }
+
+  Duration get adjustedDuration {
+    var framesPerStep = (duration ~/ 8).toFrames();
+    var power = log(framesPerStep) / log(2);
+    var andBits = (1 << power.round()) - 1;
+    if ((framesPerStep / (andBits + 1) - 1).abs() < .2) {
+      return Duration(milliseconds: (andBits + 1) * 8 * 1000 ~/ 60);
+    } else {
+      return duration;
+    }
   }
 
   Asm? fadeRoutine({required int groupIndex}) {
@@ -317,11 +378,35 @@ extension _PaletteEventAsm on PaletteEvent {
 
     var paletteOffset = 0x5e + 0x20 * groupIndex;
 
+    // there are 8 color values that we fade through
+    // e.g. if 16 frame duration
+    // we want to spend 2 frames at each color value
+
+    Asm stepTest;
+    var framesPerStep = (duration ~/ 8).toFrames();
+    var power = log(framesPerStep) / log(2);
+    var andBits = (1 << power.round()) - 1;
+    if ((framesPerStep / (andBits + 1) - 1).abs() < .2) {
+      // close enough to and..?
+      stepTest = Asm([
+        move.b((Main_Frame_Count + 1.toValue).w, d1),
+        andi.w(andBits.toWord.i, d1)
+      ]);
+    } else {
+      stepTest = Asm([
+        moveq(0.i, d1),
+        move.w((Main_Frame_Count /* + 1.toValue*/).w, d1),
+        //andi.w(andBits.toWord.i, d1),
+        divu.w(framesPerStep.toWord.i, d1),
+        swap(d1),
+        tst.w(d1),
+      ]);
+    }
+
+    // takes about 0x1e bytes
     return Asm([
       setLabel(lbl.name),
-      move.b((Main_Frame_Count + 1.toValue).w, d1),
-      // TODO: figure out value for this
-      andi.w(3.i, d1),
+      stepTest,
       bne.s('.ret'.toLabel),
       // todo: do we have to load this every loop?
       lea((Palette_Table_Buffer + paletteOffset.toByte).w, a0),
@@ -334,19 +419,21 @@ extension _PaletteEventAsm on PaletteEvent {
         ])
       else
         Asm([
-          cmpi.w(0x666.toWord.i, d1),
-          beq.s('.clear'.toLabel),
+          //cmpi.w(0x666.toWord.i, d1),
+          tst.w(d1),
+          //beq.s('.clear'.toLabel),
+          beq.s('.ret'.toLabel),
           subi.w(0x222.toWord.i, d1)
         ]),
       move.w(d1, a0.indirect),
       setLabel('.ret'),
       rts,
-      if (state == FadeState.fadeOut)
-        Asm([
-          setLabel('.clear'),
-          jsr('ClearPlaneABuf'.toLabel.l),
-          jmp(DMAPlane_A_VInt.l)
-        ])
+      // if (state == FadeState.fadeOut)
+      //   Asm([
+      //     setLabel('.clear'),
+      //     jsr('ClearPlaneABuf'.toLabel.l),
+      //     jmp(DMAPlane_A_VInt.l)
+      //   ])
     ]);
   }
 }

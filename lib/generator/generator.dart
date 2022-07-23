@@ -297,7 +297,7 @@ extension FramesPerSecond on Duration {
     // but 50 in PAL
     // could use conditional pseudo-assembly if / else
     // see: http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_3_6_
-    return inMilliseconds * 60 ~/ 1000;
+    return (inMilliseconds / 1000 * 60).round();
   }
 }
 

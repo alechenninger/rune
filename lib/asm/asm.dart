@@ -13,11 +13,15 @@ const MoveMnemonic move = MoveMnemonic();
 const MoveaMnemonic movea = MoveaMnemonic();
 const ClrMnemonic clr = ClrMnemonic();
 const AndiMnemonic andi = AndiMnemonic();
-const BccMnemonic bne = BccMnemonic('bne');
-const BccMnemonic beq = BccMnemonic('beq');
+const DivuMnemonic divu = DivuMnemonic();
+const BranchMnemonic bra = BranchMnemonic('bra');
+const BranchMnemonic bsr = BranchMnemonic('bsr');
+const BranchMnemonic bne = BranchMnemonic('bne');
+const BranchMnemonic beq = BranchMnemonic('beq');
 const AddiMnemonic addi = AddiMnemonic();
 const SubiMnemonic subi = SubiMnemonic();
 const CmpiMnemonic cmpi = CmpiMnemonic();
+const TstMnemonic tst = TstMnemonic();
 
 final rts = cmd('rts', []);
 
@@ -31,6 +35,7 @@ Asm jmp(Address to) => cmd('jmp', [to]);
 Asm bset(Address src, Address dst) => cmd('bset', [src, dst]);
 Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
 Asm trap(Immediate vector) => cmd('trap', [vector]);
+Asm swap(Address src) => cmd('swap', [src]);
 Asm dbf(Address src, Address dst) => cmd('dbf', [src, dst]);
 Asm btst(Address src, Address dst) => cmd('btst', [src, dst]);
 
@@ -65,6 +70,13 @@ class ClrMnemonic {
   const ClrMnemonic();
   //clr.b	(Render_Sprites_In_Cutscenes).w
   Asm b(Address dst) => cmd('clr.b', [dst]);
+  Asm w(Address dst) => cmd('clr.w', [dst]);
+}
+
+class TstMnemonic {
+  const TstMnemonic();
+  Asm b(Address dst) => cmd('tst.b', [dst]);
+  Asm w(Address dst) => cmd('tst.w', [dst]);
 }
 
 class AndiMnemonic {
@@ -75,9 +87,9 @@ class AndiMnemonic {
   Asm l(Address from, Address to) => cmd('andi.l', [from, to]);
 }
 
-class BccMnemonic {
+class BranchMnemonic {
   final String _branch;
-  const BccMnemonic(this._branch);
+  const BranchMnemonic(this._branch);
 
   Asm s(Address to) => cmd('$_branch.s', [to]);
   Asm w(Address to) => cmd('$_branch.w', [to]);
@@ -97,6 +109,13 @@ class SubiMnemonic {
   Asm b(Address from, Address to) => cmd('subi.b', [from, to]);
   Asm w(Address from, Address to) => cmd('subi.w', [from, to]);
   Asm l(Address from, Address to) => cmd('subi.l', [from, to]);
+}
+
+class DivuMnemonic {
+  const DivuMnemonic();
+
+  Asm w(Address from, Address to) => cmd('divu.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('divu.l', [from, to]);
 }
 
 class CmpiMnemonic {
