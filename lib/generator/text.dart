@@ -57,10 +57,6 @@ SceneAsm _displayText(
   eventAsm.addNewline();
 
   while (!eventCursor.isDone) {
-    // only 2 simultaneous are supported for now
-    // to do more would have to figure out how to use more palette cells for
-    // text
-
     var currentGroups = eventCursor.currentGroups;
 
     // setup text or fade routines if necessary
@@ -80,16 +76,6 @@ SceneAsm _displayText(
       }
 
       if (!group.loadedSet) {
-        // can we reload everything?
-        // clearplaneabuf
-        // reload all text
-        // keep going with current palette values?
-        // or have to precisely clear planea buffer
-        // lea position
-        // move.b width, d7
-        // trap 0
-        // repeat 2 more times at +0x80 offset
-
         group.loadedSet = true;
 
         for (var tile in group.loadedTiles) {
@@ -99,7 +85,15 @@ SceneAsm _displayText(
 
         var previousSet = group.previousSet;
         if (previousSet != null) {
-          // clear buffer
+          // this precisely clears the plane buffer
+          // but maybe it's simpler to reload everything?
+          // e.g.
+          // clearplaneabuf
+          // reload all text
+          // keep going with current palette values?
+          // for now precision seems to work and is probably more efficient
+          eventAsm.add(comment('clear previous text in plane A buffer'));
+
           for (var text in previousSet.texts) {
             for (var asmRef in textAsmRefs[text]!) {
               var words = asmRef.length;
@@ -125,12 +119,16 @@ SceneAsm _displayText(
                   eventAsm.add(Asm([
                     // if we deleted any longwords, d0 will already be 0
                     if (longwords == 0) moveq(0.i, d0),
+                    // trap 0 already increments a0 to the next address
+                    // now we just clear the lower word
                     move.w(d0, a0.indirect)
                   ]));
                 }
               }
             }
           }
+
+          eventAsm.addNewline();
         }
 
         var set = group.set!;
@@ -164,6 +162,7 @@ SceneAsm _displayText(
       }
     }
 
+    // not exactly sure why we have to do this or if we have to
     if (lastVint > -1) {
       eventAsm.replace(lastVint, dmaPlaneAVInt());
     }
@@ -339,7 +338,7 @@ class _ColumnEventIterator {
   }
 
   _GroupCursor get shortest => currentGroups
-      .sorted((a, b) => a.event!.duration.compareTo(b.event!.duration))
+      .sorted((a, b) => a.timeLeftInEvent!.compareTo(b.timeLeftInEvent!))
       .first;
 
   Duration? get timeUntilNextEvent => shortest.timeLeftInEvent;
@@ -474,7 +473,7 @@ class _Cursor {
 
 class _VramTileRanges {
   /// group, [[0,1],[1,2]]
-  // todo: not sure if we relaly need to track group here
+  // todo: not sure if we really need to track group here
   final _rangesByGroup = <int, List<List<int>>>{};
 
   static final _maxTiles = 0x800;
@@ -487,9 +486,15 @@ class _VramTileRanges {
     for (int i = 0; i < allRanges.length; i++) {
       var range = allRanges[i];
 
-      var gap = range[0] - start;
+      var nextStart = range[0];
+      var gap = nextStart - start;
       if (length <= gap) {
-        break;
+        // make sure there range does not start later on same line
+        var line = start ~/ 0x20;
+        var nextLine = nextStart ~/ 20;
+        if (line != nextLine) {
+          break;
+        }
       }
 
       start = range[1];
