@@ -212,6 +212,8 @@ class Longword extends SizedValue {
   @override
   final size = Size.l;
 
+  Word get lowerWord => Word(value & 0xffff);
+
   @override
   Expression operator +(Expression other) {
     if (other is Value) {
@@ -307,11 +309,12 @@ abstract class Data<T extends List<int>, E extends SizedValue,
         message: 'length must be greater than 0 but was $splitLength');
     var taken = 0;
     var splits = <D>[];
-    while (taken < splitLength) {
+    while (taken < length) {
       var take = min(length - taken, splitLength);
       if (take == 0) break;
-      splits.add(sublist(taken, take));
-      taken += take;
+      var takeTo = taken + take;
+      splits.add(sublist(taken, takeTo));
+      taken = takeTo;
     }
     return splits;
   }
