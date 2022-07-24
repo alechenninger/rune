@@ -19,7 +19,7 @@ const _perCharacter = 0x2;
 const _perPaletteLine = 0x2000;
 const _maxPosition = _topLeft + _perLineOffset * 27; // last you can fit is * 26
 
-SceneAsm dislayText(DisplayText display, AsmContext ctx,
+SceneAsm displayText(DisplayText display, AsmContext ctx,
     {DialogTree? dialogTree}) {
   var tree = dialogTree ?? DialogTree();
   return _displayText(display, tree, ctx);
@@ -49,6 +49,7 @@ SceneAsm _displayText(
 
   // todo: should probably merge the vram stuff into cursor? cursor has to
   //   remember related information anyway
+  var planeA = Plane();
   var vramTileRanges = _VramTileRanges();
   var eventCursor = _ColumnEventIterator(column);
 
@@ -65,12 +66,10 @@ SceneAsm _displayText(
     var lastVint = -1;
     for (var i = 0; i < currentGroups.length; i++) {
       var group = currentGroups[i];
-      var event = group.event!;
-      var groupIndex = group.index;
 
       if (!group.loadedEvent) {
         group.loadedEvent = true;
-        var fadeRoutine = event.fadeRoutine(groupIndex: groupIndex);
+        var fadeRoutine = group.event!.fadeRoutine(groupIndex: group.index);
         if (fadeRoutine != null) {
           fadeRoutines.add(fadeRoutine);
           fadeRoutines.addNewline();
@@ -81,42 +80,27 @@ SceneAsm _displayText(
         group.loadedSet = true;
 
         for (var tile in group.loadedTiles) {
-          vramTileRanges.releaseRange(startingAt: tile, forGroup: groupIndex);
+          vramTileRanges.releaseRange(startingAt: tile, forGroup: group.index);
           group.unloadTile(tile);
         }
 
         var previousSet = group.previousSet;
         if (previousSet != null) {
-          _clearPlaneASetText(eventAsm, previousSet, textAsmRefs);
-        }
+          //_clearPlaneASetText(eventAsm, previousSet, textAsmRefs);
+          eventAsm.add(comment('clear previous text in plane A buffer'));
 
-        var set = group.set!;
-        for (var j = 0; j < set.texts.length; j++) {
-          var text = set.texts[j];
-
-          var asmRefs = textAsmRefs[text];
-          if (asmRefs == null) {
-            throw StateError(
-                'no asm refs for text: text=$text, asmRefs=$textAsmRefs');
+          for (var text in previousSet.texts) {
+            for (var asmRef in textAsmRefs[text]!) {
+              eventAsm.add(planeA.clear(asmRef));
+            }
           }
 
-          for (var asmRef in asmRefs) {
-            var tile = vramTileRanges.tileForRange(
-                length: asmRef.length, forGroup: groupIndex);
-            group.loadedTile(tile);
-
-            // todo: parameterize palette row offset?
-            var tileNumber = Word(_perPaletteLine * (groupIndex + 2) +
-                _perCharacter * tile +
-                0x200);
-
-            // each block takes about 0x22 bytes
-            eventAsm.add(getDialogueByID(asmRef.dialogId));
-            eventAsm.add(runText2(asmRef.position.l, tileNumber.i));
-            lastVint = eventAsm.add(vIntPrepare());
-            eventAsm.addNewline();
-          }
+          eventAsm.addNewline();
         }
+
+        lastVint = _loadSetText(
+                textAsmRefs, vramTileRanges, group, eventAsm, planeA) ??
+            lastVint;
       }
     }
 
@@ -164,50 +148,44 @@ SceneAsm _displayText(
       event: eventAsm, dialogIdOffset: dialogIdOffset, dialog: newDialogs);
 }
 
-void _clearPlaneASetText(EventAsm eventAsm, TextGroupSet set,
-    Map<Text, List<TextAsmRef>> textAsmRefs) {
-  // this precisely clears the plane buffer
-  // but maybe it's simpler to reload everything?
-  // e.g.
-  // clearplaneabuf
-  // reload all text
-  // keep going with current palette values?
-  // for now precision seems to work and is probably more efficient
-  eventAsm.add(comment('clear previous text in plane A buffer'));
+int? _loadSetText(
+    Map<Text, List<TextAsmRef>> textAsmRefs,
+    _VramTileRanges vramTileRanges,
+    _GroupCursor group,
+    EventAsm eventAsm,
+    Plane planeA) {
+  TextGroupSet set = group.set!;
+  int? lastVint;
 
-  for (var text in set.texts) {
-    for (var asmRef in textAsmRefs[text]!) {
-      var words = asmRef.length;
-      var longwords = words ~/ 2;
-      var remainingWords = words % 2;
+  for (var j = 0; j < set.texts.length; j++) {
+    var text = set.texts[j];
 
-      for (var offset = 0; offset < _perLine; offset += _perLineOffset) {
-        if (longwords > 0) {
-          eventAsm.add(Asm([
-            // why w?
-            lea((asmRef.position + offset.toValue).w, a0),
-            // trap 0 deletes 1 + argument, but we have the number of
-            // longs to delete total, so subtract one.
-            move.w((longwords - 1).toWord.i, d7),
-            trap(0.i)
-          ]));
-        }
+    var asmRefs = textAsmRefs[text];
+    if (asmRefs == null) {
+      throw StateError(
+          'no asm refs for text: text=$text, asmRefs=$textAsmRefs');
+    }
 
-        if (remainingWords > 0) {
-          // only ever 1
-          eventAsm.add(Asm([
-            // if we deleted any longwords, d0 will already be 0
-            if (longwords == 0) moveq(0.i, d0),
-            // trap 0 already increments a0 to the next address
-            // now we just clear the lower word
-            move.w(d0, a0.indirect)
-          ]));
-        }
-      }
+    for (var asmRef in asmRefs) {
+      var tile = vramTileRanges.tileForRange(
+          length: asmRef.length, forGroup: group.index);
+      group.loadedTile(tile);
+
+      planeA.write(asmRef);
+
+      // todo: parameterize palette row offset?
+      var tileNumber = Word(
+          _perPaletteLine * (group.index + 2) + _perCharacter * tile + 0x200);
+
+      // each block takes about 0x22 bytes
+      eventAsm.add(getDialogueByID(asmRef.dialogId));
+      eventAsm.add(runText2(asmRef.position.l, tileNumber.i));
+      lastVint = eventAsm.add(vIntPrepare());
+      eventAsm.addNewline();
     }
   }
 
-  eventAsm.addNewline();
+  return lastVint;
 }
 
 Map<Text, List<TextAsmRef>> _generateDialogs(
@@ -531,4 +509,71 @@ class TextAsmRef {
 
   TextAsmRef(
       {required this.dialogId, required this.position, required this.length});
+}
+
+class Plane {
+  final _cells = List<TextAsmRef?>.filled(0x1000, null);
+  final _texts = <TextAsmRef, int>{};
+
+  void write(TextAsmRef text) {
+    // we know what text we actually care about
+    // vs extra that is mapped
+    var cell = text.position.value - _topLeft;
+
+    for (var i = 0; i < 32 * _perCharacter; i++) {
+      _cells[cell + i] = text;
+    }
+
+    _texts[text] = cell;
+  }
+
+  Asm clear(TextAsmRef text) {
+    // so when we free some text, we actually want to free whatever that text
+    // is mapped to
+    // if something else overwrote part of the mapping, it won't get freed
+    var asm = Asm.empty();
+
+    var start = _texts.remove(text);
+    if (start == null) throw 'text not present';
+    int end = start;
+
+    // do 32 characters unless there is vram mapping to other text which
+    // overwrote the buffer there
+    for (; end < start + 32 * _perCharacter; end++) {
+      if (_cells[end] != text) break;
+      _cells[end] = null;
+    }
+
+    var words = end - start;
+    var longwords = words ~/ 2;
+    var remainingWords = words % 2;
+
+    for (var lineOffset = 0;
+        lineOffset < _perLine;
+        lineOffset += _perLineOffset) {
+      if (longwords > 0) {
+        asm.add(Asm([
+          // why w?
+          lea((text.position + lineOffset.toValue).w, a0),
+          // trap 0 deletes 1 + argument, but we have the number of
+          // longs to delete total, so subtract one.
+          move.w((longwords - 1).toWord.i, d7),
+          trap(0.i)
+        ]));
+      }
+
+      if (remainingWords > 0) {
+        // only ever 1
+        asm.add(Asm([
+          // if we deleted any longwords, d0 will already be 0
+          if (longwords == 0) moveq(0.i, d0),
+          // trap 0 already increments a0 to the next address
+          // now we just clear the lower word
+          move.w(d0, a0.indirect)
+        ]));
+      }
+    }
+
+    return asm;
+  }
 }

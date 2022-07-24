@@ -29,7 +29,7 @@ void main() {
       ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 2)))
       ..add(PaletteEvent(FadeState.fadeOut, Duration(seconds: 2)));
     var ctx = AsmContext.fresh();
-    var asm = dislayText(
+    var asm = displayText(
         DisplayText(
             lineOffset: 0,
             column: TextColumn(texts: [
@@ -47,5 +47,38 @@ void main() {
         ctx);
 
     print(asm);
+  });
+
+  test(
+      'drawing to vram and mapping plane at new location does not show phantom text',
+      () {
+    // need to get 2 texts to load simultaneously
+    // and then after, one loads which goes past
+    var g1 = TextGroup();
+    var g2 = TextGroup();
+    var g1s1 = g1.addSet()
+      ..add(fadeIn(Duration(seconds: 1)))
+      ..add(fadeOut(Duration(seconds: 1)));
+    var g1s2 = g1.addSet()
+      ..add(fadeIn(Duration(seconds: 1)))
+      ..add(fadeOut(Duration(seconds: 1)));
+    var g2s1 = g2.addSet()
+      ..add(fadeIn(Duration(seconds: 1)))
+      ..add(fadeOut(Duration(seconds: 1)));
+
+    var display = DisplayText(
+        lineOffset: 0,
+        column: TextColumn(texts: [
+          Text(spans: [Span('hello ')], groupSet: g1s1),
+          Text(
+              spans: [Span('1234567890abcdefghijklmnopqrstuvwxyz!-– ')],
+              groupSet: g2s1),
+          Text(spans: Span.parse('world '), groupSet: g1s1),
+          Text(
+              spans: [Span('1234567890abcdefghijklmnopqrstuvwxyz!-– ')],
+              groupSet: g1s2),
+        ]));
+
+    print(displayText(display, AsmContext.fresh()));
   });
 }

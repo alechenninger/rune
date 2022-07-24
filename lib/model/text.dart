@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
+import 'package:rune/src/iterables.dart';
 
 import '../generator/generator.dart';
 import 'model.dart';
@@ -106,6 +107,10 @@ class Text {
   Text({required this.spans, required this.groupSet, this.lineBreak = false}) {
     groupSet.texts.add(this);
   }
+
+  int get length => spans
+      .map((span) => span.text.length)
+      .reduceOr((l1, l2) => l1 + l2, ifEmpty: 0);
 
   @override
   String toString() {
