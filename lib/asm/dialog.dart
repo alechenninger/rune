@@ -58,11 +58,13 @@ Asm portrait(Byte portrait) {
 }
 
 List<LineAsm> dialogLines(Bytes dialog,
-    {int outputWidth = 40, Byte dialogIdOffset = Byte.zero}) {
+    {int outputWidth = 40,
+    int startingColumn = 0,
+    Byte dialogIdOffset = Byte.zero}) {
   var lines = List<LineAsm>.empty(growable: true);
   var lineNum = 0;
   var lineStart = 0;
-  var breakPoint = 0;
+  var breakPoint = -1;
 
   void append(int start, [int? end]) {
     var line = dialog.sublist(start, end);
@@ -88,7 +90,16 @@ List<LineAsm> dialogLines(Bytes dialog,
       breakPoint = i;
     }
 
-    if (i - lineStart == outputWidth) {
+    var lineOffset = lineNum == 0 ? startingColumn : 0;
+    if (i - lineStart + lineOffset == outputWidth) {
+      if (breakPoint == -1) {
+        // No breakpoint before hitting end of line.
+        // Jump to next line and reset
+        lineNum++;
+        breakPoint = 0;
+        continue;
+      }
+
       append(lineStart, breakPoint);
 
       // Determine new line start (skip whitespace)
