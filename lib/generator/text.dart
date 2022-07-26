@@ -86,7 +86,6 @@ SceneAsm _displayText(
 
         var previousSet = group.previousSet;
         if (previousSet != null) {
-          //_clearPlaneASetText(eventAsm, previousSet, textAsmRefs);
           eventAsm.add(comment('clear previous text in plane A buffer'));
 
           for (var text in previousSet.texts) {
@@ -201,31 +200,49 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
         .reduceOr((s1, s2) => s1 + s2, ifEmpty: Bytes.empty());
     var lines = dialogLines(ascii,
         startingColumn: cursor.col, dialogIdOffset: currentDialogId);
-    int lastLine = 0;
+    var startLineNumber = cursor.line;
 
-    for (var line in lines) {
-      // assumes lines only ever advance by 1...
-      if (line.outputLineNumber > lastLine) {
-        cursor.advanceLine();
+    for (var outputLine
+        in lines.groupListsBy((l) => l.outputLineNumber).entries) {
+      cursor.line = startLineNumber + outputLine.key;
+      var lines = outputLine.value;
+
+      if (column.hAlign != HorizontalAlignment.left) {
+        var length = lines
+            .map((l) => l.length)
+            .reduceOr((l1, l2) => l1 + l2, ifEmpty: 0);
+        if (column.hAlign == HorizontalAlignment.center) {
+          var leftOffset = (column.width - length) ~/ 2;
+          cursor.advanceCharactersWithinLine(leftOffset);
+        } else {
+          var leftOffset = column.width - length;
+          cursor.advanceCharactersWithinLine(leftOffset);
+        }
       }
 
-      var position = Longword(_topLeft +
-          display.lineOffset * _perLineOffset +
-          cursor.line * _perLine +
-          cursor.col * _perCharacter);
+      for (var line in lines) {
+        var position = Longword(_topLeft +
+            display.lineOffset * _perLineOffset +
+            cursor.line * _perLine +
+            cursor.col * _perCharacter);
 
-      if (position >= _maxPosition.toValue) {
-        throw ArgumentError('text extends past bottom of screen. text="$text"');
+        if (position >= _maxPosition.toValue) {
+          throw ArgumentError(
+              'text extends past bottom of screen. text="$text"');
+        }
+
+        textAsmRefs.putIfAbsent(text, () => []).add(TextAsmRef(
+            dialogId: line.dialogId, length: line.length, position: position));
+
+        cursor.advanceCharactersWithinLine(line.length);
+        currentDialogId = (line.dialogId + 1.toByte) as Byte;
+
+        newDialogs.add(DialogAsm([line.asm]));
       }
+    }
 
-      textAsmRefs.putIfAbsent(text, () => []).add(TextAsmRef(
-          dialogId: line.dialogId, length: line.length, position: position));
-
-      cursor.advanceCharactersWithinLine(line.length);
-      currentDialogId = (line.dialogId + 1.toByte) as Byte;
-      lastLine = line.outputLineNumber;
-
-      newDialogs.add(DialogAsm([line.asm]));
+    if (text.lineBreak) {
+      cursor.advanceLine();
     }
   }
 

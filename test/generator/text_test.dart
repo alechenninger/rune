@@ -81,4 +81,52 @@ void main() {
 
     print(displayText(display, AsmContext.fresh()));
   });
+
+  test('demo text', () {
+    var g1 = TextGroup();
+    var g2 = TextGroup();
+
+    var riseAndFall = g1.addSet()
+      ..add(fadeIn(Duration(seconds: 1)))
+      ..add(wait(Duration(seconds: 1)))
+      ..add(fadeOut(Duration(seconds: 1)));
+
+    var duskAndDawn = g2.addSet()
+      ..add(wait(Duration(seconds: 1)))
+      ..add(fadeIn(Duration(seconds: 1)))
+      ..add(wait(Duration(seconds: 1)))
+      ..add(fadeOut(Duration(seconds: 1)));
+
+    var begAndEnd = g1.addSet()
+      ..add(fadeIn(Duration(seconds: 1)))
+      ..add(wait(Duration(seconds: 1)))
+      ..add(fadeOut(Duration(seconds: 1)));
+
+    var ofMillen = g2.addSet()
+      ..add(fadeIn(Duration(seconds: 1)))
+      ..add(wait(Duration(seconds: 1)))
+      ..add(fadeOut(Duration(seconds: 1)));
+
+    var display = DisplayText(
+        lineOffset: 5,
+        column: TextColumn(hAlign: HorizontalAlignment.center, texts: [
+          Text(
+              spans: [Span('The rise and fall.')],
+              groupSet: riseAndFall,
+              lineBreak: true),
+          Text(
+              spans: [Span('The dusk and dawn.          ')],
+              groupSet: duskAndDawn,
+              lineBreak: true),
+          Text(
+              spans: [Span('The beginning and the end...     ')],
+              groupSet: begAndEnd,
+              lineBreak: true),
+          Text(
+              spans: [Span('of the millennium.          ')],
+              groupSet: ofMillen),
+        ]));
+
+    print(displayText(display, AsmContext.fresh()));
+  });
 }
