@@ -60,6 +60,12 @@ SceneAsm _displayText(
   eventAsm.addNewline();
 
   while (!eventCursor.isDone) {
+    for (var group in eventCursor.finishedGroups) {
+      if (group.loadedSet != null) {
+        _clearSet(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
+      }
+    }
+
     var currentGroups = eventCursor.currentGroups;
 
     // setup text or fade routines if necessary
@@ -76,62 +82,58 @@ SceneAsm _displayText(
         }
       }
 
-      if (!group.loadedSet) {
-        group.loadedSet = true;
-
-        for (var tile in group.loadedTiles) {
-          vramTileRanges.releaseRange(startingAt: tile, forGroup: group.index);
-          group.unloadTile(tile);
-        }
-
-        var previousSet = group.previousSet;
-        if (previousSet != null) {
-          eventAsm.add(comment('clear previous text in plane A buffer'));
-
-          for (var text in previousSet.texts) {
-            for (var asmRef in textAsmRefs[text]!) {
-              eventAsm.add(planeA.clear(asmRef));
-            }
+      if (!group.hidden) {
+        if (!group.isCurrentSetLoaded) {
+          if (group.isPreviousSetLoaded) {
+            _clearSet(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
           }
 
-          eventAsm.addNewline();
-        }
+          group.loadedSet = group.set;
 
-        lastVint = _loadSetText(
-                textAsmRefs, vramTileRanges, group, eventAsm, planeA) ??
-            lastVint;
+          lastVint = _loadSetText(
+                  textAsmRefs, vramTileRanges, group, eventAsm, planeA) ??
+              lastVint;
+        }
+      } else if (group.loadedSet != null) {
+        _clearSet(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
       }
     }
 
-    // not exactly sure why we have to do this or if we have to
-    if (lastVint > -1) {
-      eventAsm.replace(lastVint, dmaPlaneAVInt());
+    if (planeA.isBufferDirty) {
+      if (lastVint > -1) {
+        eventAsm.replace(lastVint, planeA.queueDmaUpdate(vIntPrepare: true));
+      } else {
+        eventAsm.add(planeA.queueDmaUpdate());
+        eventAsm.addNewline();
+      }
     }
 
-    // now loop until next event
-    var frames = eventCursor.timeUntilNextEvent!.toFrames();
-    var loopRoutine = eventCursor.currentLoopRoutine;
+    if (currentGroups.isNotEmpty) {
+      // now loop until next event
+      var frames = eventCursor.timeUntilNextEvent!.toFrames();
+      var loopRoutine = eventCursor.currentLoopRoutine;
 
-    var routine1 = currentGroups[0].event?.fadeRoutineLbl;
-    var routine2 = currentGroups.length > 1
-        ? currentGroups[1].event?.fadeRoutineLbl
-        : null;
-    eventAsm.add(Asm([
-      if (frames < 128)
-        moveq(frames.toByte.i, d0)
-      else
-        move.l(frames.toLongword.i, d0),
-      setLabel(loopRoutine.name),
-      // can potentially use bsr
-      if (routine1 != null) bsr.w(routine1),
-      if (routine2 != null) bsr.w(routine2),
-      vIntPrepare(),
-      dbf(d0, loopRoutine)
-    ]));
+      var routine1 = currentGroups[0].event?.fadeRoutineLbl;
+      var routine2 = currentGroups.length > 1
+          ? currentGroups[1].event?.fadeRoutineLbl
+          : null;
+      eventAsm.add(Asm([
+        if (frames < 128)
+          moveq(frames.toByte.i, d0)
+        else
+          move.l(frames.toLongword.i, d0),
+        setLabel(loopRoutine.name),
+        // can potentially use bsr
+        if (routine1 != null) bsr.w(routine1),
+        if (routine2 != null) bsr.w(routine2),
+        vIntPrepare(),
+        dbf(d0, loopRoutine)
+      ]));
 
-    eventAsm.addNewline();
+      eventAsm.addNewline();
 
-    eventCursor.advanceToNextEvent();
+      eventCursor.advanceToNextEvent();
+    }
   }
 
   var done = 'done_${display.hashCode}';
@@ -145,6 +147,29 @@ SceneAsm _displayText(
 
   return SceneAsm(
       event: eventAsm, dialogIdOffset: dialogIdOffset, dialog: newDialogs);
+}
+
+void _clearSet(_GroupCursor group, _VramTileRanges vramTileRanges,
+    EventAsm eventAsm, Map<Text, List<TextAsmRef>> textAsmRefs, Plane planeA) {
+  var loaded = group.loadedSet;
+  if (loaded != null) {
+    group.loadedSet = null;
+
+    for (var tile in group.loadedTiles) {
+      vramTileRanges.releaseRange(startingAt: tile, forGroup: group.index);
+      group.unloadTile(tile);
+    }
+
+    eventAsm.add(comment('clear previous text in plane A buffer'));
+
+    for (var text in loaded.texts) {
+      for (var asmRef in textAsmRefs[text]!) {
+        eventAsm.add(planeA.clear(asmRef));
+      }
+    }
+
+    eventAsm.addNewline();
+  }
 }
 
 int? _loadSetText(
@@ -259,18 +284,39 @@ class _GroupCursor {
 
   TextGroupSet? previousSet;
   TextGroupSet? set;
-  PaletteEvent? event;
+  PaletteEvent? _event;
+  PaletteEvent? get event => _event;
   Duration? timeLeftInEvent;
 
-  bool loadedSet = false;
+  TextGroupSet? loadedSet;
+  bool get isPreviousSetLoaded =>
+      previousSet != null && loadedSet == previousSet;
+  bool get isCurrentSetLoaded => loadedSet == set;
   bool loadedEvent = false;
   final Set<int> _loadedTiles = {};
   Set<int> get loadedTiles => Set.unmodifiable(_loadedTiles);
 
+  bool hidden = true;
+
   _GroupCursor(this.index, this.group) {
     set = group.sets.firstOrNull;
-    event = set?.paletteEvents.firstOrNull;
+    _setEvent(set?.paletteEvents.firstOrNull, Duration.zero);
     timeLeftInEvent = event?.duration;
+  }
+
+  void _setEvent(PaletteEvent? event, Duration at) {
+    if (event?.state == FadeState.fadeIn) {
+      hidden = false;
+    }
+    if (event?.state == FadeState.wait && _event?.state == FadeState.fadeOut) {
+      hidden = true;
+    }
+    _event = event;
+    loadedEvent = false;
+    if (event != null) {
+      lastEventTime = at;
+      timeLeftInEvent = event.duration;
+    }
   }
 
   void loadedTile(int tile) {
@@ -303,22 +349,16 @@ class _GroupCursor {
       if (_setIndex >= sets.length) {
         previousSet = set;
         set = null;
-        loadedSet = false;
-        loadedEvent = false;
-        event = null;
+        _setEvent(null, time);
         return false;
       }
       previousSet = set;
       set = sets[_setIndex];
-      loadedSet = false;
       events = set!.paletteEvents;
       _eventIndex = 0;
     }
 
-    event = events[_eventIndex];
-    loadedEvent = false;
-    lastEventTime = time;
-    timeLeftInEvent = event!.duration;
+    _setEvent(events[_eventIndex], time);
 
     return true;
   }
@@ -357,11 +397,16 @@ class _ColumnEventIterator {
     return !isDone;
   }
 
-  bool get isDone => currentGroups.isEmpty;
+  bool get isDone =>
+      finishedGroups.where((g) => g.loadedSet == null).length == groups.length;
 
-  List<_GroupCursor> get currentGroups => _groupCursors.values
-      .where((group) => group.event != null)
-      .toList(growable: false);
+  Iterable<_GroupCursor> get groups => _groupCursors.values;
+
+  List<_GroupCursor> get finishedGroups =>
+      groups.where((group) => group.event == null).toList(growable: false);
+
+  List<_GroupCursor> get currentGroups =>
+      groups.where((group) => group.event != null).toList(growable: false);
 }
 
 extension _PaletteEventAsm on PaletteEvent {
@@ -532,6 +577,17 @@ class Plane {
   final _cells = List<TextAsmRef?>.filled(0x1000, null);
   final _texts = <TextAsmRef, int>{};
 
+  var _bufferDirty = false;
+  bool get isBufferDirty => _bufferDirty;
+
+  Asm queueDmaUpdate({bool vIntPrepare = false}) {
+    _bufferDirty = false;
+    if (vIntPrepare) {
+      return dmaPlaneAVInt();
+    }
+    return jsr('DMA_PlaneA'.toLabel.l);
+  }
+
   void write(TextAsmRef text) {
     // we know what text we actually care about
     // vs extra that is mapped
@@ -542,6 +598,7 @@ class Plane {
     }
 
     _texts[text] = cell;
+    _bufferDirty = true;
   }
 
   Asm clear(TextAsmRef text) {
@@ -566,7 +623,8 @@ class Plane {
     var remainingWords = words % 2;
 
     for (var lineOffset = 0;
-        lineOffset < _perLine;
+        // not sure why but only 2 lines works and 3 clears too much
+        lineOffset < _perLine - _perLineOffset;
         lineOffset += _perLineOffset) {
       if (longwords > 0) {
         asm.add(Asm([
@@ -590,6 +648,8 @@ class Plane {
         ]));
       }
     }
+
+    _bufferDirty = true;
 
     return asm;
   }
