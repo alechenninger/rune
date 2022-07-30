@@ -16,7 +16,7 @@ class DisplayText extends Event {
   final int lineOffset;
   final TextColumn column;
 
-  DisplayText({required this.lineOffset, required this.column});
+  DisplayText({this.lineOffset = 0, required this.column});
 
   @override
   String toString() {

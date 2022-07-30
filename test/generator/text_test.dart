@@ -32,19 +32,16 @@ void main() {
     var ctx = AsmContext.fresh();
     var asm = displayText(
         DisplayText(
-            lineOffset: 0,
-            column: TextColumn(texts: [
-              Text(spans: Span.parse('Hello world! '), groupSet: fadeIn1),
-              Text(spans: Span.parse('Bye! '), groupSet: fadeIn2),
-              Text(spans: Span.parse('Hi again! '), groupSet: fadeIn3),
-              Text(
-                  spans: Span.parse(
-                      'This fading _business_ is really something. '),
-                  groupSet: fade4),
-              Text(spans: Span.parse("I'll say!"), groupSet: fadeIn5),
-              Text(
-                  spans: Span.parse('This is even wackier'), groupSet: fadeIn1),
-            ])),
+            column: TextColumn(vAlign: VerticalAlignment.center, texts: [
+          Text(spans: Span.parse('Hello world! '), groupSet: fadeIn1),
+          Text(spans: Span.parse('Bye! '), groupSet: fadeIn2),
+          Text(spans: Span.parse('Hi again! '), groupSet: fadeIn3),
+          Text(
+              spans: Span.parse('This fading _business_ is really something. '),
+              groupSet: fade4),
+          Text(spans: Span.parse("I'll say!"), groupSet: fadeIn5),
+          Text(spans: Span.parse('This is even wackier'), groupSet: fadeIn1),
+        ])),
         ctx);
 
     print(asm);
@@ -68,17 +65,16 @@ void main() {
       ..add(fadeOut(Duration(seconds: 1)));
 
     var display = DisplayText(
-        lineOffset: 0,
         column: TextColumn(texts: [
-          Text(spans: [Span('hello ')], groupSet: g1s1),
-          Text(
-              spans: [Span('1234567890abcdefghijklmnopqrstuvwxyz!-– ')],
-              groupSet: g2s1),
-          Text(spans: Span.parse('world '), groupSet: g1s1),
-          Text(
-              spans: [Span('1234567890abcdefghijklmnopqrstuvwxyz!-– ')],
-              groupSet: g1s2),
-        ]));
+      Text(spans: [Span('hello ')], groupSet: g1s1),
+      Text(
+          spans: [Span('1234567890abcdefghijklmnopqrstuvwxyz!-– ')],
+          groupSet: g2s1),
+      Text(spans: Span.parse('world '), groupSet: g1s1),
+      Text(
+          spans: [Span('1234567890abcdefghijklmnopqrstuvwxyz!-– ')],
+          groupSet: g1s2),
+    ]));
 
     print(displayText(display, AsmContext.fresh()));
   });
@@ -101,7 +97,7 @@ void main() {
     var begAndEnd = g1.addSet()
       ..add(wait(Duration(seconds: 2)))
       ..add(fadeIn(Duration(milliseconds: 500)))
-      ..add(wait(Duration(seconds: 2)))
+      ..add(wait(Duration(seconds: 4, milliseconds: 500)))
       ..add(fadeOut(Duration(milliseconds: 500)));
 
     var ofMillen = g2.addSet()
@@ -112,22 +108,26 @@ void main() {
       ..add(wait(Duration(seconds: 2)));
 
     var display = DisplayText(
-        lineOffset: 7,
-        column: TextColumn(hAlign: HorizontalAlignment.center, texts: [
-          Text(
-              spans: [Span('The rise and fall.')],
-              groupSet: riseAndFall,
-              lineBreak: true),
-          Text(
-              spans: [Span('The dusk and dawn.')],
-              groupSet: duskAndDawn,
-              lineBreak: true),
-          Text(
-              spans: [Span('The beginning and the end...')],
-              groupSet: begAndEnd,
-              lineBreak: true),
-          Text(spans: [Span('of the millennium.')], groupSet: ofMillen),
-        ]));
+        // lineOffset: 7,
+        lineOffset: 0,
+        column: TextColumn(
+            vAlign: VerticalAlignment.center,
+            hAlign: HorizontalAlignment.center,
+            texts: [
+              Text(
+                  spans: [Span('The rise and fall.')],
+                  groupSet: riseAndFall,
+                  lineBreak: true),
+              Text(
+                  spans: [Span('The dusk and dawn.')],
+                  groupSet: duskAndDawn,
+                  lineBreak: true),
+              Text(
+                  spans: [Span('The beginning and the end...')],
+                  groupSet: begAndEnd,
+                  lineBreak: true),
+              Text(spans: [Span('of the millennium.')], groupSet: ofMillen),
+            ]));
 
     print(displayText(display, AsmContext.fresh()));
   });

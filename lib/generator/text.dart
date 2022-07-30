@@ -69,6 +69,9 @@ SceneAsm _displayText(
 
       if (!group.loadedEvent) {
         group.loadedEvent = true;
+        // todo: often due to symmetry desired in design, these fade routines
+        //   end up being the same, creating a lot of redundant code.
+        //   especially if we parameterize the palette address
         var fadeRoutine =
             group.event!.fadeRoutine(groupIndex: group.index, set: group.set!);
         if (fadeRoutine != null) {
@@ -224,7 +227,7 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
     Byte currentDialogId, DisplayText display, List<DialogAsm> newDialogs) {
   var column = display.column;
   var textAsmRefs = <Text, List<TextAsmRef>>{};
-  var cursor = _Cursor();
+  var layout = _ColumnLayout();
   var quotes = Quotes();
 
   for (var text in column.texts) {
@@ -232,12 +235,13 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
         .map((s) => s.toAscii(quotes))
         .reduceOr((s1, s2) => s1 + s2, ifEmpty: Bytes.empty());
     var lines = dialogLines(ascii,
-        startingColumn: cursor.col, dialogIdOffset: currentDialogId);
-    var startLineNumber = cursor.line;
+        startingColumn: layout.col, dialogIdOffset: currentDialogId);
+
+    var startLineNumber = layout.line;
 
     for (var outputLine
         in lines.groupListsBy((l) => l.outputLineNumber).entries) {
-      cursor.line = startLineNumber + outputLine.key;
+      layout.line = startLineNumber + outputLine.key;
       var lines = outputLine.value;
 
       if (column.hAlign != HorizontalAlignment.left) {
@@ -246,37 +250,54 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
             .reduceOr((l1, l2) => l1 + l2, ifEmpty: 0);
         if (column.hAlign == HorizontalAlignment.center) {
           var leftOffset = (column.width - length) ~/ 2;
-          cursor.advanceCharactersWithinLine(leftOffset);
+          layout.advanceCharactersWithinLine(leftOffset);
         } else {
           var leftOffset = column.width - length;
-          cursor.advanceCharactersWithinLine(leftOffset);
+          layout.advanceCharactersWithinLine(leftOffset);
         }
       }
 
       for (var line in lines) {
-        var position = Longword(_topLeft +
-            display.lineOffset * _perLineOffset +
-            cursor.line * _perLine +
-            cursor.col * _perCharacter);
-
-        if (position >= _maxPosition.toValue) {
-          throw ArgumentError(
-              'text extends past bottom of screen. text="$text"');
-        }
-
-        textAsmRefs.putIfAbsent(text, () => []).add(TextAsmRef(
-            dialogId: line.dialogId, length: line.length, position: position));
-
-        cursor.advanceCharactersWithinLine(line.length);
+        layout.place(line, text);
         currentDialogId = (line.dialogId + 1.toByte) as Byte;
-
         newDialogs.add(DialogAsm([line.asm]));
       }
     }
 
     if (text.lineBreak) {
-      cursor.advanceLine();
+      layout.advanceLine();
     }
+  }
+
+  var alignedLineOffset = display.lineOffset;
+  if (column.vAlign != VerticalAlignment.top) {
+    var totalLines = layout.line + (layout.col == 0 ? 0 : 1);
+    var maxOffsets =
+        (_maxPosition - (_topLeft + display.lineOffset * _perLineOffset)) ~/
+            _perLineOffset;
+    var heightInOffsets = totalLines * (_perLine ~/ _perLineOffset);
+    if (column.vAlign == VerticalAlignment.center) {
+      alignedLineOffset += (maxOffsets - heightInOffsets) ~/ 2;
+    } else {
+      alignedLineOffset += maxOffsets - heightInOffsets;
+    }
+  }
+
+  for (var placement in layout.placements) {
+    var position = Longword(_topLeft +
+        alignedLineOffset * _perLineOffset +
+        placement.line * _perLine +
+        placement.col * _perCharacter);
+
+    Text text = placement.text;
+    LineAsm asm = placement.asm;
+
+    if (position >= _maxPosition.toValue) {
+      throw ArgumentError('text extends past bottom of screen. text="$text"');
+    }
+
+    textAsmRefs.putIfAbsent(text, () => []).add(TextAsmRef(
+        dialogId: asm.dialogId, length: asm.length, position: position));
   }
 
   return textAsmRefs;
@@ -497,12 +518,13 @@ extension _PaletteEventAsm on PaletteEvent {
   }
 }
 
-class _Cursor {
+class _ColumnLayout {
   var _position = [0, 0];
   var _advanced = 0;
   int get line => _position[0];
   int get col => _position[1];
   int get advanced => _advanced;
+
   void advanceCharactersWithinLine(int length) {
     _position[1] = _position[1] + length;
     _advanced += length;
@@ -525,6 +547,27 @@ class _Cursor {
     _position = [0, 0];
     _advanced = 0;
   }
+
+  final _placements = <_Placement>[];
+  List<_Placement> get placements => _placements;
+
+  void place(LineAsm asm, Text text) {
+    _placements.add(_Placement(line: line, col: col, text: text, asm: asm));
+    advanceCharactersWithinLine(asm.length);
+  }
+}
+
+class _Placement {
+  final int line;
+  final int col;
+  final Text text;
+  final LineAsm asm;
+
+  _Placement(
+      {required this.line,
+      required this.col,
+      required this.text,
+      required this.asm});
 }
 
 class _VramTileRanges {
