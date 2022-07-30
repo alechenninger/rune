@@ -28,7 +28,15 @@ abstract class Expression {
   Absolute get l => Absolute.long(this);
 
   Expression operator +(Expression other) {
-    return AdditionExpression(this, other);
+    return ArithmaticExpression('+', this, other);
+  }
+
+  Expression operator -(Expression other) {
+    return ArithmaticExpression('-', this, other);
+  }
+
+  Expression operator ~/(Expression other) {
+    return ArithmaticExpression('/', this, other);
   }
 
   /// Assembly representation of the expression.
@@ -44,25 +52,26 @@ abstract class Expression {
   }
 }
 
-class AdditionExpression extends Expression {
+class ArithmaticExpression extends Expression {
   final Expression operand1;
   final Expression operand2;
+  final String operator;
 
-  AdditionExpression(this.operand1, this.operand2);
+  ArithmaticExpression(this.operator, this.operand1, this.operand2);
 
   @override
   bool get isKnownZero => false;
 
   @override
   String toString() {
-    return '($operand1+$operand2)';
+    return '($operand1$operator$operand2)';
   }
 }
 
 class Value extends Expression implements Comparable<Value> {
   final int value;
 
-  Value(this.value);
+  const Value(this.value) : super.constant();
 
   const Value.constant(this.value) : super.constant();
 
@@ -78,6 +87,22 @@ class Value extends Expression implements Comparable<Value> {
       return Value(value + other.value);
     }
     return super + other;
+  }
+
+  @override
+  Expression operator -(Expression other) {
+    if (other is Value) {
+      return Value(value - other.value);
+    }
+    return super - other;
+  }
+
+  @override
+  Expression operator ~/(Expression other) {
+    if (other is Value) {
+      return Value(value ~/ other.value);
+    }
+    return super ~/ other;
   }
 
   bool operator >(Value other) {
@@ -195,6 +220,7 @@ class Byte extends SizedValue {
 
 class Word extends SizedValue {
   Word(int value) : super(value);
+
   @override
   final size = Size.w;
 
@@ -204,6 +230,22 @@ class Word extends SizedValue {
       return Word(value + other.value);
     }
     return super + other;
+  }
+
+  @override
+  Expression operator -(Expression other) {
+    if (other is Value) {
+      return Word(value - other.value);
+    }
+    return super - other;
+  }
+
+  @override
+  Expression operator ~/(Expression other) {
+    if (other is Value) {
+      return Word(value ~/ other.value);
+    }
+    return super ~/ other;
   }
 }
 

@@ -16,7 +16,17 @@ const AndiMnemonic andi = AndiMnemonic();
 const DivuMnemonic divu = DivuMnemonic();
 const BranchMnemonic bra = BranchMnemonic('bra');
 const BranchMnemonic bsr = BranchMnemonic('bsr');
+
+/// Branch if Z is clear
 const BranchMnemonic bne = BranchMnemonic('bne');
+
+/// Branch if N is set (negative)
+const BranchMnemonic bmi = BranchMnemonic('bmi');
+
+/// Branch if N is clear (positive)
+const BranchMnemonic bpl = BranchMnemonic('bpl');
+
+/// Branch if Z is set
 const BranchMnemonic beq = BranchMnemonic('beq');
 const AddiMnemonic addi = AddiMnemonic();
 const SubiMnemonic subi = SubiMnemonic();
@@ -37,6 +47,8 @@ Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
 Asm trap(Immediate vector) => cmd('trap', [vector]);
 Asm swap(Address src) => cmd('swap', [src]);
 Asm dbf(Address src, Address dst) => cmd('dbf', [src, dst]);
+
+/// Set Z if bit is 0.
 Asm btst(Address src, Address dst) => cmd('btst', [src, dst]);
 
 // It looks like this should be limited to 32 bytes per line

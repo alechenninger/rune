@@ -1,3 +1,4 @@
+import 'package:rune/asm/asm.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/text.dart';
 import 'package:rune/model/model.dart';
@@ -83,8 +84,8 @@ void main() {
   });
 
   test('demo text', () {
-    var g1 = TextGroup();
-    var g2 = TextGroup();
+    var g1 = TextGroup(defaultBlack: Word(0x666));
+    var g2 = TextGroup(defaultBlack: Word(0x666));
 
     var riseAndFall = g1.addSet()
       ..add(fadeIn(Duration(milliseconds: 500)))

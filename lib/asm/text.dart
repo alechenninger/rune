@@ -26,18 +26,13 @@ Asm dmaPlaneAVInt() {
 }
 
 Asm runText2(
-  Address position,
-  Address tileNumber,
+  Address planeABufferPosition,
+  Address vramTileNumber,
 ) {
   return Asm([
-    lea(position, a1),
-    move.w(tileNumber, d3),
+    lea(planeABufferPosition, a1),
+    move.w(vramTileNumber, d3),
     moveq(1.toValue.i, d4),
     jsr(RunText2.l),
   ]);
-}
-
-Asm setPaletteColor(int row, int column, Word color) {
-  var offset = (row * 0x20 + column * 2).toValue;
-  return lea(color.i, (Palette_Table_Buffer + offset).w);
 }

@@ -53,12 +53,6 @@ SceneAsm _displayText(
   var vramTileRanges = _VramTileRanges();
   var eventCursor = _ColumnEventIterator(column);
 
-  for (var i = 0; i < column.groups.length; i++) {
-    eventAsm.add(clr.w((Palette_Table_Buffer + (0x5e + 0x20 * i).toByte).w));
-  }
-
-  eventAsm.addNewline();
-
   while (!eventCursor.isDone) {
     for (var group in eventCursor.finishedGroups) {
       if (group.loadedSet != null) {
@@ -75,7 +69,8 @@ SceneAsm _displayText(
 
       if (!group.loadedEvent) {
         group.loadedEvent = true;
-        var fadeRoutine = group.event!.fadeRoutine(groupIndex: group.index);
+        var fadeRoutine =
+            group.event!.fadeRoutine(groupIndex: group.index, set: group.set!);
         if (fadeRoutine != null) {
           fadeRoutines.add(fadeRoutine);
           fadeRoutines.addNewline();
@@ -110,7 +105,10 @@ SceneAsm _displayText(
 
     if (currentGroups.isNotEmpty) {
       // now loop until next event
-      var frames = eventCursor.timeUntilNextEvent!.toFrames();
+      // add 1 just in case there is some vint timing issue
+      // sometimes certain configurations don't make it to the next key frame
+      // in the animation for some reason.
+      var frames = eventCursor.timeUntilNextEvent!.toFrames() + 1;
       var loopRoutine = eventCursor.currentLoopRoutine;
 
       var routine1 = currentGroups[0].event?.fadeRoutineLbl;
@@ -180,6 +178,16 @@ int? _loadSetText(
     Plane planeA) {
   TextGroupSet set = group.set!;
   int? lastVint;
+
+  // todo: assumes previous set faded out
+  if (group.previousSet?.black != set.black) {
+    var palette = Palette_Table_Buffer + (0x5e + 0x20 * group.index).toByte;
+    var setBlack = set.black == Word(0)
+        ? clr.w(palette.w)
+        : move.w(set.black.i, palette.w);
+    eventAsm.add(setBlack);
+    eventAsm.addNewline();
+  }
 
   for (var j = 0; j < set.texts.length; j++) {
     var text = set.texts[j];
@@ -415,7 +423,7 @@ extension _PaletteEventAsm on PaletteEvent {
     return '${state.name}_$hashCode'.toLabel;
   }
 
-  Asm? fadeRoutine({required int groupIndex}) {
+  Asm? fadeRoutine({required int groupIndex, required TextGroupSet set}) {
     if (groupIndex > 1) {
       throw ArgumentError('text must not have more that 2 text groups');
     }
@@ -425,12 +433,17 @@ extension _PaletteEventAsm on PaletteEvent {
 
     var paletteOffset = 0x5e + 0x20 * groupIndex;
 
-    // there are 8 color values that we fade through
+    // if there are 8 color values that we fade through
     // e.g. if 16 frame duration
     // we want to spend 2 frames at each color value
 
+    // todo: values must be perfectly divisible by 0x222
+    var white = set.white;
+    var black = set.black;
+    var steps = (white.value - black.value) ~/ 0x222;
+
     Asm stepTest;
-    var framesPerStep = (duration ~/ 8).toFrames();
+    var framesPerStep = (duration ~/ steps).toFrames();
     var power = log(framesPerStep) / log(2);
     var andBits = (1 << power.round()) - 1;
     if ((framesPerStep / (andBits + 1) - 1).abs() < .2) {
@@ -443,7 +456,6 @@ extension _PaletteEventAsm on PaletteEvent {
       stepTest = Asm([
         moveq(0.i, d1),
         move.w((Main_Frame_Count /* + 1.toValue*/).w, d1),
-        //andi.w(andBits.toWord.i, d1),
         divu.w(framesPerStep.toWord.i, d1),
         swap(d1),
         tst.w(d1),
@@ -461,27 +473,26 @@ extension _PaletteEventAsm on PaletteEvent {
       if (state == FadeState.fadeIn)
         Asm([
           addi.w(0x222.toWord.i, d1),
-          btst(0xC.i, d1),
-          bne.s('.ret'.toLabel)
+          if (white == Word(0xEEE)) ...[
+            btst(0xC.i, d1),
+            bne.s('.ret'.toLabel)
+          ] else ...[
+            cmpi.w((white).i, d1),
+            // if d1 > white, don't add to
+            bpl.s('.ret'.toLabel)
+          ],
         ])
       else
         Asm([
           // if we want a non-zero lower bound, can use
           // e.g. cmpi.w(0x666.toWord.i, d1),
-          tst.w(d1),
-          //beq.s('.clear'.toLabel),
+          if (black == Word(0)) tst.w(d1) else cmpi.w(black.i, d1),
           beq.s('.ret'.toLabel),
           subi.w(0x222.toWord.i, d1)
         ]),
       move.w(d1, a0.indirect),
       setLabel('.ret'),
       rts,
-      // if (state == FadeState.fadeOut)
-      //   Asm([
-      //     setLabel('.clear'),
-      //     jsr('ClearPlaneABuf'.toLabel.l),
-      //     jmp(DMAPlane_A_VInt.l)
-      //   ])
     ]);
   }
 }

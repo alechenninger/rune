@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
+import 'package:rune/asm/asm.dart';
 import 'package:rune/src/iterables.dart';
 
 import '../generator/generator.dart';
@@ -152,9 +153,18 @@ PaletteEvent fadeOut(Duration d) => PaletteEvent(FadeState.fadeOut, d);
 
 class TextGroup {
   final sets = <TextGroupSet>[];
+  final Word defaultBlack;
+  final Word defaultWhite;
 
-  TextGroupSet addSet() {
-    var set = TextGroupSet(group: this);
+  TextGroup({Word? defaultBlack, Word? defaultWhite})
+      : defaultWhite = defaultWhite ?? Word(0xEEE),
+        defaultBlack = defaultBlack ?? Word(0);
+
+  TextGroupSet addSet({Word? white, Word? black}) {
+    var set = TextGroupSet(
+        group: this,
+        white: white ?? defaultWhite,
+        black: black ?? defaultBlack);
     sets.add(set);
     return set;
   }
@@ -171,18 +181,27 @@ class TextGroupSet {
 
   final TextGroup group;
   final List<Text> texts = [];
+  final Word black;
+  final Word white;
+
+  TextGroupSet({required this.group, Word? black, Word? white})
+      : black = black ?? Word(0),
+        white = white ?? Word(0xeee);
+  TextGroupSet.withDefaultFades(
+      {required this.group,
+      required Duration showFor,
+      Word? black,
+      Word? white})
+      : black = black ?? Word(0),
+        white = white ?? Word(0xeee) {
+    addDefaultEvents(showFor: showFor);
+  }
 
   void add(PaletteEvent f) => _paletteEvents.add(f);
   void addDefaultEvents({required Duration showFor}) {
     add(fadeIn(Duration(milliseconds: 500)));
     add(wait(showFor));
     add(fadeOut(Duration(milliseconds: 500)));
-  }
-
-  TextGroupSet({required this.group});
-  TextGroupSet.withDefaultFades(
-      {required this.group, required Duration showFor}) {
-    addDefaultEvents(showFor: showFor);
   }
 
   @override
