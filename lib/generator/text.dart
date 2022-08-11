@@ -1,16 +1,16 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:rune/asm/dialog.dart';
-import 'package:rune/asm/text.dart';
-import 'package:rune/generator/event.dart';
-import 'package:rune/generator/generator.dart';
-import 'package:rune/generator/scene.dart';
-import 'package:rune/model/text.dart';
-import 'package:rune/src/iterables.dart';
 
 import '../asm/asm.dart';
+import '../asm/dialog.dart';
+import '../asm/text.dart';
+import '../model/text.dart';
+import '../src/iterables.dart';
 import 'dialog.dart';
+import 'event.dart';
+import 'generator.dart';
+import 'scene.dart';
 
 const _topLeft = 0xffff8000;
 const _perLine = 0x180;
@@ -51,7 +51,7 @@ SceneAsm _displayText(
   //   remember related information anyway
   var planeA = Plane();
   var vramTileRanges = _VramTileRanges();
-  var eventCursor = _ColumnEventIterator(column);
+  var eventCursor = _ColumnEventCursor(column);
 
   while (!eventCursor.isDone) {
     for (var group in eventCursor.finishedGroups) {
@@ -289,8 +289,8 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
         placement.line * _perLine +
         placement.col * _perCharacter);
 
-    Text text = placement.text;
-    LineAsm asm = placement.asm;
+    var text = placement.text;
+    var asm = placement.asm;
 
     if (position >= _maxPosition.toValue) {
       throw ArgumentError('text extends past bottom of screen. text="$text"');
@@ -393,13 +393,13 @@ class _GroupCursor {
   }
 }
 
-class _ColumnEventIterator {
+class _ColumnEventCursor {
   final TextColumn column;
 
   var _time = Duration.zero;
   final _groupCursors = <int, _GroupCursor>{};
 
-  _ColumnEventIterator(this.column) {
+  _ColumnEventCursor(this.column) {
     var groups = column.groups;
     for (int i = 0; i < groups.length; i++) {
       var group = groups[i];
@@ -414,6 +414,8 @@ class _ColumnEventIterator {
   Duration? get timeUntilNextEvent => shortest.timeLeftInEvent;
 
   Label get currentLoopRoutine =>
+      // todo: for deterministic ASM compiles, we could keep track of unique
+      // columns in context and refer by number
       'loop_${column.hashCode}_t${_time.inMilliseconds}'.toLabel;
 
   bool advanceToNextEvent() {
@@ -451,6 +453,11 @@ extension _PaletteEventAsm on PaletteEvent {
 
     var lbl = fadeRoutineLbl;
     if (lbl == null) return null;
+
+    // todo: fade routines with the same parameters produce the same code
+    //   we should reuse them.
+    // we can even do this across text events if we push this into global
+    // context.
 
     var paletteOffset = 0x5e + 0x20 * groupIndex;
 

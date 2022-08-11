@@ -1,9 +1,9 @@
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
-import 'package:rune/asm/asm.dart';
-import 'package:rune/src/iterables.dart';
 
+import '../asm/asm.dart';
 import '../generator/generator.dart';
+import "../src/iterables.dart";
 import 'model.dart';
 
 class DisplayText extends Event {
@@ -12,6 +12,8 @@ class DisplayText extends Event {
   /// way to do this is to just use a single column with new lines.
   ///
   /// See [Text.lineBreak].
+  // todo: for now we are assuming just one column at a time
+  // multiple is possible but they still have to share the same 2 text groups
   // final Map<int, List<TextColumn>> columns;
   final int lineOffset;
   final TextColumn column;
@@ -44,6 +46,7 @@ class DisplayText extends Event {
 /// A continuously (left-to-right) laid out series of [Text]s which may display
 /// at different times but share the same boundaries and alignment.
 class TextColumn {
+  // todo: unimplemented
   final int left;
   final int width;
   final VerticalAlignment vAlign;
@@ -58,16 +61,21 @@ class TextColumn {
       this.width = 40,
       this.vAlign = VerticalAlignment.top,
       this.hAlign = HorizontalAlignment.left,
-      required this.texts})
-      : groups =
-            texts.map((e) => e.groupSet.group).toSet().toList(growable: false) {
+      required List<Text> texts})
+      : texts = List.unmodifiable(texts),
+        groups = List.unmodifiable(texts
+            .map((e) => e.groupSet.group)
+            .toSet()
+            .toList(growable: false)) {
     checkArgument(left + width <= 40,
         message:
             'left + width must be <= 40 but $left + $width = ${left + width}');
+    checkArgument(texts.isNotEmpty, message: 'texts must not be empty');
     // TODO: if we support multiple columns at once this check would move up
     //   to that higher level
-    checkArgument(groups.length <= 2,
-        message: 'cannot display more than 2 text groups');
+    checkArgument(groups.isNotEmpty && groups.length <= 2,
+        message: 'cannot display more than 2 text groups '
+            '(and must have at least one)');
   }
 
   @override
@@ -84,6 +92,7 @@ class TextColumn {
           left == other.left &&
           width == other.width &&
           hAlign == other.hAlign &&
+          vAlign == other.vAlign &&
           const ListEquality<Text>().equals(texts, other.texts);
 
   @override
@@ -91,6 +100,7 @@ class TextColumn {
       left.hashCode ^
       width.hashCode ^
       hAlign.hashCode ^
+      vAlign.hashCode ^
       const ListEquality<Text>().hash(texts);
 }
 
@@ -106,7 +116,7 @@ class Text {
   final bool lineBreak;
 
   Text({required this.spans, required this.groupSet, this.lineBreak = false}) {
-    groupSet.texts.add(this);
+    groupSet._addToSet(this);
   }
 
   int get length => spans
@@ -152,7 +162,8 @@ PaletteEvent wait(Duration d) => PaletteEvent(FadeState.wait, d);
 PaletteEvent fadeOut(Duration d) => PaletteEvent(FadeState.fadeOut, d);
 
 class TextGroup {
-  final sets = <TextGroupSet>[];
+  final _sets = <TextGroupSet>[];
+  List<TextGroupSet> get sets => List.unmodifiable(_sets);
   final Word defaultBlack;
   final Word defaultWhite;
 
@@ -165,13 +176,13 @@ class TextGroup {
         group: this,
         white: white ?? defaultWhite,
         black: black ?? defaultBlack);
-    sets.add(set);
+    _sets.add(set);
     return set;
   }
 
   @override
   String toString() {
-    return 'TextGroup{$hashCode, sets: $sets}';
+    return 'TextGroup{$hashCode, sets: $_sets}';
   }
 }
 
@@ -180,7 +191,8 @@ class TextGroupSet {
   List<PaletteEvent> get paletteEvents => UnmodifiableListView(_paletteEvents);
 
   final TextGroup group;
-  final List<Text> texts = [];
+  final _texts = <Text>[];
+  List<Text> get texts => List.unmodifiable(_texts);
   final Word black;
   final Word white;
 
@@ -197,6 +209,10 @@ class TextGroupSet {
     addDefaultEvents(showFor: showFor);
   }
 
+  void _addToSet(Text text) {
+    _texts.add(text);
+  }
+
   void add(PaletteEvent f) => _paletteEvents.add(f);
   void addDefaultEvents({required Duration showFor}) {
     add(fadeIn(Duration(milliseconds: 500)));
@@ -208,17 +224,4 @@ class TextGroupSet {
   String toString() {
     return 'TextGroupSet{$hashCode, paletteEvents: $_paletteEvents}';
   }
-
-/*
-  FadeState? fadeAt(Duration time) {
-    if (delay > time) return null;
-    var doneFadeIn = delay + fadeIn;
-    if (doneFadeIn > time) return FadeState.fadeIn;
-    var doneMaintain = doneFadeIn + duration;
-    if (doneMaintain > time) return FadeState.wait;
-    var doneFadeOut = doneMaintain + fadeOut;
-    if (doneFadeOut > time) return FadeState.fadeOut;
-    return null;
-  }
-   */
 }
