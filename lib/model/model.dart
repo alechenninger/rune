@@ -110,6 +110,10 @@ class Scene {
     events.add(event);
   }
 
+  void addEvents(Iterable<Event> events) {
+    this.events.addAll(events);
+  }
+
   @override
   String toString() {
     return 'Scene{name: $name, events: $events}';
@@ -139,6 +143,14 @@ class SceneId {
 
   @override
   String toString() => id;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SceneId && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class SetContext extends Event {
