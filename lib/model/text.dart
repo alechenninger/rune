@@ -115,6 +115,7 @@ class Text {
   /// If a line break should occur after these spans.
   final bool lineBreak;
 
+  @Deprecated('use TextGroupSet#addText instead')
   Text({required this.spans, required this.groupSet, this.lineBreak = false}) {
     groupSet._addToSet(this);
   }
@@ -164,6 +165,7 @@ PaletteEvent fadeOut(Duration d) => PaletteEvent(FadeState.fadeOut, d);
 class TextGroup {
   final _sets = <TextGroupSet>[];
   List<TextGroupSet> get sets => List.unmodifiable(_sets);
+  // todo: decouple model from asm
   final Word defaultBlack;
   final Word defaultWhite;
 
@@ -178,6 +180,17 @@ class TextGroup {
         black: black ?? defaultBlack);
     _sets.add(set);
     return set;
+  }
+
+  TextGroupSet setAt(int index, {Word? white, Word? black}) {
+    if (index >= _sets.length) {
+      if (index != _sets.length) {
+        throw ArgumentError(
+            'must be existing or next set but was $index', 'index');
+      }
+      return addSet(white: white, black: black);
+    }
+    return _sets[index];
   }
 
   @override
@@ -211,6 +224,11 @@ class TextGroupSet {
 
   void _addToSet(Text text) {
     _texts.add(text);
+  }
+
+  Text addText(List<Span> spans, {bool lineBreak = false}) {
+    // ignore: deprecated_member_use_from_same_package
+    return Text(spans: spans, groupSet: this, lineBreak: lineBreak);
   }
 
   void add(PaletteEvent f) => _paletteEvents.add(f);

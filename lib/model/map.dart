@@ -33,7 +33,6 @@ class GameMap {
   }
 }
 
-// ignore: constant_identifier_names
 enum MapId {
   Aiedo,
   Piata,
