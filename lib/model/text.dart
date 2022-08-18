@@ -27,8 +27,12 @@ class DisplayText extends Event {
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
-    // TODO: implement generateAsm
-    throw UnimplementedError();
+    throw 'unsupported';
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.displayText(this);
   }
 
   @override

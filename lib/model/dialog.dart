@@ -71,6 +71,11 @@ class Dialog extends Event {
   }
 
   @override
+  void visit(EventVisitor visitor) {
+    visitor.dialog(this);
+  }
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Dialog &&

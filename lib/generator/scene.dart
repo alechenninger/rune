@@ -1,3 +1,5 @@
+import 'package:rune/model/text.dart';
+
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
 import '../asm/events.dart';
@@ -33,7 +35,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
   var eventCounter = 1;
   var startInEvent = ctx.inEvent;
 
-  void _terminateCurrentDialogTree({int? at}) {
+  void _terminateCurrentDialog({int? at}) {
     // todo: this is probably only ever the last line
     //   so we could remove parameter and just check if last line is an event
     //   break control code and if so replace that?
@@ -60,7 +62,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
       currentDialog.add(interrupt());
     }
 
-    currentDialog.add(dialog.generateAsm(generator, ctx));
+    currentDialog.add(generator.dialogToAsm(dialog));
   }
 
   void _addEvent(Event event) {
@@ -93,7 +95,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
   if (!ctx.inEvent) {
     if (!_processableInDialogLoop(scene, ctx)) {
       _startEventFromDialog(ctx, currentDialog, eventAsm, sceneId);
-      _terminateCurrentDialogTree();
+      _terminateCurrentDialog();
     } else if (ctx.isProcessingInteraction) {
       // todo: isn't this always true if not in event?
       var first = events.first;
@@ -120,9 +122,9 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
 
   // was lastEventBreak >= 0, but i think it should be this?
   if (!ctx.inDialogLoop && lastEventBreak >= 0) {
-    _terminateCurrentDialogTree(at: lastEventBreak);
+    _terminateCurrentDialog(at: lastEventBreak);
   } else if (currentDialog.isNotEmpty) {
-    _terminateCurrentDialogTree();
+    _terminateCurrentDialog();
   }
 
   if (!startInEvent && ctx.inEvent) {
@@ -146,14 +148,14 @@ bool _isInteractionObjFacePlayer(Event event, AsmContext ctx) {
   return event.object == ctx.inAddress(a3)?.obj;
 }
 
-void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialogTree,
+void _startEventFromDialog(AsmContext ctx, DialogAsm currentDialog,
     EventAsm eventAsm, SceneId? sceneId) {
   var eventName =
       sceneId?.toString() ?? ctx.peekNextEventIndex.value.toRadixString(16);
   var eventRoutine = Label('Event_GrandCross_$eventName');
   var eventIndex = ctx.addEventPointer(eventRoutine);
 
-  currentDialogTree.add(runEvent(eventIndex));
+  currentDialog.add(runEvent(eventIndex));
 
   eventAsm.add(setLabel(eventRoutine.name));
 

@@ -19,22 +19,12 @@ const _perCharacter = 0x2;
 const _perPaletteLine = 0x2000;
 const _maxPosition = _topLeft + _perLineOffset * 27; // last you can fit is * 26
 
-SceneAsm displayText(DisplayText display, AsmContext ctx,
-    {DialogTree? dialogTree}) {
+SceneAsm displayTextToAsm(DisplayText display, {DialogTree? dialogTree}) {
   var tree = dialogTree ?? DialogTree();
-  return _displayText(display, tree, ctx);
+  return _displayTextToAsm(display, tree);
 }
 
-SceneAsm _displayText(
-    DisplayText display, DialogTree dialogTree, AsmContext ctx) {
-  // todo: otherwise we assume in dialog loop, in which case we would do similar
-  // to scene asm and fork into event mode... however if we're in dialog loop,
-  // different asm generator should be called? (e.g. scene)
-  if (!ctx.inEvent) {
-    throw StateError(
-        'asm must be generating event to generate display text asm');
-  }
-
+SceneAsm _displayTextToAsm(DisplayText display, DialogTree dialogTree) {
   var newDialogs = <DialogAsm>[];
   // todo: handle hitting max trees!
   var currentDialogId = dialogTree.nextDialogId!,

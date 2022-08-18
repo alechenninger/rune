@@ -223,6 +223,11 @@ class FacePlayer extends Event {
   }
 
   @override
+  void visit(EventVisitor visitor) {
+    visitor.facePlayer(this);
+  }
+
+  @override
   String toString() {
     return 'FacePlayer{object: $object}';
   }
@@ -305,6 +310,11 @@ class PartyMove extends Event {
   }
 
   @override
+  void visit(EventVisitor visitor) {
+    visitor.partyMove(this);
+  }
+
+  @override
   String toString() {
     return 'PartyMove{movement: $movement, startingAxis: $startingAxis}';
   }
@@ -318,6 +328,11 @@ class IndividualMoves extends Event {
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.individualMovesToAsm(this, ctx);
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.individualMoves(this);
   }
 
   Steps get duration => moves.values

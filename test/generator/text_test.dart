@@ -30,19 +30,17 @@ void main() {
       ..add(PaletteEvent(FadeState.fadeIn, Duration(seconds: 2)))
       ..add(PaletteEvent(FadeState.fadeOut, Duration(seconds: 2)));
     var ctx = AsmContext.fresh();
-    var asm = displayText(
-        DisplayText(
-            column: TextColumn(vAlign: VerticalAlignment.center, texts: [
-          Text(spans: Span.parse('Hello world! '), groupSet: fadeIn1),
-          Text(spans: Span.parse('Bye! '), groupSet: fadeIn2),
-          Text(spans: Span.parse('Hi again! '), groupSet: fadeIn3),
-          Text(
-              spans: Span.parse('This fading _business_ is really something. '),
-              groupSet: fade4),
-          Text(spans: Span.parse("I'll say!"), groupSet: fadeIn5),
-          Text(spans: Span.parse('This is even wackier'), groupSet: fadeIn1),
-        ])),
-        ctx);
+    var asm = displayTextToAsm(DisplayText(
+        column: TextColumn(vAlign: VerticalAlignment.center, texts: [
+      Text(spans: Span.parse('Hello world! '), groupSet: fadeIn1),
+      Text(spans: Span.parse('Bye! '), groupSet: fadeIn2),
+      Text(spans: Span.parse('Hi again! '), groupSet: fadeIn3),
+      Text(
+          spans: Span.parse('This fading _business_ is really something. '),
+          groupSet: fade4),
+      Text(spans: Span.parse("I'll say!"), groupSet: fadeIn5),
+      Text(spans: Span.parse('This is even wackier'), groupSet: fadeIn1),
+    ])));
 
     print(asm);
   });
@@ -76,7 +74,7 @@ void main() {
           groupSet: g1s2),
     ]));
 
-    print(displayText(display, AsmContext.fresh()));
+    print(displayTextToAsm(display));
   });
 
   test('demo text', () {
@@ -129,6 +127,6 @@ void main() {
               Text(spans: [Span('of the millennium.')], groupSet: ofMillen),
             ]));
 
-    print(displayText(display, AsmContext.fresh()));
+    print(displayTextToAsm(display));
   });
 }

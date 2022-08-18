@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/text.dart';
 
 import 'dialog.dart';
 import 'map.dart';
@@ -14,9 +15,23 @@ export 'movement.dart';
 export 'map.dart';
 
 abstract class Event {
-  // TODO: should probably not have this here? creates dependency on generator
-  // from model
+  @Deprecated('does not fit all events')
   Asm generateAsm(AsmGenerator generator, AsmContext ctx);
+
+  void visit(EventVisitor visitor);
+}
+
+abstract class EventVisitor {
+  void asm(Asm asm); // todo: ?
+  void dialog(Dialog dialog);
+  void displayText(DisplayText text);
+  void facePlayer(FacePlayer face);
+  void individualMoves(IndividualMoves moves);
+  void lockCamera(LockCamera lock);
+  void partyMove(PartyMove move);
+  void pause(Pause pause);
+  void setContext(SetContext set);
+  void unlockCamera(UnlockCamera unlock);
 }
 
 class EventState {
@@ -90,6 +105,7 @@ class Positions {
 }
 
 class Scene {
+  @Deprecated('unused')
   final String? name;
   final List<Event> events;
 
@@ -165,6 +181,11 @@ class SetContext extends Event {
   }
 
   @override
+  void visit(EventVisitor visitor) {
+    visitor.setContext(this);
+  }
+
+  @override
   String toString() {
     // todo: detect if mirrors avail and output source?
     return 'SetContext{$_setCtx}';
@@ -183,6 +204,11 @@ class Pause extends Event {
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.pauseToAsm(this);
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.pause(this);
   }
 
   @override
@@ -208,6 +234,11 @@ class LockCamera extends Event {
   }
 
   @override
+  void visit(EventVisitor visitor) {
+    visitor.lockCamera(this);
+  }
+
+  @override
   String toString() {
     return 'LockCamera{}';
   }
@@ -217,6 +248,11 @@ class UnlockCamera extends Event {
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.unlockCameraToAsm(ctx);
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.unlockCamera(this);
   }
 
   @override

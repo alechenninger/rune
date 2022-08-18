@@ -18,8 +18,16 @@ void main() {
       var scene = Scene([dialog1, dialog2]);
       var sceneAsm =
           generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
+      var program = Program();
+      program.addScene(SceneId('test'), scene);
 
       expect(sceneAsm.dialog[0].toString(), '''${dialog1.toAsm()}
+	dc.b	\$FD
+${dialog2.toAsm()}
+	dc.b	\$FF''');
+
+      expect(program.scenes[SceneId('test')]!.dialog[0].toString(),
+          '''${dialog1.toAsm()}
 	dc.b	\$FD
 ${dialog2.toAsm()}
 	dc.b	\$FF''');
