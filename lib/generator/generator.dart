@@ -54,61 +54,24 @@ class Program {
   void addScene(SceneId id, Scene scene) {
     var dialogTree = DialogTree();
     var eventAsm = EventAsm.empty();
-    var builder = _SceneAsmBuilder.forEvent(id, dialogTree, eventAsm);
+    var generator = SceneAsmGenerator.forEvent(id, dialogTree, eventAsm);
+
     for (var event in scene.events) {
-      event.visit(builder);
+      event.visit(generator);
     }
-    builder.finish();
+
+    generator.finish();
+
     _scenes[id] = SceneAsm(
         event: eventAsm, dialogIdOffset: Byte(0), dialog: dialogTree.toList());
   }
 
-  // TODO: except this has to be in context of a map! derp!
-  void addDialogInteraction(SceneId id, FieldObject obj, Scene scene) {
-    var dialogTree = DialogTree();
-    var event = EventAsm.empty();
-    _SceneAsmBuilder builder;
-    var events = scene.events;
-
-    if (_processableInDialogLoop(scene, obj)) {
-      builder =
-          _SceneAsmBuilder.forDialogInteractionWith(obj, id, dialogTree, event);
-    } else {
-      // Have to start an event from dialog loop, and then can continue as if
-      // in event.
-      var eventName = id.toString();
-      var eventRoutine = Label('Event_GrandCross_$eventName');
-      var eventIndex = addEventPointer(eventRoutine);
-
-      var dialog = DialogAsm.empty();
-      dialog.add(runEvent(eventIndex));
-      dialog.add(terminateDialog());
-      dialogTree.add(dialog);
-
-      event.add(setLabel(eventRoutine.name));
-
-      builder = _SceneAsmBuilder.forDialogInteractionWith(
-          obj, id, dialogTree, event,
-          inEvent: true);
+  void addMap(GameMap map) {
+    var builder = MapAsmBuilder(map, addEventPointer);
+    for (var obj in map.objects) {
+      builder.addObject(obj);
     }
-
-    for (var event in events) {
-      event.visit(builder);
-    }
-
-    builder.finish();
-  }
-
-  bool _processableInDialogLoop(Scene scene, FieldObject obj) {
-    var first = scene.events.first;
-    return (_isInteractionObjFacePlayer(first, obj) &&
-            scene.events.skip(1).every((event) => event is Dialog)) ||
-        scene.events.every((event) => event is Dialog);
-  }
-
-  bool _isInteractionObjFacePlayer(Event event, FieldObject obj) {
-    if (event is! FacePlayer) return false;
-    return event.object == obj;
+    _maps[map.id] = builder.build();
   }
 }
 
@@ -236,7 +199,7 @@ class AsmContext {
   }
 }
 
-class _SceneAsmBuilder implements EventVisitor {
+class SceneAsmGenerator implements EventVisitor {
   final SceneId id;
 
   final EventState _state = EventState();
@@ -254,8 +217,9 @@ class _SceneAsmBuilder implements EventVisitor {
 
   bool _hasSavedDialogPosition = false;
 
-  bool _isProcessingInteraction = false;
+  final bool _isProcessingInteraction;
   bool get isProcessingInteraction => _isProcessingInteraction;
+  bool get startedInEvent => _isProcessingInteraction;
 
   final _inAddress = <DirectAddressRegister, AddressOf>{};
 
@@ -263,30 +227,41 @@ class _SceneAsmBuilder implements EventVisitor {
   final EventAsm _eventAsm;
   final Byte _dialogIdOffset;
 
-  final _newDialogs = <Asm>[];
-  final bool _startInEvent;
   late Byte _currentDialogId;
   var _currentDialog = DialogAsm.empty();
   var _lastEventBreak = -1;
   Event? _lastEvent;
   var _eventCounter = 1;
 
-  _SceneAsmBuilder.forDialogInteractionWith(
+  static bool interactionIsolatedToDialogLoop(
+      List<Event> events, FieldObject obj) {
+    bool _isInteractionObjFacePlayer(Event event, FieldObject obj) {
+      if (event is! FacePlayer) return false;
+      return event.object == obj;
+    }
+
+    var first = events.first;
+    return (_isInteractionObjFacePlayer(first, obj) &&
+            events.skip(1).every((event) => event is Dialog)) ||
+        events.every((event) => event is Dialog);
+  }
+
+  SceneAsmGenerator.forInteraction(
       FieldObject obj, this.id, this._dialogTree, this._eventAsm,
       {bool inEvent = false})
       : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _startInEvent = inEvent {
+        _isProcessingInteraction = true {
     _currentDialogId = _dialogIdOffset;
-    _inEvent = inEvent;
     _gameMode = _inEvent ? Mode.event : Mode.dialog;
-    _isProcessingInteraction = true;
+    _inEvent = inEvent;
+
     _putInAddress(a3, obj);
     _hasSavedDialogPosition = false;
   }
 
-  _SceneAsmBuilder.forEvent(this.id, this._dialogTree, this._eventAsm)
+  SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
       : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _startInEvent = true {
+        _isProcessingInteraction = false {
     _currentDialogId = _dialogIdOffset;
     _gameMode = Mode.event;
     _inEvent = true;
@@ -324,7 +299,6 @@ class _SceneAsmBuilder implements EventVisitor {
   @override
   void displayText(DisplayText display) {
     var asm = text.displayTextToAsm(display, dialogTree: _dialogTree);
-    _newDialogs.addAll(asm.dialog);
     _currentDialogId = _dialogTree.nextDialogId!;
     _currentDialog = DialogAsm.empty();
     _addToEvent(display, asm.event);
@@ -390,11 +364,10 @@ class _SceneAsmBuilder implements EventVisitor {
     }
 
     if (_currentDialog.isNotEmpty) {
-      _newDialogs.add(_currentDialog);
       _dialogTree.add(_currentDialog);
     }
 
-    if (!_startInEvent && inEvent) {
+    if (!startedInEvent && inEvent) {
       _eventAsm.add(returnFromDialogEvent());
     }
   }
@@ -471,6 +444,8 @@ class DialogTree extends IterableBase<DialogAsm> {
 
   /// Adds the dialog and returns its id in the tree.
   Byte add(DialogAsm dialog) {
+    // TODO: validate dialog contains exactly one terminator and only at the end
+    // or validate contains none, and add here (or add here if not already set)
     var id = nextDialogId;
     if (id == null) {
       throw StateError('no more dialog can fit into dialog trees');
@@ -484,6 +459,18 @@ class DialogTree extends IterableBase<DialogAsm> {
 
   DialogAsm operator [](int index) {
     return _dialogs[index];
+  }
+
+  Asm toAsm() {
+    var all = Asm.empty();
+
+    for (var i = 0; i < length; i++) {
+      all.add(comment('${i.toByte}'));
+      all.add(this[i]);
+      all.addNewline();
+    }
+
+    return all;
   }
 
   @override

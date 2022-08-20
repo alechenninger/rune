@@ -1,9 +1,13 @@
 import 'package:collection/collection.dart';
 import 'package:rune/generator/movement.dart';
+import 'package:rune/generator/scene.dart';
 import 'package:rune/numbers.dart';
 
 import '../asm/asm.dart';
+import '../asm/dialog.dart';
 import '../model/model.dart';
+import 'dialog.dart';
+import 'event.dart';
 import 'generator.dart';
 
 class MapAsm {
@@ -232,6 +236,148 @@ final _npcBehaviorRoutines = {
   FaceDown: Word('38'.hex), // FieldObj_NPCType1
   WanderAround: Word('3C'.hex) // FieldObj_NPCType2
 };
+
+class MapAsmBuilder {
+  final GameMap _map;
+  final Word Function(Label routine) _addEventPointer;
+  final int _spriteVramOffset;
+  final _spritesTileNumbers = <Sprite, Word>{};
+  final _spritesAsm = Asm.empty();
+  final _tree = DialogTree();
+  final _objectsAsm = Asm.empty();
+  final _eventsAsm = EventAsm.empty();
+  final _cutscenesAsm = Asm.empty();
+
+  // fixme: nonnull assertion
+  MapAsmBuilder(this._map, this._addEventPointer)
+      : _spriteVramOffset = _spriteVramOffsets[_map.id]!;
+
+  void addObject(MapObject obj) {
+    var tileNumber = _configureSprite(obj);
+    _writeMapConfiguration(obj, tileNumber);
+    _writeInteractionScene(obj);
+  }
+
+  Word? _configureSprite(MapObject obj) {
+    var spec = obj.spec;
+    if (spec is Npc) {
+      var sprite = spec.sprite;
+      var artLbl = _spriteArtLabels[sprite];
+
+      if (artLbl == null) {
+        throw Exception('no art label configured for sprite: $sprite');
+      }
+
+      var existing = _spritesTileNumbers[sprite];
+      if (existing != null) {
+        return existing;
+      }
+
+      var tileNumber = Word(_spriteVramOffset +
+          _spritesTileNumbers.length * _vramOffsetPerSprite);
+      _spritesTileNumbers[sprite] = tileNumber;
+
+      _spritesAsm.add(dc.w([tileNumber]));
+      _spritesAsm.add(dc.l([artLbl]));
+
+      return tileNumber;
+    }
+    return null;
+  }
+
+  void _writeMapConfiguration(MapObject obj, Word? tileNumber) {
+    var spec = obj.spec;
+    // todo: handle max
+    var dialogId = _tree.nextDialogId!;
+    var facingAndDialog = dc.b([spec.startFacing.constant, dialogId]);
+
+    _objectsAsm.add(comment(obj.id.toString()));
+
+    if (spec is Npc) {
+      var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
+
+      if (routine == null) {
+        throw Exception(
+            'no routine configured for npc behavior ${spec.behavior}');
+      }
+
+      _objectsAsm.add(dc.w([routine]));
+      _objectsAsm.add(facingAndDialog);
+
+      // TODO: i think you can use 0 for invisible / no sprite
+      // see Map_ZioFort
+      if (tileNumber == null) {
+        throw Exception('no tile number for sprite ${spec.sprite}');
+      }
+
+      _objectsAsm.add(dc.w([tileNumber]));
+    } else {
+      var routine = _mapObjectSpecRoutines[spec];
+
+      if (routine == null) {
+        throw Exception('no routine configured for spec $spec');
+      }
+
+      _objectsAsm.add(dc.w([routine]));
+      _objectsAsm.add(facingAndDialog);
+      // in this case we assume the vram tile does not matter?
+      // TODO: if it does we need to track so do not reuse same
+      // todo: is 0 okay?
+      _objectsAsm.add(
+          // dc.w([vramTileNumbers.values.max() + Word(_vramOffsetPerSprite)]));
+          dc.w([0.toWord]));
+    }
+
+    _objectsAsm.add(
+        dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]));
+
+    _objectsAsm.addNewline();
+  }
+
+  void _writeInteractionScene(MapObject obj) {
+    var events = obj.onInteract.events;
+    var id = SceneId('${_map.id}_${obj.id}');
+
+    SceneAsmGenerator builder;
+
+    if (SceneAsmGenerator.interactionIsolatedToDialogLoop(events, obj)) {
+      builder = SceneAsmGenerator.forInteraction(obj, id, _tree, _eventsAsm);
+    } else {
+      // Have to start an event from dialog loop, and then can continue as if
+      // in event.
+
+      var eventName = id.toString();
+      var eventRoutine = Label('Event_GrandCross_$eventName');
+      var eventIndex = _addEventPointer(eventRoutine);
+      _eventsAsm.add(setLabel(eventRoutine.name));
+
+      var dialog = DialogAsm.empty();
+      dialog.add(runEvent(eventIndex));
+      dialog.add(terminateDialog());
+      _tree.add(dialog);
+
+      builder = SceneAsmGenerator.forInteraction(obj, id, _tree, _eventsAsm,
+          inEvent: true);
+    }
+
+    for (var event in events) {
+      event.visit(builder);
+    }
+
+    builder.finish();
+
+    _eventsAsm.addNewline();
+  }
+
+  MapAsm build() {
+    return MapAsm(
+        sprites: _spritesAsm,
+        objects: _objectsAsm,
+        dialog: _tree.toAsm(),
+        events: _eventsAsm,
+        cutscenes: _cutscenesAsm);
+  }
+}
 
 extension ObjectAddress on GameMap {
   Longword addressOf(MapObject obj) {
