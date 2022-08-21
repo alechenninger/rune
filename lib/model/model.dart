@@ -180,6 +180,10 @@ class SetContext extends Event {
     return Asm.empty();
   }
 
+  void call(EventState state) {
+    _setCtx(state);
+  }
+
   @override
   void visit(EventVisitor visitor) {
     visitor.setContext(this);

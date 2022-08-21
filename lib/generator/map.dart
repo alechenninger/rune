@@ -336,7 +336,7 @@ class MapAsmBuilder {
 
   void _writeInteractionScene(MapObject obj) {
     var events = obj.onInteract.events;
-    var id = SceneId('${_map.id}_${obj.id}');
+    var id = SceneId('${_map.id.name}_${obj.id}');
 
     SceneAsmGenerator builder;
 

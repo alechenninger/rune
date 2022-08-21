@@ -36,6 +36,7 @@ SceneAsm _displayTextToAsm(DisplayText display, DialogTree dialogTree) {
 
   // first associate all the asm with each Text, regardless of text group
   var textAsmRefs = _generateDialogs(currentDialogId, display, newDialogs);
+  newDialogs.forEach(dialogTree.add);
 
   // todo: should probably merge the vram stuff into cursor? cursor has to
   //   remember related information anyway
