@@ -33,25 +33,22 @@ class Program {
   final Asm _eventPointers = Asm.empty();
   Asm get eventPointers => Asm([_eventPointers]);
 
-  Word _eventIndexOffset = 'a0'.hex.toWord;
-  Word get peekNextEventIndex => (_eventIndexOffset.value + 1).toWord;
+  Word _eventIndexOffset;
 
-  /// Returns next event index to add a new event in EventPtrs.
-  Word _nextEventIndex() {
-    _eventIndexOffset = peekNextEventIndex;
-    return _eventIndexOffset;
-  }
+  Program({Word? eventIndexOffset})
+      : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord;
 
   /// Returns event index by which [routine] can be referenced.
   ///
   /// The event code must be added separate with the exact label of [routine].
   Word _addEventPointer(Label routine) {
-    var eventIndex = _nextEventIndex();
+    var eventIndex = _eventIndexOffset;
     _eventPointers.add(dc.l([routine], comment: '$eventIndex'));
+    _eventIndexOffset = (eventIndex.value + 1).toWord;
     return eventIndex;
   }
 
-  void addScene(SceneId id, Scene scene) {
+  SceneAsm addScene(SceneId id, Scene scene) {
     var dialogTree = DialogTree();
     var eventAsm = EventAsm.empty();
     var generator = SceneAsmGenerator.forEvent(id, dialogTree, eventAsm);
@@ -62,16 +59,16 @@ class Program {
 
     generator.finish();
 
-    _scenes[id] = SceneAsm(
+    return _scenes[id] = SceneAsm(
         event: eventAsm, dialogIdOffset: Byte(0), dialog: dialogTree.toList());
   }
 
-  void addMap(GameMap map) {
+  MapAsm addMap(GameMap map) {
     var builder = MapAsmBuilder(map, _addEventPointer);
     for (var obj in map.objects) {
       builder.addObject(obj);
     }
-    _maps[map.id] = builder.build();
+    return _maps[map.id] = builder.build();
   }
 }
 
@@ -278,6 +275,12 @@ class SceneAsmGenerator implements EventVisitor {
     _inEvent = true;
   }
 
+  void scene(Scene scene) {
+    for (var event in scene.events) {
+      event.visit(this);
+    }
+  }
+
   @override
   void asm(Asm asm) {
     _addToEvent(AsmEvent(), () => asm);
@@ -322,7 +325,7 @@ class SceneAsmGenerator implements EventVisitor {
   void facePlayer(FacePlayer face) {
     if (_isProcessingInteraction && _lastEvent == null) {
       // this already will happen by default if the first event
-      // todo: should lastEvent be updated?
+      _lastEvent = face;
       return;
     }
 
@@ -571,10 +574,6 @@ class AsmGenerator {
         () => text.displayTextToAsm(display, dialogTree: dialogTree),
         ctx,
         display);
-  }
-
-  MapAsm mapToAsm(GameMap map, AsmContext ctx) {
-    return _wrapException(() => map.toAsm(this, ctx), ctx, map);
   }
 
   DialogAsm dialogToAsm(Dialog dialog) {

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/generator/dialog.dart';
+import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/scene.dart';
 import 'package:rune/model/model.dart';
@@ -11,10 +12,11 @@ import 'package:test/test.dart';
 
 void main() {
   late GameMap testMap;
-  var generator = AsmGenerator();
+  late Program program;
 
   setUp(() {
     testMap = GameMap(MapId.Test);
+    program = Program(eventIndexOffset: Word(0));
   });
 
   test('map model generates asm', () {
@@ -27,7 +29,7 @@ void main() {
 
     testMap.addObject(obj);
 
-    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+    var mapAsm = program.addMap(testMap);
 
     expect(
         mapAsm.objects.trim().withoutComments(),
@@ -54,7 +56,7 @@ void main() {
 
     testMap.addObject(obj);
 
-    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+    var mapAsm = program.addMap(testMap);
 
     expect(
         mapAsm.objects.withoutComments().first,
@@ -73,7 +75,7 @@ void main() {
 
     testMap.addObject(obj);
 
-    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+    var mapAsm = program.addMap(testMap);
 
     expect(
         mapAsm.sprites,
@@ -105,7 +107,7 @@ void main() {
           Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
-    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+    var mapAsm = program.addMap(testMap);
 
     expect(
         mapAsm.sprites,
@@ -141,7 +143,7 @@ void main() {
           Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
-    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+    var mapAsm = program.addMap(testMap);
     var objectsAsm = mapAsm.objects.withoutComments();
     // todo: this is kind of brittle
     expect(objectsAsm[2], dc.w(['2d0'.hex.toWord]));
@@ -171,7 +173,7 @@ void main() {
           Dialog(spans: [DialogSpan('Hello world!')])
         ])));
 
-    var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+    var mapAsm = program.addMap(testMap);
 
     expect(
         mapAsm.sprites,
@@ -209,7 +211,7 @@ void main() {
     });
 
     test('objects with dialog produce dialog asm', () {
-      var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+      var mapAsm = program.addMap(testMap);
 
       expect(
           mapAsm.dialog,
@@ -226,7 +228,7 @@ void main() {
     });
 
     test('objects with interaction refer to correct dialog offset', () {
-      var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+      var mapAsm = program.addMap(testMap);
 
       expect(
           mapAsm.objects.withoutComments()[1],
@@ -250,7 +252,7 @@ void main() {
           ]),
           onInteractFacePlayer: false));
 
-      var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+      var mapAsm = program.addMap(testMap);
 
       expect(
           mapAsm.dialog,
@@ -292,41 +294,47 @@ void main() {
       testMap.addObject(npc2);
     });
 
-    test('produce event code with npc facing player', () {
-      var mapAsm = generator.mapToAsm(testMap, AsmContext.fresh());
+    test('trigger scenes from dialog interactions', () {
+      var mapAsm = program.addMap(testMap);
 
-      var comparisonCtx = AsmContext.forDialog(EventState());
       var comparisonDialogTree = DialogTree();
+      var comparisonEventAsm = EventAsm.empty();
 
-      comparisonCtx.startDialogInteractionWith(npc1);
-      var scene1Asm = npc1.onInteract.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('Test_npc1'));
+      comparisonEventAsm.add(setLabel('Event_GrandCross_Test_npc1'));
+      comparisonDialogTree
+          .add(DialogAsm([runEvent(Word(0)), terminateDialog()]));
 
-      comparisonCtx.startDialogInteractionWith(npc2);
-      var scene2Asm = npc2.onInteract.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('Test_npc2'));
+      SceneAsmGenerator.forInteraction(
+          npc1, SceneId('Test_npc1'), comparisonDialogTree, comparisonEventAsm,
+          inEvent: true)
+        ..scene(npc1.onInteract)
+        ..finish();
 
-      expect(mapAsm.events,
-          Asm([scene1Asm.event, newLine(), scene2Asm.event, newLine()]));
+      comparisonEventAsm.addNewline();
+
+      comparisonEventAsm.add(setLabel('Event_GrandCross_Test_npc2'));
+      comparisonDialogTree
+          .add(DialogAsm([runEvent(Word(1)), terminateDialog()]));
+
+      SceneAsmGenerator.forInteraction(
+          npc2, SceneId('Test_npc2'), comparisonDialogTree, comparisonEventAsm,
+          inEvent: true)
+        ..scene(npc2.onInteract)
+        ..finish();
+
+      expect(mapAsm.events.trim(), comparisonEventAsm);
+      expect(mapAsm.dialog, comparisonDialogTree.toAsm());
     });
 
     test('produce event pointers', () {
-      var ctx = AsmContext.fresh();
-      generator.mapToAsm(testMap, ctx);
+      program.addMap(testMap);
 
-      var comparisonCtx = AsmContext.forDialog(EventState());
-      var comparisonDialogTree = DialogTree();
-
-      comparisonCtx.startDialogInteractionWith(npc1);
-      npc1Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('Test_npc1'));
-      comparisonCtx.startDialogInteractionWith(npc2);
-      npc2Scene.toAsm(generator, comparisonCtx,
-          dialogTree: comparisonDialogTree, id: SceneId('Test_npc2'));
-
-      print(ctx.eventPointers);
-
-      expect(ctx.eventPointers, comparisonCtx.eventPointers);
+      expect(
+          program.eventPointers,
+          Asm([
+            dc.l([Label('Event_GrandCross_Test_npc1')], comment: r'$0000'),
+            dc.l([Label('Event_GrandCross_Test_npc2')], comment: r'$0001')
+          ]));
     });
   });
 }

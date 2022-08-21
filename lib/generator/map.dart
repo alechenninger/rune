@@ -44,12 +44,6 @@ class MapAsm {
   }
 }
 
-extension MapToAsm on GameMap {
-  MapAsm toAsm(AsmGenerator generator, AsmContext ctx) {
-    return mapToAsm(this, generator, ctx);
-  }
-}
-
 MapAsm mapToAsm(GameMap map, AsmGenerator generator, AsmContext ctx) {
   var spritesAsm = Asm.empty();
   var dialogAsm = Asm.empty();
@@ -241,54 +235,59 @@ class MapAsmBuilder {
   final GameMap _map;
   final Word Function(Label routine) _addEventPointer;
   final int _spriteVramOffset;
+  final DialogTree _tree;
   final _spritesTileNumbers = <Sprite, Word>{};
   final _spritesAsm = Asm.empty();
-  final _tree = DialogTree();
   final _objectsAsm = Asm.empty();
   final _eventsAsm = EventAsm.empty();
   final _cutscenesAsm = Asm.empty();
 
-  // fixme: nonnull assertion
   MapAsmBuilder(this._map, this._addEventPointer)
-      : _spriteVramOffset = _spriteVramOffsets[_map.id]!;
+      // todo: can we inject these differently so it's more testable?
+      // fixme: nonnull assertion
+      : _spriteVramOffset = _spriteVramOffsets[_map.id]!,
+        _tree = DialogTree(offset: Byte(_dialogIdOffsets[_map.id] ?? 0));
 
   void addObject(MapObject obj) {
+    // todo:
+    // if (map.objects.length > 64) {
+    //   throw Exception('too many objects (limited ram)');
+    // }
+    var dialogId = _writeInteractionScene(obj);
     var tileNumber = _configureSprite(obj);
-    _writeMapConfiguration(obj, tileNumber);
-    _writeInteractionScene(obj);
+    _writeMapConfiguration(obj, tileNumber, dialogId);
   }
 
   Word? _configureSprite(MapObject obj) {
     var spec = obj.spec;
-    if (spec is Npc) {
-      var sprite = spec.sprite;
-      var artLbl = _spriteArtLabels[sprite];
-
-      if (artLbl == null) {
-        throw Exception('no art label configured for sprite: $sprite');
-      }
-
-      var existing = _spritesTileNumbers[sprite];
-      if (existing != null) {
-        return existing;
-      }
-
-      var tileNumber = Word(_spriteVramOffset +
-          _spritesTileNumbers.length * _vramOffsetPerSprite);
-      _spritesTileNumbers[sprite] = tileNumber;
-
-      _spritesAsm.add(dc.w([tileNumber]));
-      _spritesAsm.add(dc.l([artLbl]));
-
-      return tileNumber;
+    if (spec is! Npc) {
+      return null;
     }
-    return null;
+
+    var sprite = spec.sprite;
+    var artLbl = _spriteArtLabels[sprite];
+
+    if (artLbl == null) {
+      throw Exception('no art label configured for sprite: $sprite');
+    }
+
+    var existing = _spritesTileNumbers[sprite];
+    if (existing != null) {
+      return existing;
+    }
+
+    var tileNumber = Word(
+        _spriteVramOffset + _spritesTileNumbers.length * _vramOffsetPerSprite);
+    _spritesTileNumbers[sprite] = tileNumber;
+
+    _spritesAsm.add(dc.w([tileNumber]));
+    _spritesAsm.add(dc.l([artLbl]));
+
+    return tileNumber;
   }
 
-  void _writeMapConfiguration(MapObject obj, Word? tileNumber) {
+  void _writeMapConfiguration(MapObject obj, Word? tileNumber, Byte dialogId) {
     var spec = obj.spec;
-    // todo: handle max
-    var dialogId = _tree.nextDialogId!;
     var facingAndDialog = dc.b([spec.startFacing.constant, dialogId]);
 
     _objectsAsm.add(comment(obj.id.toString()));
@@ -334,9 +333,12 @@ class MapAsmBuilder {
     _objectsAsm.addNewline();
   }
 
-  void _writeInteractionScene(MapObject obj) {
+  Byte _writeInteractionScene(MapObject obj) {
     var events = obj.onInteract.events;
     var id = SceneId('${_map.id.name}_${obj.id}');
+
+    // todo: handle max
+    var dialogId = _tree.nextDialogId!;
 
     SceneAsmGenerator builder;
 
@@ -367,6 +369,8 @@ class MapAsmBuilder {
     builder.finish();
 
     _eventsAsm.addNewline();
+
+    return dialogId;
   }
 
   MapAsm build() {

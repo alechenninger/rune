@@ -9,6 +9,7 @@ import 'package:test/test.dart';
 
 void main() {
   var generator = AsmGenerator();
+  late Program program;
 
   group('a cursor separates', () {
     test('between dialogs', () {
