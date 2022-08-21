@@ -255,7 +255,7 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   SceneAsmGenerator.forInteraction(
-      FieldObject obj, this.id, this._dialogTree, this._eventAsm,
+      GameMap map, FieldObject obj, this.id, this._dialogTree, this._eventAsm,
       {bool inEvent = false})
       : _dialogIdOffset = _dialogTree.nextDialogId!,
         _isProcessingInteraction = true {
@@ -265,6 +265,7 @@ class SceneAsmGenerator implements EventVisitor {
 
     _putInAddress(a3, obj);
     _hasSavedDialogPosition = false;
+    _state.currentMap = map;
   }
 
   SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
@@ -557,8 +558,6 @@ class AsmGenerator {
         ctx,
         events);
   }
-
-  Asm? eventToAsm(Event event) {}
 
   SceneAsm sceneToAsm(Scene scene, AsmContext ctx,
       {DialogTree? dialogTree, SceneId? id}) {

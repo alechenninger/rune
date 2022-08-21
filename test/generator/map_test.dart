@@ -304,8 +304,8 @@ void main() {
       comparisonDialogTree
           .add(DialogAsm([runEvent(Word(0)), terminateDialog()]));
 
-      SceneAsmGenerator.forInteraction(
-          npc1, SceneId('Test_npc1'), comparisonDialogTree, comparisonEventAsm,
+      SceneAsmGenerator.forInteraction(testMap, npc1, SceneId('Test_npc1'),
+          comparisonDialogTree, comparisonEventAsm,
           inEvent: true)
         ..scene(npc1.onInteract)
         ..finish();
@@ -316,8 +316,8 @@ void main() {
       comparisonDialogTree
           .add(DialogAsm([runEvent(Word(1)), terminateDialog()]));
 
-      SceneAsmGenerator.forInteraction(
-          npc2, SceneId('Test_npc2'), comparisonDialogTree, comparisonEventAsm,
+      SceneAsmGenerator.forInteraction(testMap, npc2, SceneId('Test_npc2'),
+          comparisonDialogTree, comparisonEventAsm,
           inEvent: true)
         ..scene(npc2.onInteract)
         ..finish();

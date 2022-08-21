@@ -44,149 +44,6 @@ class MapAsm {
   }
 }
 
-MapAsm mapToAsm(GameMap map, AsmGenerator generator, AsmContext ctx) {
-  var spritesAsm = Asm.empty();
-  var dialogAsm = Asm.empty();
-  var objectsAsm = Asm.empty();
-  var eventsAsm = Asm.empty();
-
-  if (map.objects.length > 64) {
-    throw Exception('too many objects (limited ram)');
-  }
-
-  var vramTileNumbers = _generateSpriteAsm(map, spritesAsm);
-  var dialogOffsets =
-      _generateDialogAndEventsAsm(map, dialogAsm, eventsAsm, ctx, generator);
-
-  _generateObjectsAsm(map, objectsAsm, vramTileNumbers, dialogOffsets);
-
-  return MapAsm(
-      sprites: spritesAsm,
-      objects: objectsAsm,
-      dialog: dialogAsm,
-      events: eventsAsm,
-      cutscenes: Asm.empty());
-}
-
-void _generateObjectsAsm(GameMap map, Asm objectsAsm,
-    Map<Sprite, Word> vramTileNumbers, List<Byte> dialogOffsets) {
-  map.objects.forEachIndexed((i, obj) {
-    var spec = obj.spec;
-
-    var facingAndDialog = dc.b([spec.startFacing.constant, dialogOffsets[i]]);
-
-    objectsAsm.add(comment(obj.id.toString()));
-
-    if (spec is Npc) {
-      var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
-
-      if (routine == null) {
-        throw Exception(
-            'no routine configured for npc behavior ${spec.behavior}');
-      }
-
-      objectsAsm.add(dc.w([routine]));
-      objectsAsm.add(facingAndDialog);
-
-      // TODO: i think you can use 0 for invisible / no sprite
-      // see Map_ZioFort
-      var tileNumber = vramTileNumbers[spec.sprite];
-      if (tileNumber == null) {
-        throw Exception('no tile number for sprite ${spec.sprite}');
-      }
-
-      objectsAsm.add(dc.w([tileNumber]));
-    } else {
-      var routine = _mapObjectSpecRoutines[spec];
-
-      if (routine == null) {
-        throw Exception('no routine configured for spec $spec');
-      }
-
-      objectsAsm.add(dc.w([routine]));
-      objectsAsm.add(facingAndDialog);
-      // in this case we assume the vram tile does not matter?
-      // TODO: if it does we need to track so do not reuse same
-      // todo: is 0 okay?
-      objectsAsm.add(
-          // dc.w([vramTileNumbers.values.max() + Word(_vramOffsetPerSprite)]));
-          dc.w([0.toWord]));
-    }
-
-    objectsAsm.add(
-        dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]));
-
-    objectsAsm.addNewline();
-  });
-}
-
-Map<Sprite, Word> _generateSpriteAsm(GameMap map, Asm spritesAsm) {
-  var vramOffset = _spriteVramOffsets[map.id];
-
-  if (vramOffset == null) {
-    throw Exception('no offset configured for map: ${map.id}');
-  }
-
-  var vramTileNumbers = <Sprite, Word>{};
-
-  map.objects
-      .map((e) => e.spec)
-      .whereType<Npc>()
-      .map((e) => e.sprite)
-      .toSet()
-      .forEachIndexed((i, sprite) {
-    var artLbl = _spriteArtLabels[sprite];
-
-    if (artLbl == null) {
-      throw Exception('no art label configured for sprite: $sprite');
-    }
-
-    var tileNumber = Word(vramOffset + i * _vramOffsetPerSprite);
-    vramTileNumbers[sprite] = tileNumber;
-
-    spritesAsm.add(dc.w([tileNumber]));
-    spritesAsm.add(dc.l([artLbl]));
-  });
-
-  return vramTileNumbers;
-}
-
-List<Byte> _generateDialogAndEventsAsm(GameMap map, Asm dialogAsm,
-    Asm eventsAsm, AsmContext ctx, AsmGenerator generator) {
-  var dialogOffsets = <Byte>[];
-  var tree = DialogTree(offset: Byte(_dialogIdOffsets[map.id] ?? 0));
-
-  // hard coded dialog
-  switch (map.id) {
-    case MapId.Piata:
-      dialogAsm.add(Asm.fromRaw(_piataDialog));
-      break;
-    default:
-    // noop
-  }
-
-  for (var obj in map.objects) {
-    // todo: handle max
-    dialogOffsets.add(tree.nextDialogId!);
-
-    // Interaction always starts with triggering dialog
-    ctx.startDialogInteractionWith(obj, state: EventState()..currentMap = map);
-
-    var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx,
-        dialogTree: tree, id: SceneId("${map.id.name}_${obj.id}"));
-
-    dialogAsm.add(sceneAsm.allDialog);
-    eventsAsm.add(sceneAsm.event);
-    eventsAsm.addNewline();
-
-    // todo: this is a bit hacky, but avoiding hanging on to that
-    // for too long
-    ctx.putInAddress(a3, null);
-  }
-
-  return dialogOffsets;
-}
-
 final _vramOffsetPerSprite = '48'.hex;
 
 // These offsets are used to account for assembly specifics, which allows for
@@ -256,6 +113,48 @@ class MapAsmBuilder {
     var dialogId = _writeInteractionScene(obj);
     var tileNumber = _configureSprite(obj);
     _writeMapConfiguration(obj, tileNumber, dialogId);
+  }
+
+  Byte _writeInteractionScene(MapObject obj) {
+    var events = obj.onInteract.events;
+    var id = SceneId('${_map.id.name}_${obj.id}');
+
+    // todo: handle max
+    var dialogId = _tree.nextDialogId!;
+
+    SceneAsmGenerator builder;
+
+    if (SceneAsmGenerator.interactionIsolatedToDialogLoop(events, obj)) {
+      builder =
+          SceneAsmGenerator.forInteraction(_map, obj, id, _tree, _eventsAsm);
+    } else {
+      // Have to start an event from dialog loop, and then can continue as if
+      // in event.
+
+      var eventName = id.toString();
+      var eventRoutine = Label('Event_GrandCross_$eventName');
+      var eventIndex = _addEventPointer(eventRoutine);
+      _eventsAsm.add(setLabel(eventRoutine.name));
+
+      var dialog = DialogAsm.empty();
+      dialog.add(runEvent(eventIndex));
+      dialog.add(terminateDialog());
+      _tree.add(dialog);
+
+      builder = SceneAsmGenerator.forInteraction(
+          _map, obj, id, _tree, _eventsAsm,
+          inEvent: true);
+    }
+
+    for (var event in events) {
+      event.visit(builder);
+    }
+
+    builder.finish();
+
+    _eventsAsm.addNewline();
+
+    return dialogId;
   }
 
   Word? _configureSprite(MapObject obj) {
@@ -333,51 +232,24 @@ class MapAsmBuilder {
     _objectsAsm.addNewline();
   }
 
-  Byte _writeInteractionScene(MapObject obj) {
-    var events = obj.onInteract.events;
-    var id = SceneId('${_map.id.name}_${obj.id}');
-
-    // todo: handle max
-    var dialogId = _tree.nextDialogId!;
-
-    SceneAsmGenerator builder;
-
-    if (SceneAsmGenerator.interactionIsolatedToDialogLoop(events, obj)) {
-      builder = SceneAsmGenerator.forInteraction(obj, id, _tree, _eventsAsm);
-    } else {
-      // Have to start an event from dialog loop, and then can continue as if
-      // in event.
-
-      var eventName = id.toString();
-      var eventRoutine = Label('Event_GrandCross_$eventName');
-      var eventIndex = _addEventPointer(eventRoutine);
-      _eventsAsm.add(setLabel(eventRoutine.name));
-
-      var dialog = DialogAsm.empty();
-      dialog.add(runEvent(eventIndex));
-      dialog.add(terminateDialog());
-      _tree.add(dialog);
-
-      builder = SceneAsmGenerator.forInteraction(obj, id, _tree, _eventsAsm,
-          inEvent: true);
-    }
-
-    for (var event in events) {
-      event.visit(builder);
-    }
-
-    builder.finish();
-
-    _eventsAsm.addNewline();
-
-    return dialogId;
-  }
-
   MapAsm build() {
+    var dialogAsm = DialogAsm.empty();
+
+    // hard coded dialog
+    switch (_map.id) {
+      case MapId.Piata:
+        dialogAsm.add(Asm.fromRaw(_piataDialog));
+        break;
+      default:
+      // noop
+    }
+
+    dialogAsm.add(_tree.toAsm());
+
     return MapAsm(
         sprites: _spritesAsm,
         objects: _objectsAsm,
-        dialog: _tree.toAsm(),
+        dialog: dialogAsm,
         events: _eventsAsm,
         cutscenes: _cutscenesAsm);
   }
