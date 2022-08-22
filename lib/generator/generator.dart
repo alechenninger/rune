@@ -289,7 +289,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void dialog(Dialog dialog) {
-    if (_isProcessingInteraction && _lastEvent == null) {
+    if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
       // Not starting with face player, so signal not to.
       _currentDialog.add(dc.b(Bytes.of(0xf3)));
     }
@@ -324,7 +324,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void facePlayer(FacePlayer face) {
-    if (_isProcessingInteraction && _lastEvent == null) {
+    if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
       // this already will happen by default if the first event
       _lastEvent = face;
       return;
