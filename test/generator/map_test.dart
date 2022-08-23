@@ -5,6 +5,7 @@ import 'package:rune/asm/dialog.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/generator/map.dart';
 import 'package:rune/generator/scene.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
@@ -194,6 +195,8 @@ void main() {
   test('objects use correct facing direction', () {});
 
   group('objects with dialog', () {
+    late MapAsm mapAsm;
+
     setUp(() {
       testMap.addObject(MapObject(
           startPosition: Position('1e0'.hex, '2e0'.hex),
@@ -208,11 +211,11 @@ void main() {
           onInteract: Scene([
             Dialog(spans: [DialogSpan('Goodbye!')])
           ])));
+
+      mapAsm = program.addMap(testMap);
     });
 
-    test('objects with dialog produce dialog asm', () {
-      var mapAsm = program.addMap(testMap);
-
+    test('produce dialog asm', () {
       expect(
           mapAsm.dialog,
           Asm([
@@ -227,9 +230,7 @@ void main() {
           ]));
     });
 
-    test('objects with interaction refer to correct dialog offset', () {
-      var mapAsm = program.addMap(testMap);
-
+    test('refer to correct dialog offset', () {
       expect(
           mapAsm.objects.withoutComments()[1],
           Asm([
@@ -244,6 +245,7 @@ void main() {
 
     test("when not starting with faceplayer, starts with f3 control code", () {
       var testMap = GameMap(MapId.Test);
+
       testMap.addObject(MapObject(
           startPosition: Position('1e0'.hex, '2e0'.hex),
           spec: Npc(Sprite.PalmanMan1, FaceDown()),
@@ -263,6 +265,11 @@ void main() {
             terminateDialog(),
             newLine(),
           ]));
+    });
+
+    test('does not product event code', () {
+      expect(mapAsm.events, Asm.empty());
+      expect(program.eventPointers, Asm.empty());
     });
   });
 

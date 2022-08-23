@@ -9,6 +9,7 @@ import 'package:test/test.dart';
 
 void main() {
   var generator = AsmGenerator();
+  var program = Program();
 
   group('a cursor separates', () {
     test('between dialogs', () {
@@ -16,59 +17,12 @@ void main() {
       var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hello'));
 
       var scene = Scene([dialog1, dialog2]);
-      var sceneAsm =
-          generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
-      var program = Program();
-      program.addScene(SceneId('test'), scene);
+      var sceneAsm = program.addScene(SceneId('test'), scene);
 
       expect(sceneAsm.dialog[0].toString(), '''${dialog1.toAsm()}
 	dc.b	\$FD
 ${dialog2.toAsm()}
 	dc.b	\$FF''');
-
-      expect(program.scenes[SceneId('test')]!.dialog[0].toString(),
-          '''${dialog1.toAsm()}
-	dc.b	\$FD
-${dialog2.toAsm()}
-	dc.b	\$FF''');
-    });
-  });
-
-  group('just dialog', () {
-    test('does not run an event', () {
-      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
-      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hello'));
-
-      var scene = Scene([dialog1, dialog2]);
-      var ctx = AsmContext.fresh(gameMode: Mode.dialog);
-      var sceneAsm = generator.sceneToAsm(scene, ctx);
-
-      expect(
-          sceneAsm.allDialog.withoutComments().toString(), '''${dialog1.toAsm()}
-	dc.b	\$FD
-${dialog2.toAsm()}
-	dc.b	\$FF
-''');
-      expect(sceneAsm.event, Asm.empty());
-      expect(ctx.eventPointers, Asm.empty());
-    });
-
-    test('if first event is FacePlayer, also does not run an event', () {
-      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
-      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hello'));
-
-      var scene = Scene([dialog1, dialog2]);
-      var ctx = AsmContext.fresh(gameMode: Mode.dialog);
-      var sceneAsm = generator.sceneToAsm(scene, ctx);
-
-      expect(
-          sceneAsm.allDialog.withoutComments().toString(), '''${dialog1.toAsm()}
-	dc.b	\$FD
-${dialog2.toAsm()}
-	dc.b	\$FF
-''');
-      expect(sceneAsm.event, Asm.empty());
-      expect(ctx.eventPointers, Asm.empty());
     });
   });
 
