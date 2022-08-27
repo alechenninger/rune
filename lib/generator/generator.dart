@@ -1,5 +1,7 @@
 import 'dart:collection';
 
+import 'package:rune/model/conditional.dart';
+
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
 import '../asm/events.dart';
@@ -69,6 +71,386 @@ class Program {
       builder.addObject(obj);
     }
     return _maps[map.id] = builder.build();
+  }
+}
+
+// FIXME just to track an event has happened
+class AsmEvent extends Event {
+  @override
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
+    // TODO: implement generateAsm
+    throw UnimplementedError();
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    // TODO: implement visit
+  }
+}
+
+class SceneAsmGenerator implements EventVisitor {
+  final SceneId id;
+
+  final EventState _state = EventState();
+
+  Mode _gameMode = Mode.event;
+  bool get inDialogLoop => _gameMode == Mode.dialog;
+
+  // i think this should always be true if mode == event?
+  /// Whether or not we are generating in the context of an existing event.
+  ///
+  /// This is necessary to understand whether, when in dialog mode, we can pop
+  /// back to an event or have to trigger a new one.
+  var _inEvent = true;
+
+  bool _hasSavedDialogPosition = false;
+
+  final _inAddress = <DirectAddressRegister, AddressOf>{};
+
+  final DialogTree _dialogTree;
+  final EventAsm _eventAsm;
+  final Byte _dialogIdOffset;
+
+  final bool _isProcessingInteraction;
+  late Byte _currentDialogId;
+  var _currentDialog = DialogAsm.empty();
+  var _lastEventBreak = -1;
+  Event? _lastEvent;
+  var _eventCounter = 1;
+
+  static bool interactionIsolatedToDialogLoop(
+      List<Event> events, FieldObject obj) {
+    bool _isInteractionObjFacePlayer(Event event, FieldObject obj) {
+      if (event is! FacePlayer) return false;
+      return event.object == obj;
+    }
+
+    var first = events.first;
+    return (_isInteractionObjFacePlayer(first, obj) &&
+            events.skip(1).every((event) => event is Dialog)) ||
+        events.every((event) => event is Dialog);
+  }
+
+  SceneAsmGenerator.forInteraction(
+      GameMap map, FieldObject obj, this.id, this._dialogTree, this._eventAsm,
+      {bool inEvent = false})
+      : _dialogIdOffset = _dialogTree.nextDialogId!,
+        _isProcessingInteraction = true {
+    _currentDialogId = _dialogIdOffset;
+    _gameMode = _inEvent ? Mode.event : Mode.dialog;
+    _inEvent = inEvent;
+
+    _putInAddress(a3, obj);
+    _hasSavedDialogPosition = false;
+    _state.currentMap = map;
+  }
+
+  SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
+      : _dialogIdOffset = _dialogTree.nextDialogId!,
+        _isProcessingInteraction = false {
+    _currentDialogId = _dialogIdOffset;
+    _gameMode = Mode.event;
+    _inEvent = true;
+  }
+
+  void scene(Scene scene) {
+    for (var event in scene.events) {
+      event.visit(this);
+    }
+  }
+
+  @override
+  void asm(Asm asm) {
+    _addToEvent(AsmEvent(), (i) => asm);
+  }
+
+  @override
+  void dialog(Dialog dialog) {
+    if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
+      // Not starting with face player, so signal not to.
+      _currentDialog.add(dc.b(Bytes.of(0xf3)));
+    }
+
+    if (!inDialogLoop) {
+      if (_hasSavedDialogPosition) {
+        _eventAsm.add(popAndRunDialog);
+        _eventAsm.addNewline();
+      } else {
+        _eventAsm.add(getAndRunDialog(_currentDialogId.i));
+      }
+      _gameMode = Mode.dialog;
+    } else if (_lastEvent is Dialog) {
+      // Consecutive dialog, new cursor in between each dialog
+      _currentDialog.add(interrupt());
+    }
+
+    _currentDialog.add(dialog.toAsm());
+    _lastEvent = dialog;
+  }
+
+  @override
+  void displayText(DisplayText display) {
+    _addToEvent(display, (i) {
+      _flushCurrentDialog();
+      var asm = text.displayTextToAsm(display, dialogTree: _dialogTree);
+      _currentDialogId = _dialogTree.nextDialogId!;
+      _currentDialog = DialogAsm.empty();
+      return asm.event;
+    });
+  }
+
+  @override
+  void facePlayer(FacePlayer face) {
+    if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
+      // this already will happen by default if the first event
+      _lastEvent = face;
+      return;
+    }
+
+    _addToEvent(face, (i) {
+      var asm = EventAsm.empty();
+
+      if (_inAddress[a3] != AddressOf(face.object)) {
+        asm.add(face.object.toA3(_state));
+        _inAddress[a3] = AddressOf(face.object);
+      }
+
+      asm.add(jsr(Label('Interaction_UpdateObj').l));
+
+      return asm;
+    });
+  }
+
+  @override
+  void individualMoves(IndividualMoves moves) {
+    _addToEvent(moves, (i) => moves.toAsm(_state));
+  }
+
+  @override
+  void lockCamera(LockCamera lock) {
+    _addToEvent(lock,
+        (i) => EventAsm.of(asmevents.lockCamera(_state.cameraLock = true)));
+  }
+
+  @override
+  void partyMove(PartyMove move) {
+    _addToEvent(move, (i) => move.toIndividualMoves(_state).toAsm(_state));
+  }
+
+  @override
+  void pause(Pause pause) {
+    _addToEvent(pause, (i) {
+      var frames = pause.duration.toFrames();
+      return EventAsm.of(vIntPrepareLoop(Word(frames)));
+    });
+  }
+
+  @override
+  void setContext(SetContext set) {
+    set(_state);
+  }
+
+  @override
+  void unlockCamera(UnlockCamera unlock) {
+    _addToEvent(unlock,
+        (i) => EventAsm.of(asmevents.lockCamera(_state.cameraLock = false)));
+  }
+
+  @override
+  void ifEvent(IfEvent ifEvent) {
+    if (ifEvent.ifSet.isEmpty && ifEvent.ifUnset.isEmpty) {
+      return;
+    }
+
+    _addToEvent(ifEvent, (i) {
+      var flag = ifEvent.flag;
+
+      // note that if we need to move further than beq.w we will need to branch
+      // to subroutine which then jsr/jmp to another
+      // TODO: need to approximate code size so we can handle jump distance
+
+      if (ifEvent.ifSet.isEmpty) {
+        // use event counter in case flag is checked again
+        var ifSet = Label('${id}_${flag.value}_set$i');
+        // skip ahead if set
+        _eventAsm.add(branchIfEventFlagSet(flag.toConstant.i, ifSet));
+        // otherwise run this stuff
+        for (var event in ifEvent.ifUnset) {
+          event.visit(this);
+        }
+        _eventAsm.add(setLabel(ifSet.name));
+      } else {
+        // use event counter in case flag is checked again
+        var ifUnset = Label('${id}_${flag.value}_unset$i');
+        Label? unconditional = ifEvent.ifUnset.isNotEmpty
+            ? Label('${id}_${flag.value}_cont$i')
+            : null;
+        // skip ahead if set
+        _eventAsm.add(branchIfEvenfFlagNotSet(flag.toConstant.i, ifUnset));
+        // otherwise run this stuff
+        for (var event in ifEvent.ifSet) {
+          event.visit(this);
+        }
+
+        if (unconditional != null) {
+          _eventAsm.add(bra.w(unconditional));
+        }
+
+        _eventAsm.add(setLabel(ifUnset.name));
+        for (var event in ifEvent.ifUnset) {
+          event.visit(this);
+        }
+
+        if (unconditional != null) {
+          _eventAsm.add(setLabel(unconditional.name));
+        }
+      }
+
+      return null;
+    });
+  }
+
+  void finish() {
+    _flushCurrentDialog();
+
+    if (_isProcessingInteraction && _inEvent) {
+      _eventAsm.add(returnFromDialogEvent());
+    }
+  }
+
+  void _flushCurrentDialog() {
+    // was lastEventBreak >= 0, but i think it should be this?
+    if (!inDialogLoop && _lastEventBreak >= 0) {
+      // i think this is only ever the last line so could simplify
+      _currentDialog.replace(_lastEventBreak, terminateDialog());
+    } else if (_currentDialog.isNotEmpty) {
+      _currentDialog.add(terminateDialog());
+    }
+
+    if (_currentDialog.isNotEmpty) {
+      _dialogTree.add(_currentDialog);
+    }
+
+    _lastEventBreak = -1;
+  }
+
+  void _addToEvent(Event event, Asm? Function(int eventIndex) generate) {
+    var eventIndex = _eventCounter++;
+
+    if (!_inEvent) {
+      throw StateError("can't add event when not in event loop");
+    } else if (inDialogLoop) {
+      // todo: why did we check this before?
+      // i think b/c we always assumed in dialog loop to start
+      //if (dialogAsm.isNotEmpty) {
+      _currentDialog.add(comment('scene event $eventIndex'));
+      _lastEventBreak = _currentDialog.add(eventBreak());
+      _hasSavedDialogPosition = true;
+      _gameMode = Mode.event;
+    }
+
+    var length = _eventAsm.length;
+
+    var returned = generate(eventIndex);
+    if (returned != null) {
+      _eventAsm.add(returned);
+    }
+
+    if (_eventAsm.length > length) {
+      _eventAsm.insert(
+          length, Asm([comment('$eventIndex: ${event.runtimeType}')]));
+    }
+
+    _lastEvent = event;
+  }
+
+  void _putInAddress(DirectAddressRegister a, Object? obj) {
+    if (obj == null) {
+      _inAddress.remove(a);
+    } else {
+      _inAddress[a] = AddressOf(obj);
+    }
+  }
+}
+
+class AddressOf {
+  final Object obj;
+
+  AddressOf(this.obj);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AddressOf &&
+          runtimeType == other.runtimeType &&
+          obj == other.obj;
+
+  @override
+  int get hashCode => obj.hashCode;
+
+  @override
+  String toString() {
+    return 'AddressOf{$obj}';
+  }
+}
+
+enum Mode { dialog, event }
+
+class DialogTree extends IterableBase<DialogAsm> {
+  final _dialogs = <DialogAsm>[];
+
+  DialogTree({Byte? offset}) {
+    if (offset != null) {
+      for (var i = 0; i < offset.value; i++) {
+        // todo: or null?
+        _dialogs.add(DialogAsm([comment('hard coded (skipped)')]));
+      }
+    }
+  }
+
+  @override
+  DialogAsm get last => _dialogs.last;
+
+  /// Adds the dialog and returns its id in the tree.
+  Byte add(DialogAsm dialog) {
+    // TODO: validate dialog contains exactly one terminator and only at the end
+    // or validate contains none, and add here (or add here if not already set)
+    var id = nextDialogId;
+    if (id == null) {
+      throw StateError('no more dialog can fit into dialog trees');
+    }
+    _dialogs.add(dialog);
+    return id;
+  }
+
+  Byte? get nextDialogId =>
+      _dialogs.length > Size.b.maxValue ? null : _dialogs.length.toByte;
+
+  DialogAsm operator [](int index) {
+    return _dialogs[index];
+  }
+
+  Asm toAsm() {
+    var all = Asm.empty();
+
+    for (var i = 0; i < length; i++) {
+      all.add(comment('${i.toByte}'));
+      all.add(this[i]);
+      all.addNewline();
+    }
+
+    return all;
+  }
+
+  @override
+  int get length => _dialogs.length;
+
+  @override
+  Iterator<DialogAsm> get iterator => _dialogs.iterator;
+
+  @override
+  String toString() {
+    return toAsm().toString();
   }
 }
 
@@ -197,327 +579,6 @@ class AsmContext {
   }
 }
 
-// FIXME just to track an event has happened
-class AsmEvent extends Event {
-  @override
-  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
-    // TODO: implement generateAsm
-    throw UnimplementedError();
-  }
-
-  @override
-  void visit(EventVisitor visitor) {
-    // TODO: implement visit
-  }
-}
-
-class SceneAsmGenerator implements EventVisitor {
-  final SceneId id;
-
-  final EventState _state = EventState();
-
-  Mode _gameMode = Mode.event;
-  bool get inDialogLoop => _gameMode == Mode.dialog;
-
-  // i think this should always be true if mode == event?
-  /// Whether or not we are generating in the context of an existing event.
-  ///
-  /// This is necessary to understand whether, when in dialog mode, we can pop
-  /// back to an event or have to trigger a new one.
-  var _inEvent = true;
-
-  bool _hasSavedDialogPosition = false;
-
-  final _inAddress = <DirectAddressRegister, AddressOf>{};
-
-  final DialogTree _dialogTree;
-  final EventAsm _eventAsm;
-  final Byte _dialogIdOffset;
-
-  final bool _isProcessingInteraction;
-  late Byte _currentDialogId;
-  var _currentDialog = DialogAsm.empty();
-  var _lastEventBreak = -1;
-  Event? _lastEvent;
-  var _eventCounter = 1;
-
-  static bool interactionIsolatedToDialogLoop(
-      List<Event> events, FieldObject obj) {
-    bool _isInteractionObjFacePlayer(Event event, FieldObject obj) {
-      if (event is! FacePlayer) return false;
-      return event.object == obj;
-    }
-
-    var first = events.first;
-    return (_isInteractionObjFacePlayer(first, obj) &&
-            events.skip(1).every((event) => event is Dialog)) ||
-        events.every((event) => event is Dialog);
-  }
-
-  SceneAsmGenerator.forInteraction(
-      GameMap map, FieldObject obj, this.id, this._dialogTree, this._eventAsm,
-      {bool inEvent = false})
-      : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _isProcessingInteraction = true {
-    _currentDialogId = _dialogIdOffset;
-    _gameMode = _inEvent ? Mode.event : Mode.dialog;
-    _inEvent = inEvent;
-
-    _putInAddress(a3, obj);
-    _hasSavedDialogPosition = false;
-    _state.currentMap = map;
-  }
-
-  SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
-      : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _isProcessingInteraction = false {
-    _currentDialogId = _dialogIdOffset;
-    _gameMode = Mode.event;
-    _inEvent = true;
-  }
-
-  void scene(Scene scene) {
-    for (var event in scene.events) {
-      event.visit(this);
-    }
-  }
-
-  @override
-  void asm(Asm asm) {
-    _addToEvent(AsmEvent(), () => asm);
-  }
-
-  @override
-  void dialog(Dialog dialog) {
-    if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
-      // Not starting with face player, so signal not to.
-      _currentDialog.add(dc.b(Bytes.of(0xf3)));
-    }
-
-    if (!inDialogLoop) {
-      if (_hasSavedDialogPosition) {
-        _eventAsm.add(popAndRunDialog);
-        _eventAsm.addNewline();
-      } else {
-        _eventAsm.add(getAndRunDialog(_currentDialogId.i));
-      }
-      _gameMode = Mode.dialog;
-    } else if (_lastEvent is Dialog) {
-      // Consecutive dialog, new cursor in between each dialog
-      _currentDialog.add(interrupt());
-    }
-
-    _currentDialog.add(dialog.toAsm());
-    _lastEvent = dialog;
-  }
-
-  @override
-  void displayText(DisplayText display) {
-    _addToEvent(display, () {
-      _flushCurrentDialog();
-      var asm = text.displayTextToAsm(display, dialogTree: _dialogTree);
-      _currentDialogId = _dialogTree.nextDialogId!;
-      _currentDialog = DialogAsm.empty();
-      return asm.event;
-    });
-  }
-
-  @override
-  void facePlayer(FacePlayer face) {
-    if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
-      // this already will happen by default if the first event
-      _lastEvent = face;
-      return;
-    }
-
-    _addToEvent(face, () {
-      var asm = EventAsm.empty();
-
-      if (_inAddress[a3] != AddressOf(face.object)) {
-        asm.add(face.object.toA3(_state));
-        _inAddress[a3] = AddressOf(face.object);
-      }
-
-      asm.add(jsr(Label('Interaction_UpdateObj').l));
-
-      return asm;
-    });
-  }
-
-  @override
-  void individualMoves(IndividualMoves moves) {
-    _addToEvent(moves, () => moves.toAsm(_state));
-  }
-
-  @override
-  void lockCamera(LockCamera lock) {
-    _addToEvent(lock,
-        () => EventAsm.of(asmevents.lockCamera(_state.cameraLock = true)));
-  }
-
-  @override
-  void partyMove(PartyMove move) {
-    _addToEvent(move, () => move.toIndividualMoves(_state).toAsm(_state));
-  }
-
-  @override
-  void pause(Pause pause) {
-    _addToEvent(pause, () {
-      var frames = pause.duration.toFrames();
-      return EventAsm.of(vIntPrepareLoop(Word(frames)));
-    });
-  }
-
-  @override
-  void setContext(SetContext set) {
-    set(_state);
-  }
-
-  @override
-  void unlockCamera(UnlockCamera unlock) {
-    _addToEvent(unlock,
-        () => EventAsm.of(asmevents.lockCamera(_state.cameraLock = false)));
-  }
-
-  void finish() {
-    _flushCurrentDialog();
-
-    if (_isProcessingInteraction && _inEvent) {
-      _eventAsm.add(returnFromDialogEvent());
-    }
-  }
-
-  void _flushCurrentDialog() {
-    // was lastEventBreak >= 0, but i think it should be this?
-    if (!inDialogLoop && _lastEventBreak >= 0) {
-      // i think this is only ever the last line so could simplify
-      _currentDialog.replace(_lastEventBreak, terminateDialog());
-    } else if (_currentDialog.isNotEmpty) {
-      _currentDialog.add(terminateDialog());
-    }
-
-    if (_currentDialog.isNotEmpty) {
-      _dialogTree.add(_currentDialog);
-    }
-
-    _lastEventBreak = -1;
-  }
-
-  void _addToEvent(Event event, Asm Function() generate) {
-    if (!_inEvent) {
-      throw StateError("can't add event when not in event loop");
-    } else if (inDialogLoop) {
-      // todo: why did we check this before?
-      // i think b/c we always assumed in dialog loop to start
-      //if (dialogAsm.isNotEmpty) {
-      _currentDialog.add(comment('scene event $_eventCounter'));
-      _lastEventBreak = _currentDialog.add(eventBreak());
-      _hasSavedDialogPosition = true;
-      _gameMode = Mode.event;
-    }
-
-    var asm = generate();
-
-    if (asm.isNotEmpty) {
-      _eventAsm.add(comment('scene event $_eventCounter'));
-      _eventAsm.add(comment('generated from type: ${event.runtimeType}'));
-      _eventAsm.add(asm);
-      _eventCounter++;
-    }
-
-    _lastEvent = event;
-  }
-
-  void _putInAddress(DirectAddressRegister a, Object? obj) {
-    if (obj == null) {
-      _inAddress.remove(a);
-    } else {
-      _inAddress[a] = AddressOf(obj);
-    }
-  }
-}
-
-class AddressOf {
-  final Object obj;
-
-  AddressOf(this.obj);
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AddressOf &&
-          runtimeType == other.runtimeType &&
-          obj == other.obj;
-
-  @override
-  int get hashCode => obj.hashCode;
-
-  @override
-  String toString() {
-    return 'AddressOf{$obj}';
-  }
-}
-
-enum Mode { dialog, event }
-
-class DialogTree extends IterableBase<DialogAsm> {
-  final _dialogs = <DialogAsm>[];
-
-  DialogTree({Byte? offset}) {
-    if (offset != null) {
-      for (var i = 0; i < offset.value; i++) {
-        // todo: or null?
-        _dialogs.add(DialogAsm([comment('hard coded (skipped)')]));
-      }
-    }
-  }
-
-  @override
-  DialogAsm get last => _dialogs.last;
-
-  /// Adds the dialog and returns its id in the tree.
-  Byte add(DialogAsm dialog) {
-    // TODO: validate dialog contains exactly one terminator and only at the end
-    // or validate contains none, and add here (or add here if not already set)
-    var id = nextDialogId;
-    if (id == null) {
-      throw StateError('no more dialog can fit into dialog trees');
-    }
-    _dialogs.add(dialog);
-    return id;
-  }
-
-  Byte? get nextDialogId =>
-      _dialogs.length > Size.b.maxValue ? null : _dialogs.length.toByte;
-
-  DialogAsm operator [](int index) {
-    return _dialogs[index];
-  }
-
-  Asm toAsm() {
-    var all = Asm.empty();
-
-    for (var i = 0; i < length; i++) {
-      all.add(comment('${i.toByte}'));
-      all.add(this[i]);
-      all.addNewline();
-    }
-
-    return all;
-  }
-
-  @override
-  int get length => _dialogs.length;
-
-  @override
-  Iterator<DialogAsm> get iterator => _dialogs.iterator;
-
-  @override
-  String toString() {
-    return toAsm().toString();
-  }
-}
-
 class AsmGenerationException {
   final AsmContext? ctx;
   final Object? model;
@@ -631,6 +692,10 @@ extension FramesPerSecond on Duration {
     // see: http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_3_6_
     return (inMilliseconds / 1000 * 60).round();
   }
+}
+
+extension EventFlagConstant on EventFlag {
+  Constant get toConstant => Constant('EventFlag_$value');
 }
 
 /*

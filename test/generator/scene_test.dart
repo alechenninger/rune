@@ -2,7 +2,9 @@ import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/dialog.dart';
+import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
@@ -285,4 +287,80 @@ ${dialog2.toAsm()}
           ]));
     });
   });
+
+  group('conditional events', () {
+    var sceneId = SceneId('test');
+
+    var pause1 = EventAsm.empty();
+    SceneAsmGenerator.forEvent(sceneId, DialogTree(), pause1)
+      ..pause(Pause(1.second))
+      ..finish();
+    var pause2 = EventAsm.empty();
+    SceneAsmGenerator.forEvent(sceneId, DialogTree(), pause2)
+      ..pause(Pause(2.second))
+      ..finish();
+
+    test('runs if-set events iff event flag is set', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+        ..ifEvent(IfEvent(EventFlag('Test'), ifSet: [Pause(1.second)]))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset1')),
+            pause1.withoutComments(),
+            setLabel('test_Test_unset1')
+          ]));
+    });
+
+    test('runs if-unset events iff event flag is unset', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+        ..ifEvent(IfEvent(EventFlag('Test'), ifUnset: [Pause(1.second)]))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            bne.w(Label('test_Test_set1')),
+            pause1.withoutComments(),
+            setLabel('test_Test_set1')
+          ]));
+    });
+
+    test('runs if-set events iff set, and if-unset events iff unset', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+        ..ifEvent(IfEvent(EventFlag('Test'),
+            ifUnset: [Pause(1.second)], ifSet: [Pause(2.seconds)]))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset1')),
+            pause2,
+            bra.w(Label('test_Test_cont1')),
+            setLabel('test_Test_unset1'),
+            pause1,
+            setLabel('test_Test_cont1')
+          ]).withoutComments());
+    });
+  });
+}
+
+extension EasyDuration on int {
+  Duration get second => Duration(seconds: this);
+  Duration get seconds => Duration(seconds: this);
 }

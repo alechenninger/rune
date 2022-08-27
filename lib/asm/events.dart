@@ -227,3 +227,19 @@ Asm addCharacterToParty({
 Asm clearUninterrupted({required Address clear, required Address range}) {
   return Asm([lea(clear, a0), move.w(range, d7), trap(0.toByte.i)]);
 }
+
+Asm branchIfEventFlagSet(Address flag, Address to, {bool short = false}) {
+  return Asm([
+    moveq(flag, d0),
+    jsr(Label('EventFlags_Test').l),
+    if (short) bne.s(to) else bne.w(to)
+  ]);
+}
+
+Asm branchIfEvenfFlagNotSet(Address flag, Address to, {bool short = false}) {
+  return Asm([
+    moveq(flag, d0),
+    jsr(Label('EventFlags_Test').l),
+    if (short) beq.s(to) else beq.w(to)
+  ]);
+}

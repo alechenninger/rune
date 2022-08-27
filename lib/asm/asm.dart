@@ -36,7 +36,10 @@ const TstMnemonic tst = TstMnemonic();
 final rts = cmd('rts', []);
 
 Asm newLine() => Asm.fromInstruction(_Instruction());
-Asm comment(String comment) => _Instruction(comment: comment).toAsm();
+Asm comment(String comment) => Asm.fromInstructions(LineSplitter()
+    .convert(comment)
+    .map((e) => _Instruction(comment: comment))
+    .toList(growable: false));
 
 Asm lea(Address src, Address dst) => cmd('lea', [src, dst]);
 Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
@@ -186,6 +189,10 @@ class Asm extends IterableBase<Instruction> {
   void replace(int index, Asm asm) {
     lines.removeRange(index, index + asm.length);
     lines.insertAll(index, asm.lines);
+  }
+
+  void insert(int index, Asm asm) {
+    lines.insertAll(index, asm);
   }
 
   void addLine(Instruction line) {

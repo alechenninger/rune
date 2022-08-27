@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/conditional.dart';
 import 'package:rune/model/text.dart';
 
 import 'dialog.dart';
@@ -16,7 +17,9 @@ export 'map.dart';
 
 abstract class Event {
   @Deprecated('does not fit all events')
-  Asm generateAsm(AsmGenerator generator, AsmContext ctx);
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
+    throw UnimplementedError('generateAsm');
+  }
 
   void visit(EventVisitor visitor);
 }
@@ -32,6 +35,7 @@ abstract class EventVisitor {
   void pause(Pause pause);
   void setContext(SetContext set);
   void unlockCamera(UnlockCamera unlock);
+  void ifEvent(IfEvent ifEvent);
 }
 
 class EventState {
