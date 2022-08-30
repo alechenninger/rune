@@ -83,8 +83,10 @@ extension IndividualMovesToAsm on IndividualMoves {
         firstAxis = Axis.x;
         maxSteps = maxStepsXFirst;
       } else {
-        // Keep first axis from context if either is equivalent
-        firstAxis = maxStepsYFirst > maxStepsXFirst ? Axis.y : ctx.startingAxis;
+        // Keep first axis from context or default to x if either is equivalent
+        firstAxis = maxStepsYFirst > maxStepsXFirst
+            ? Axis.y
+            : (ctx.startingAxis ?? Axis.x);
         maxSteps = maxStepsYFirst;
       }
 
@@ -142,7 +144,7 @@ extension IndividualMovesToAsm on IndividualMoves {
 
             var destination = current + afterSteps.relativePosition;
             ctx.positions[moveable] = destination;
-            ctx.facing[moveable] = afterSteps.facing;
+            ctx.setFacing(moveable, afterSteps.facing);
 
             var x = Word(destination.x).i;
             var y = Word(destination.y).i;

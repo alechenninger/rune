@@ -291,20 +291,22 @@ ${dialog2.toAsm()}
   group('conditional events', () {
     var sceneId = SceneId('test');
 
-    var pause1 = EventAsm.empty();
-    SceneAsmGenerator.forEvent(sceneId, DialogTree(), pause1)
-      ..pause(Pause(1.second))
-      ..finish();
-    var pause2 = EventAsm.empty();
-    SceneAsmGenerator.forEvent(sceneId, DialogTree(), pause2)
-      ..pause(Pause(2.second))
-      ..finish();
+    Asm pause(int seconds) {
+      var asm = EventAsm.empty();
+      SceneAsmGenerator.forEvent(sceneId, DialogTree(), asm)
+        ..pause(Pause(seconds.seconds))
+        ..finish();
+      return asm;
+    }
+
+    var pause1 = pause(1);
+    var pause2 = pause(2);
 
     test('runs if-set events iff event flag is set', () {
       var eventAsm = EventAsm.empty();
 
       SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
-        ..ifEvent(IfEvent(EventFlag('Test'), ifSet: [Pause(1.second)]))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [Pause(1.second)]))
         ..finish();
 
       expect(
@@ -322,7 +324,7 @@ ${dialog2.toAsm()}
       var eventAsm = EventAsm.empty();
 
       SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
-        ..ifEvent(IfEvent(EventFlag('Test'), ifUnset: [Pause(1.second)]))
+        ..ifFlag(IfFlag(EventFlag('Test'), isUnset: [Pause(1.second)]))
         ..finish();
 
       expect(
@@ -340,8 +342,8 @@ ${dialog2.toAsm()}
       var eventAsm = EventAsm.empty();
 
       SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
-        ..ifEvent(IfEvent(EventFlag('Test'),
-            ifUnset: [Pause(1.second)], ifSet: [Pause(2.seconds)]))
+        ..ifFlag(IfFlag(EventFlag('Test'),
+            isUnset: [Pause(1.second)], isSet: [Pause(2.seconds)]))
         ..finish();
 
       expect(
@@ -355,6 +357,68 @@ ${dialog2.toAsm()}
             setLabel('test_Test_unset1'),
             pause1,
             setLabel('test_Test_cont1')
+          ]).withoutComments());
+    });
+
+    test('nested conditionals skip impossible branches', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+        ..ifFlag(IfFlag(EventFlag('Test'), isUnset: [
+          IfFlag(EventFlag('Test'),
+              isSet: [Pause(1.second)], isUnset: [Pause(2.second)])
+        ], isSet: [
+          Pause(3.seconds)
+        ]))
+        ..finish();
+
+      print(eventAsm);
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset1')),
+            pause(3),
+            bra.w(Label('test_Test_cont1')),
+            setLabel('test_Test_unset1'),
+            pause2,
+            setLabel('test_Test_cont1')
+          ]).withoutComments());
+    });
+
+    test('additional checks use different branch routines', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+        ..ifFlag(IfFlag(EventFlag('Test'),
+            isUnset: [Pause(1.second)], isSet: [Pause(2.seconds)]))
+        ..ifFlag(IfFlag(EventFlag('Test'),
+            isUnset: [Pause(3.second)], isSet: [Pause(4.seconds)]))
+        ..finish();
+
+      print(eventAsm);
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset1')),
+            pause2,
+            bra.w(Label('test_Test_cont1')),
+            setLabel('test_Test_unset1'),
+            pause1,
+            setLabel('test_Test_cont1'),
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset4')),
+            pause(4),
+            bra.w(Label('test_Test_cont4')),
+            setLabel('test_Test_unset4'),
+            pause(3),
+            setLabel('test_Test_cont4'),
           ]).withoutComments());
     });
   });

@@ -35,43 +35,61 @@ abstract class EventVisitor {
   void pause(Pause pause);
   void setContext(SetContext set);
   void unlockCamera(UnlockCamera unlock);
-  void ifEvent(IfEvent ifEvent);
+  void ifFlag(IfFlag ifEvent);
 }
 
 class EventState {
-  late final Positions positions;
-  final facing = <FieldObject, Direction>{};
+  final _facing = <FieldObject, Direction>{};
 
-  /// 1-indexed (first is 1; 0 is invalid)
-  final slots = BiMap<int, Character>();
+  late final Positions _positions;
+  Positions get positions => _positions;
 
-  // TODO: might need allow this to be unknown
-  var startingAxis = Axis.x;
+  final Slots slots = Slots._();
+
+  Axis? startingAxis = Axis.x;
 
   /// Whether or not to follow character at slot[0]
-  // TODO: might need allow this to be unknown
   bool? followLead = true;
 
-  // TODO: might need allow this to be unknown
   bool? cameraLock = false;
 
   GameMap? currentMap;
 
   EventState() {
-    positions = Positions._(this);
+    _positions = Positions._(this);
   }
 
-  int? slotFor(Character c) => slots.inverse[c];
+  EventState branch() {
+    return EventState()
+      .._facing.addAll(_facing)
+      ..positions.addAll(positions)
+      ..slots.addAll(slots)
+      ..startingAxis = startingAxis
+      ..followLead = followLead
+      ..cameraLock = cameraLock
+      ..currentMap = currentMap;
+  }
 
-  int get numCharacters => slots.keys.reduce(max);
+  Direction? getFacing(FieldObject obj) => _facing[obj];
+  void setFacing(FieldObject obj, Direction dir) => _facing[obj] = dir;
+  void clearFacing(FieldObject obj) => _facing.remove(obj);
 
-  Position? positionOfSlot(int s) => positions[slots[s]];
+  /// 1-indexed (first slot is 1, there is no slot 0).
+  int? slotFor(Character c) => slots.slotFor(c);
+
+  /// 1-indexed (first slot is 1, there is no slot 0).
+  void setSlot(int slot, Character c) => slots[slot] = c;
+
+  /// 1-indexed (first slot is 1, there is no slot 0).
+  void clearSlot(int slot) => slots[slot] = null;
+
+  int get numCharacters => slots.numCharacters;
 
   void addCharacter(Character c,
       {int? slot, Position? position, Direction? facing}) {
     if (slot != null) slots[slot] = c;
     if (position != null) positions[c] = position;
-    if (facing != null) this.facing[c] = facing;
+    if (facing != null) _facing[c] = facing;
   }
 }
 
@@ -81,11 +99,15 @@ class Positions {
 
   Positions._(this._ctx);
 
-  void clear() {
-    _positions.clear();
+  void addAll(Positions p) {
+    _positions.addAll(p._positions);
   }
 
-  Position? operator [](FieldObject? m) {
+  void forEach(Function(FieldObject, Position) func) {
+    _positions.forEach(func);
+  }
+
+  Position? operator [](FieldObject m) {
     if (m is Slot) {
       var inSlot = _ctx.slots[m.index];
       if (inSlot == null) return null;
@@ -95,7 +117,7 @@ class Positions {
     return _positions[m];
   }
 
-  void operator []=(FieldObject m, Position p) {
+  void operator []=(FieldObject m, Position? p) {
     if (m is Slot) {
       var inSlot = _ctx.slots[m.index];
       if (inSlot == null) {
@@ -104,8 +126,44 @@ class Positions {
       m = inSlot;
     }
 
-    _positions[m] = p;
+    if (p == null) {
+      _positions.remove(m);
+    } else {
+      _positions[m] = p;
+    }
   }
+}
+
+class Slots {
+  /// 1-indexed (first is 1; 0 is invalid)
+  final _slots = BiMap<int, Character>();
+
+  Slots._();
+
+  void addAll(Slots slots) {
+    _slots.addAll(slots._slots);
+  }
+
+  void forEach(Function(int, Character) func) {
+    _slots.forEach(func);
+  }
+
+  /// 1-indexed (first slot is 1, there is no slot 0).
+  Character? operator [](int slot) => _slots[slot];
+
+  /// 1-indexed (first slot is 1, there is no slot 0).
+  void operator []=(int slot, Character? c) {
+    if (c == null) {
+      _slots.remove(slot);
+    } else {
+      _slots[slot] = c;
+    }
+  }
+
+  /// 1-indexed (first slot is 1, there is no slot 0).
+  int? slotFor(Character c) => _slots.inverse[c];
+
+  int get numCharacters => _slots.keys.reduce(max);
 }
 
 class Scene {

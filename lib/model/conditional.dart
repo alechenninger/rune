@@ -21,16 +21,16 @@ class EventFlag {
   }
 }
 
-class IfEvent extends Event {
+class IfFlag extends Event {
   final EventFlag flag;
-  final List<Event> ifSet;
-  final List<Event> ifUnset;
+  final List<Event> isSet;
+  final List<Event> isUnset;
 
-  IfEvent(this.flag, {this.ifSet = const [], this.ifUnset = const []});
+  IfFlag(this.flag, {this.isSet = const [], this.isUnset = const []});
 
   @override
   void visit(EventVisitor visitor) {
-    visitor.ifEvent(this);
+    visitor.ifFlag(this);
   }
 
   @override

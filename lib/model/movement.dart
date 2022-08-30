@@ -285,7 +285,7 @@ class PartyMove extends Event {
             ..from = position
             ..to = nextLeaderPosition
             ..firstAxis = startingAxis
-            ..direction = ctx.facing[Slot(1)] ?? Direction.up; // fixme
+            ..direction = ctx.getFacing(Slot(1)) ?? Direction.up; // fixme
 
           var lookahead = move.lookahead(1.step);
           positions[s] = position + lookahead.relativePosition;

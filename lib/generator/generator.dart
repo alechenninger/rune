@@ -1,3 +1,23 @@
+/// Generates assembly from model.
+///
+/// There are two general types of state
+/// which needs to be managed while generating code:
+///
+/// 1. Non-volatile (code state, see [Program]):
+/// the state of the code that we can see in a text editor.
+/// Related to this state is the known state of volatile memory
+/// which must be true at the moment of generating certain instructions
+/// (e.g. whether we are in an event loop or dialog loop).
+/// See [SceneAsmGenerator]
+/// This is not considered the second category
+/// because it is only needed to contextualize code being generated.
+/// 2. Volatile (event state, see [Memory]):
+/// the state of registers and RAM.
+/// This can be looked at in two different views:
+/// abstract (state of the model, [EventState]) and
+/// system (values in RAM and CPU registers, [SystemState]).
+library generator.dart;
+
 import 'dart:collection';
 
 import 'package:rune/model/conditional.dart';
@@ -91,7 +111,10 @@ class AsmEvent extends Event {
 class SceneAsmGenerator implements EventVisitor {
   final SceneId id;
 
-  final EventState _state = EventState();
+  // Non-volatile state (state of the code being generated)
+  final DialogTree _dialogTree;
+  final EventAsm _eventAsm;
+  final Byte _dialogIdOffset;
 
   Mode _gameMode = Mode.event;
   bool get inDialogLoop => _gameMode == Mode.dialog;
@@ -101,22 +124,30 @@ class SceneAsmGenerator implements EventVisitor {
   ///
   /// This is necessary to understand whether, when in dialog mode, we can pop
   /// back to an event or have to trigger a new one.
-  var _inEvent = true;
-
-  bool _hasSavedDialogPosition = false;
-
-  final _inAddress = <DirectAddressRegister, AddressOf>{};
-
-  final DialogTree _dialogTree;
-  final EventAsm _eventAsm;
-  final Byte _dialogIdOffset;
+  final bool _inEvent;
 
   final bool _isProcessingInteraction;
+
   late Byte _currentDialogId;
   var _currentDialog = DialogAsm.empty();
   var _lastEventBreak = -1;
   Event? _lastEvent;
   var _eventCounter = 1;
+
+  // conditional runtime state
+  // MEMORY (ram/registers)! vs rom! (volatile vs nonvolatile)
+  final EventState _state = EventState();
+  final _inAddress = <DirectAddressRegister, AddressOf>{};
+  bool _hasSavedDialogPosition = false;
+
+  /// For currently generating branch, what is the known state of event flags
+  final Map<EventFlag, bool> _currentFlags = {};
+
+  /// mem state which exactly matches current flags; other states may need
+  /// updates
+  Memory _currentMem = Memory(); // todo: ctor initialization
+  /// should also contain root state
+  final _stateGraph = <Map<EventFlag, bool>, Memory>{};
 
   static bool interactionIsolatedToDialogLoop(
       List<Event> events, FieldObject obj) {
@@ -135,22 +166,24 @@ class SceneAsmGenerator implements EventVisitor {
       GameMap map, FieldObject obj, this.id, this._dialogTree, this._eventAsm,
       {bool inEvent = false})
       : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _isProcessingInteraction = true {
+        _isProcessingInteraction = true,
+        _inEvent = inEvent {
     _currentDialogId = _dialogIdOffset;
     _gameMode = _inEvent ? Mode.event : Mode.dialog;
-    _inEvent = inEvent;
 
     _putInAddress(a3, obj);
     _hasSavedDialogPosition = false;
     _state.currentMap = map;
+    _stateGraph[{}] = _currentMem;
   }
 
   SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
       : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _isProcessingInteraction = false {
+        _isProcessingInteraction = false,
+        _inEvent = true {
     _currentDialogId = _dialogIdOffset;
     _gameMode = Mode.event;
-    _inEvent = true;
+    _stateGraph[{}] = _currentMem;
   }
 
   void scene(Scene scene) {
@@ -257,65 +290,154 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
-  void ifEvent(IfEvent ifEvent) {
-    if (ifEvent.ifSet.isEmpty && ifEvent.ifUnset.isEmpty) {
+  void ifFlag(IfFlag ifEvent) {
+    if (ifEvent.isSet.isEmpty && ifEvent.isUnset.isEmpty) {
       return;
     }
 
-    _addToEvent(ifEvent, (i) {
-      var flag = ifEvent.flag;
+    var flag = ifEvent.flag;
 
-      // note that if we need to move further than beq.w we will need to branch
-      // to subroutine which then jsr/jmp to another
-      // TODO: need to approximate code size so we can handle jump distance
-
-      if (ifEvent.ifSet.isEmpty) {
-        // use event counter in case flag is checked again
-        var ifSet = Label('${id}_${flag.value}_set$i');
-        // skip ahead if set
-        _eventAsm.add(branchIfEventFlagSet(flag.toConstant.i, ifSet));
-        // otherwise run this stuff
-        for (var event in ifEvent.ifUnset) {
-          event.visit(this);
-        }
-        _eventAsm.add(setLabel(ifSet.name));
-      } else {
-        // use event counter in case flag is checked again
-        var ifUnset = Label('${id}_${flag.value}_unset$i');
-        Label? unconditional = ifEvent.ifUnset.isNotEmpty
-            ? Label('${id}_${flag.value}_cont$i')
-            : null;
-        // skip ahead if set
-        _eventAsm.add(branchIfEvenfFlagNotSet(flag.toConstant.i, ifUnset));
-        // otherwise run this stuff
-        for (var event in ifEvent.ifSet) {
-          event.visit(this);
-        }
-
-        if (unconditional != null) {
-          _eventAsm.add(bra.w(unconditional));
-        }
-
-        _eventAsm.add(setLabel(ifUnset.name));
-        for (var event in ifEvent.ifUnset) {
-          event.visit(this);
-        }
-
-        if (unconditional != null) {
-          _eventAsm.add(setLabel(unconditional.name));
-        }
+    var knownState = _currentFlags[flag];
+    if (knownState != null) {
+      // one branch is dead code so only run the other, and skip useless
+      // conditional check
+      var events = knownState ? ifEvent.isSet : ifEvent.isUnset;
+      for (var event in events) {
+        event.visit(this);
       }
+    } else {
+      _addToEvent(ifEvent, (i) {
+        // note that if we need to move further than beq.w we will need to branch
+        // to subroutine which then jsr/jmp to another
+        // TODO: need to approximate code size so we can handle jump distance
 
-      return null;
-    });
+        if (ifEvent.isSet.isEmpty) {
+          // use event counter in case flag is checked again
+          var ifSet = Label('${id}_${flag.value}_set$i');
+          // skip ahead if set
+          _eventAsm.add(branchIfEventFlagSet(flag.toConstant.i, ifSet));
+
+          // otherwise run this stuff
+          _flagIsNotSet(flag);
+          for (var event in ifEvent.isUnset) {
+            event.visit(this);
+          }
+          // todo: have to come back to event loop if not already
+          _flagUnknown(flag);
+          _eventAsm.add(setLabel(ifSet.name));
+        } else {
+          // use event counter in case flag is checked again
+          var ifUnset = Label('${id}_${flag.value}_unset$i');
+          Label? unconditional = ifEvent.isUnset.isNotEmpty
+              ? Label('${id}_${flag.value}_cont$i')
+              : null;
+
+          // skip ahead if not set
+          _eventAsm.add(branchIfEvenfFlagNotSet(flag.toConstant.i, ifUnset));
+
+          // otherwise run this stuff
+          _flagIsSet(flag);
+          for (var event in ifEvent.isSet) {
+            event.visit(this);
+          }
+          // todo: have to come back to event loop if not already
+
+          if (unconditional != null) {
+            _eventAsm.add(bra.w(unconditional));
+          }
+          _flagUnknown(flag); // todo: not sure about this
+          _flagIsNotSet(flag);
+          _eventAsm.add(setLabel(ifUnset.name));
+          for (var event in ifEvent.isUnset) {
+            event.visit(this);
+          }
+          // todo: have to come back to event loop if not already
+
+          _flagUnknown(flag);
+          if (unconditional != null) {
+            _eventAsm.add(setLabel(unconditional.name));
+          }
+        }
+
+        return null;
+      });
+    }
   }
 
   void finish() {
+    // also apply all changes for current mem across graph
+
     _flushCurrentDialog();
 
     if (_isProcessingInteraction && _inEvent) {
       _eventAsm.add(returnFromDialogEvent());
     }
+  }
+
+  _flagIsSet(EventFlag flag) {
+    _updateStateGraph();
+
+    _currentFlags[flag] = true;
+    var state = _stateGraph[_currentFlags];
+    if (state == null) {
+      _stateGraph[Map.of(_currentFlags)] = state = _currentMem.branch();
+    }
+    _currentMem = state;
+  }
+
+  _flagIsNotSet(EventFlag flag) {
+    _updateStateGraph();
+
+    _currentFlags[flag] = false;
+    var state = _stateGraph[_currentFlags];
+    if (state == null) {
+      _stateGraph[Map.of(_currentFlags)] = state = _currentMem.branch();
+    }
+    _currentMem = state;
+  }
+
+  _flagUnknown(EventFlag flag) {
+    _updateStateGraph();
+
+    var changes = _currentMem._changes;
+    _currentFlags.remove(flag);
+    var state = _stateGraph[_currentFlags];
+    if (state == null) {
+      // nothing can be known in this case? or is this error case?
+      _stateGraph[Map.of(_currentFlags)] = state = Memory();
+    }
+    _currentMem = state;
+    for (var change in changes) {
+      change.mayApply(_currentMem);
+    }
+    return state;
+  }
+
+  void _updateStateGraph() {
+    var changes = _currentMem._changes;
+    // find all child states, apply changes
+    // find all other states, apply unknown
+
+    graph:
+    for (var entry in _stateGraph.entries) {
+      var condition = entry.key;
+      var state = entry.value;
+
+      for (var flagEntry in _currentFlags.entries) {
+        if (condition[flagEntry.key] != flagEntry.value) {
+          for (var change in changes) {
+            change.mayApply(state);
+          }
+          continue graph;
+        }
+      }
+
+      for (var change in changes) {
+        change.apply(state);
+      }
+    }
+
+    _currentMem._changes.clear();
   }
 
   void _flushCurrentDialog() {
@@ -712,3 +834,340 @@ what is steps per second?
 60 / 8 step per second (7.5)
 
  */
+
+abstract class StateChange<T> {
+  T apply(Memory memory);
+  mayApply(Memory memory);
+}
+
+class SystemState {
+  final _inAddress = <DirectAddressRegister, AddressOf>{};
+  bool _hasSavedDialogPosition = false;
+
+  void _putInAddress(DirectAddressRegister a, Object? obj) {
+    if (obj == null) {
+      _inAddress.remove(a);
+    } else {
+      _inAddress[a] = AddressOf(obj);
+    }
+  }
+
+  SystemState branch() {
+    return SystemState()
+      .._inAddress.addAll(_inAddress)
+      .._hasSavedDialogPosition = _hasSavedDialogPosition;
+  }
+}
+
+class Memory implements EventState {
+  final List<StateChange> _changes = [];
+  final SystemState _sysState;
+  final EventState _eventState;
+
+  Memory()
+      : _sysState = SystemState(),
+        _eventState = EventState();
+  Memory.from(this._sysState, this._eventState);
+
+  @override
+  Memory branch() => Memory.from(_sysState.branch(), _eventState.branch());
+
+  set hasSavedDialogPosition(bool saved) {
+    _apply(SetSavedDialogPosition(saved));
+  }
+
+  bool get hasSavedDialogPosition => _sysState._hasSavedDialogPosition;
+
+  void putInAddress(DirectAddressRegister a, Object? obj) {
+    _apply(PutInAddress(a, obj));
+  }
+
+  @override
+  Positions get positions => _Positions(this);
+  @override
+  Slots get slots => _Slots(this);
+
+  @override
+  Axis? get startingAxis => _eventState.startingAxis;
+
+  @override
+  set startingAxis(Axis? a) {
+    _apply(SetStartingAxis(a));
+  }
+
+  @override
+  bool? get followLead => _eventState.followLead;
+
+  @override
+  set followLead(bool? follow) => _apply(SetValue<bool>(follow,
+      (m) => m._eventState.followLead, (f, m) => m._eventState.followLead = f));
+
+  @override
+  bool? get cameraLock => _eventState.cameraLock;
+
+  @override
+  set cameraLock(bool? lock) => _apply(SetValue<bool>(lock,
+      (m) => m._eventState.cameraLock, (l, m) => m._eventState.cameraLock = l));
+
+  @override
+  GameMap? get currentMap => _eventState.currentMap;
+  @override
+  set currentMap(GameMap? map) => _apply(SetValue<GameMap>(
+      map,
+      (m) => m._eventState.currentMap,
+      (map, m) => m._eventState.currentMap = map));
+
+  @override
+  Direction? getFacing(FieldObject obj) => _eventState.getFacing(obj);
+
+  @override
+  void setFacing(FieldObject obj, Direction dir) {
+    _apply(SetFacing(obj, dir));
+  }
+
+  @override
+  void clearFacing(FieldObject obj) {
+    // TODO: implement clearFacing
+  }
+
+  @override
+  int? slotFor(Character c) => _eventState.slotFor(c);
+  @override
+  int get numCharacters => _eventState.numCharacters;
+  @override
+  void setSlot(int slot, Character c) {
+    _apply(SetSlot(slot, c));
+  }
+
+  @override
+  void clearSlot(int slot) {
+    _apply(SetSlot(slot, null));
+  }
+
+  @override
+  void addCharacter(Character c,
+      {int? slot, Position? position, Direction? facing}) {
+    if (slot != null) slots[slot] = c;
+    if (position != null) positions[c] = position;
+    if (facing != null) setFacing(c, facing);
+  }
+
+  T _apply<T>(StateChange<T> change) {
+    _changes.add(change);
+    return change.apply(this);
+  }
+}
+
+class _Positions implements Positions {
+  final Memory _memory;
+
+  _Positions(this._memory);
+
+  @override
+  Position? operator [](FieldObject obj) => _memory._eventState.positions[obj];
+
+  @override
+  void operator []=(FieldObject obj, Position? p) {
+    _memory._apply(SetPosition(obj, p));
+  }
+
+  @override
+  void addAll(Positions p) {
+    _memory._apply(AddAllPositions(p));
+  }
+
+  @override
+  void forEach(Function(FieldObject obj, Position pos) func) {
+    _memory._eventState.positions.forEach(func);
+  }
+}
+
+class _Slots implements Slots {
+  final Memory _memory;
+
+  _Slots(this._memory);
+
+  @override
+  Character? operator [](int slot) => _memory._eventState.slots[slot];
+
+  @override
+  void operator []=(int slot, Character? c) =>
+      _memory._eventState.slots[slot] = c;
+
+  @override
+  int? slotFor(Character c) => _memory._eventState.slots.slotFor(c);
+
+  @override
+  int get numCharacters => _memory._eventState.numCharacters;
+
+  @override
+  void addAll(Slots slots) {
+    _memory._apply(AddAllSlots(slots));
+  }
+
+  @override
+  void forEach(Function(int slot, Character c) func) {
+    _memory._eventState.slots.forEach(func);
+  }
+}
+
+// TODO: if prior value is same, then "may apply" can keep same value
+// e.g. if
+
+class SetSavedDialogPosition implements StateChange {
+  final bool saved;
+
+  SetSavedDialogPosition(this.saved);
+
+  @override
+  apply(Memory memory) {
+    memory._sysState._hasSavedDialogPosition = saved;
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._sysState._hasSavedDialogPosition = false;
+  }
+}
+
+class PutInAddress implements StateChange {
+  final DirectAddressRegister register;
+  final Object? obj;
+
+  PutInAddress(this.register, this.obj);
+
+  @override
+  apply(Memory memory) {
+    memory._sysState._putInAddress(register, obj);
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._sysState._putInAddress(register, null);
+  }
+}
+
+class SetFacing implements StateChange {
+  final FieldObject obj;
+  final Direction dir;
+
+  SetFacing(this.obj, this.dir);
+
+  @override
+  apply(Memory memory) {
+    memory._eventState.setFacing(obj, dir);
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.clearFacing(obj);
+  }
+}
+
+class SetSlot implements StateChange {
+  final int slot;
+  final Character? char;
+
+  SetSlot(this.slot, this.char);
+
+  @override
+  apply(Memory memory) {
+    var c = char;
+    if (c == null) {
+      memory._eventState.clearSlot(slot);
+    } else {
+      memory._eventState.setSlot(slot, c);
+    }
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.clearSlot(slot);
+  }
+}
+
+class AddAllSlots implements StateChange {
+  final Slots slots;
+
+  AddAllSlots(this.slots);
+
+  @override
+  apply(Memory memory) {
+    memory._eventState.slots.addAll(slots);
+  }
+
+  @override
+  mayApply(Memory memory) {
+    slots.forEach((slot, c) => memory._eventState.slots[slot] = null);
+  }
+}
+
+class SetPosition implements StateChange {
+  final FieldObject obj;
+  final Position? pos;
+
+  SetPosition(this.obj, this.pos);
+
+  @override
+  apply(Memory memory) {
+    memory._eventState.positions[obj] = pos;
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.positions[obj] = null;
+  }
+}
+
+class AddAllPositions implements StateChange {
+  final Positions positions;
+
+  AddAllPositions(this.positions);
+
+  @override
+  apply(Memory memory) {
+    memory._eventState.positions.addAll(positions);
+  }
+
+  @override
+  mayApply(Memory memory) {
+    positions.forEach((obj, pos) => memory._eventState.positions[obj] = null);
+  }
+}
+
+class SetStartingAxis implements StateChange {
+  final Axis? axis;
+
+  SetStartingAxis(this.axis);
+
+  @override
+  apply(Memory memory) {
+    memory._eventState.startingAxis = axis;
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.startingAxis = null;
+  }
+}
+
+class SetValue<T> implements StateChange {
+  final T? _val;
+  final T? Function(Memory) _get;
+  final void Function(T?, Memory) _set;
+
+  SetValue(this._val, this._get, this._set);
+
+  @override
+  apply(Memory memory) {
+    _set(_val, memory);
+  }
+
+  @override
+  mayApply(Memory memory) {
+    // todo: not sure about this?
+    if (_get(memory) != _val) {
+      _set(null, memory);
+    }
+  }
+}
