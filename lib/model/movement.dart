@@ -149,6 +149,11 @@ class Position {
   Position operator *(int factor) {
     return Position((x * factor), (y * factor));
   }
+
+  @override
+  String toString() {
+    return 'Position{$x, $y}';
+  }
 }
 
 const up = Direction.up;

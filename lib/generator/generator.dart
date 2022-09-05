@@ -21,6 +21,7 @@ library generator.dart;
 import 'dart:collection';
 
 import 'package:rune/model/conditional.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -135,19 +136,14 @@ class SceneAsmGenerator implements EventVisitor {
   var _eventCounter = 1;
 
   // conditional runtime state
-  // MEMORY (ram/registers)! vs rom! (volatile vs nonvolatile)
-  final EventState _state = EventState();
-  final _inAddress = <DirectAddressRegister, AddressOf>{};
-  bool _hasSavedDialogPosition = false;
-
   /// For currently generating branch, what is the known state of event flags
-  final Map<EventFlag, bool> _currentFlags = {};
+  Condition _currentCondition = Condition.empty();
 
   /// mem state which exactly matches current flags; other states may need
   /// updates
-  Memory _currentMem = Memory(); // todo: ctor initialization
+  Memory _memory = Memory(); // todo: ctor initialization
   /// should also contain root state
-  final _stateGraph = <Map<EventFlag, bool>, Memory>{};
+  final _stateGraph = <Condition, Memory>{};
 
   static bool interactionIsolatedToDialogLoop(
       List<Event> events, FieldObject obj) {
@@ -171,10 +167,10 @@ class SceneAsmGenerator implements EventVisitor {
     _currentDialogId = _dialogIdOffset;
     _gameMode = _inEvent ? Mode.event : Mode.dialog;
 
-    _putInAddress(a3, obj);
-    _hasSavedDialogPosition = false;
-    _state.currentMap = map;
-    _stateGraph[{}] = _currentMem;
+    _memory.putInAddress(a3, obj);
+    _memory.hasSavedDialogPosition = false;
+    _memory.currentMap = map;
+    _stateGraph[Condition.empty()] = _memory;
   }
 
   SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
@@ -183,7 +179,7 @@ class SceneAsmGenerator implements EventVisitor {
         _inEvent = true {
     _currentDialogId = _dialogIdOffset;
     _gameMode = Mode.event;
-    _stateGraph[{}] = _currentMem;
+    _stateGraph[Condition.empty()] = _memory;
   }
 
   void scene(Scene scene) {
@@ -205,7 +201,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     if (!inDialogLoop) {
-      if (_hasSavedDialogPosition) {
+      if (_memory.hasSavedDialogPosition) {
         _eventAsm.add(popAndRunDialog);
         _eventAsm.addNewline();
       } else {
@@ -243,9 +239,9 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(face, (i) {
       var asm = EventAsm.empty();
 
-      if (_inAddress[a3] != AddressOf(face.object)) {
-        asm.add(face.object.toA3(_state));
-        _inAddress[a3] = AddressOf(face.object);
+      if (_memory.inAddress(a3) != AddressOf(face.object)) {
+        asm.add(face.object.toA3(_memory));
+        _memory.putInAddress(a3, face.object);
       }
 
       asm.add(jsr(Label('Interaction_UpdateObj').l));
@@ -256,18 +252,18 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void individualMoves(IndividualMoves moves) {
-    _addToEvent(moves, (i) => moves.toAsm(_state));
+    _addToEvent(moves, (i) => moves.toAsm(_memory));
   }
 
   @override
   void lockCamera(LockCamera lock) {
     _addToEvent(lock,
-        (i) => EventAsm.of(asmevents.lockCamera(_state.cameraLock = true)));
+        (i) => EventAsm.of(asmevents.lockCamera(_memory.cameraLock = true)));
   }
 
   @override
   void partyMove(PartyMove move) {
-    _addToEvent(move, (i) => move.toIndividualMoves(_state).toAsm(_state));
+    _addToEvent(move, (i) => move.toIndividualMoves(_memory).toAsm(_memory));
   }
 
   @override
@@ -280,13 +276,13 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void setContext(SetContext set) {
-    set(_state);
+    set(_memory);
   }
 
   @override
   void unlockCamera(UnlockCamera unlock) {
     _addToEvent(unlock,
-        (i) => EventAsm.of(asmevents.lockCamera(_state.cameraLock = false)));
+        (i) => EventAsm.of(asmevents.lockCamera(_memory.cameraLock = false)));
   }
 
   @override
@@ -297,10 +293,12 @@ class SceneAsmGenerator implements EventVisitor {
 
     var flag = ifEvent.flag;
 
-    var knownState = _currentFlags[flag];
+    var knownState = _currentCondition[flag];
     if (knownState != null) {
       // one branch is dead code so only run the other, and skip useless
       // conditional check
+      // also, no need to manage flags in scene graph because this flag is
+      // already set.
       var events = knownState ? ifEvent.isSet : ifEvent.isUnset;
       for (var event in events) {
         event.visit(this);
@@ -322,7 +320,8 @@ class SceneAsmGenerator implements EventVisitor {
           for (var event in ifEvent.isUnset) {
             event.visit(this);
           }
-          // todo: have to come back to event loop if not already
+
+          _updateStateGraph(flag);
           _flagUnknown(flag);
           _eventAsm.add(setLabel(ifSet.name));
         } else {
@@ -335,24 +334,30 @@ class SceneAsmGenerator implements EventVisitor {
           // skip ahead if not set
           _eventAsm.add(branchIfEvenfFlagNotSet(flag.toConstant.i, ifUnset));
 
+          // memory will change while flag is set, so remember this to branch
+          // off of for unset branch
+          var parent = _memory;
+
           // otherwise run this stuff
           _flagIsSet(flag);
           for (var event in ifEvent.isSet) {
             event.visit(this);
           }
+
           // todo: have to come back to event loop if not already
 
           if (unconditional != null) {
             _eventAsm.add(bra.w(unconditional));
           }
-          _flagUnknown(flag); // todo: not sure about this
-          _flagIsNotSet(flag);
+
+          _flagIsNotSet(flag, parent: parent);
           _eventAsm.add(setLabel(ifUnset.name));
           for (var event in ifEvent.isUnset) {
             event.visit(this);
           }
           // todo: have to come back to event loop if not already
 
+          _updateStateGraph(flag);
           _flagUnknown(flag);
           if (unconditional != null) {
             _eventAsm.add(setLabel(unconditional.name));
@@ -374,70 +379,121 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  _flagIsSet(EventFlag flag) {
-    _updateStateGraph();
-
-    _currentFlags[flag] = true;
-    var state = _stateGraph[_currentFlags];
+  _flagIsSet(EventFlag flag, {Memory? parent}) {
+    parent = parent ?? _memory;
+    _currentCondition = _currentCondition.withSet(flag);
+    var state = _stateGraph[_currentCondition];
     if (state == null) {
-      _stateGraph[Map.of(_currentFlags)] = state = _currentMem.branch();
+      _stateGraph[_currentCondition] = state = parent.branch();
     }
-    _currentMem = state;
+    _memory = state;
   }
 
-  _flagIsNotSet(EventFlag flag) {
-    _updateStateGraph();
-
-    _currentFlags[flag] = false;
-    var state = _stateGraph[_currentFlags];
+  _flagIsNotSet(EventFlag flag, {Memory? parent}) {
+    parent = parent ?? _memory;
+    _currentCondition = _currentCondition.withNotSet(flag);
+    var state = _stateGraph[_currentCondition];
     if (state == null) {
-      _stateGraph[Map.of(_currentFlags)] = state = _currentMem.branch();
+      _stateGraph[_currentCondition] = state = parent.branch();
     }
-    _currentMem = state;
+    _memory = state;
   }
 
   _flagUnknown(EventFlag flag) {
-    _updateStateGraph();
-
-    var changes = _currentMem._changes;
-    _currentFlags.remove(flag);
-    var state = _stateGraph[_currentFlags];
+    _currentCondition = _currentCondition.without(flag);
+    var state = _stateGraph[_currentCondition];
     if (state == null) {
       // nothing can be known in this case? or is this error case?
-      _stateGraph[Map.of(_currentFlags)] = state = Memory();
+      _stateGraph[_currentCondition] = state = Memory();
     }
-    _currentMem = state;
-    for (var change in changes) {
-      change.mayApply(_currentMem);
-    }
-    return state;
+    _memory = state;
   }
 
-  void _updateStateGraph() {
-    var changes = _currentMem._changes;
-    // find all child states, apply changes
-    // find all other states, apply unknown
+  /// This takes changes applied to the current state of this branch
+  /// (defined by its [branchFlag])
+  /// and it's immediate sibling,
+  /// and updates the graph based on the following logic:
+  ///
+  /// * All branches which contain *at least* the current condition are updated.
+  /// If there are any event flag checks following this,
+  /// we know the state changes here must apply, since they are most recent.
+  /// * All branches which contain *at least* the sibling condition are updated
+  /// in the same fashion with that branch's changes.
+  /// * In both cases, branches where we know the [branchFlag] is different, do
+  /// not apply changes, because we know these must not apply.
+  /// * In all of the remaining branches, we won't know if these flags are also
+  /// set or not the next they are evaluated, so we have to tell these states
+  /// that these changes may have applied.
+  void _updateStateGraph(EventFlag branchFlag) {
+    var currentBranch = _currentCondition[branchFlag];
+    if (currentBranch == null) {
+      throw ArgumentError.value(
+          branchFlag,
+          'branchFlag',
+          'is not in current branch conditions, '
+              'so it must not be the current branch flag');
+    }
+
+    var changes = _memory._changes;
+    // there may be no sibling if that branch had no events
+    var sibling =
+        _stateGraph[_currentCondition.withFlag(branchFlag, !currentBranch)];
+    var siblingChanges = sibling == null
+        ? List<StateChange>.empty(growable: true)
+        : sibling._changes;
 
     graph:
     for (var entry in _stateGraph.entries) {
       var condition = entry.key;
       var state = entry.value;
+      // a peer is a state where all other current conditions are also set
+      // *except* for the branch flag. in all of these branches we know the
+      // changes don't apply.
+      var mayBePeer = false;
 
-      for (var flagEntry in _currentFlags.entries) {
-        if (condition[flagEntry.key] != flagEntry.value) {
+      for (var flagEntry in _currentCondition.entries) {
+        // should include parent states (must be at least as specific)
+        var currentFlag = flagEntry.key;
+        if (condition[currentFlag] != flagEntry.value) {
+          if (currentFlag == branchFlag) {
+            mayBePeer = true;
+            // keep evaluating other conditions, because it may not be a peer.
+            continue;
+          }
+
+          // if flag other than branch flag is different, it must not be a peer
+          // and is therefore an alternative branch to be considered.
           for (var change in changes) {
+            change.mayApply(state);
+          }
+
+          // Sibling changes may also apply!
+          for (var change in siblingChanges) {
             change.mayApply(state);
           }
           continue graph;
         }
       }
 
+      if (mayBePeer) {
+        if (state != sibling) {
+          // Superset of sibling, so we know sibling changes apply
+          for (var change in siblingChanges) {
+            change.apply(state);
+          }
+        }
+        continue;
+      }
+
+      // this state definitely has all of the current conditions set, so
+      // changes will apply.
       for (var change in changes) {
         change.apply(state);
       }
     }
 
-    _currentMem._changes.clear();
+    changes.clear();
+    siblingChanges.clear();
   }
 
   void _flushCurrentDialog() {
@@ -448,6 +504,8 @@ class SceneAsmGenerator implements EventVisitor {
     } else if (_currentDialog.isNotEmpty) {
       _currentDialog.add(terminateDialog());
     }
+
+    // todo: i think we should also reset has saved dialog position?
 
     if (_currentDialog.isNotEmpty) {
       _dialogTree.add(_currentDialog);
@@ -467,7 +525,7 @@ class SceneAsmGenerator implements EventVisitor {
       //if (dialogAsm.isNotEmpty) {
       _currentDialog.add(comment('scene event $eventIndex'));
       _lastEventBreak = _currentDialog.add(eventBreak());
-      _hasSavedDialogPosition = true;
+      _memory.hasSavedDialogPosition = true;
       _gameMode = Mode.event;
     }
 
@@ -484,14 +542,6 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _lastEvent = event;
-  }
-
-  void _putInAddress(DirectAddressRegister a, Object? obj) {
-    if (obj == null) {
-      _inAddress.remove(a);
-    } else {
-      _inAddress[a] = AddressOf(obj);
-    }
   }
 }
 
@@ -835,6 +885,42 @@ what is steps per second?
 
  */
 
+class Condition {
+  final IMap<EventFlag, bool> _flags;
+
+  Condition(Map<EventFlag, bool> flags) : _flags = flags.lock;
+  Condition.empty() : _flags = IMap();
+
+  Condition withFlag(EventFlag flag, bool isSet) => Condition(_flags.unlock
+    ..[flag] = isSet
+    ..lock);
+
+  Condition withSet(EventFlag flag) => withFlag(flag, true);
+  Condition withNotSet(EventFlag flag) => withFlag(flag, false);
+  Condition without(EventFlag flag) => Condition(_flags.unlock
+    ..remove(flag)
+    ..lock);
+
+  Iterable<MapEntry<EventFlag, bool>> get entries => _flags.entries;
+
+  bool? operator [](EventFlag flag) => _flags[flag];
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Condition &&
+          runtimeType == other.runtimeType &&
+          _flags == other._flags;
+
+  @override
+  int get hashCode => _flags.hashCode;
+
+  @override
+  String toString() {
+    return 'Condition{$_flags}';
+  }
+}
+
 abstract class StateChange<T> {
   T apply(Memory memory);
   mayApply(Memory memory);
@@ -878,6 +964,9 @@ class Memory implements EventState {
 
   bool get hasSavedDialogPosition => _sysState._hasSavedDialogPosition;
 
+  AddressOf? inAddress(DirectAddressRegister a) => _sysState._inAddress[a];
+
+  /// [obj] should not be wrapped in [AddressOf].
   void putInAddress(DirectAddressRegister a, Object? obj) {
     _apply(PutInAddress(a, obj));
   }

@@ -421,6 +421,81 @@ ${dialog2.toAsm()}
             setLabel('test_Test_cont4'),
           ]).withoutComments());
     });
+
+    test('dialog in branch terminates and clears saved dialog state', () {
+      var eventAsm = EventAsm.empty();
+      var dialog = DialogTree();
+
+      SceneAsmGenerator.forEvent(sceneId, dialog, eventAsm)
+        ..ifFlag(IfFlag(EventFlag('Test'),
+            isSet: [Dialog(spans: DialogSpan.parse('Hello!'))]))
+        ..dialog(Dialog(spans: DialogSpan.parse('Greetings!')))
+        ..finish();
+
+      print(eventAsm);
+      print(dialog);
+    });
+
+    test('events which require context should fail if context is unknown', () {
+      var eventAsm = EventAsm.empty();
+
+      var generator = SceneAsmGenerator.forEvent(
+          sceneId, DialogTree(), eventAsm)
+        ..setContext(
+            SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
+        ..individualMoves(
+            IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
+        ], isUnset: [
+          IndividualMoves()
+            ..moves[alys] = (StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps)
+        ]));
+
+      // generator should not have failed at this point.
+      print(eventAsm);
+
+      // but then, add a relative move. because we do not know where alys might
+      // be, this should fail.
+      expect(() {
+        generator.individualMoves(
+            IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps));
+      }, throwsStateError);
+    });
+
+    test('events use context from previous branched states', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+        ..setContext(
+            SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
+        ..individualMoves(
+            IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
+        ], isUnset: [
+          IndividualMoves()
+            ..moves[alys] = (StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps)
+        ]))
+        ..pause(Pause(1.second))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          IndividualMoves()
+            ..moves[alys] = (StepPath()
+              ..direction = Direction.left
+              ..distance = 2.steps)
+        ], isUnset: [
+          IndividualMoves()
+            ..moves[alys] = (StepPath()
+              ..direction = Direction.up
+              ..distance = 2.steps)
+        ]));
+
+      print(eventAsm);
+    });
   });
 }
 

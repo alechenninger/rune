@@ -285,7 +285,7 @@ extension CharacterData on Character {
       case Shay:
         return Constant('CharID_Chaz').i;
       default:
-        return Constant('CharID_$this}').i;
+        return Constant('CharID_$this').i;
     }
   }
 
@@ -294,7 +294,7 @@ extension CharacterData on Character {
       case Shay:
         return Label('FieldObj_Chaz').l;
       default:
-        return Label('FieldObj_$this}').l;
+        return Label('FieldObj_$this').l;
     }
   }
 
