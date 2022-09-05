@@ -201,6 +201,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     if (!inDialogLoop) {
+      _eventAsm.add(Asm([comment('${_eventCounter++}: $Dialog')]));
       if (_memory.hasSavedDialogPosition) {
         _eventAsm.add(popAndRunDialog);
         _eventAsm.addNewline();
@@ -220,7 +221,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void displayText(DisplayText display) {
     _addToEvent(display, (i) {
-      _flushCurrentDialog();
+      _flushAndTerminateCurrentDialog();
       var asm = text.displayTextToAsm(display, dialogTree: _dialogTree);
       _currentDialogId = _dialogTree.nextDialogId!;
       _currentDialog = DialogAsm.empty();
@@ -321,6 +322,7 @@ class SceneAsmGenerator implements EventVisitor {
             event.visit(this);
           }
 
+          _flushAndTerminateCurrentDialog();
           _updateStateGraph(flag);
           _flagUnknown(flag);
           _eventAsm.add(setLabel(ifSet.name));
@@ -344,7 +346,7 @@ class SceneAsmGenerator implements EventVisitor {
             event.visit(this);
           }
 
-          // todo: have to come back to event loop if not already
+          _flushAndTerminateCurrentDialog();
 
           if (unconditional != null) {
             _eventAsm.add(bra.w(unconditional));
@@ -355,10 +357,11 @@ class SceneAsmGenerator implements EventVisitor {
           for (var event in ifEvent.isUnset) {
             event.visit(this);
           }
-          // todo: have to come back to event loop if not already
 
+          _flushAndTerminateCurrentDialog();
           _updateStateGraph(flag);
           _flagUnknown(flag);
+
           if (unconditional != null) {
             _eventAsm.add(setLabel(unconditional.name));
           }
@@ -372,7 +375,7 @@ class SceneAsmGenerator implements EventVisitor {
   void finish() {
     // also apply all changes for current mem across graph
 
-    _flushCurrentDialog();
+    _flushAndTerminateCurrentDialog();
 
     if (_isProcessingInteraction && _inEvent) {
       _eventAsm.add(returnFromDialogEvent());
@@ -454,8 +457,9 @@ class SceneAsmGenerator implements EventVisitor {
       for (var flagEntry in _currentCondition.entries) {
         // should include parent states (must be at least as specific)
         var currentFlag = flagEntry.key;
-        if (condition[currentFlag] != flagEntry.value) {
-          if (currentFlag == branchFlag) {
+        var stateValue = condition[currentFlag];
+        if (stateValue != flagEntry.value) {
+          if (currentFlag == branchFlag && stateValue != null) {
             mayBePeer = true;
             // keep evaluating other conditions, because it may not be a peer.
             continue;
@@ -496,21 +500,27 @@ class SceneAsmGenerator implements EventVisitor {
     siblingChanges.clear();
   }
 
-  void _flushCurrentDialog() {
+  void _flushAndTerminateCurrentDialog() {
     // was lastEventBreak >= 0, but i think it should be this?
     if (!inDialogLoop && _lastEventBreak >= 0) {
       // i think this is only ever the last line so could simplify
       _currentDialog.replace(_lastEventBreak, terminateDialog());
     } else if (_currentDialog.isNotEmpty) {
       _currentDialog.add(terminateDialog());
+      _gameMode = Mode.event;
     }
 
     // todo: i think we should also reset has saved dialog position?
 
     if (_currentDialog.isNotEmpty) {
       _dialogTree.add(_currentDialog);
+      _currentDialogId = _dialogTree.nextDialogId!;
+      _currentDialog = DialogAsm.empty();
     }
 
+    // i think terminate might still save dialog position but i don't usually
+    // see it used that way. just an optimization so come back to this.
+    _memory.hasSavedDialogPosition = false;
     _lastEventBreak = -1;
   }
 

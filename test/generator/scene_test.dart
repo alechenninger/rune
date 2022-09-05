@@ -426,39 +426,64 @@ ${dialog2.toAsm()}
       var eventAsm = EventAsm.empty();
       var dialog = DialogTree();
 
+      var hello = DialogSpan.parse('Hello!');
+      var greetings = DialogSpan.parse('Greetings!');
+
       SceneAsmGenerator.forEvent(sceneId, dialog, eventAsm)
-        ..ifFlag(IfFlag(EventFlag('Test'),
-            isSet: [Dialog(spans: DialogSpan.parse('Hello!'))]))
-        ..dialog(Dialog(spans: DialogSpan.parse('Greetings!')))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [Dialog(spans: hello)]))
+        ..dialog(Dialog(spans: greetings))
         ..finish();
 
+      print('> event');
       print(eventAsm);
+      print('> dialog');
       print(dialog);
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset1')),
+            getAndRunDialog(0.toByte.i),
+            setLabel('test_Test_unset1'),
+            getAndRunDialog(1.toByte.i),
+          ]).withoutComments());
+
+      expect(
+          dialog.toAsm(),
+          containsAllInOrder(Asm([
+            dc.b(hello[0].toAscii()),
+            terminateDialog(),
+            dc.b(greetings[0].toAscii()),
+            terminateDialog()
+          ])));
     });
 
     test('events which require context should fail if context is unknown', () {
       var eventAsm = EventAsm.empty();
 
-      var generator = SceneAsmGenerator.forEvent(
-          sceneId, DialogTree(), eventAsm)
-        ..setContext(
-            SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
-        ..individualMoves(
-            IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps))
-        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
-          IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
-        ], isUnset: [
-          IndividualMoves()
-            ..moves[alys] = (StepPath()
-              ..direction = Direction.right
-              ..distance = 2.steps)
-        ]));
+      var generator =
+          SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+            ..setContext(
+                SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
+            ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+              IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
+            ], isUnset: [
+              IndividualMoves()
+                ..moves[alys] = (StepPath()
+                  ..direction = Direction.right
+                  ..distance = 2.steps)
+            ]));
 
       // generator should not have failed at this point.
       print(eventAsm);
 
       // but then, add a relative move. because we do not know where alys might
-      // be, this should fail.
+      // be to start with, this should fail
+      // (unless relative move code is later updated to deal with this
+      // ambiguity, in which case we'll have to test it does generate code that
+      // deals with that e.g. performs arithmetic in the asm)
       expect(() {
         generator.individualMoves(
             IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps));
