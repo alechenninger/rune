@@ -1,23 +1,23 @@
 import 'model.dart';
 
 class EventFlag {
-  final String value;
+  final String name;
 
-  EventFlag(this.value);
+  EventFlag(this.name);
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is EventFlag &&
           runtimeType == other.runtimeType &&
-          value == other.value;
+          name == other.name;
 
   @override
-  int get hashCode => value.hashCode;
+  int get hashCode => name.hashCode;
 
   @override
   String toString() {
-    return 'EventFlag{$value}';
+    return 'EventFlag{$name}';
   }
 }
 

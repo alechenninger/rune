@@ -333,37 +333,33 @@ class SceneAsmGenerator implements EventVisitor {
         // to subroutine which then jsr/jmp to another
         // TODO: need to approximate code size so we can handle jump distance
 
-        if (ifEvent.isSet.isEmpty) {
-          // use event counter in case flag is checked again
-          var ifSet = Label('${id}_${flag.value}_set$i');
-          // skip ahead if set
-          _eventAsm.add(branchIfEventFlagSet(flag.toConstant.i, ifSet));
+        // use event counter in case flag is checked again
+        var ifUnset = Label('${id}_${flag.name}_unset$i');
+        var ifSet = Label('${id}_${flag.name}_set$i');
 
-          // otherwise run this stuff
-          _flagIsNotSet(flag);
-          for (var event in ifEvent.isUnset) {
-            event.visit(this);
+        // For readability, set continue scene label based on what branches
+        // there are.
+        var continueScene = ifEvent.isSet.isEmpty
+            ? ifSet
+            : (ifEvent.isUnset.isEmpty
+                ? ifUnset
+                : Label('${id}_${flag.name}_cont$i'));
+
+        // memory may change while flag is set, so remember this to branch
+        // off of for unset branch
+        var parent = _memory;
+
+        // run isSet events unless there are none
+        if (ifEvent.isSet.isEmpty) {
+          _eventAsm.add(branchIfEventFlagSet(flag.toConstant.i, continueScene));
+        } else {
+          if (ifEvent.isUnset.isEmpty) {
+            _eventAsm
+                .add(branchIfEvenfFlagNotSet(flag.toConstant.i, continueScene));
+          } else {
+            _eventAsm.add(branchIfEvenfFlagNotSet(flag.toConstant.i, ifUnset));
           }
 
-          _flushAndTerminateDialog();
-          _updateStateGraph(flag);
-          _flagUnknown(flag);
-          _eventAsm.add(setLabel(ifSet.name));
-        } else {
-          // use event counter in case flag is checked again
-          var ifUnset = Label('${id}_${flag.value}_unset$i');
-          Label? unconditional = ifEvent.isUnset.isNotEmpty
-              ? Label('${id}_${flag.value}_cont$i')
-              : null;
-
-          // skip ahead if not set
-          _eventAsm.add(branchIfEvenfFlagNotSet(flag.toConstant.i, ifUnset));
-
-          // memory will change while flag is set, so remember this to branch
-          // off of for unset branch
-          var parent = _memory;
-
-          // otherwise run this stuff
           _flagIsSet(flag);
           for (var event in ifEvent.isSet) {
             event.visit(this);
@@ -371,24 +367,30 @@ class SceneAsmGenerator implements EventVisitor {
 
           _flushAndTerminateDialog();
 
-          if (unconditional != null) {
-            _eventAsm.add(bra.w(unconditional));
+          // skip past unset events
+          if (ifEvent.isUnset.isNotEmpty) {
+            _eventAsm.add(bra.w(continueScene));
           }
+        }
 
+        // define routine for unset events if there are any
+        if (ifEvent.isUnset.isNotEmpty) {
           _flagIsNotSet(flag, parent: parent);
-          _eventAsm.add(setLabel(ifUnset.name));
+          if (ifEvent.isSet.isNotEmpty) {
+            _eventAsm.add(setLabel(ifUnset.name));
+          }
           for (var event in ifEvent.isUnset) {
             event.visit(this);
           }
 
           _flushAndTerminateDialog();
-          _updateStateGraph(flag);
-          _flagUnknown(flag);
-
-          if (unconditional != null) {
-            _eventAsm.add(setLabel(unconditional.name));
-          }
         }
+
+        _updateStateGraph(flag);
+        _flagUnknown(flag);
+
+        // define routine for continuing
+        _eventAsm.add(setLabel(continueScene.name));
 
         return null;
       });
@@ -900,7 +902,7 @@ extension FramesPerSecond on Duration {
 }
 
 extension EventFlagConstant on EventFlag {
-  Constant get toConstant => Constant('EventFlag_$value');
+  Constant get toConstant => Constant('EventFlag_$name');
 }
 
 /*
