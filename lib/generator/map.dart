@@ -124,7 +124,9 @@ class MapAsmBuilder {
 
     SceneAsmGenerator builder;
 
-    if (SceneAsmGenerator.interactionIsolatedToDialogLoop(events, obj)) {
+    var isolatedToDialogLoop =
+        SceneAsmGenerator.interactionIsolatedToDialogLoop(events, obj);
+    if (isolatedToDialogLoop) {
       builder =
           SceneAsmGenerator.forInteraction(_map, obj, id, _tree, _eventsAsm);
     } else {
@@ -152,7 +154,9 @@ class MapAsmBuilder {
 
     builder.finish();
 
-    _eventsAsm.addNewline();
+    if (!isolatedToDialogLoop) {
+      _eventsAsm.addNewline();
+    }
 
     return dialogId;
   }

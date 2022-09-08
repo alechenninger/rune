@@ -8,7 +8,7 @@ import 'asm.dart';
 
 class _ControlCodes {
   static final action = Bytes.hex('F2');
-  static final keepNpcFacingDirection = Bytes.hex('F3'); // ?
+  static final keepNpcFacingDirection = Bytes.hex('F3');
   static final portrait = Bytes.hex('F4');
   static final yesNo = Bytes.hex('F5');
   static final event = Bytes.hex('F6');
@@ -55,6 +55,13 @@ Asm runEvent(Word index) {
 
 Asm portrait(Byte portrait) {
   return dc.b([..._ControlCodes.portrait, portrait]);
+}
+
+Asm eventCheck(Expression flag, Byte dialogOffset) {
+  return Asm([
+    dc.b(_ControlCodes.eventCheck),
+    dc.b([flag, dialogOffset])
+  ]);
 }
 
 List<LineAsm> dialogLines(Bytes dialog,

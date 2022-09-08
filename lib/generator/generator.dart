@@ -145,17 +145,40 @@ class SceneAsmGenerator implements EventVisitor {
   /// should also contain root state
   final _stateGraph = <Condition, Memory>{};
 
+  /// Reproduces logic in Interaction_ProcessDialogueTree to see if the events
+  /// can be processed soley through dialog loop.
+  ///
+  /// Returns `true` if events occur in the following order:
+  /// - Zero or more [IfFlag] (i.e. `$FA` control code)
+  /// where each branch is also processable within dialog
+  /// (recursively follows these rules)
+  /// - Zero or one [FacePlayer] where `object` is [obj]
+  /// (i.e. `$F3` control code)
+  /// - Zero or more [Dialog]
   static bool interactionIsolatedToDialogLoop(
       List<Event> events, FieldObject obj) {
-    bool _isInteractionObjFacePlayer(Event event, FieldObject obj) {
-      if (event is! FacePlayer) return false;
-      return event.object == obj;
+    var check = 0;
+    var checks = <bool Function(Event)>[
+      (event) =>
+          event is IfFlag &&
+          interactionIsolatedToDialogLoop(event.isSet, obj) &&
+          interactionIsolatedToDialogLoop(event.isUnset, obj),
+      (event) => event is FacePlayer && event.object == obj,
+      (event) => event is Dialog
+    ];
+
+    event:
+    for (var event in events) {
+      for (var i = check; i < checks.length; i++) {
+        if (checks[i](event)) {
+          check = i;
+          continue event;
+        }
+      }
+      return false;
     }
 
-    var first = events.first;
-    return (_isInteractionObjFacePlayer(first, obj) &&
-            events.skip(1).every((event) => event is Dialog)) ||
-        events.every((event) => event is Dialog);
+    return true;
   }
 
   SceneAsmGenerator.forInteraction(
@@ -221,7 +244,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void displayText(DisplayText display) {
     _addToEvent(display, (i) {
-      _flushAndTerminateCurrentDialog();
+      _flushAndTerminateDialog();
       var asm = text.displayTextToAsm(display, dialogTree: _dialogTree);
       _currentDialogId = _dialogTree.nextDialogId!;
       _currentDialog = DialogAsm.empty();
@@ -322,7 +345,7 @@ class SceneAsmGenerator implements EventVisitor {
             event.visit(this);
           }
 
-          _flushAndTerminateCurrentDialog();
+          _flushAndTerminateDialog();
           _updateStateGraph(flag);
           _flagUnknown(flag);
           _eventAsm.add(setLabel(ifSet.name));
@@ -346,7 +369,7 @@ class SceneAsmGenerator implements EventVisitor {
             event.visit(this);
           }
 
-          _flushAndTerminateCurrentDialog();
+          _flushAndTerminateDialog();
 
           if (unconditional != null) {
             _eventAsm.add(bra.w(unconditional));
@@ -358,7 +381,7 @@ class SceneAsmGenerator implements EventVisitor {
             event.visit(this);
           }
 
-          _flushAndTerminateCurrentDialog();
+          _flushAndTerminateDialog();
           _updateStateGraph(flag);
           _flagUnknown(flag);
 
@@ -375,7 +398,7 @@ class SceneAsmGenerator implements EventVisitor {
   void finish() {
     // also apply all changes for current mem across graph
 
-    _flushAndTerminateCurrentDialog();
+    _flushAndTerminateDialog();
 
     if (_isProcessingInteraction && _inEvent) {
       _eventAsm.add(returnFromDialogEvent());
@@ -500,7 +523,7 @@ class SceneAsmGenerator implements EventVisitor {
     siblingChanges.clear();
   }
 
-  void _flushAndTerminateCurrentDialog() {
+  void _flushAndTerminateDialog() {
     // was lastEventBreak >= 0, but i think it should be this?
     if (!inDialogLoop && _lastEventBreak >= 0) {
       // i think this is only ever the last line so could simplify

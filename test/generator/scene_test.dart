@@ -496,8 +496,6 @@ ${dialog2.toAsm()}
       SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
         ..setContext(
             SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
-        ..individualMoves(
-            IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps))
         ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
           IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
         ], isUnset: [
@@ -520,6 +518,72 @@ ${dialog2.toAsm()}
         ]));
 
       print(eventAsm);
+
+      // success if doesn't throw; but should also assert output
+    });
+
+    group('at the start of interactions', () {
+      var map = GameMap(MapId.Test);
+      var obj = MapObject(
+          startPosition: Position(0x50, 0x50),
+          spec: Npc(Sprite.PalmanOldMan1, WanderAround(Direction.down)));
+      map.addObject(obj);
+
+      late DialogTree dialog;
+      late EventAsm asm;
+      late SceneAsmGenerator generator;
+
+      setUp(() {
+        dialog = DialogTree();
+        asm = EventAsm.empty();
+      });
+
+      test('in event, flag is checked in event code', () {
+        generator = SceneAsmGenerator.forInteraction(
+            map, obj, SceneId('interact'), dialog, asm,
+            inEvent: true);
+      });
+
+      test('in dialog, flag is checked in dialog', () {
+        SceneAsmGenerator.forInteraction(
+            map, obj, SceneId('interact'), dialog, asm,
+            inEvent: false)
+          ..ifFlag(IfFlag(EventFlag('flag1'),
+              isSet: [Dialog(spans: DialogSpan.parse('Flag1 is set'))],
+              isUnset: [Dialog(spans: DialogSpan.parse('Flag1 is not set'))]))
+          ..finish();
+
+        expect(asm, isEmpty);
+      });
+
+      test(
+          'is considered processable in dialog loop if branches only contain dialog',
+          () {
+        expect(
+            SceneAsmGenerator.interactionIsolatedToDialogLoop([
+              IfFlag(EventFlag('flag1'), isSet: [
+                Dialog(spans: DialogSpan.parse('Flag1 is set'))
+              ], isUnset: [
+                Dialog(spans: DialogSpan.parse('Flag1 is not set'))
+              ])
+            ], obj),
+            true);
+      });
+
+      test(
+          'is not considered processable in dialog loop if a branch has events',
+          () {
+        expect(
+            SceneAsmGenerator.interactionIsolatedToDialogLoop([
+              IfFlag(EventFlag('flag1'), isSet: [
+                Dialog(spans: DialogSpan.parse('Flag1 is set')),
+                Pause(1.second),
+              ], isUnset: [
+                Dialog(spans: DialogSpan.parse('Flag1 is not set'))
+              ])
+            ], obj),
+            false);
+      });
     });
   });
 }
