@@ -215,6 +215,14 @@ class Byte extends SizedValue {
     }
     return super + other;
   }
+
+  @override
+  Expression operator -(Expression other) {
+    if (other is Value) {
+      return Byte(value - other.value);
+    }
+    return super - other;
+  }
 }
 
 class Word extends SizedValue {

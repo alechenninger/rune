@@ -132,7 +132,7 @@ class SceneAsmGenerator implements EventVisitor {
   Byte? _currentDialogId;
   DialogAsm? _currentDialog;
   var _lastEventBreak = -1;
-  Event? _lastEvent;
+  Event? _lastEventInCurrentDialog;
   var _eventCounter = 1;
 
   // conditional runtime state
@@ -216,7 +216,9 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void dialog(Dialog dialog) {
-    if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
+    if (!_inEvent &&
+        _isProcessingInteraction &&
+        _lastEventInCurrentDialog == null) {
       // Not starting with face player, so signal not to.
       _addToDialog(dc.b(Bytes.of(0xf3)));
     }
@@ -230,19 +232,19 @@ class SceneAsmGenerator implements EventVisitor {
         _eventAsm.add(getAndRunDialog(_currentDialogIdOrStart().i));
       }
       _gameMode = Mode.dialog;
-    } else if (_lastEvent is Dialog) {
+    } else if (_lastEventInCurrentDialog is Dialog) {
       // Consecutive dialog, new cursor in between each dialog
       _addToDialog(interrupt());
     }
 
     _addToDialog(dialog.toAsm());
-    _lastEvent = dialog;
+    _lastEventInCurrentDialog = dialog;
   }
 
   @override
   void displayText(DisplayText display) {
     _addToEvent(display, (i) {
-      _flushAndTerminateDialog();
+      _terminateDialog();
       var asm = text.displayTextToAsm(display, dialogTree: _dialogTree);
       return asm.event;
     });
@@ -250,9 +252,11 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void facePlayer(FacePlayer face) {
-    if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
+    if (!_inEvent &&
+        _isProcessingInteraction &&
+        _lastEventInCurrentDialog == null) {
       // this already will happen by default if the first event
-      _lastEvent = face;
+      _lastEventInCurrentDialog = face;
       return;
     }
 
@@ -306,12 +310,12 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
-  void ifFlag(IfFlag ifEvent) {
-    if (ifEvent.isSet.isEmpty && ifEvent.isUnset.isEmpty) {
+  void ifFlag(IfFlag ifFlag) {
+    if (ifFlag.isSet.isEmpty && ifFlag.isUnset.isEmpty) {
       return;
     }
 
-    var flag = ifEvent.flag;
+    var flag = ifFlag.flag;
 
     var knownState = _currentCondition[flag];
     if (knownState != null) {
@@ -319,7 +323,7 @@ class SceneAsmGenerator implements EventVisitor {
       // conditional check
       // also, no need to manage flags in scene graph because this flag is
       // already set.
-      var events = knownState ? ifEvent.isSet : ifEvent.isUnset;
+      var events = knownState ? ifFlag.isSet : ifFlag.isUnset;
       for (var event in events) {
         event.visit(this);
       }
@@ -329,17 +333,28 @@ class SceneAsmGenerator implements EventVisitor {
 
       var ifSet = DialogAsm.empty();
       var currentDialogId = _currentDialogIdOrStart();
-      var ifSetOffset = _dialogTree.add(ifSet) - currentDialogId as Byte;
+      var ifSetId = _dialogTree.add(ifSet);
+      var ifSetOffset = ifSetId - currentDialogId as Byte;
+
       _addToDialog(eventCheck(flag.toConstant, ifSetOffset));
-      for (var event in ifEvent.isUnset) {
+
+      for (var event in ifFlag.isUnset) {
         event.visit(this);
       }
 
       if (!inDialogLoop) {
         throw StateError('expected dialog loop');
       }
+
+      _terminateDialog();
+      _currentDialog = ifSet;
+      _currentDialogId = ifSetId;
+
+      for (var event in ifFlag.isSet) {
+        event.visit(this);
+      }
     } else {
-      _addToEvent(ifEvent, (i) {
+      _addToEvent(ifFlag, (i) {
         // note that if we need to move further than beq.w we will need to branch
         // to subroutine which then jsr/jmp to another
         // TODO: need to approximate code size so we can handle jump distance
@@ -350,9 +365,9 @@ class SceneAsmGenerator implements EventVisitor {
 
         // For readability, set continue scene label based on what branches
         // there are.
-        var continueScene = ifEvent.isSet.isEmpty
+        var continueScene = ifFlag.isSet.isEmpty
             ? ifSet
-            : (ifEvent.isUnset.isEmpty
+            : (ifFlag.isUnset.isEmpty
                 ? ifUnset
                 : Label('${id}_${flag.name}_cont$i'));
 
@@ -361,10 +376,10 @@ class SceneAsmGenerator implements EventVisitor {
         var parent = _memory;
 
         // run isSet events unless there are none
-        if (ifEvent.isSet.isEmpty) {
+        if (ifFlag.isSet.isEmpty) {
           _eventAsm.add(branchIfEventFlagSet(flag.toConstant.i, continueScene));
         } else {
-          if (ifEvent.isUnset.isEmpty) {
+          if (ifFlag.isUnset.isEmpty) {
             _eventAsm
                 .add(branchIfEvenfFlagNotSet(flag.toConstant.i, continueScene));
           } else {
@@ -372,29 +387,29 @@ class SceneAsmGenerator implements EventVisitor {
           }
 
           _flagIsSet(flag);
-          for (var event in ifEvent.isSet) {
+          for (var event in ifFlag.isSet) {
             event.visit(this);
           }
 
-          _flushAndTerminateDialog();
+          _terminateDialog();
 
           // skip past unset events
-          if (ifEvent.isUnset.isNotEmpty) {
+          if (ifFlag.isUnset.isNotEmpty) {
             _eventAsm.add(bra.w(continueScene));
           }
         }
 
         // define routine for unset events if there are any
-        if (ifEvent.isUnset.isNotEmpty) {
+        if (ifFlag.isUnset.isNotEmpty) {
           _flagIsNotSet(flag, parent: parent);
-          if (ifEvent.isSet.isNotEmpty) {
+          if (ifFlag.isSet.isNotEmpty) {
             _eventAsm.add(setLabel(ifUnset.name));
           }
-          for (var event in ifEvent.isUnset) {
+          for (var event in ifFlag.isUnset) {
             event.visit(this);
           }
 
-          _flushAndTerminateDialog();
+          _terminateDialog();
         }
 
         _updateStateGraph(flag);
@@ -411,7 +426,7 @@ class SceneAsmGenerator implements EventVisitor {
   void finish() {
     // also applfinishy all changes for current mem across graph
 
-    _flushAndTerminateDialog();
+    _terminateDialog();
 
     if (_isProcessingInteraction && _inEvent) {
       _eventAsm.add(returnFromDialogEvent());
@@ -536,15 +551,21 @@ class SceneAsmGenerator implements EventVisitor {
     siblingChanges.clear();
   }
 
-  void _flushAndTerminateDialog() {
+  void _terminateDialog() {
     // was lastEventBreak >= 0, but i think it should be this?
     if (!inDialogLoop && _lastEventBreak >= 0) {
       // i think this is only ever the last line so could simplify
       _currentDialog!.replace(_lastEventBreak, terminateDialog());
     } else if (_currentDialog?.isNotEmpty == true) {
       _currentDialog!.add(terminateDialog());
-      _gameMode = Mode.event;
+      if (_inEvent) {
+        _gameMode = Mode.event;
+      }
     }
+
+    _currentDialog = null;
+    _currentDialogId = _dialogTree.nextDialogId;
+    _lastEventInCurrentDialog = null;
 
     // i think terminate might still save dialog position but i don't usually
     // see it used that way. just an optimization so come back to this.
@@ -592,7 +613,7 @@ class SceneAsmGenerator implements EventVisitor {
           length, Asm([comment('$eventIndex: ${event.runtimeType}')]));
     }
 
-    _lastEvent = event;
+    _lastEventInCurrentDialog = event;
   }
 }
 

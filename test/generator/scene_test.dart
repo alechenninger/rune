@@ -548,12 +548,29 @@ ${dialog2.toAsm()}
         SceneAsmGenerator.forInteraction(
             map, obj, SceneId('interact'), dialog, asm,
             inEvent: false)
-          ..ifFlag(IfFlag(EventFlag('flag1'),
-              isSet: [Dialog(spans: DialogSpan.parse('Flag1 is set'))],
-              isUnset: [Dialog(spans: DialogSpan.parse('Flag1 is not set'))]))
+          ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
+            FacePlayer(obj),
+            Dialog(spans: DialogSpan.parse('Flag1 is set'))
+          ], isUnset: [
+            FacePlayer(obj),
+            Dialog(spans: DialogSpan.parse('Flag1 is not set'))
+          ]))
           ..finish();
 
         expect(asm, isEmpty);
+        expect(
+            dialog.toAsm().withoutComments().trim(),
+            Asm([
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is not set').toAscii()),
+              terminateDialog(),
+              newLine(),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is set').toAscii()),
+              terminateDialog(),
+            ]));
       });
 
       test(
