@@ -129,8 +129,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   final bool _isProcessingInteraction;
 
-  late Byte _currentDialogId;
-  var _currentDialog = DialogAsm.empty();
+  Byte? _currentDialogId;
+  DialogAsm? _currentDialog;
   var _lastEventBreak = -1;
   Event? _lastEvent;
   var _eventCounter = 1;
@@ -187,7 +187,6 @@ class SceneAsmGenerator implements EventVisitor {
       : _dialogIdOffset = _dialogTree.nextDialogId!,
         _isProcessingInteraction = true,
         _inEvent = inEvent {
-    _currentDialogId = _dialogIdOffset;
     _gameMode = _inEvent ? Mode.event : Mode.dialog;
 
     _memory.putInAddress(a3, obj);
@@ -200,7 +199,6 @@ class SceneAsmGenerator implements EventVisitor {
       : _dialogIdOffset = _dialogTree.nextDialogId!,
         _isProcessingInteraction = false,
         _inEvent = true {
-    _currentDialogId = _dialogIdOffset;
     _gameMode = Mode.event;
     _stateGraph[Condition.empty()] = _memory;
   }
@@ -220,7 +218,7 @@ class SceneAsmGenerator implements EventVisitor {
   void dialog(Dialog dialog) {
     if (!_inEvent && _isProcessingInteraction && _lastEvent == null) {
       // Not starting with face player, so signal not to.
-      _currentDialog.add(dc.b(Bytes.of(0xf3)));
+      _addToDialog(dc.b(Bytes.of(0xf3)));
     }
 
     if (!inDialogLoop) {
@@ -229,15 +227,15 @@ class SceneAsmGenerator implements EventVisitor {
         _eventAsm.add(popAndRunDialog);
         _eventAsm.addNewline();
       } else {
-        _eventAsm.add(getAndRunDialog(_currentDialogId.i));
+        _eventAsm.add(getAndRunDialog(_currentDialogIdOrStart().i));
       }
       _gameMode = Mode.dialog;
     } else if (_lastEvent is Dialog) {
       // Consecutive dialog, new cursor in between each dialog
-      _currentDialog.add(interrupt());
+      _addToDialog(interrupt());
     }
 
-    _currentDialog.add(dialog.toAsm());
+    _addToDialog(dialog.toAsm());
     _lastEvent = dialog;
   }
 
@@ -246,8 +244,6 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(display, (i) {
       _flushAndTerminateDialog();
       var asm = text.displayTextToAsm(display, dialogTree: _dialogTree);
-      _currentDialogId = _dialogTree.nextDialogId!;
-      _currentDialog = DialogAsm.empty();
       return asm.event;
     });
   }
@@ -327,6 +323,21 @@ class SceneAsmGenerator implements EventVisitor {
       for (var event in events) {
         event.visit(this);
       }
+    } else if (!_inEvent) {
+      // attempt to process in dialog
+      // we can assume at this point that all events will be processed in dialog
+
+      var ifSet = DialogAsm.empty();
+      var currentDialogId = _currentDialogIdOrStart();
+      var ifSetOffset = _dialogTree.add(ifSet) - currentDialogId as Byte;
+      _addToDialog(eventCheck(flag.toConstant, ifSetOffset));
+      for (var event in ifEvent.isUnset) {
+        event.visit(this);
+      }
+
+      if (!inDialogLoop) {
+        throw StateError('expected dialog loop');
+      }
     } else {
       _addToEvent(ifEvent, (i) {
         // note that if we need to move further than beq.w we will need to branch
@@ -398,7 +409,7 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void finish() {
-    // also apply all changes for current mem across graph
+    // also applfinishy all changes for current mem across graph
 
     _flushAndTerminateDialog();
 
@@ -529,24 +540,29 @@ class SceneAsmGenerator implements EventVisitor {
     // was lastEventBreak >= 0, but i think it should be this?
     if (!inDialogLoop && _lastEventBreak >= 0) {
       // i think this is only ever the last line so could simplify
-      _currentDialog.replace(_lastEventBreak, terminateDialog());
-    } else if (_currentDialog.isNotEmpty) {
-      _currentDialog.add(terminateDialog());
+      _currentDialog!.replace(_lastEventBreak, terminateDialog());
+    } else if (_currentDialog?.isNotEmpty == true) {
+      _currentDialog!.add(terminateDialog());
       _gameMode = Mode.event;
-    }
-
-    // todo: i think we should also reset has saved dialog position?
-
-    if (_currentDialog.isNotEmpty) {
-      _dialogTree.add(_currentDialog);
-      _currentDialogId = _dialogTree.nextDialogId!;
-      _currentDialog = DialogAsm.empty();
     }
 
     // i think terminate might still save dialog position but i don't usually
     // see it used that way. just an optimization so come back to this.
     _memory.hasSavedDialogPosition = false;
     _lastEventBreak = -1;
+  }
+
+  Byte _currentDialogIdOrStart() {
+    _addToDialog(Asm.empty());
+    return _currentDialogId!;
+  }
+
+  int _addToDialog(Asm asm) {
+    if (_currentDialog == null) {
+      _currentDialog = DialogAsm.empty();
+      _currentDialogId = _dialogTree.add(_currentDialog!);
+    }
+    return _currentDialog!.add(asm);
   }
 
   void _addToEvent(Event event, Asm? Function(int eventIndex) generate) {
@@ -558,8 +574,8 @@ class SceneAsmGenerator implements EventVisitor {
       // todo: why did we check this before?
       // i think b/c we always assumed in dialog loop to start
       //if (dialogAsm.isNotEmpty) {
-      _currentDialog.add(comment('scene event $eventIndex'));
-      _lastEventBreak = _currentDialog.add(eventBreak());
+      _addToDialog(comment('scene event $eventIndex'));
+      _lastEventBreak = _addToDialog(eventBreak());
       _memory.hasSavedDialogPosition = true;
       _gameMode = Mode.event;
     }
