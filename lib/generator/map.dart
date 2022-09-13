@@ -90,7 +90,7 @@ final _npcBehaviorRoutines = {
 
 class MapAsmBuilder {
   final GameMap _map;
-  final Word Function(Label routine) _addEventPointer;
+  final EventRoutines _eventRoutines;
   final int _spriteVramOffset;
   final DialogTree _tree;
   final _spritesTileNumbers = <Sprite, Word>{};
@@ -99,7 +99,7 @@ class MapAsmBuilder {
   final _eventsAsm = EventAsm.empty();
   final _cutscenesAsm = Asm.empty();
 
-  MapAsmBuilder(this._map, this._addEventPointer)
+  MapAsmBuilder(this._map, this._eventRoutines)
       // todo: can we inject these differently so it's more testable?
       // fixme: nonnull assertion
       : _spriteVramOffset = _spriteVramOffsets[_map.id]!,
@@ -122,41 +122,18 @@ class MapAsmBuilder {
     // todo: handle max
     var dialogId = _tree.nextDialogId!;
 
-    SceneAsmGenerator builder;
+    SceneAsmGenerator builder = SceneAsmGenerator.forInteraction(
+        _map, obj, id, _tree, _eventsAsm, _eventRoutines);
 
-    var isolatedToDialogLoop =
-        SceneAsmGenerator.interactionIsolatedToDialogLoop(events, obj);
-    if (isolatedToDialogLoop) {
-      builder =
-          SceneAsmGenerator.forInteraction(_map, obj, id, _tree, _eventsAsm);
-    } else {
-      // Have to start an event from dialog loop, and then can continue as if
-      // in event.
-
-      var eventName = id.toString();
-      var eventRoutine = Label('Event_GrandCross_$eventName');
-      var eventIndex = _addEventPointer(eventRoutine);
-      _eventsAsm.add(setLabel(eventRoutine.name));
-
-      var dialog = DialogAsm.empty();
-      dialog.add(runEvent(eventIndex));
-      dialog.add(terminateDialog());
-      _tree.add(dialog);
-
-      builder = SceneAsmGenerator.forInteraction(
-          _map, obj, id, _tree, _eventsAsm,
-          inEvent: true);
+    if (builder.needsEvent(events)) {
+      builder.runEventFromInteraction();
     }
 
     for (var event in events) {
       event.visit(builder);
     }
 
-    builder.finish();
-
-    if (!isolatedToDialogLoop) {
-      _eventsAsm.addNewline();
-    }
+    builder.finish(appendNewline: true);
 
     return dialogId;
   }

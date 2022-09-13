@@ -9,6 +9,8 @@ import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
+import '../fixtures.dart';
+
 void main() {
   var generator = AsmGenerator();
   var program = Program();
@@ -532,22 +534,22 @@ ${dialog2.toAsm()}
       late DialogTree dialog;
       late EventAsm asm;
       late SceneAsmGenerator generator;
+      late TestEventRoutines eventRoutines;
 
       setUp(() {
         dialog = DialogTree();
         asm = EventAsm.empty();
+        eventRoutines = TestEventRoutines();
       });
 
       test('in event, flag is checked in event code', () {
         generator = SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm,
-            inEvent: true);
+            map, obj, SceneId('interact'), dialog, asm, eventRoutines);
       });
 
       test('in dialog, flag is checked in dialog', () {
         SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm,
-            inEvent: false)
+            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
             FacePlayer(obj),
             Dialog(spans: DialogSpan.parse('Flag1 is set'))
@@ -573,33 +575,142 @@ ${dialog2.toAsm()}
             ]));
       });
 
-      test(
-          'is considered processable in dialog loop if branches only contain dialog',
-          () {
+      test('in dialog, alternate flags are checked in same dialog', () {
+        SceneAsmGenerator.forInteraction(
+            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+          ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
+            FacePlayer(obj),
+            Dialog(spans: DialogSpan.parse('Flag1 is set'))
+          ], isUnset: [
+            IfFlag(EventFlag('flag2'), isSet: [
+              FacePlayer(obj),
+              Dialog(spans: DialogSpan.parse('Flag1 is not set, but 2 is'))
+            ], isUnset: [
+              FacePlayer(obj),
+              Dialog(spans: DialogSpan.parse('Flag1 and 2 are not set'))
+            ]),
+          ]))
+          ..finish();
+
+        expect(asm, isEmpty);
         expect(
-            SceneAsmGenerator.interactionIsolatedToDialogLoop([
+            dialog.toAsm().withoutComments().trim(),
+            Asm([
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag2'), Byte(0x02)]),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 and 2 are not set').toAscii()),
+              terminateDialog(),
+              newLine(),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is set').toAscii()),
+              terminateDialog(),
+              newLine(),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is not set, but 2 is').toAscii()),
+              terminateDialog(),
+            ]));
+      });
+
+      test('in dialog, nested flags are checked in consecutive dialog', () {
+        SceneAsmGenerator.forInteraction(
+            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+          ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
+            IfFlag(EventFlag('flag3'), isSet: [
+              FacePlayer(obj),
+              Dialog(spans: DialogSpan.parse('Flag1 and 3 are set'))
+            ], isUnset: [
+              FacePlayer(obj),
+              Dialog(spans: DialogSpan.parse('Flag1 is set, but 3 is not'))
+            ]),
+          ], isUnset: [
+            IfFlag(EventFlag('flag2'), isSet: [
+              FacePlayer(obj),
+              Dialog(spans: DialogSpan.parse('Flag1 is not set, but 2 is'))
+            ], isUnset: [
+              FacePlayer(obj),
+              Dialog(spans: DialogSpan.parse('Flag1 and 2 are not set'))
+            ]),
+          ]))
+          ..finish();
+
+        expect(asm, isEmpty);
+        expect(
+            dialog.toAsm().withoutComments().trim(),
+            Asm([
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag2'), Byte(0x02)]),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 and 2 are not set').toAscii()),
+              terminateDialog(),
+              newLine(),
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag3'), Byte(0x02)]),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is set, but 3 is not').toAscii()),
+              terminateDialog(),
+              newLine(),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is not set, but 2 is').toAscii()),
+              terminateDialog(),
+              newLine(),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 and 3 are set').toAscii()),
+              terminateDialog(),
+            ]));
+      });
+
+      test('in dialog, common dialog (not sure)', () {
+        // todo:
+      });
+
+      test('does not need event if branches only contain dialog', () {
+        expect(
+            SceneAsmGenerator.forInteraction(
+                    map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+                .needsEvent([
               IfFlag(EventFlag('flag1'), isSet: [
                 Dialog(spans: DialogSpan.parse('Flag1 is set'))
               ], isUnset: [
                 Dialog(spans: DialogSpan.parse('Flag1 is not set'))
               ])
-            ], obj),
-            true);
+            ]),
+            false);
       });
 
-      test(
-          'is not considered processable in dialog loop if a branch has events',
-          () {
+      test('does not need event even if a branch has events', () {
         expect(
-            SceneAsmGenerator.interactionIsolatedToDialogLoop([
+            SceneAsmGenerator.forInteraction(
+                    map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+                .needsEvent([
               IfFlag(EventFlag('flag1'), isSet: [
                 Dialog(spans: DialogSpan.parse('Flag1 is set')),
                 Pause(1.second),
               ], isUnset: [
                 Dialog(spans: DialogSpan.parse('Flag1 is not set'))
               ])
-            ], obj),
+            ]),
             false);
+      });
+
+      test('does need event if there are unconditional events', () {
+        expect(
+            SceneAsmGenerator.forInteraction(
+                    map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+                .needsEvent([
+              IfFlag(EventFlag('flag1'), isSet: [
+                Dialog(spans: DialogSpan.parse('Flag1 is set')),
+                Pause(1.second),
+              ], isUnset: [
+                Dialog(spans: DialogSpan.parse('Flag1 is not set'))
+              ]),
+              IfFlag(EventFlag('flagother'))
+            ]),
+            true);
       });
     });
   });

@@ -25,6 +25,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
+import '../asm/dialog.dart' as asmdialog;
 import '../asm/events.dart';
 import '../asm/events.dart' as asmevents;
 import '../model/model.dart';
@@ -87,12 +88,25 @@ class Program {
   }
 
   MapAsm addMap(GameMap map) {
-    var builder = MapAsmBuilder(map, _addEventPointer);
+    var builder = MapAsmBuilder(map, _ProgramEventRoutines(this));
     for (var obj in map.objects) {
       builder.addObject(obj);
     }
     return _maps[map.id] = builder.build();
   }
+}
+
+abstract class EventRoutines {
+  Word add(Label name);
+}
+
+class _ProgramEventRoutines extends EventRoutines {
+  final Program _program;
+
+  _ProgramEventRoutines(this._program);
+
+  @override
+  Word add(Label routine) => _program._addEventPointer(routine);
 }
 
 // FIXME just to track an event has happened
@@ -115,6 +129,8 @@ class SceneAsmGenerator implements EventVisitor {
   // Non-volatile state (state of the code being generated)
   final DialogTree _dialogTree;
   final EventAsm _eventAsm;
+  // required if processing interaction (see todo on ctor)
+  EventRoutines? _eventRoutines;
   final Byte _dialogIdOffset;
 
   Mode _gameMode = Mode.event;
@@ -125,15 +141,17 @@ class SceneAsmGenerator implements EventVisitor {
   ///
   /// This is necessary to understand whether, when in dialog mode, we can pop
   /// back to an event or have to trigger a new one.
-  final bool _inEvent;
+  bool _inEvent;
 
-  final bool _isProcessingInteraction;
+  final FieldObject? _interactingWith;
+  bool get _isProcessingInteraction => _interactingWith != null;
 
   Byte? _currentDialogId;
   DialogAsm? _currentDialog;
   var _lastEventBreak = -1;
   Event? _lastEventInCurrentDialog;
   var _eventCounter = 1;
+  var _finished = false;
 
   // conditional runtime state
   /// For currently generating branch, what is the known state of event flags
@@ -145,24 +163,81 @@ class SceneAsmGenerator implements EventVisitor {
   /// should also contain root state
   final _stateGraph = <Condition, Memory>{};
 
+  // todo: This might be a subclass really
+  SceneAsmGenerator.forInteraction(GameMap map, FieldObject obj, this.id,
+      this._dialogTree, this._eventAsm, EventRoutines eventRoutines)
+      : _dialogIdOffset = _dialogTree.nextDialogId!,
+        _interactingWith = obj,
+        _eventRoutines = eventRoutines,
+        _inEvent = false {
+    _gameMode = _inEvent ? Mode.event : Mode.dialog;
+
+    _memory.putInAddress(a3, obj);
+    _memory.hasSavedDialogPosition = false;
+    _memory.currentMap = map;
+    _stateGraph[Condition.empty()] = _memory;
+  }
+
+  SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
+      : _dialogIdOffset = _dialogTree.nextDialogId!,
+        _interactingWith = null,
+        _inEvent = true {
+    _gameMode = Mode.event;
+    _stateGraph[Condition.empty()] = _memory;
+  }
+
+  void scene(Scene scene) {
+    for (var event in scene.events) {
+      event.visit(this);
+    }
+  }
+
+  /// Returns true if an event routine is needed in code generated for [events].
+  ///
   /// Reproduces logic in Interaction_ProcessDialogueTree to see if the events
   /// can be processed soley through dialog loop.
   ///
-  /// Returns `true` if events occur in the following order:
-  /// - Zero or more [IfFlag] (i.e. `$FA` control code)
-  /// where each branch is also processable within dialog
-  /// (recursively follows these rules)
+  /// Returns `false` if events occur in the following order:
+  /// - A single [IfFlag] (i.e. `$FA` control code) event
+  /// and nothing else.
+  /// This is because if there are other events,
+  /// they are common to both branches,
+  /// and therefore must be added to both dialog trees
+  /// OR resulting events
+  /// if the individual branches end up running events themselves.
+  /// To avoid this complexity we resort to event code
+  /// which already deals with subsequent unconditional events.
+  ///
+  /// OR
+  ///
   /// - Zero or one [FacePlayer] where `object` is [obj]
   /// (i.e. `$F3` control code)
   /// - Zero or more [Dialog]
-  static bool interactionIsolatedToDialogLoop(
-      List<Event> events, FieldObject obj) {
+  ///
+  /// See also: [runEventFromInteraction]
+  /*
+  todo: can also support all of this action control code stuff as events:
+  $F2 = Determines actions during dialogues. The byte after this has the following values:
+		0 = Loads Panel; the word after this is the Panel index
+		1 = Destroys panel loaded last
+		2 = Destroys all panels
+		3 = Loads sound; the byte after this is the Sound index
+		4 = Loads sound; the byte after this is the Sound index
+		6 = Updates palettes
+		7 = Zio's eyes turn red in one of his panels (before the battle)
+		8 = Pauses music
+		9 = Resumes music
+		$A = For the spaceship sabotage, plays alarm sound and turns the screen red
+		$B = Sets event flag
+		$C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
+   */
+  bool needsEvent(List<Event> events) {
+    var obj = _interactingWith;
+    if (obj == null) return true; // todo: not quite sure about this
+    if (events.length == 1 && events[0] is IfFlag) return false;
+
     var check = 0;
     var checks = <bool Function(Event)>[
-      (event) =>
-          event is IfFlag &&
-          interactionIsolatedToDialogLoop(event.isSet, obj) &&
-          interactionIsolatedToDialogLoop(event.isUnset, obj),
       (event) => event is FacePlayer && event.object == obj,
       (event) => event is Dialog
     ];
@@ -175,38 +250,45 @@ class SceneAsmGenerator implements EventVisitor {
           continue event;
         }
       }
-      return false;
+      return true;
     }
 
-    return true;
+    return false;
   }
 
-  SceneAsmGenerator.forInteraction(
-      GameMap map, FieldObject obj, this.id, this._dialogTree, this._eventAsm,
-      {bool inEvent = false})
-      : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _isProcessingInteraction = true,
-        _inEvent = inEvent {
-    _gameMode = _inEvent ? Mode.event : Mode.dialog;
+  ///
+  ///
+  /// If [eventIndex] is not provided, a new event will be added with optional
+  /// [nameSuffix].
+  void runEventFromInteraction({Word? eventIndex, String? nameSuffix}) {
+    _checkFinished();
 
-    _memory.putInAddress(a3, obj);
-    _memory.hasSavedDialogPosition = false;
-    _memory.currentMap = map;
-    _stateGraph[Condition.empty()] = _memory;
-  }
-
-  SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
-      : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _isProcessingInteraction = false,
-        _inEvent = true {
-    _gameMode = Mode.event;
-    _stateGraph[Condition.empty()] = _memory;
-  }
-
-  void scene(Scene scene) {
-    for (var event in scene.events) {
-      event.visit(this);
+    if (_inEvent) {
+      throw StateError('cannot run event; already in event');
     }
+
+    if (_lastEventInCurrentDialog != null ||
+        _lastEventInCurrentDialog is! IfFlag) {
+      throw StateError('can only run events first or after IfFlag events '
+          'but last event was $_lastEventInCurrentDialog');
+    }
+
+    if (eventIndex == null) {
+      // only include event counter if we're in a branch condition
+      // todo: we might not always start with an empty condition so this should
+      // maybe be something about root or starting condition
+      var eventName = nameSuffix == null
+          ? '$id${_currentCondition == Condition.empty() ? '' : _eventCounter}'
+          : '$id$nameSuffix';
+      var eventRoutine = Label('Event_GrandCross_$eventName');
+      eventIndex = _eventRoutines!.add(eventRoutine);
+      _eventAsm.add(setLabel(eventRoutine.name));
+    }
+
+    _addToDialog(asmdialog.runEvent(eventIndex));
+    _inEvent = true;
+
+    _terminateDialog();
   }
 
   @override
@@ -216,6 +298,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void dialog(Dialog dialog) {
+    _checkFinished();
+
     if (!_inEvent &&
         _isProcessingInteraction &&
         _lastEventInCurrentDialog == null) {
@@ -252,6 +336,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void facePlayer(FacePlayer face) {
+    _checkFinished();
+
     if (!_inEvent &&
         _isProcessingInteraction &&
         _lastEventInCurrentDialog == null) {
@@ -300,6 +386,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void setContext(SetContext set) {
+    _checkFinished();
     set(_memory);
   }
 
@@ -311,6 +398,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void ifFlag(IfFlag ifFlag) {
+    _checkFinished();
+
     if (ifFlag.isSet.isEmpty && ifFlag.isUnset.isEmpty) {
       return;
     }
@@ -329,34 +418,65 @@ class SceneAsmGenerator implements EventVisitor {
       }
     } else if (!_inEvent) {
       // attempt to process in dialog
-      // we can assume at this point that all events will be processed in dialog
+      // this must be the only event in the dialog in that case,
+      // because it is treated as a hard fork.
+      // there can be no common events as there is no one scene now;
+      // it is split into two after this.
 
       var ifSet = DialogAsm.empty();
       var currentDialogId = _currentDialogIdOrStart();
       var ifSetId = _dialogTree.add(ifSet);
       var ifSetOffset = ifSetId - currentDialogId as Byte;
 
+      // memory may change while flag is set, so remember this to branch
+      // off of for unset branch
+      var parent = _memory;
+
       _addToDialog(eventCheck(flag.toConstant, ifSetOffset));
+      _flagIsNotSet(flag);
+
+      if (needsEvent(ifFlag.isUnset)) {
+        runEventFromInteraction(nameSuffix: '${ifFlag.flag.name}Unset');
+      }
 
       for (var event in ifFlag.isUnset) {
         event.visit(this);
       }
 
+      // we may be in event now, but we have to go back to dialog generation
+      // since we're playing out the "isSet" branch now
       if (!inDialogLoop) {
-        throw StateError('expected dialog loop');
+        _inEvent = false;
+        _gameMode = Mode.dialog;
       }
 
+      // Either way, terminate dialog if there is any.
       _terminateDialog();
-      _currentDialog = ifSet;
-      _currentDialogId = ifSetId;
+      _resetCurrentDialog(id: ifSetId, asm: ifSet);
+      _flagIsSet(flag, parent: parent);
+
+      if (needsEvent(ifFlag.isSet)) {
+        runEventFromInteraction(nameSuffix: '${ifFlag.flag.name}Set');
+      }
 
       for (var event in ifFlag.isSet) {
         event.visit(this);
       }
+
+      // no more events can be added
+      // because we would have to add them to both branches
+      // which is not supported when starting from dialog loop
+      // todo: finished is actually a per-branch state,
+      //   but we're using 'empty' condition
+      //   to proxy for the original state or 'root' state
+      if (_currentCondition == Condition.empty()) {
+        finish();
+      }
     } else {
       _addToEvent(ifFlag, (i) {
-        // note that if we need to move further than beq.w we will need to branch
-        // to subroutine which then jsr/jmp to another
+        // note that if we need to move further than beq.w
+        // we will need to branch to subroutine
+        // which then jsr/jmp to another
         // TODO: need to approximate code size so we can handle jump distance
 
         // use event counter in case flag is checked again
@@ -423,13 +543,26 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  void finish() {
-    // also applfinishy all changes for current mem across graph
+  void finish({bool appendNewline = false}) {
+    // todo: also applfinishy all changes for current mem across graph
+    // not sure if still need to do this
+
+    _finished = true;
 
     _terminateDialog();
 
     if (_isProcessingInteraction && _inEvent) {
       _eventAsm.add(returnFromDialogEvent());
+    }
+
+    if (_eventAsm.isNotEmpty && appendNewline) {
+      _eventAsm.addNewline();
+    }
+  }
+
+  void _checkFinished() {
+    if (_finished) {
+      throw StateError('scene is finished; cannot add more to scene');
     }
   }
 
@@ -551,6 +684,8 @@ class SceneAsmGenerator implements EventVisitor {
     siblingChanges.clear();
   }
 
+  /// Terminates the current dialog, if there is any,
+  /// regardless of whether current generating within dialog loop or not.
   void _terminateDialog() {
     // was lastEventBreak >= 0, but i think it should be this?
     if (!inDialogLoop && _lastEventBreak >= 0) {
@@ -563,9 +698,24 @@ class SceneAsmGenerator implements EventVisitor {
       }
     }
 
-    _currentDialog = null;
-    _currentDialogId = _dialogTree.nextDialogId;
-    _lastEventInCurrentDialog = null;
+    _resetCurrentDialog();
+  }
+
+  /// If [id] is provided, [asm] must be provided. Otherwise, sets to next id
+  /// in tree. [_currentDialog] is still lazily set
+  /// and must be added to using [_addToDialog].
+  void _resetCurrentDialog(
+      {Byte? id, DialogAsm? asm, Event? lastEventForDialog}) {
+    if (id != null) {
+      ArgumentError.checkNotNull(asm, 'asm');
+      _currentDialogId = id;
+      _currentDialog = asm;
+      _lastEventInCurrentDialog = lastEventForDialog;
+    } else {
+      _currentDialogId = _dialogTree.nextDialogId;
+      _currentDialog = null;
+      _lastEventInCurrentDialog = null;
+    }
 
     // i think terminate might still save dialog position but i don't usually
     // see it used that way. just an optimization so come back to this.
@@ -579,6 +729,8 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   int _addToDialog(Asm asm) {
+    _checkFinished();
+
     if (_currentDialog == null) {
       _currentDialog = DialogAsm.empty();
       _currentDialogId = _dialogTree.add(_currentDialog!);
@@ -587,14 +739,13 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void _addToEvent(Event event, Asm? Function(int eventIndex) generate) {
+    _checkFinished();
+
     var eventIndex = _eventCounter++;
 
     if (!_inEvent) {
       throw StateError("can't add event when not in event loop");
     } else if (inDialogLoop) {
-      // todo: why did we check this before?
-      // i think b/c we always assumed in dialog loop to start
-      //if (dialogAsm.isNotEmpty) {
       _addToDialog(comment('scene event $eventIndex'));
       _lastEventBreak = _addToDialog(eventBreak());
       _memory.hasSavedDialogPosition = true;

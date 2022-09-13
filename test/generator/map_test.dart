@@ -11,13 +11,17 @@ import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
+import '../fixtures.dart';
+
 void main() {
   late GameMap testMap;
   late Program program;
+  late TestEventRoutines testEventRoutines;
 
   setUp(() {
     testMap = GameMap(MapId.Test);
     program = Program(eventIndexOffset: Word(0));
+    testEventRoutines = TestEventRoutines();
   });
 
   test('map model generates asm', () {
@@ -312,8 +316,8 @@ void main() {
           .add(DialogAsm([runEvent(Word(0)), terminateDialog()]));
 
       SceneAsmGenerator.forInteraction(testMap, npc1, SceneId('Test_npc1'),
-          comparisonDialogTree, comparisonEventAsm,
-          inEvent: true)
+          comparisonDialogTree, comparisonEventAsm, testEventRoutines)
+        ..runEventFromInteraction()
         ..scene(npc1.onInteract)
         ..finish();
 
@@ -324,8 +328,8 @@ void main() {
           .add(DialogAsm([runEvent(Word(1)), terminateDialog()]));
 
       SceneAsmGenerator.forInteraction(testMap, npc2, SceneId('Test_npc2'),
-          comparisonDialogTree, comparisonEventAsm,
-          inEvent: true)
+          comparisonDialogTree, comparisonEventAsm, testEventRoutines)
+        ..runEventFromInteraction()
         ..scene(npc2.onInteract)
         ..finish();
 
