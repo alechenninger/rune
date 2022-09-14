@@ -311,21 +311,11 @@ void main() {
       var comparisonDialogTree = DialogTree();
       var comparisonEventAsm = EventAsm.empty();
 
-      comparisonEventAsm.add(setLabel('Event_GrandCross_Test_npc1'));
-      comparisonDialogTree
-          .add(DialogAsm([runEvent(Word(0)), terminateDialog()]));
-
       SceneAsmGenerator.forInteraction(testMap, npc1, SceneId('Test_npc1'),
           comparisonDialogTree, comparisonEventAsm, testEventRoutines)
         ..runEventFromInteraction()
         ..scene(npc1.onInteract)
-        ..finish();
-
-      comparisonEventAsm.addNewline();
-
-      comparisonEventAsm.add(setLabel('Event_GrandCross_Test_npc2'));
-      comparisonDialogTree
-          .add(DialogAsm([runEvent(Word(1)), terminateDialog()]));
+        ..finish(appendNewline: true);
 
       SceneAsmGenerator.forInteraction(testMap, npc2, SceneId('Test_npc2'),
           comparisonDialogTree, comparisonEventAsm, testEventRoutines)

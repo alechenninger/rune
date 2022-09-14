@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
@@ -524,7 +525,7 @@ ${dialog2.toAsm()}
       // success if doesn't throw; but should also assert output
     });
 
-    group('at the start of interactions', () {
+    group('in interactions', () {
       var map = GameMap(MapId.Test);
       var obj = MapObject(
           startPosition: Position(0x50, 0x50),
@@ -545,6 +546,7 @@ ${dialog2.toAsm()}
       test('in event, flag is checked in event code', () {
         generator = SceneAsmGenerator.forInteraction(
             map, obj, SceneId('interact'), dialog, asm, eventRoutines);
+        // todo:
       });
 
       test('in dialog, flag is checked in dialog', () {
@@ -664,8 +666,37 @@ ${dialog2.toAsm()}
             ]));
       });
 
-      test('in dialog, common dialog (not sure)', () {
-        // todo:
+      test('in dialog, branches that need events run events', () {
+        SceneAsmGenerator.forInteraction(
+            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+          ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
+            SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)),
+            IndividualMoves()..moves[alys] = (StepPath()..distance = 1.steps)
+          ], isUnset: [
+            FacePlayer(obj),
+            Dialog(spans: DialogSpan.parse('Flag1 is not set'))
+          ]))
+          ..finish();
+
+        print(asm);
+
+        expect(eventRoutines.routines,
+            [Label('Event_GrandCross_interactflag1Set')]);
+        expect(asm.withoutComments().firstOrNull?.toAsm(),
+            setLabel('Event_GrandCross_interactflag1Set'));
+        expect(
+            dialog.toAsm().withoutComments().trim(),
+            Asm([
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is not set').toAscii()),
+              terminateDialog(),
+              newLine(),
+              dc.b([Byte(0xf6)]),
+              dc.w([Word(0)]),
+              terminateDialog(),
+            ]));
       });
 
       test('does not need event if branches only contain dialog', () {
@@ -711,6 +742,31 @@ ${dialog2.toAsm()}
               IfFlag(EventFlag('flagother'))
             ]),
             true);
+      });
+
+      group('cannot then run event in interaction', () {
+        test('if another event other than IfFlag has occurred', () {
+          var generator = SceneAsmGenerator.forInteraction(
+              map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            ..dialog(Dialog(spans: DialogSpan.parse('Flag1 is set')));
+
+          expect(() => generator.runEventFromInteraction(), throwsStateError);
+        });
+
+        test('if already in event', () {
+          var generator =
+              SceneAsmGenerator.forEvent(SceneId('event'), dialog, asm);
+
+          expect(() => generator.runEventFromInteraction(), throwsStateError);
+        });
+
+        test('if already run event in interaction', () {
+          var generator = SceneAsmGenerator.forInteraction(
+              map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            ..runEventFromInteraction();
+
+          expect(() => generator.runEventFromInteraction(), throwsStateError);
+        });
       });
     });
   });

@@ -256,7 +256,7 @@ class SceneAsmGenerator implements EventVisitor {
     return false;
   }
 
-  ///
+  /// If in interaction and not yet in an event, run an event from dialog.
   ///
   /// If [eventIndex] is not provided, a new event will be added with optional
   /// [nameSuffix].
@@ -267,7 +267,7 @@ class SceneAsmGenerator implements EventVisitor {
       throw StateError('cannot run event; already in event');
     }
 
-    if (_lastEventInCurrentDialog != null ||
+    if (_lastEventInCurrentDialog != null &&
         _lastEventInCurrentDialog is! IfFlag) {
       throw StateError('can only run events first or after IfFlag events '
           'but last event was $_lastEventInCurrentDialog');
