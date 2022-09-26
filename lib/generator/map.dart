@@ -79,6 +79,7 @@ final _spriteArtLabels = {
   Sprite.PalmanFighter2: Label('Art_PalmanFighter2'),
   Sprite.PalmanFighter3: Label('Art_PalmanFighter3'),
   Sprite.PalmanStudent1: Label('Art_PalmanStudent1'),
+  Sprite.Kroft: Label('Art_Kroft'),
 };
 
 final _mapObjectSpecRoutines = {AlysWaiting(): Word('68'.hex)};

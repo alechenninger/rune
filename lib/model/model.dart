@@ -36,6 +36,7 @@ abstract class EventVisitor {
   void setContext(SetContext set);
   void unlockCamera(UnlockCamera unlock);
   void ifFlag(IfFlag ifEvent);
+  void setFlag(SetFlag setFlag);
 }
 
 class EventState {
@@ -182,6 +183,10 @@ class Scene {
 
   Scene startingWith(List<Event> events) {
     return Scene([...events, ...this.events], name);
+  }
+
+  Scene unlessSet(EventFlag flag, {required List<Event> then}) {
+    return Scene([IfFlag(flag, isSet: then, isUnset: events)]);
   }
 
   void addEvent(Event event) {

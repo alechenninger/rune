@@ -766,6 +766,17 @@ class SceneAsmGenerator implements EventVisitor {
 
     _lastEventInCurrentDialog = event;
   }
+
+  @override
+  void setFlag(SetFlag setFlag) {
+    // TODO: can implement in dialog with F2 and B i guess
+    _addToEvent(
+        setFlag,
+        (eventIndex) => Asm([
+              moveq(setFlag.flag.toConstant.i, d0),
+              jsr('EventFlags_Set'.toLabel.l)
+            ]));
+  }
 }
 
 class AddressOf {

@@ -25,6 +25,10 @@ class GameMap {
 
   //final onMove = <Event>[];
 
+  bool containsObject(MapObjectId id) => _objects.containsKey(id);
+
+  MapObject? object(MapObjectId id) => _objects[id];
+
   void addObject(MapObject obj) {
     if (_objects.containsKey(obj.id)) {
       throw ArgumentError('map already contains object with id: ${obj.id}');
@@ -97,6 +101,7 @@ enum Sprite {
   PalmanWoman2,
   PalmanWoman3,
   PalmanStudent1,
+  Kroft,
 }
 
 Sprite? spriteByName(String name) {

@@ -38,3 +38,19 @@ class IfFlag extends Event {
     return 'IfEvent{$flag}';
   }
 }
+
+class SetFlag extends Event {
+  final EventFlag flag;
+
+  SetFlag(this.flag);
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.setFlag(this);
+  }
+
+  @override
+  String toString() {
+    return 'SetFlag{$flag}';
+  }
+}
