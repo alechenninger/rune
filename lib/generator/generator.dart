@@ -1123,7 +1123,7 @@ class Condition {
   final IMap<EventFlag, bool> _flags;
 
   Condition(Map<EventFlag, bool> flags) : _flags = flags.lock;
-  Condition.empty() : _flags = IMap();
+  const Condition.empty() : _flags = const IMapConst({});
 
   Condition withFlag(EventFlag flag, bool isSet) => Condition(_flags.unlock
     ..[flag] = isSet
