@@ -8,6 +8,7 @@ import 'event.dart';
 import 'generator.dart';
 import 'movement.dart';
 import 'scene.dart';
+import 'memory.dart';
 import 'text.dart' as text;
 
 // should track transient state about code generation

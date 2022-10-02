@@ -33,14 +33,13 @@ import '../model/conditional.dart';
 import '../model/cutscenes.dart';
 import '../model/model.dart';
 import '../model/text.dart';
-import '../numbers.dart';
+import 'cutscenes.dart';
 import 'dialog.dart';
 import 'event.dart';
 import 'map.dart';
-import 'movement.dart';
 import 'memory.dart';
+import 'movement.dart';
 import 'scene.dart';
-import 'cutscenes.dart';
 import 'text.dart' as text;
 
 export '../asm/asm.dart' show Asm;
@@ -116,18 +115,9 @@ class _ProgramEventRoutines extends EventRoutines {
   Word addEvent(Label routine) => _program._addEventPointer(routine);
 }
 
-// FIXME just to track an event has happened
-class AsmEvent extends Event {
+class _AsmEvent extends Event {
   @override
-  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
-    // TODO: implement generateAsm
-    throw UnimplementedError();
-  }
-
-  @override
-  void visit(EventVisitor visitor) {
-    // TODO: implement visit
-  }
+  void visit(EventVisitor visitor) {}
 }
 
 class SceneAsmGenerator implements EventVisitor {
@@ -300,7 +290,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void asm(Asm asm) {
-    _addToEvent(AsmEvent(), (i) => asm);
+    _addToEvent(_AsmEvent(), (i) => asm);
   }
 
   @override
