@@ -192,6 +192,7 @@ abstract class Speaker {
       case 'shay':
         return shay;
       case 'kroft':
+      case 'principal kroft':
         return const PrincipalKroft();
     }
     return null;

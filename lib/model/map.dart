@@ -71,6 +71,11 @@ class MapObject extends FieldObject {
   int? slot(EventState c) => null;
 
   @override
+  String toString() {
+    return 'MapObject{id: $id}';
+  }
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is MapObject &&

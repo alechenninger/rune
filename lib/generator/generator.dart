@@ -439,9 +439,12 @@ class SceneAsmGenerator implements EventVisitor {
         event.visit(this);
       }
 
-      // we may be in event now, but we have to go back to dialog generation
-      // since we're playing out the "isSet" branch now
-      if (!inDialogLoop) {
+      if (_inEvent) {
+        if (_isProcessingInteraction) {
+          _eventAsm.add(returnFromDialogEvent());
+        }
+        // we may be in event now, but we have to go back to dialog generation
+        // since we're playing out the "isSet" branch now
         _inEvent = false;
         _gameMode = Mode.dialog;
       }
@@ -458,6 +461,8 @@ class SceneAsmGenerator implements EventVisitor {
       for (var event in ifFlag.isSet) {
         event.visit(this);
       }
+
+      _flagUnknown(flag);
 
       // no more events can be added
       // because we would have to add them to both branches
@@ -665,16 +670,17 @@ class SceneAsmGenerator implements EventVisitor {
   void finish({bool appendNewline = false}) {
     // todo: also applfinishy all changes for current mem across graph
     // not sure if still need to do this
+    if (!_finished) {
+      _finished = true;
 
-    _finished = true;
+      _terminateDialog();
 
-    _terminateDialog();
-
-    if (_isProcessingInteraction && _inEvent) {
-      _eventAsm.add(returnFromDialogEvent());
+      if (_isProcessingInteraction && _inEvent) {
+        _eventAsm.add(returnFromDialogEvent());
+      }
     }
 
-    if (_eventAsm.isNotEmpty && appendNewline) {
+    if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
       _eventAsm.addNewline();
     }
   }
@@ -810,7 +816,7 @@ class SceneAsmGenerator implements EventVisitor {
     if (!inDialogLoop && _lastEventBreak >= 0) {
       // i think this is only ever the last line so could simplify
       _currentDialog!.replace(_lastEventBreak, terminateDialog());
-    } else if (_currentDialog?.isNotEmpty == true) {
+    } else if (inDialogLoop && _currentDialog != null) {
       _currentDialog!.add(terminateDialog());
       if (_inEvent) {
         _gameMode = Mode.event;

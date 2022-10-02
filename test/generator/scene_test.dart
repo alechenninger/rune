@@ -561,6 +561,8 @@ ${dialog2.toAsm()}
           ]))
           ..finish();
 
+        print(dialog);
+
         expect(asm, isEmpty);
         expect(
             dialog.toAsm().withoutComments().trim(),
@@ -573,6 +575,33 @@ ${dialog2.toAsm()}
               newLine(),
               dc.b([Byte(0xF4), Byte.zero]),
               dc.b(DialogSpan('Flag1 is set').toAscii()),
+              terminateDialog(),
+            ]));
+      });
+
+      test('in dialog, if no dialog when flag set, terminate', () {
+        SceneAsmGenerator.forInteraction(
+            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+          ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
+            FacePlayer(obj),
+          ], isUnset: [
+            FacePlayer(obj),
+            Dialog(spans: DialogSpan.parse('Flag1 is not set'))
+          ]))
+          ..finish();
+
+        print(dialog);
+
+        expect(asm, isEmpty);
+        expect(
+            dialog.toAsm().withoutComments().trim(),
+            Asm([
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is not set').toAscii()),
+              terminateDialog(),
+              newLine(),
               terminateDialog(),
             ]));
       });
@@ -594,6 +623,8 @@ ${dialog2.toAsm()}
             Dialog(spans: DialogSpan.parse('Flag1 is not set'))
           ]))
           ..finish();
+
+        print(dialog);
 
         expect(asm, isEmpty);
         expect(
@@ -627,6 +658,8 @@ ${dialog2.toAsm()}
             ]),
           ]))
           ..finish();
+
+        print(dialog);
 
         expect(asm, isEmpty);
         expect(
@@ -700,7 +733,7 @@ ${dialog2.toAsm()}
             ]));
       });
 
-      test('in dialog, branches that need events run events', () {
+      test('dialog branches that need events run events', () {
         SceneAsmGenerator.forInteraction(
             map, obj, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
@@ -729,6 +762,42 @@ ${dialog2.toAsm()}
               newLine(),
               dc.b([Byte(0xf6)]),
               dc.w([Word(0)]),
+              terminateDialog(),
+            ]));
+      });
+
+      test('unset event returns to map', () {
+        SceneAsmGenerator.forInteraction(
+            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+          ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
+            FacePlayer(obj),
+            Dialog(spans: DialogSpan.parse('Flag1 is set'))
+          ], isUnset: [
+            SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)),
+            IndividualMoves()..moves[alys] = (StepPath()..distance = 1.steps)
+          ]))
+          ..finish();
+
+        print(asm);
+
+        expect(asm.withoutComments().firstOrNull?.toAsm(),
+            setLabel('Event_GrandCross_interactflag1Unset'));
+
+        var returnFromDialog = returnFromDialogEvent().withoutComments();
+        expect(asm.withoutComments().tail(returnFromDialog.length),
+            returnFromDialog);
+
+        expect(
+            dialog.toAsm().withoutComments().trim(),
+            Asm([
+              dc.b([Byte(0xFA)]),
+              dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
+              dc.b([Byte(0xf6)]),
+              dc.w([Word(0)]),
+              terminateDialog(),
+              newLine(),
+              dc.b([Byte(0xF4), Byte.zero]),
+              dc.b(DialogSpan('Flag1 is set').toAscii()),
               terminateDialog(),
             ]));
       });

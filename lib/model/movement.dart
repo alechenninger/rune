@@ -236,6 +236,16 @@ class FacePlayer extends Event {
   String toString() {
     return 'FacePlayer{object: $object}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FacePlayer &&
+          runtimeType == other.runtimeType &&
+          object == other.object;
+
+  @override
+  int get hashCode => object.hashCode;
 }
 
 /// The party follows the leader

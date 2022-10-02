@@ -154,7 +154,48 @@ class Quotes {
 }
 
 extension Portrait on Speaker {
-  static final _index = [UnnamedSpeaker, Shay, Alys];
+  static final _index = [
+    UnnamedSpeaker, // dc.l	0						; 0
+    Shay, // dc.l	ArtNem_ChazDialPortrait	; 1
+    Alys, // dc.l	ArtNem_AlysDialPortrait	; 2
+    null, // dc.l	ArtNem_HahnDialPortrait	; 3
+    null, // dc.l	ArtNem_RuneDialPortrait	; 4
+    null, // dc.l	ArtNem_GryzDialPortrait	; 5
+    null, // dc.l	ArtNem_RikaDialPortrait	; 6
+    null, // dc.l	ArtNem_DemiDialPortrait	; 7
+    null, // dc.l	ArtNem_WrenDialPortrait	; 8
+    null, // dc.l	ArtNem_RajaDialPortrait	; 9
+    null, // dc.l	ArtNem_KyraDialPortrait	; $A
+    null, // dc.l	ArtNem_SethDialPortrait	; $B
+    null, // dc.l	ArtNem_SayaDialPortrait	; $C
+    null, // dc.l	ArtNem_HoltDialPortrait	; $D
+    PrincipalKroft, // dc.l	ArtNem_PrincipalDialPortrait	; $E
+    null, // dc.l	ArtNem_DorinDialPortrait	; $F
+    null, // dc.l	ArtNem_PanaDialPortrait	; $10
+    null, // dc.l	ArtNem_HntGuildReceptionistDialPortrait	; $11
+    null, // dc.l	ArtNem_BakerDialPortrait	; $12
+    null, // dc.l	ArtNem_ZioDialPortrait	; $13
+    null, // dc.l	ArtNem_JuzaDialPortrait	; $14
+    null, // dc.l	ArtNem_GyunaDialPortrait	; $15
+    null, // dc.l	ArtNem_EsperDialPortrait	; $16
+    null, // dc.l	ArtNem_EsperDialPortrait	; $17
+    null, // dc.l	ArtNem_EsperChiefDialPortrait	; $18
+    null, // dc.l	ArtNem_EsperChiefDialPortrait	; $19
+    null, // dc.l	ArtNem_GumbiousPriestDialPortrait	; $1A
+    null, // dc.l	ArtNem_GumbiousBishopDialPortrait	; $1B
+    null, // dc.l	ArtNem_LashiecDialPortrait	; $1C
+    null, // dc.l	ArtNem_XeAThoulDialPortrait	; $1D
+    null, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1E
+    null, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1F
+    null, // dc.l	ArtNem_FortuneTellerDialPortrait	; $20
+    null, // dc.l	ArtNem_DElmLarsDialPortrait	; $21
+    null, // dc.l	ArtNem_AlysWoundedDialPortrait	; $22
+    null, // dc.l	ArtNem_ReFazeDialPortrait	; $23
+    null, // dc.l	ArtNem_MissingStudentDialPortrait	; $24
+    null, // dc.l	ArtNem_TallasDialPortrait	; $25
+    null, // dc.l	ArtNem_DyingBoyDialPortrait	; $26
+    null, // dc.l	ArtNem_SekreasDialPortrait	; $27
+  ];
 
   Byte get portraitCode {
     var index = _index.indexOf(runtimeType);

@@ -7,6 +7,7 @@ import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/map.dart';
 import 'package:rune/generator/scene.dart';
+import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
@@ -336,6 +337,17 @@ void main() {
             dc.l([Label('Event_GrandCross_Test_npc1')], comment: r'$0000'),
             dc.l([Label('Event_GrandCross_Test_npc2')], comment: r'$0001')
           ]));
+    });
+
+    test('conditional test', () {
+      npc1.onInteract =
+          npc1.onInteract.unlessSet(EventFlag('teststory'), then: [
+        Dialog(spans: [DialogSpan('Hello again')])
+      ]);
+
+      var mapAsm = program.addMap(testMap);
+
+      print(mapAsm);
     });
   });
 }

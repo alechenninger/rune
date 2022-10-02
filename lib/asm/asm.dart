@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:math';
 
 import 'address.dart';
 import 'data.dart';
@@ -203,6 +204,11 @@ class Asm extends IterableBase<Instruction> {
     lines.add(_Instruction());
   }
 
+  Asm tail(int lines) {
+    lines = min(lines, length);
+    return Asm.fromInstructions(this.lines.sublist(length - lines));
+  }
+
   @override
   int get length => lines.length;
 
@@ -253,6 +259,9 @@ abstract class Instruction {
   Asm toAsm() {
     return Asm.fromInstruction(this);
   }
+
+  bool get isEmpty => toString().isEmpty;
+  bool get isNotEmpty => toString().isNotEmpty;
 
   @override
   String toString();
