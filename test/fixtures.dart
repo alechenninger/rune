@@ -5,7 +5,7 @@ class TestEventRoutines extends EventRoutines {
   final routines = <Label>[];
 
   @override
-  Word add(Label name) {
+  Word addEvent(Label name) {
     routines.add(name);
     return Word(routines.length - 1);
   }

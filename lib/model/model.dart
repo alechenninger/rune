@@ -5,6 +5,7 @@ import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/conditional.dart';
+import 'package:rune/model/cutscenes.dart';
 import 'package:rune/model/text.dart';
 
 import 'dialog.dart';
@@ -16,6 +17,8 @@ export 'movement.dart';
 export 'map.dart';
 
 abstract class Event {
+  const Event();
+
   @Deprecated('does not fit all events')
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     throw UnimplementedError('generateAsm');
@@ -37,6 +40,11 @@ abstract class EventVisitor {
   void unlockCamera(UnlockCamera unlock);
   void ifFlag(IfFlag ifEvent);
   void setFlag(SetFlag setFlag);
+  void showPanel(ShowPanel showPanel);
+  void hideTopPanels(HideTopPanels hidePanels);
+  void hideAllPanels(HideAllPanels hidePanels);
+  void fadeOutField(FadeOutField fadeOut);
+  void fadeInField(FadeInField fadeIn);
 }
 
 class EventState {
@@ -69,6 +77,15 @@ class EventState {
       ..followLead = followLead
       ..cameraLock = cameraLock
       ..currentMap = currentMap;
+  }
+
+  int? panelsShown;
+  void addPanel() {
+    if (panelsShown != null) panelsShown = panelsShown! + 1;
+  }
+
+  void removePanel() {
+    if (panelsShown != null) panelsShown = panelsShown! - 1;
   }
 
   Direction? getFacing(FieldObject obj) => _facing[obj];

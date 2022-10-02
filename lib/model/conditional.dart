@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+
 import 'model.dart';
 
 class EventFlag {
@@ -35,8 +37,23 @@ class IfFlag extends Event {
 
   @override
   String toString() {
-    return 'IfEvent{$flag}';
+    return 'IfFlag{flag: $flag, isSet: $isSet, isUnset: $isUnset}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IfFlag &&
+          runtimeType == other.runtimeType &&
+          flag == other.flag &&
+          const ListEquality<Event>().equals(isSet, other.isSet) &&
+          const ListEquality<Event>().equals(isUnset, other.isUnset);
+
+  @override
+  int get hashCode =>
+      flag.hashCode ^
+      const ListEquality<Event>().hash(isSet) ^
+      const ListEquality<Event>().hash(isUnset);
 }
 
 class SetFlag extends Event {
@@ -53,4 +70,14 @@ class SetFlag extends Event {
   String toString() {
     return 'SetFlag{$flag}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SetFlag &&
+          runtimeType == other.runtimeType &&
+          flag == other.flag;
+
+  @override
+  int get hashCode => flag.hashCode;
 }

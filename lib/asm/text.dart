@@ -6,6 +6,7 @@ final GetDialogueByID = 'GetDialogueByID'.toLabel;
 final RunText2 = 'RunText2'.toLabel;
 final VInt_Prepare = 'VInt_Prepare'.toLabel;
 final DMAPlane_A_VInt = 'DMAPlane_A_VInt'.toLabel;
+final DMAPlanes_VInt = 'DMAPlanes_VInt'.toLabel;
 final Main_Frame_Count = 'Main_Frame_Count'.toConstant;
 
 final Palette_Table_Buffer = 'Palette_Table_Buffer'.toConstant;
@@ -23,6 +24,10 @@ Asm vIntPrepare() {
 
 Asm dmaPlaneAVInt() {
   return jsr(DMAPlane_A_VInt.l);
+}
+
+Asm dmaPlanesVInt() {
+  return jsr(DMAPlanes_VInt.l);
 }
 
 Asm runText2(

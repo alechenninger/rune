@@ -19,15 +19,18 @@
 library generator.dart;
 
 import 'dart:collection';
+import 'dart:math';
 
 import 'package:rune/model/conditional.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:rune/model/cutscenes.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
 import '../asm/dialog.dart' as asmdialog;
 import '../asm/events.dart';
 import '../asm/events.dart' as asmevents;
+import '../asm/text.dart';
 import '../model/model.dart';
 import '../model/text.dart';
 import '../numbers.dart';
@@ -39,6 +42,7 @@ import 'scene.dart';
 import 'text.dart' as text;
 
 export '../asm/asm.dart' show Asm;
+export 'deprecated.dart';
 
 // tracks global state about the program code
 // e.g. event pointers
@@ -97,7 +101,8 @@ class Program {
 }
 
 abstract class EventRoutines {
-  Word add(Label name);
+  Word addEvent(Label name);
+  //Word addCutscene(Label name);
 }
 
 class _ProgramEventRoutines extends EventRoutines {
@@ -106,7 +111,7 @@ class _ProgramEventRoutines extends EventRoutines {
   _ProgramEventRoutines(this._program);
 
   @override
-  Word add(Label routine) => _program._addEventPointer(routine);
+  Word addEvent(Label routine) => _program._addEventPointer(routine);
 }
 
 // FIXME just to track an event has happened
@@ -261,7 +266,7 @@ class SceneAsmGenerator implements EventVisitor {
   /// If [eventIndex] is not provided, a new event will be added with optional
   /// [nameSuffix].
   void runEventFromInteraction({Word? eventIndex, String? nameSuffix}) {
-    _checkFinished();
+    _checkNotFinished();
 
     if (_inEvent) {
       throw StateError('cannot run event; already in event');
@@ -281,7 +286,7 @@ class SceneAsmGenerator implements EventVisitor {
           ? '$id${_currentCondition == Condition.empty() ? '' : _eventCounter}'
           : '$id$nameSuffix';
       var eventRoutine = Label('Event_GrandCross_$eventName');
-      eventIndex = _eventRoutines!.add(eventRoutine);
+      eventIndex = _eventRoutines!.addEvent(eventRoutine);
       _eventAsm.add(setLabel(eventRoutine.name));
     }
 
@@ -298,7 +303,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void dialog(Dialog dialog) {
-    _checkFinished();
+    _checkNotFinished();
 
     if (!_inEvent &&
         _isProcessingInteraction &&
@@ -336,7 +341,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void facePlayer(FacePlayer face) {
-    _checkFinished();
+    _checkNotFinished();
 
     if (!_inEvent &&
         _isProcessingInteraction &&
@@ -386,7 +391,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void setContext(SetContext set) {
-    _checkFinished();
+    _checkNotFinished();
     set(_memory);
   }
 
@@ -398,7 +403,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void ifFlag(IfFlag ifFlag) {
-    _checkFinished();
+    _checkNotFinished();
 
     if (ifFlag.isSet.isEmpty && ifFlag.isUnset.isEmpty) {
       return;
@@ -543,6 +548,104 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
+  @override
+  void setFlag(SetFlag setFlag) {
+    // TODO: can implement in dialog with F2 and B i guess
+    _addToEvent(
+        setFlag,
+        (eventIndex) => Asm([
+              moveq(setFlag.flag.toConstant.i, d0),
+              jsr('EventFlags_Set'.toLabel.l)
+            ]));
+  }
+
+  @override
+  void fadeInField(FadeInField fadeIn) {
+    _memory.isFieldShown = true;
+    _addToEvent(
+        fadeIn,
+        (eventIndex) => Asm([
+              bset(3.i, (Constant('Map_Load_Flags')).w),
+              jsr(Label('RefreshMap').l)
+            ]));
+  }
+
+  @override
+  void fadeOutField(FadeOutField fadeOut) {
+    _memory.isFieldShown = false;
+    _addToEvent(
+        fadeOut,
+        (eventIndex) => Asm([
+              jsr(Label('InitVRAMAndCRAM').l),
+              jsr(Label('Pal_FadeIn').l),
+              move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
+            ]));
+  }
+
+  @override
+  void showPanel(ShowPanel showPanel) {
+    var index = showPanel.panel.panelIndex;
+    if (inDialogLoop) {
+      _memory.addPanel();
+      _addToDialog(Asm([
+        dc.b([Byte(0xf2), Byte.zero]),
+        dc.w([Word(index)]),
+      ]));
+    } else {
+      _memory.addPanel();
+      _addToEvent(
+          showPanel,
+          (_) => Asm([
+                move.w(index.toWord.i, d0),
+                jsr('Panel_Create'.toLabel.l),
+                dmaPlanesVInt(),
+              ]));
+    }
+  }
+
+  @override
+  void hideAllPanels(HideAllPanels hidePanels) {
+    if (inDialogLoop) {
+      _addToDialog(dc.b([Byte(0xf2), Byte.two]));
+    }
+  }
+
+  @override
+  void hideTopPanels(HideTopPanels hidePanels) {
+    var panels = hidePanels.panelsToHide;
+    if (inDialogLoop) {
+      _addToDialog(Asm([
+        for (var i = 0; i < panels; i++) dc.b([Byte(0xf2), Byte.one]),
+        // todo: this is used often but not always, how to know when?
+        // it might be if the field is not faded out, but not always
+        if (_memory.isFieldShown == true) dc.b([Byte(0xf2), Byte(6)]),
+      ]));
+    } else {
+      var panelsShown = _memory.panelsShown;
+      if (panelsShown == 0) return;
+      if (panelsShown != null) {
+        panels = min(panels, panelsShown);
+      }
+      _addToEvent(hidePanels, (eventIndex) {
+        var skip = '.skipHidePanel$eventIndex';
+        return Asm([
+          for (var i = 0; i < panels; i++) ...[
+            if (panelsShown == null)
+              Asm([
+                tst.b(Constant('Panel_Num').w),
+                // if too many panels .s might be broken :X
+                beq.s(Label(skip)),
+              ]),
+            jsr('Panel_Destroy'.toLabel.l),
+          ],
+          // todo: not sure if this has to be in loop or not
+          dmaPlanesVInt(),
+          if (panelsShown == null) setLabel(skip),
+        ]);
+      });
+    }
+  }
+
   void finish({bool appendNewline = false}) {
     // todo: also applfinishy all changes for current mem across graph
     // not sure if still need to do this
@@ -560,7 +663,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  void _checkFinished() {
+  void _checkNotFinished() {
     if (_finished) {
       throw StateError('scene is finished; cannot add more to scene');
     }
@@ -729,7 +832,7 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   int _addToDialog(Asm asm) {
-    _checkFinished();
+    _checkNotFinished();
 
     if (_currentDialog == null) {
       _currentDialog = DialogAsm.empty();
@@ -739,7 +842,7 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void _addToEvent(Event event, Asm? Function(int eventIndex) generate) {
-    _checkFinished();
+    _checkNotFinished();
 
     var eventIndex = _eventCounter++;
 
@@ -765,17 +868,6 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _lastEventInCurrentDialog = event;
-  }
-
-  @override
-  void setFlag(SetFlag setFlag) {
-    // TODO: can implement in dialog with F2 and B i guess
-    _addToEvent(
-        setFlag,
-        (eventIndex) => Asm([
-              moveq(setFlag.flag.toConstant.i, d0),
-              jsr('EventFlags_Set'.toLabel.l)
-            ]));
   }
 }
 
@@ -1104,6 +1196,29 @@ extension EventFlagConstant on EventFlag {
   Constant get toConstant => Constant('EventFlag_$name');
 }
 
+final _panelData = [
+  PrincipalPanel.principal,
+  PrincipalPanel.shayAndAlys,
+  PrincipalPanel.xanafalgue,
+  PrincipalPanel.principalScared,
+  MeetingHahnPanel.hahn,
+  MeetingHahnPanel.hahnSweatsBeforeAlys,
+  PrincipalPanel.alysGrabsPrincipal,
+  PrincipalPanel.zio,
+  PrincipalPanel.manTurnedToStone,
+  PrincipalPanel.alysWhispersToHahn,
+];
+
+extension PanelIndex on Panel {
+  int get panelIndex {
+    var i = _panelData.indexOf(this);
+    if (i < 0) {
+      throw UnimplementedError('no panel data for $this');
+    }
+    return i;
+  }
+}
+
 /*
 walking speed?
 
@@ -1191,6 +1306,8 @@ class Memory implements EventState {
 
   @override
   Memory branch() => Memory.from(_sysState.branch(), _eventState.branch());
+
+  get panelsShown => null;
 
   set hasSavedDialogPosition(bool saved) {
     _apply(SetSavedDialogPosition(saved));
