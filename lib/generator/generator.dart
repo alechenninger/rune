@@ -40,6 +40,7 @@ import 'map.dart';
 import 'movement.dart';
 import 'memory.dart';
 import 'scene.dart';
+import 'cutscenes.dart';
 import 'text.dart' as text;
 
 export '../asm/asm.dart' show Asm;
@@ -725,13 +726,13 @@ class SceneAsmGenerator implements EventVisitor {
               'so it must not be the current branch flag');
     }
 
-    var changes = _memory._changes;
+    var changes = _memory.changes;
     // there may be no sibling if that branch had no events
     var sibling =
         _stateGraph[_currentCondition.withFlag(branchFlag, !currentBranch)];
     var siblingChanges = sibling == null
         ? List<StateChange>.empty(growable: true)
-        : sibling._changes;
+        : sibling.changes;
 
     graph:
     for (var entry in _stateGraph.entries) {

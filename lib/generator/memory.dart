@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import '../asm/asm.dart';
 import '../model/model.dart';
 
@@ -58,6 +60,8 @@ class Memory implements EventState {
 
   @override
   Memory branch() => Memory.from(_sysState.branch(), _eventState.branch());
+
+  List<StateChange> get changes => UnmodifiableListView(_changes);
 
   set hasSavedDialogPosition(bool saved) {
     _apply(SetSavedDialogPosition(saved));
@@ -147,13 +151,32 @@ class Memory implements EventState {
   }
 
   @override
+  bool? get isFieldShown => _eventState.isFieldShown;
+
+  @override
+  set isFieldShown(bool? isShown) {
+    _apply(SetValue<bool>(isShown, (mem) => mem._eventState.isFieldShown,
+        (val, mem) => mem._eventState.isFieldShown = val));
+  }
+
+  @override
   int? get panelsShown => _eventState.panelsShown;
 
   @override
-  void addPanel() {}
+  set panelsShown(int? panels) {
+    _apply(SetValue<int>(panels, (mem) => mem._eventState.panelsShown,
+        (val, mem) => mem._eventState.panelsShown = val));
+  }
 
   @override
-  void removePanel() {}
+  void addPanel() {
+    _apply(AddPanel());
+  }
+
+  @override
+  void removePanel() {
+    _apply(RemovePanel());
+  }
 
   T _apply<T>(StateChange<T> change) {
     _changes.add(change);
@@ -372,8 +395,8 @@ class SetStartingAxis implements StateChange {
 
 class SetValue<T> implements StateChange {
   final T? _val;
-  final T? Function(Memory) _get;
-  final void Function(T?, Memory) _set;
+  final T? Function(Memory mem) _get;
+  final void Function(T? val, Memory mem) _set;
 
   SetValue(this._val, this._get, this._set);
 
@@ -388,5 +411,29 @@ class SetValue<T> implements StateChange {
     if (_get(memory) != _val) {
       _set(null, memory);
     }
+  }
+}
+
+class AddPanel implements StateChange {
+  @override
+  apply(Memory memory) {
+    memory._eventState.addPanel();
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.panelsShown = null;
+  }
+}
+
+class RemovePanel implements StateChange {
+  @override
+  apply(Memory memory) {
+    memory._eventState.removePanel();
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.panelsShown = null;
   }
 }
