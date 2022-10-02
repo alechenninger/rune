@@ -120,6 +120,11 @@ class FadeInField extends Event {
 
 class Panel {}
 
+final allPanels = <Panel>[
+  ...PrincipalPanel.values,
+  ...MeetingHahnPanel.values,
+];
+
 enum PrincipalPanel implements Panel {
   principal,
   shayAndAlys,

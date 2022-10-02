@@ -1,6 +1,6 @@
 import '../model/cutscenes.dart';
 
-final _panelData = [
+final _panelData = <Panel>[
   PrincipalPanel.principal,
   PrincipalPanel.shayAndAlys,
   PrincipalPanel.xanafalgue,

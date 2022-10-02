@@ -63,6 +63,10 @@ class Memory implements EventState {
 
   List<StateChange> get changes => UnmodifiableListView(_changes);
 
+  void clearChanges() {
+    _changes.clear();
+  }
+
   set hasSavedDialogPosition(bool saved) {
     _apply(SetSavedDialogPosition(saved));
   }
@@ -174,8 +178,8 @@ class Memory implements EventState {
   }
 
   @override
-  void removePanel() {
-    _apply(RemovePanel());
+  void removePanels([int n = 1]) {
+    _apply(RemovePanels(n));
   }
 
   T _apply<T>(StateChange<T> change) {
@@ -426,10 +430,14 @@ class AddPanel implements StateChange {
   }
 }
 
-class RemovePanel implements StateChange {
+class RemovePanels implements StateChange {
+  final int n;
+
+  RemovePanels(this.n);
+
   @override
   apply(Memory memory) {
-    memory._eventState.removePanel();
+    memory._eventState.removePanels(n);
   }
 
   @override

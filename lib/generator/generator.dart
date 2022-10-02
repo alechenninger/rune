@@ -30,7 +30,6 @@ import '../asm/events.dart';
 import '../asm/events.dart' as asmevents;
 import '../asm/text.dart';
 import '../model/conditional.dart';
-import '../model/cutscenes.dart';
 import '../model/model.dart';
 import '../model/text.dart';
 import 'cutscenes.dart';
@@ -553,29 +552,42 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void fadeInField(FadeInField fadeIn) {
-    _memory.isFieldShown = true;
-    _addToEvent(
-        fadeIn,
-        (eventIndex) => Asm([
-              bset(3.i, (Constant('Map_Load_Flags')).w),
-              jsr(Label('RefreshMap').l)
-            ]));
+    _addToEvent(fadeIn, (eventIndex) {
+      _memory.isFieldShown = true;
+      return Asm([
+        // Appears to have the same effect as
+        // bset 2 flag in LoadFieldMap
+        // which skips reloading of secondary objects
+        bset(3.i, (Constant('Map_Load_Flags')).w),
+        jsr(Label('RefreshMap').l)
+      ]);
+    });
   }
 
   @override
   void fadeOutField(FadeOutField fadeOut) {
-    _memory.isFieldShown = false;
-    _addToEvent(
-        fadeOut,
-        (eventIndex) => Asm([
-              jsr(Label('InitVRAMAndCRAM').l),
-              jsr(Label('Pal_FadeIn').l),
-              move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
-            ]));
+    _addToEvent(fadeOut, (eventIndex) {
+      _memory.isFieldShown = false;
+      return Asm([
+        // This calls PalFadeOut_ClrSpriteTbl
+        // which is what actually does the fade out,
+        // Then it clears plane A and VRAM completely,
+        // resets camera position,
+        // and resets palette
+        // It is used often in cutscenes but maybe does too much.
+        jsr(Label('InitVRAMAndCRAM').l),
+        // I think this just fades in the palette,
+        // using the values set from above.
+        jsr(Label('Pal_FadeIn').l),
+        move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
+      ]);
+    });
   }
 
   @override
   void showPanel(ShowPanel showPanel) {
+    _checkNotFinished();
+
     var index = showPanel.panel.panelIndex;
     if (inDialogLoop) {
       _memory.addPanel();
@@ -584,14 +596,14 @@ class SceneAsmGenerator implements EventVisitor {
         dc.w([Word(index)]),
       ]));
     } else {
-      _memory.addPanel();
-      _addToEvent(
-          showPanel,
-          (_) => Asm([
-                move.w(index.toWord.i, d0),
-                jsr('Panel_Create'.toLabel.l),
-                dmaPlanesVInt(),
-              ]));
+      _addToEvent(showPanel, (_) {
+        _memory.addPanel();
+        return Asm([
+          move.w(index.toWord.i, d0),
+          jsr('Panel_Create'.toLabel.l),
+          dmaPlanesVInt(),
+        ]);
+      });
     }
   }
 
@@ -599,13 +611,27 @@ class SceneAsmGenerator implements EventVisitor {
   void hideAllPanels(HideAllPanels hidePanels) {
     if (inDialogLoop) {
       _addToDialog(dc.b([Byte(0xf2), Byte.two]));
+    } else {
+      _addToEvent(hidePanels, (_) => jsr(Label('Panel_DestroyAll').l));
     }
   }
 
   @override
   void hideTopPanels(HideTopPanels hidePanels) {
+    _checkNotFinished();
+
     var panels = hidePanels.panelsToHide;
+    var panelsShown = _memory.panelsShown;
+
+    if (panelsShown == 0) return;
+
+    if (panelsShown != null) {
+      panels = min(panels, panelsShown);
+    }
+
     if (inDialogLoop) {
+      _memory.removePanels(panels);
+
       _addToDialog(Asm([
         for (var i = 0; i < panels; i++) dc.b([Byte(0xf2), Byte.one]),
         // todo: this is used often but not always, how to know when?
@@ -613,12 +639,9 @@ class SceneAsmGenerator implements EventVisitor {
         if (_memory.isFieldShown == true) dc.b([Byte(0xf2), Byte(6)]),
       ]));
     } else {
-      var panelsShown = _memory.panelsShown;
-      if (panelsShown == 0) return;
-      if (panelsShown != null) {
-        panels = min(panels, panelsShown);
-      }
       _addToEvent(hidePanels, (eventIndex) {
+        _memory.removePanels(panels);
+
         var skip = '.skipHidePanel$eventIndex';
         return Asm([
           for (var i = 0; i < panels; i++) ...[
@@ -629,9 +652,10 @@ class SceneAsmGenerator implements EventVisitor {
                 beq.s(Label(skip)),
               ]),
             jsr('Panel_Destroy'.toLabel.l),
+            // in Panel_DestroyAll it is done after each,
+            // so assuming this is needed here
+            dmaPlanesVInt(),
           ],
-          // todo: not sure if this has to be in loop or not
-          dmaPlanesVInt(),
           if (panelsShown == null) setLabel(skip),
         ]);
       });
@@ -775,8 +799,8 @@ class SceneAsmGenerator implements EventVisitor {
       }
     }
 
-    changes.clear();
-    siblingChanges.clear();
+    _memory.clearChanges();
+    sibling?.clearChanges();
   }
 
   /// Terminates the current dialog, if there is any,

@@ -15,6 +15,7 @@ import 'movement.dart';
 export 'dialog.dart';
 export 'movement.dart';
 export 'map.dart';
+export 'cutscenes.dart';
 
 abstract class Event {
   const Event();
@@ -86,8 +87,8 @@ class EventState {
     if (panelsShown != null) panelsShown = panelsShown! + 1;
   }
 
-  void removePanel() {
-    if (panelsShown != null) panelsShown = panelsShown! - 1;
+  void removePanels([int n = 1]) {
+    if (panelsShown != null) panelsShown = panelsShown! - n;
   }
 
   Direction? getFacing(FieldObject obj) => _facing[obj];
