@@ -62,6 +62,8 @@ class EventState {
 
   bool? cameraLock = false;
 
+  bool? isFieldShown = true;
+
   GameMap? currentMap;
 
   EventState() {
@@ -79,7 +81,7 @@ class EventState {
       ..currentMap = currentMap;
   }
 
-  int? panelsShown;
+  int? panelsShown = 0;
   void addPanel() {
     if (panelsShown != null) panelsShown = panelsShown! + 1;
   }
