@@ -74,12 +74,12 @@ class HideAllPanels extends Event {
   int get hashCode => 0;
 }
 
-class FadeOutField extends Event {
-  const FadeOutField();
+class FadeOut extends Event {
+  const FadeOut();
 
   @override
   void visit(EventVisitor visitor) {
-    visitor.fadeOutField(this);
+    visitor.fadeOut(this);
   }
 
   @override
@@ -90,7 +90,7 @@ class FadeOutField extends Event {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FadeOutField && runtimeType == other.runtimeType;
+      other is FadeOut && runtimeType == other.runtimeType;
 
   @override
   int get hashCode => 0;

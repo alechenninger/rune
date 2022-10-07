@@ -75,6 +75,13 @@ Asm getAndRunDialog(Address dialogId) {
   ]);
 }
 
+Asm getAndRunDialog3(Address dialogId) {
+  return Asm([
+    moveq(dialogId, d0),
+    jsr(Label('Event_GetAndRunDialogue3').l),
+  ]);
+}
+
 Asm returnFromDialogEvent() {
   /*
 	move.w	#0, (Game_Mode_Routine).w

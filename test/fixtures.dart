@@ -2,11 +2,18 @@ import 'package:rune/asm/asm.dart';
 import 'package:rune/generator/generator.dart';
 
 class TestEventRoutines extends EventRoutines {
-  final routines = <Label>[];
+  final eventRoutines = <Label>[];
+  final cutsceneRoutines = <Label>[];
 
   @override
   Word addEvent(Label name) {
-    routines.add(name);
-    return Word(routines.length - 1);
+    eventRoutines.add(name);
+    return Word(eventRoutines.length - 1);
+  }
+
+  @override
+  Word addCutscene(Label name) {
+    cutsceneRoutines.add(name);
+    return Word(cutsceneRoutines.length - 1);
   }
 }

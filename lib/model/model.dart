@@ -44,7 +44,7 @@ abstract class EventVisitor {
   void showPanel(ShowPanel showPanel);
   void hideTopPanels(HideTopPanels hidePanels);
   void hideAllPanels(HideAllPanels hidePanels);
-  void fadeOutField(FadeOutField fadeOut);
+  void fadeOut(FadeOut fadeOut);
   void fadeInField(FadeInField fadeIn);
 }
 

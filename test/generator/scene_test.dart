@@ -289,6 +289,35 @@ ${dialog2.toAsm()}
             returnFromDialogEvent()
           ]));
     });
+
+    test('if dialog while faded, uses cutscene routine', () {
+      var map = GameMap(MapId.Test);
+      var obj = MapObject(
+          startPosition: Position(0x50, 0x50),
+          spec: Npc(Sprite.PalmanOldMan1, WanderAround(Direction.down)));
+      map.addObject(obj);
+
+      var dialog = DialogTree();
+      var asm = EventAsm.empty();
+      var eventRoutines = TestEventRoutines();
+      var events = [
+        FadeOut(),
+        Dialog(spans: DialogSpan.parse('Hello world')),
+        FadeInField()
+      ];
+
+      var generator = SceneAsmGenerator.forInteraction(
+          map, obj, SceneId('testscene'), dialog, asm, eventRoutines)
+        ..runEventFromInteractionIfNeeded(events);
+
+      for (var event in events) {
+        event.visit(generator);
+      }
+
+      generator.finish();
+
+      expect(eventRoutines.cutsceneRoutines, hasLength(1));
+    });
   });
 
   group('conditional events', () {
@@ -448,9 +477,9 @@ ${dialog2.toAsm()}
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
             beq.w(Label('test_Test_unset1')),
-            getAndRunDialog(0.toByte.i),
+            getAndRunDialog3(0.toByte.i),
             setLabel('test_Test_unset1'),
-            getAndRunDialog(1.toByte.i),
+            getAndRunDialog3(1.toByte.i),
           ]).withoutComments());
 
       expect(
@@ -547,7 +576,7 @@ ${dialog2.toAsm()}
         generator = SceneAsmGenerator.forInteraction(
             map, obj, SceneId('interact'), dialog, asm, eventRoutines);
         // todo:
-      });
+      }, skip: true);
 
       test('in dialog, flag is checked in dialog', () {
         SceneAsmGenerator.forInteraction(
@@ -747,7 +776,7 @@ ${dialog2.toAsm()}
 
         print(asm);
 
-        expect(eventRoutines.routines,
+        expect(eventRoutines.eventRoutines,
             [Label('Event_GrandCross_interactflag1Set')]);
         expect(asm.withoutComments().firstOrNull?.toAsm(),
             setLabel('Event_GrandCross_interactflag1Set'));
@@ -813,7 +842,7 @@ ${dialog2.toAsm()}
                 Dialog(spans: DialogSpan.parse('Flag1 is not set'))
               ])
             ]),
-            false);
+            null);
       });
 
       test('does not need event even if a branch has events', () {
@@ -828,7 +857,7 @@ ${dialog2.toAsm()}
                 Dialog(spans: DialogSpan.parse('Flag1 is not set'))
               ])
             ]),
-            false);
+            null);
       });
 
       test('does need event if there are unconditional events', () {
@@ -844,7 +873,7 @@ ${dialog2.toAsm()}
               ]),
               IfFlag(EventFlag('flagother'))
             ]),
-            true);
+            EventType.event);
       });
 
       group('cannot then run event in interaction', () {

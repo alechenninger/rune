@@ -60,11 +60,15 @@ class Program {
 
   final Asm _eventPointers = Asm.empty();
   Asm get eventPointers => Asm([_eventPointers]);
-
   Word _eventIndexOffset;
 
-  Program({Word? eventIndexOffset})
-      : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord;
+  final Asm _cutscenesPointers = Asm.empty();
+  Asm get cutscenesPointers => Asm([_cutscenesPointers]);
+  Word _cutsceneIndexOffset;
+
+  Program({Word? eventIndexOffset, Word? cutsceneIndexOffset})
+      : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord,
+        _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord;
 
   /// Returns event index by which [routine] can be referenced.
   ///
@@ -74,6 +78,16 @@ class Program {
     _eventPointers.add(dc.l([routine], comment: '$eventIndex'));
     _eventIndexOffset = (eventIndex.value + 1).toWord;
     return eventIndex;
+  }
+
+  /// Returns event index by which [routine] can be referenced.
+  ///
+  /// The event code must be added separate with the exact label of [routine].
+  Word _addCutscenePointer(Label routine) {
+    var cutsceneIndex = _cutsceneIndexOffset;
+    _cutscenesPointers.add(dc.l([routine], comment: '$cutsceneIndex'));
+    _cutsceneIndexOffset = (cutsceneIndex.value + 1).toWord;
+    return cutsceneIndex;
   }
 
   SceneAsm addScene(SceneId id, Scene scene) {
@@ -102,7 +116,7 @@ class Program {
 
 abstract class EventRoutines {
   Word addEvent(Label name);
-  //Word addCutscene(Label name);
+  Word addCutscene(Label name);
 }
 
 class _ProgramEventRoutines extends EventRoutines {
@@ -112,6 +126,9 @@ class _ProgramEventRoutines extends EventRoutines {
 
   @override
   Word addEvent(Label routine) => _program._addEventPointer(routine);
+
+  @override
+  Word addCutscene(Label routine) => _program._addCutscenePointer(routine);
 }
 
 class _AsmEvent extends Event {
@@ -148,6 +165,7 @@ class SceneAsmGenerator implements EventVisitor {
   Event? _lastEventInCurrentDialog;
   var _eventCounter = 1;
   var _finished = false;
+  Function([int? dialogRoutine])? _replaceDialogRoutine;
 
   // conditional runtime state
   /// For currently generating branch, what is the known state of event flags
@@ -193,7 +211,7 @@ class SceneAsmGenerator implements EventVisitor {
   /// Reproduces logic in Interaction_ProcessDialogueTree to see if the events
   /// can be processed soley through dialog loop.
   ///
-  /// Returns `false` if events occur in the following order:
+  /// Returns `null` if events occur in the following order:
   /// - A single [IfFlag] (i.e. `$FA` control code) event
   /// and nothing else.
   /// This is because if there are other events,
@@ -227,36 +245,74 @@ class SceneAsmGenerator implements EventVisitor {
 		$B = Sets event flag
 		$C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
    */
-  bool needsEvent(List<Event> events) {
-    var obj = _interactingWith;
-    if (obj == null) return true; // todo: not quite sure about this
-    if (events.length == 1 && events[0] is IfFlag) return false;
+  EventType? needsEvent(List<Event> events) {
+    /*
+    to determine if needs *cutscene* we need to know if there is dialog during
+    a fade out
+    OR we fake the cutscene bit
+    OR we add some other flag and modify the runtext subroutines
+     */
 
-    var check = 0;
-    var checks = <bool Function(Event)>[
-      (event) => event is FacePlayer && event.object == obj,
-      (event) => event is Dialog
+    if (events.length == 1 && events[0] is IfFlag) return null;
+
+    // todo: if we do the hidePanelsOnClose thing in dialog
+    // we need an event if any dialog has that set that isn't the last event
+
+    var dialogCheck = 0;
+    var dialogChecks = <bool Function(Event, int)>[
+      (event, i) => event is FacePlayer && event.object == _interactingWith,
+      (event, i) => event is Dialog && !event.hidePanelsOnClose,
+      (event, i) =>
+          event is Dialog && event.hidePanelsOnClose && i == events.length - 1,
     ];
 
+    var faded = false;
+    var needsEvent = false;
+
     event:
-    for (var event in events) {
-      for (var i = check; i < checks.length; i++) {
-        if (checks[i](event)) {
-          check = i;
+    for (int i = 0; i < events.length; i++) {
+      var event = events[i];
+      for (var cIdx = dialogCheck;
+          cIdx < dialogChecks.length && !needsEvent;
+          cIdx++) {
+        if (dialogChecks[cIdx](event, i)) {
+          dialogCheck = cIdx;
           continue event;
         }
       }
-      return true;
+
+      needsEvent = true;
+
+      if (event is FadeOut) {
+        faded = true;
+      } else if (event is FadeInField) {
+        faded = false;
+      } else if (event is Dialog && faded) {
+        return EventType.cutscene;
+      }
     }
 
-    return false;
+    if (needsEvent) return EventType.event;
+
+    return null;
+  }
+
+  void runEventFromInteractionIfNeeded(List<Event> events,
+      {Word? eventIndex, String? nameSuffix}) {
+    var type = needsEvent(events);
+    if (type == null) return;
+    runEventFromInteraction(
+        type: type, eventIndex: eventIndex, nameSuffix: nameSuffix);
   }
 
   /// If in interaction and not yet in an event, run an event from dialog.
   ///
   /// If [eventIndex] is not provided, a new event will be added with optional
   /// [nameSuffix].
-  void runEventFromInteraction({Word? eventIndex, String? nameSuffix}) {
+  void runEventFromInteraction(
+      {Word? eventIndex,
+      String? nameSuffix,
+      EventType type = EventType.event}) {
     _checkNotFinished();
 
     if (_inEvent) {
@@ -277,7 +333,7 @@ class SceneAsmGenerator implements EventVisitor {
           ? '$id${_currentCondition == Condition.empty() ? '' : _eventCounter}'
           : '$id$nameSuffix';
       var eventRoutine = Label('Event_GrandCross_$eventName');
-      eventIndex = _eventRoutines!.addEvent(eventRoutine);
+      eventIndex = type.addRoutine(_eventRoutines!, eventRoutine);
       _eventAsm.add(setLabel(eventRoutine.name));
     }
 
@@ -305,12 +361,65 @@ class SceneAsmGenerator implements EventVisitor {
 
     if (!inDialogLoop) {
       _eventAsm.add(Asm([comment('${_eventCounter++}: $Dialog')]));
-      if (_memory.hasSavedDialogPosition) {
-        _eventAsm.add(popAndRunDialog);
-        _eventAsm.addNewline();
-      } else {
-        _eventAsm.add(getAndRunDialog(_currentDialogIdOrStart().i));
+
+      // todo if null, have to check somehow?
+      // todo: not sure if this is right
+      if (_memory.isFieldShown == false) {
+        // fake a cutscene ... hehehe
+        // todo: save in model of ram to prevent unnecessary repetition
+        // todo: but does this break saving?
+        // _eventAsm.add(bset(7.i, Constant('Event_Index').w));
+        _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
       }
+
+      /*
+      differences in panel handling after button press:
+
+      rundialog - destory panels, then destroy window
+      rundialog2 - leave everything up, but reset counts - used before battles
+      rundialog3 - destroy window, don't touch panels
+      rundialog4 - destroy window, don't touch panels
+        (but uses runtext3 instead - used in ending for non-interactive dialog)
+      rundialog5 - destroy window, then fade screen (then destroy panels silently)
+
+      problem is we have to know how we want to handle panels in the future
+      before we run dialog.
+
+      we could lookahead and see what's about to happen:
+
+      - if no more events
+        - if there are panels
+          - if field is faded
+            - run5
+          - run regular
+        - run regular
+      - run3
+
+      we could also look back? remember where the last rundialog routine was
+      and change it accordingly?
+
+      the behavior of destroying a panel before the window is more like a dialog
+      behavior. so we'd set a flag on the dialog to say whether it should close
+      panels with it, and then look ahead in dialog for that.
+
+      fade out can just be done explicitly, but might check if we have already
+      faded the field, in which case only call the palfadeout routine. that is,
+      default to rundialog3.
+       */
+
+      if (_memory.hasSavedDialogPosition) {
+        _eventAsm.add(popdlg);
+        var line = _eventAsm.add(jsr(Label('Event_RunDialogue3').l));
+        _replaceDialogRoutine = ([i]) => _eventAsm.replace(
+            line, jsr(Label('Event_RunDialogue${i ?? ""}').l));
+      } else {
+        var dialogId = _currentDialogIdOrStart().i;
+        _eventAsm.add(moveq(dialogId, d0));
+        var line = _eventAsm.add(jsr(Label('Event_GetAndRunDialogue3').l));
+        _replaceDialogRoutine = ([i]) => _eventAsm.replace(
+            line, jsr(Label('Event_GetAndRunDialogue${i ?? ""}').l));
+      }
+
       _gameMode = Mode.dialog;
     } else if (_lastEventInCurrentDialog is Dialog) {
       // Consecutive dialog, new cursor in between each dialog
@@ -431,9 +540,8 @@ class SceneAsmGenerator implements EventVisitor {
       _addToDialog(eventCheck(flag.toConstant, ifSetOffset));
       _flagIsNotSet(flag);
 
-      if (needsEvent(ifFlag.isUnset)) {
-        runEventFromInteraction(nameSuffix: '${ifFlag.flag.name}Unset');
-      }
+      runEventFromInteractionIfNeeded(ifFlag.isUnset,
+          nameSuffix: '${ifFlag.flag.name}Unset');
 
       for (var event in ifFlag.isUnset) {
         event.visit(this);
@@ -454,9 +562,8 @@ class SceneAsmGenerator implements EventVisitor {
       _resetCurrentDialog(id: ifSetId, asm: ifSet);
       _flagIsSet(flag, parent: parent);
 
-      if (needsEvent(ifFlag.isSet)) {
-        runEventFromInteraction(nameSuffix: '${ifFlag.flag.name}Set');
-      }
+      runEventFromInteractionIfNeeded(ifFlag.isSet,
+          nameSuffix: '${ifFlag.flag.name}Set');
 
       for (var event in ifFlag.isSet) {
         event.visit(this);
@@ -557,9 +664,16 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void fadeInField(FadeInField fadeIn) {
+    if (_memory.isFieldShown == true) return;
+
     _addToEvent(fadeIn, (eventIndex) {
+      var wasFieldShown = _memory.isFieldShown;
       _memory.isFieldShown = true;
+      // fixme: i think need to force hide panels
+      //  if field not shown and there are panels
       return Asm([
+        if (wasFieldShown == false && (_memory.panelsShown ?? 0) > 0)
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
         // Appears to have the same effect as
         // bset 2 flag in LoadFieldMap
         // which skips reloading of secondary objects
@@ -570,22 +684,25 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
-  void fadeOutField(FadeOutField fadeOut) {
+  void fadeOut(FadeOut fadeOut) {
     _addToEvent(fadeOut, (eventIndex) {
+      var wasFieldShown = _memory.isFieldShown;
       _memory.isFieldShown = false;
-      return Asm([
-        // This calls PalFadeOut_ClrSpriteTbl
-        // which is what actually does the fade out,
-        // Then it clears plane A and VRAM completely,
-        // resets camera position,
-        // and resets palette
-        // It is used often in cutscenes but maybe does too much.
-        jsr(Label('InitVRAMAndCRAM').l),
-        // I think this just fades in the palette,
-        // using the values set from above.
-        jsr(Label('Pal_FadeIn').l),
-        move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
-      ]);
+      return wasFieldShown == true
+          ? Asm([
+              // This calls PalFadeOut_ClrSpriteTbl
+              // which is what actually does the fade out,
+              // Then it clears plane A and VRAM completely,
+              // resets camera position,
+              // and resets palette
+              // It is used often in cutscenes but maybe does too much.
+              jsr(Label('InitVRAMAndCRAM').l),
+              // I think this just fades in the palette,
+              // using the values set from above.
+              jsr(Label('Pal_FadeIn').l),
+              move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
+            ])
+          : jsr(Label('PalFadeOut_ClrSpriteTbl').l);
     });
   }
 
@@ -811,7 +928,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   /// Terminates the current dialog, if there is any,
   /// regardless of whether current generating within dialog loop or not.
-  void _terminateDialog() {
+  void _terminateDialog({bool? hidePanels}) {
     // was lastEventBreak >= 0, but i think it should be this?
     if (!inDialogLoop && _lastEventBreak >= 0) {
       // i think this is only ever the last line so could simplify
@@ -821,6 +938,20 @@ class SceneAsmGenerator implements EventVisitor {
       if (_inEvent) {
         _gameMode = Mode.event;
       }
+    }
+
+    // fixme: hidePanels tracking not implemented yet
+    //   (remember from last dialog event?)
+    // if replace routine is null,
+    // this should mean that we are processing interaction and not in event
+    // so panels will be hidden as interaction ends normally
+    if (hidePanels == true && _replaceDialogRoutine != null) {
+      _replaceDialogRoutine!();
+    }
+
+    if (hidePanels == false && _isProcessingInteraction && !_inEvent) {
+      throw StateError('ending interaction without event cannot keep panels, '
+          'but hidePanels == false');
     }
 
     _resetCurrentDialog();
@@ -846,6 +977,7 @@ class SceneAsmGenerator implements EventVisitor {
     // see it used that way. just an optimization so come back to this.
     _memory.hasSavedDialogPosition = false;
     _lastEventBreak = -1;
+    _replaceDialogRoutine = null;
   }
 
   Byte _currentDialogIdOrStart() {
@@ -894,6 +1026,27 @@ class SceneAsmGenerator implements EventVisitor {
 }
 
 enum Mode { dialog, event }
+
+Word _addEventRoutine(EventRoutines r, Label name) {
+  return r.addEvent(name);
+}
+
+Word _addCutsceneRoutine(EventRoutines r, Label name) {
+  return r.addCutscene(name);
+}
+
+enum EventType {
+  event(_addEventRoutine),
+  cutscene(_addCutsceneRoutine);
+
+  final Word Function(EventRoutines, Label) _addRoutine;
+
+  const EventType(this._addRoutine);
+
+  Word addRoutine(EventRoutines routines, Label name) {
+    return _addRoutine(routines, name);
+  }
+}
 
 class DialogTree extends IterableBase<DialogAsm> {
   final _dialogs = <DialogAsm>[];

@@ -50,6 +50,7 @@ final _vramOffsetPerSprite = '48'.hex;
 // variances in maps to be coded manually (such as objects).
 // todo: it might be nice to manage these with the assembly or the compiler
 //  itself rather than hard coding here.
+//  Program API would be the right place now that we have that.
 
 final _spriteVramOffsets = {
   MapId.Test: 0x2d0,
@@ -123,18 +124,16 @@ class MapAsmBuilder {
     // todo: handle max
     var dialogId = _tree.nextDialogId!;
 
-    SceneAsmGenerator builder = SceneAsmGenerator.forInteraction(
+    SceneAsmGenerator generator = SceneAsmGenerator.forInteraction(
         _map, obj, id, _tree, _eventsAsm, _eventRoutines);
 
-    if (builder.needsEvent(events)) {
-      builder.runEventFromInteraction();
-    }
+    generator.runEventFromInteractionIfNeeded(events);
 
     for (var event in events) {
-      event.visit(builder);
+      event.visit(generator);
     }
 
-    builder.finish(appendNewline: true);
+    generator.finish(appendNewline: true);
 
     return dialogId;
   }
