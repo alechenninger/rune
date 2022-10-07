@@ -204,6 +204,11 @@ class Asm extends IterableBase<Instruction> {
     lines.add(_Instruction());
   }
 
+  Asm head(int lines) {
+    lines = min(lines, length);
+    return Asm.fromInstructions(this.lines.sublist(0, lines));
+  }
+
   Asm tail(int lines) {
     lines = min(lines, length);
     return Asm.fromInstructions(this.lines.sublist(length - lines));

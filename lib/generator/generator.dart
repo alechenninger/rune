@@ -87,7 +87,7 @@ class Program {
     var cutsceneIndex = _cutsceneIndexOffset;
     _cutscenesPointers.add(dc.l([routine], comment: '$cutsceneIndex'));
     _cutsceneIndexOffset = (cutsceneIndex.value + 1).toWord;
-    return cutsceneIndex;
+    return (cutsceneIndex + Word(0x8000)) as Word;
   }
 
   SceneAsm addScene(SceneId id, Scene scene) {
