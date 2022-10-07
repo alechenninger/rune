@@ -155,6 +155,7 @@ class SceneAsmGenerator implements EventVisitor {
   /// This is necessary to understand whether, when in dialog mode, we can pop
   /// back to an event or have to trigger a new one.
   bool _inEvent;
+  EventType? _eventType;
 
   final FieldObject? _interactingWith;
   bool get _isProcessingInteraction => _interactingWith != null;
@@ -195,6 +196,7 @@ class SceneAsmGenerator implements EventVisitor {
   SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
       : _dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = null,
+        // FIXME: also set eventtype so finish() does the right thing
         _inEvent = true {
     _gameMode = Mode.event;
     _stateGraph[Condition.empty()] = _memory;
@@ -339,6 +341,7 @@ class SceneAsmGenerator implements EventVisitor {
 
     _addToDialog(asmdialog.runEvent(eventIndex));
     _inEvent = true;
+    _eventType = type;
 
     _terminateDialog();
   }
@@ -669,8 +672,6 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(fadeIn, (eventIndex) {
       var wasFieldShown = _memory.isFieldShown;
       _memory.isFieldShown = true;
-      // fixme: i think need to force hide panels
-      //  if field not shown and there are panels
       return Asm([
         if (wasFieldShown == false && (_memory.panelsShown ?? 0) > 0)
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
@@ -678,7 +679,8 @@ class SceneAsmGenerator implements EventVisitor {
         // bset 2 flag in LoadFieldMap
         // which skips reloading of secondary objects
         bset(3.i, (Constant('Map_Load_Flags')).w),
-        jsr(Label('RefreshMap').l)
+        jsr(Label('RefreshMap').l),
+        jsr(Label('Pal_FadeIn').l)
       ]);
     });
   }
@@ -793,7 +795,12 @@ class SceneAsmGenerator implements EventVisitor {
       _terminateDialog();
 
       if (_isProcessingInteraction && _inEvent) {
-        _eventAsm.add(returnFromDialogEvent());
+        if (_eventType == EventType.cutscene) {
+          // clears z bit so we don't reload the map from cutscene
+          _eventAsm.add(moveq(1.i, d0));
+        } else {
+          _eventAsm.add(returnFromDialogEvent());
+        }
       }
     }
 
