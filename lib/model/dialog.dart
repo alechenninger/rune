@@ -7,6 +7,7 @@ import 'model.dart';
 class Dialog extends Event {
   // todo: make not nullable
   Speaker? speaker;
+  // fixme: toString/==/etc
   bool hidePanelsOnClose = false;
   final List<DialogSpan> _spans = [];
   List<DialogSpan> get spans => UnmodifiableListView(_spans);

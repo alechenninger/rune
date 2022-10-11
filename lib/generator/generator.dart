@@ -714,11 +714,20 @@ class SceneAsmGenerator implements EventVisitor {
 
     var index = showPanel.panel.panelIndex;
     if (inDialogLoop) {
+      // todo: support optionally including panel with dialog?
+      if (_lastEventInCurrentDialog is Dialog) {
+        // Panel should come after this Dialog;
+        // otherwise gets rendered before player continues
+        _addToDialog(interrupt());
+      }
+
       _memory.addPanel();
       _addToDialog(Asm([
         dc.b([Byte(0xf2), Byte.zero]),
         dc.w([Word(index)]),
       ]));
+
+      _lastEventInCurrentDialog = showPanel;
     } else {
       _addToEvent(showPanel, (_) {
         _memory.addPanel();

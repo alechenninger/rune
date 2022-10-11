@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/cutscenes.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
@@ -28,6 +29,26 @@ void main() {
 	dc.b	\$FD
 ${dialog2.toAsm()}
 	dc.b	\$FF''');
+    });
+
+    test('between dialog and panel', () {
+      var sceneAsm = program.addScene(
+          SceneId('test'),
+          Scene([
+            Dialog(speaker: alys, spans: DialogSpan.parse('Hi')),
+            ShowPanel(PrincipalPanel.principal),
+          ]));
+
+      expect(
+          sceneAsm.dialog[0],
+          Asm([
+            dc.b([Byte(0xF4), alys.portraitCode]),
+            dc.b(Bytes.ascii('Hi')),
+            dc.b([Byte(0xFD)]),
+            dc.b([Byte(0xF2), Byte.zero]),
+            dc.w([Word(PrincipalPanel.principal.panelIndex)]),
+            dc.b([Byte(0xff)])
+          ]));
     });
   });
 
