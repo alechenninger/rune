@@ -154,7 +154,7 @@ class SceneAsmGenerator implements EventVisitor {
   ///
   /// This is necessary to understand whether, when in dialog mode, we can pop
   /// back to an event or have to trigger a new one.
-  bool _inEvent;
+  bool get _inEvent => _eventType != null;
   EventType? _eventType;
 
   final FieldObject? _interactingWith;
@@ -183,9 +183,8 @@ class SceneAsmGenerator implements EventVisitor {
       this._dialogTree, this._eventAsm, EventRoutines eventRoutines)
       : _dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = obj,
-        _eventRoutines = eventRoutines,
-        _inEvent = false {
-    _gameMode = _inEvent ? Mode.event : Mode.dialog;
+        _eventRoutines = eventRoutines {
+    _gameMode = Mode.dialog;
 
     _memory.putInAddress(a3, obj);
     _memory.hasSavedDialogPosition = false;
@@ -196,8 +195,8 @@ class SceneAsmGenerator implements EventVisitor {
   SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
       : _dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = null,
-        // FIXME: also set eventtype so finish() does the right thing
-        _inEvent = true {
+        // FIXME: also parameterize eventtype so finish() does the right thing
+        _eventType = EventType.event {
     _gameMode = Mode.event;
     _stateGraph[Condition.empty()] = _memory;
   }
@@ -340,7 +339,6 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _addToDialog(asmdialog.runEvent(eventIndex));
-    _inEvent = true;
     _eventType = type;
 
     _terminateDialog();
@@ -550,18 +548,16 @@ class SceneAsmGenerator implements EventVisitor {
         event.visit(this);
       }
 
+      // Wrap up this branch
+      _finish();
+
       if (_inEvent) {
-        if (_isProcessingInteraction) {
-          _eventAsm.add(returnFromDialogEvent());
-        }
         // we may be in event now, but we have to go back to dialog generation
         // since we're playing out the "isSet" branch now
-        _inEvent = false;
+        _eventType = null;
         _gameMode = Mode.dialog;
       }
 
-      // Either way, terminate dialog if there is any.
-      _terminateDialog();
       _resetCurrentDialog(id: ifSetId, asm: ifSet);
       _flagIsSet(flag, parent: parent);
 
@@ -800,22 +796,35 @@ class SceneAsmGenerator implements EventVisitor {
     // not sure if still need to do this
     if (!_finished) {
       _finished = true;
-
-      _terminateDialog();
-
-      if (_isProcessingInteraction && _inEvent) {
-        if (_eventType == EventType.cutscene) {
-          // clears z bit so we don't reload the map from cutscene
-          _eventAsm.add(moveq(1.i, d0));
-        } else {
-          _eventAsm.add(returnFromDialogEvent());
-        }
-      }
+      _finish();
     }
 
     if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
       _eventAsm.addNewline();
     }
+  }
+
+  void _finish() {
+    if (_isProcessingInteraction && _inEvent) {
+      if (_eventType == EventType.cutscene) {
+        var reload = _memory.isFieldShown == false;
+        // clears z bit so we don't reload the map from cutscene
+        _eventAsm.add(moveq(reload ? 0.i : 1.i, d0));
+        _eventAsm.add(rts);
+        if (reload && _replaceDialogRoutine != null) {
+          // dialog 5 will fade out the whole screen
+          // before map reload happens
+          // (destroy window -> fade out -> destroy panels)
+          _replaceDialogRoutine!(5);
+          // todo: but what if there isn't dialog?
+          //  do we need to do palfadout?
+        }
+      } else {
+        _eventAsm.add(returnFromDialogEvent());
+      }
+    }
+
+    _terminateDialog();
   }
 
   void _checkNotFinished() {

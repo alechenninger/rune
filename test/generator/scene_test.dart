@@ -56,6 +56,20 @@ ${dialog2.toAsm()}
     late EventState state;
     late EventState origState;
 
+    var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
+    var moves = IndividualMoves();
+    moves.moves[alys] = StepPath()..distance = 1.step;
+
+    var map = GameMap(MapId.Test);
+    var obj = MapObject(
+        id: 'testObj', startPosition: Position(0, 0), spec: AlysWaiting());
+    obj.onInteract = Scene([
+      SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)),
+      dialog1,
+      moves
+    ]);
+    map.addObject(obj);
+
     setUp(() {
       state = EventState()
         ..positions[alys] = Position('50'.hex, '50'.hex)
@@ -71,31 +85,25 @@ ${dialog2.toAsm()}
       var ctx = AsmContext.forDialog(state);
       var eventIndex = ctx.peekNextEventIndex;
 
-      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
-      var moves = IndividualMoves();
-      moves.moves[alys] = StepPath()..distance = 1.step;
-
-      var scene = Scene([dialog1, moves]);
-
-      var sceneAsm = generator.sceneToAsm(scene, ctx);
-
-      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
-        DialogAsm([
-          dc.b(Bytes.hex('F6')),
-          dc.w([eventIndex]),
-          dc.b(Bytes.hex('FF')),
-        ]),
-        DialogAsm([
-          dialog1.toAsm(),
-          dc.b(Bytes.hex('ff')),
-        ])
-      ]);
+      var program = Program();
+      var mapAsm = program.addMap(map);
 
       expect(
-          sceneAsm.event.withoutComments(),
+          mapAsm.dialog.withoutComments().trim(),
           Asm([
-            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
-            getAndRunDialog(Byte.one.i),
+            dc.b(Bytes.hex('F6')),
+            dc.w([eventIndex]),
+            dc.b(Bytes.hex('FF')),
+            newLine(),
+            dialog1.toAsm(),
+            dc.b(Bytes.hex('ff')),
+          ]));
+
+      expect(
+          mapAsm.events.withoutComments().trim(),
+          Asm([
+            setLabel('Event_GrandCross_Test_testObj'),
+            getAndRunDialog3(Byte.one.i),
             generator
                 .individualMovesToAsm(moves, AsmContext.forEvent(origState))
                 .withoutComments(),
@@ -103,11 +111,9 @@ ${dialog2.toAsm()}
           ]));
 
       expect(
-          ctx.eventPointers.withoutComments(),
+          program.eventPointers.withoutComments(),
           Asm([
-            dc.l([
-              Label('Event_GrandCross_${eventIndex.value.toRadixString(16)}')
-            ])
+            dc.l([Label('Event_GrandCross_Test_testObj')])
           ]));
     });
 
@@ -322,9 +328,9 @@ ${dialog2.toAsm()}
       var asm = EventAsm.empty();
       var eventRoutines = TestEventRoutines();
       var events = [
+        Pause(Duration(seconds: 1)),
         FadeOut(),
         Dialog(spans: DialogSpan.parse('Hello world')),
-        FadeInField()
       ];
 
       var generator = SceneAsmGenerator.forInteraction(
@@ -337,7 +343,54 @@ ${dialog2.toAsm()}
 
       generator.finish();
 
+      print(asm);
+
       expect(eventRoutines.cutsceneRoutines, hasLength(1));
+    });
+
+    test('if cutscene in conditional branch, ends with fade and map reload',
+        () {
+      var map = GameMap(MapId.Test);
+      var obj = MapObject(
+          startPosition: Position(0x50, 0x50),
+          spec: Npc(Sprite.PalmanOldMan1, WanderAround(Direction.down)));
+      map.addObject(obj);
+
+      var dialog = DialogTree();
+      var asm = EventAsm.empty();
+      var eventRoutines = TestEventRoutines();
+      var events = [
+        IfFlag(EventFlag('test'), isSet: [
+          Dialog(spans: DialogSpan.parse('Bye world')),
+        ], isUnset: [
+          FadeOut(),
+          Dialog(spans: DialogSpan.parse('Hello world')),
+          SetFlag(EventFlag('test')),
+        ]),
+      ];
+
+      var generator = SceneAsmGenerator.forInteraction(
+          map, obj, SceneId('testscene'), dialog, asm, eventRoutines)
+        ..runEventFromInteractionIfNeeded(events);
+
+      for (var event in events) {
+        event.visit(generator);
+      }
+
+      generator.finish();
+
+      print(asm);
+
+      expect(eventRoutines.cutsceneRoutines, hasLength(1));
+      expect(
+          asm.withoutComments().tail(5),
+          Asm([
+            jsr(Label('Event_GetAndRunDialogue5').l),
+            moveq(Constant('EventFlag_test').i, d0),
+            jsr(Label('EventFlags_Set').l),
+            moveq(0.i, d0),
+            rts
+          ]));
     });
   });
 

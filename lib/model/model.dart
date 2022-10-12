@@ -79,7 +79,9 @@ class EventState {
       ..startingAxis = startingAxis
       ..followLead = followLead
       ..cameraLock = cameraLock
-      ..currentMap = currentMap;
+      ..currentMap = currentMap
+      ..isFieldShown = isFieldShown
+      ..panelsShown = panelsShown;
   }
 
   int? panelsShown = 0;
