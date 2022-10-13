@@ -339,15 +339,23 @@ void main() {
           ]));
     });
 
-    test('conditional test', () {
-      npc1.onInteract =
-          npc1.onInteract.unlessSet(EventFlag('teststory'), then: [
-        Dialog(spans: [DialogSpan('Hello again')])
+    test('event asm has newline between events and cutscenes', () {
+      var cutsceneNpc = MapObject(
+          id: 'CutsceneNpc',
+          startPosition: Position(0x1d0, 0x2e0),
+          spec: AlysWaiting());
+      cutsceneNpc.onInteract = Scene.forNpcInteractionWith(cutsceneNpc, [
+        FadeOut(),
+        Dialog(spans: [DialogSpan('Test!')]),
       ]);
+
+      testMap.addObject(cutsceneNpc);
 
       var mapAsm = program.addMap(testMap);
 
-      print(mapAsm);
+      print(mapAsm.events);
+      print(program.cutscenesPointers);
+      print(program.eventPointers);
     });
   });
 }

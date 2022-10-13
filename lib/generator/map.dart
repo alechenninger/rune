@@ -80,6 +80,8 @@ final _spriteArtLabels = {
   Sprite.PalmanFighter2: Label('Art_PalmanFighter2'),
   Sprite.PalmanFighter3: Label('Art_PalmanFighter3'),
   Sprite.PalmanStudent1: Label('Art_PalmanStudent1'),
+  Sprite.PalmanProfessor1: Label('Art_PalmanProfessor1'),
+  Sprite.PalmanProfessor2: Label('Art_PalmanProfessor2'),
   Sprite.Kroft: Label('Art_Kroft'),
 };
 
@@ -87,7 +89,8 @@ final _mapObjectSpecRoutines = {AlysWaiting(): Word('68'.hex)};
 
 final _npcBehaviorRoutines = {
   FaceDown: Word('38'.hex), // FieldObj_NPCType1
-  WanderAround: Word('3C'.hex) // FieldObj_NPCType2
+  WanderAround: Word('3C'.hex), // FieldObj_NPCType2
+  SlowlyWanderAround: Word('40'.hex), // FieldObj_NPCType3
 };
 
 class MapAsmBuilder {

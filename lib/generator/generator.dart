@@ -698,7 +698,7 @@ class SceneAsmGenerator implements EventVisitor {
               // I think this just fades in the palette,
               // using the values set from above.
               jsr(Label('Pal_FadeIn').l),
-              move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
+              // todo: remove? move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
             ])
           : jsr(Label('PalFadeOut_ClrSpriteTbl').l);
     });

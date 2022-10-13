@@ -107,6 +107,12 @@ enum Sprite {
   PalmanWoman3,
   PalmanStudent1,
   Kroft,
+
+  /// Old professor.
+  PalmanProfessor1,
+
+  /// Old professor humped over with hands behind his back.
+  PalmanProfessor2,
 }
 
 Sprite? spriteByName(String name) {
@@ -236,5 +242,27 @@ class WanderAround extends NpcBehavior {
   @override
   String toString() {
     return 'WanderAround{startFacing: $startFacing}';
+  }
+}
+
+class SlowlyWanderAround extends NpcBehavior {
+  @override
+  final Direction startFacing;
+
+  SlowlyWanderAround(this.startFacing);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SlowlyWanderAround &&
+          runtimeType == other.runtimeType &&
+          startFacing == other.startFacing;
+
+  @override
+  int get hashCode => startFacing.hashCode;
+
+  @override
+  String toString() {
+    return 'SlowlyWanderAround{startFacing: $startFacing}';
   }
 }
