@@ -371,4 +371,28 @@ void main() {
       print(program.eventPointers);
     });
   });
+
+  group('npc interaction events', () {
+    group('in dialog', () {
+      test('plays sound', () {
+        var obj = MapObject(
+            startPosition: Position('1e0'.hex, '2e0'.hex),
+            spec: Npc(Sprite.PalmanMan1, FaceDown()),
+            onInteract: Scene([
+              PlaySound(Sound.surprise),
+            ]));
+        testMap.addObject(obj);
+
+        var asm = program.addMap(testMap);
+
+        expect(
+            asm.dialog.withoutComments().trim(),
+            Asm([
+              dc.b([Byte(0xf2), Byte(3)]),
+              dc.b([Constant('SFXID_Surprise')]),
+              dc.b([Byte(0xff)]),
+            ]));
+      });
+    });
+  });
 }

@@ -380,7 +380,7 @@ class _Instruction extends Instruction {
           if (c == ',' || isBlank(c)) {
             if (operand == null) throw StateError('bad operand');
 
-            if (operand.startsWith(_number) || operand.startsWith(r'$')) {
+            if (_number.hasMatch(operand)) {
               SizedValue sized;
               bool hex = operand.startsWith(r'$');
               var val = hex ? operand.substring(1).hex : int.parse(operand);
@@ -476,4 +476,4 @@ class _Instruction extends Instruction {
 
 enum _Token { root, label, cmd, operand, stringConstant, comment }
 
-final _number = RegExp(r'\d');
+final _number = RegExp(r'^\$?\d+$');

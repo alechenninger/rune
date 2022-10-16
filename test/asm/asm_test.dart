@@ -13,11 +13,20 @@ main() {
       expect(asm.first.withoutComment(), Asm.fromRaw('\tdc.b\t"Abc"\t').first);
     });
 
-    group('equivalence', () {
+    group('equivalent to model', () {
       test('empty', () {
         expect(Asm.fromRaw(''), newLine());
         expect(Asm.fromRaw('   '), newLine());
         expect(Asm.fromRaw('\t'), newLine());
+      });
+    });
+
+    group('equivalent back to string', () {
+      test('address displacement', () {
+        var asm =
+            Asm.fromRaw(r'	move.w	$30(a4), $38(a4)	; move current to dest x');
+        expect(asm.toString(),
+            r'	move.w	$30(a4), $38(a4)	; move current to dest x');
       });
     });
   });

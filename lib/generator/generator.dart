@@ -262,7 +262,8 @@ class SceneAsmGenerator implements EventVisitor {
     var dialogCheck = 0;
     var dialogChecks = <bool Function(Event, int)>[
       (event, i) => event is FacePlayer && event.object == _interactingWith,
-      (event, i) => event is Dialog && !event.hidePanelsOnClose,
+      (event, i) =>
+          (event is Dialog && !event.hidePanelsOnClose) || event is PlaySound,
       (event, i) =>
           event is Dialog && event.hidePanelsOnClose && i == events.length - 1,
     ];
@@ -790,6 +791,17 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
+  @override
+  void playSound(PlaySound playSound) {
+    if (inDialogLoop) {
+      _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
+      _addToDialog(dc.b([playSound.sound.sfxId]));
+    } else {
+      _addToEvent(playSound,
+          (_) => move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l));
+    }
+  }
+
   void finish({bool appendNewline = false}) {
     // todo: also applfinishy all changes for current mem across graph
     // not sure if still need to do this
@@ -1145,6 +1157,21 @@ extension FramesPerSecond on Duration {
     // could use conditional pseudo-assembly if / else
     // see: http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_3_6_
     return (inMilliseconds / 1000 * 60).round();
+  }
+}
+
+extension Sfxid on Sound {
+  static Constant _defaultConstant(Sound s) {
+    var first = s.name.substring(0, 1);
+    var rest = s.name.substring(1);
+    return Constant('SFXID_${first.toUpperCase()}$rest');
+  }
+
+  Expression get sfxId {
+    switch (this) {
+      default:
+        return _defaultConstant(this);
+    }
   }
 }
 

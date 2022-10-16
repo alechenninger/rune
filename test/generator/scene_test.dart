@@ -52,6 +52,16 @@ ${dialog2.toAsm()}
     });
   });
 
+  group('events', () {
+    test('play sounds', () {
+      var scene = Scene([(PlaySound(Sound.selection))]);
+      var program = Program();
+      var asm = program.addScene(SceneId('test'), scene);
+      expect(asm.event.withoutComments(),
+          move.b(Constant('SFXID_Selection').i, Constant('Sound_Index').l));
+    });
+  });
+
   group('dialog with event', () {
     late EventState state;
     late EventState origState;

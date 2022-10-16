@@ -11,11 +11,13 @@ import 'package:rune/model/text.dart';
 import 'dialog.dart';
 import 'map.dart';
 import 'movement.dart';
+import 'sound.dart';
 
 export 'dialog.dart';
 export 'movement.dart';
 export 'map.dart';
 export 'cutscenes.dart';
+export 'sound.dart';
 
 abstract class Event {
   const Event();
@@ -46,6 +48,7 @@ abstract class EventVisitor {
   void hideAllPanels(HideAllPanels hidePanels);
   void fadeOut(FadeOut fadeOut);
   void fadeInField(FadeInField fadeIn);
+  void playSound(PlaySound playSound);
 }
 
 class EventState {
