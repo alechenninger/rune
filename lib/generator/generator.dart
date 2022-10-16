@@ -675,8 +675,7 @@ class SceneAsmGenerator implements EventVisitor {
         // Appears to have the same effect as
         // bset 2 flag in LoadFieldMap
         // which skips reloading of secondary objects
-        bset(3.i, (Constant('Map_Load_Flags')).w),
-        jsr(Label('RefreshMap').l),
+        refreshMap(refreshObjects: false),
         jsr(Label('Pal_FadeIn').l)
       ]);
     });
@@ -711,6 +710,7 @@ class SceneAsmGenerator implements EventVisitor {
     var index = showPanel.panel.panelIndex;
     if (inDialogLoop) {
       // todo: support optionally including panel with dialog?
+      // fixme: need ShowPanel in needsEvent check
       if (_lastEventInCurrentDialog is Dialog) {
         // Panel should come after this Dialog;
         // otherwise gets rendered before player continues
@@ -794,8 +794,16 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void playSound(PlaySound playSound) {
     if (inDialogLoop) {
+      if (_lastEventInCurrentDialog is Dialog) {
+        // Panel should come after this Dialog;
+        // otherwise gets rendered before player continues
+        _addToDialog(interrupt());
+      }
+
       _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
       _addToDialog(dc.b([playSound.sound.sfxId]));
+
+      _lastEventInCurrentDialog = playSound;
     } else {
       _addToEvent(playSound,
           (_) => move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l));
@@ -817,22 +825,43 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void _finish() {
-    if (_isProcessingInteraction && _inEvent) {
-      if (_eventType == EventType.cutscene) {
-        var reload = _memory.isFieldShown == false;
-        // clears z bit so we don't reload the map from cutscene
-        _eventAsm.add(moveq(reload ? 0.i : 1.i, d0));
-        _eventAsm.add(rts);
-        if (reload && _replaceDialogRoutine != null) {
-          // dialog 5 will fade out the whole screen
-          // before map reload happens
-          // (destroy window -> fade out -> destroy panels)
-          _replaceDialogRoutine!(5);
-          // todo: but what if there isn't dialog?
-          //  do we need to do palfadout?
+    if (_inEvent) {
+      if (_isProcessingInteraction) {
+        if (_eventType == EventType.cutscene) {
+          var reload = _memory.isFieldShown == false;
+          // clears z bit so we don't reload the map from cutscene
+          _eventAsm.add(moveq(reload ? 0.i : 1.i, d0));
+          _eventAsm.add(rts);
+          if (reload && _replaceDialogRoutine != null) {
+            // dialog 5 will fade out the whole screen
+            // before map reload happens
+            // (destroy window -> fade out -> destroy panels)
+            _replaceDialogRoutine!(5);
+            // todo: but what if there isn't dialog?
+            //  do we need to do palfadout?
+          }
+        } else {
+          _eventAsm.add(returnFromDialogEvent());
         }
       } else {
-        _eventAsm.add(returnFromDialogEvent());
+        /*
+        hacky workaround for reloading dialog tree back to map tree
+        for now this is commented out and just handling it in the asm itself,
+        since that is where we load the tree also.
+
+        in order to detect if needed we'd have to know:
+         - current map at all times
+         - dialog tree in ram at all times
+        this is not all that hard but maybe there is an easier way
+
+        for example could we just reuse map dialog trees at this point?
+        the starting scene, though, has no map loaded at that point that i can
+        tell. more importantly perhaps, it would require tracking map updates
+        in events and the ability to switch dialog trees in the generator itself
+        which currently assumes only a single tree per scene. this might
+        however be a problem even with interactions.
+         */
+        //_eventAsm.add(refreshMap(refreshObjects: false));
       }
     }
 
@@ -1021,6 +1050,8 @@ class SceneAsmGenerator implements EventVisitor {
     return _currentDialogId!;
   }
 
+  // fixme: should get similar treatment as _addToEvent to handle common dialog
+  // stuff like adding interrupts
   int _addToDialog(Asm asm) {
     _checkNotFinished();
 

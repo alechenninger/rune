@@ -54,6 +54,7 @@ const curr_y_pos = Constant('curr_y_pos');
 /// bit 1 = update movement order (X first, Y second or viceversa)
 /// bit 2 = lock camera
 const Char_Move_Flags = Constant('Char_Move_Flags');
+const Map_Load_Flags = Constant('Map_Load_Flags');
 
 final popdlg = cmd('popdlg', []);
 
@@ -248,5 +249,15 @@ Asm branchIfEvenfFlagNotSet(Address flag, Address to, {bool short = false}) {
     moveq(flag, d0),
     jsr(Label('EventFlags_Test').l),
     if (short) beq.s(to) else beq.w(to)
+  ]);
+}
+
+Asm refreshMap({bool refreshObjects = true}) {
+  return Asm([
+    if (refreshObjects)
+      bclr(3.i, Map_Load_Flags.w)
+    else
+      bset(3.i, Map_Load_Flags.w),
+    jsr(Label('RefreshMap').l)
   ]);
 }

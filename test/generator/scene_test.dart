@@ -410,8 +410,7 @@ ${dialog2.toAsm()}
     Asm pause(int seconds) {
       var asm = EventAsm.empty();
       SceneAsmGenerator.forEvent(sceneId, DialogTree(), asm)
-        ..pause(Pause(seconds.seconds))
-        ..finish();
+          .pause(Pause(seconds.seconds));
       return asm;
     }
 
