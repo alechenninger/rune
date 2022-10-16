@@ -64,10 +64,12 @@ final _spriteVramOffsets = {
 //   their location in memory. we would have to offset that location.
 final _objectIndexOffsets = {MapId.PiataAcademyF1: 1, MapId.Piata: 3};
 
-final _dialogIdOffsets = {
-  MapId.PiataAcademyF1: 1,
-  MapId.Piata: 45,
+final _defaultDialogs = {
+  MapId.PiataAcademyF1: DialogTree()..add(DialogAsm.emptyDialog()),
+  MapId.Piata: DialogTree()..addAll(DialogAsm.fromRaw(_piataDialog).split()),
 };
+DialogTree _defaultDialogTree(MapId map) =>
+    _defaultDialogs[map] ?? DialogTree();
 
 final _spriteArtLabels = {
   Sprite.PalmanMan1: Label('Art_PalmanMan1'),
@@ -104,11 +106,11 @@ class MapAsmBuilder {
   final _eventsAsm = EventAsm.empty();
   final _cutscenesAsm = Asm.empty();
 
-  MapAsmBuilder(this._map, this._eventRoutines)
+  MapAsmBuilder(this._map, this._eventRoutines, {DialogTree? dialogTree})
       // todo: can we inject these differently so it's more testable?
       // fixme: nonnull assertion
       : _spriteVramOffset = _spriteVramOffsets[_map.id]!,
-        _tree = DialogTree(offset: Byte(_dialogIdOffsets[_map.id] ?? 0));
+        _tree = dialogTree ?? _defaultDialogTree(_map.id);
 
   void addObject(MapObject obj) {
     // todo:
@@ -137,6 +139,8 @@ class MapAsmBuilder {
     }
 
     generator.finish(appendNewline: true);
+
+    assert(_tree.length > dialogId.value, "no interaction dialog in tree");
 
     return dialogId;
   }
@@ -217,23 +221,10 @@ class MapAsmBuilder {
   }
 
   MapAsm build() {
-    var dialogAsm = DialogAsm.empty();
-
-    // hard coded dialog
-    switch (_map.id) {
-      case MapId.Piata:
-        dialogAsm.add(Asm.fromRaw(_piataDialog));
-        break;
-      default:
-      // noop
-    }
-
-    dialogAsm.add(_tree.toAsm());
-
     return MapAsm(
         sprites: _spritesAsm,
         objects: _objectsAsm,
-        dialog: dialogAsm,
+        dialog: _tree.toAsm(),
         events: _eventsAsm,
         cutscenes: _cutscenesAsm);
   }
@@ -764,3 +755,8 @@ const _piataDialog = r'''
 	dc.b	"I'm putting you through."
 	dc.b	$FF
 ''';
+
+main() {
+  var asm = Asm.fromRaw(_piataDialog);
+  print(DialogAsm([asm]).dialogs);
+}

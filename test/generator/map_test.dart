@@ -199,6 +199,19 @@ void main() {
 
   test('objects use correct facing direction', () {});
 
+  test('objects with no dialog still terminate dialog', () {
+    var obj = MapObject(
+        startPosition: Position('1e0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()));
+    obj.onInteract = Scene.forNpcInteractionWith(obj, []);
+
+    testMap.addObject(obj);
+
+    var asm = program.addMap(testMap);
+
+    expect(asm.dialog.withoutComments().trim().tail(1), dc.b([Byte(0xff)]));
+  });
+
   group('objects with dialog', () {
     late MapAsm mapAsm;
 

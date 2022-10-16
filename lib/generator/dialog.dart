@@ -11,7 +11,58 @@ import '../model/model.dart';
 
 class DialogAsm extends Asm {
   DialogAsm.empty() : super.empty();
+  DialogAsm.fromRaw(String raw) : super.fromRaw(raw);
   DialogAsm(List<Asm> asm) : super(asm);
+
+  DialogAsm.emptyDialog()
+      : super([
+          dc.b([Byte(0xff)])
+        ]);
+
+  /// If the ASM contains multiple dialogs, split each into their own element.
+  ///
+  /// A dialog must be terminated for it to be considered.
+  List<DialogAsm> split() {
+    var dialogs = <DialogAsm>[];
+    var dialog = DialogAsm.empty();
+    for (var line in lines) {
+      var lineAlreadyAdded = false;
+
+      if (line.cmd == 'dc.b') {
+        for (var i = 0; i < line.operands.length; i++) {
+          var op = line.operands[i];
+          if (op is Byte) {
+            if (op == Byte(0xff)) {
+              var last = dc.b(
+                  line.operands.sublist(0, i + 1) as List<Expression>,
+                  comment: line.comment);
+              dialog.add(last);
+              dialogs.add(dialog);
+              dialog = DialogAsm.empty();
+              var remaining = line.operands.sublist(i + 1) as List<Expression>;
+              if (remaining.isNotEmpty) {
+                line = dc.b(remaining, comment: line.comment).first;
+                i = 0;
+              } else {
+                lineAlreadyAdded = true;
+              }
+            }
+          } else {
+            // ignored
+          }
+        }
+
+        if (!lineAlreadyAdded) {
+          dialog.addLine(line);
+        }
+      } else {
+        dialog.addLine(line);
+      }
+    }
+    return dialogs;
+  }
+
+  int get dialogs => split().length;
 }
 
 extension DialogToAsm on Dialog {

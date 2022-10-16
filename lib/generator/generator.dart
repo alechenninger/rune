@@ -698,7 +698,6 @@ class SceneAsmGenerator implements EventVisitor {
               // I think this just fades in the palette,
               // using the values set from above.
               jsr(Label('Pal_FadeIn').l),
-              // todo: remove? move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
             ])
           : jsr(Label('PalFadeOut_ClrSpriteTbl').l);
     });
@@ -795,8 +794,9 @@ class SceneAsmGenerator implements EventVisitor {
     // todo: also applfinishy all changes for current mem across graph
     // not sure if still need to do this
     if (!_finished) {
-      _finished = true;
       _finish();
+      _dialogTree.finish();
+      _finished = true;
     }
 
     if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
@@ -954,15 +954,14 @@ class SceneAsmGenerator implements EventVisitor {
   /// Terminates the current dialog, if there is any,
   /// regardless of whether current generating within dialog loop or not.
   void _terminateDialog({bool? hidePanels}) {
-    // was lastEventBreak >= 0, but i think it should be this?
-    if (!inDialogLoop && _lastEventBreak >= 0) {
-      // i think this is only ever the last line so could simplify
-      _currentDialog!.replace(_lastEventBreak, terminateDialog());
-    } else if (inDialogLoop && _currentDialog != null) {
-      _currentDialog!.add(terminateDialog());
+    if (inDialogLoop) {
+      _addToDialog(terminateDialog());
       if (_inEvent) {
         _gameMode = Mode.event;
       }
+    } else if (_lastEventBreak >= 0) {
+      // i think this is only ever the last line so could simplify
+      _currentDialog!.replace(_lastEventBreak, terminateDialog());
     }
 
     // fixme: hidePanels tracking not implemented yet
@@ -1076,22 +1075,16 @@ enum EventType {
 class DialogTree extends IterableBase<DialogAsm> {
   final _dialogs = <DialogAsm>[];
 
-  DialogTree({Byte? offset}) {
-    if (offset != null) {
-      for (var i = 0; i < offset.value; i++) {
-        // todo: or null?
-        _dialogs.add(DialogAsm([comment('hard coded (skipped)')]));
-      }
-    }
-  }
+  DialogTree();
 
   @override
   DialogAsm get last => _dialogs.last;
 
-  /// Adds the dialog and returns its id in the tree.
+  /// Adds the dialog and returns the id of the first dialog added in the tree.
   Byte add(DialogAsm dialog) {
-    // TODO: validate dialog contains exactly one terminator and only at the end
-    // or validate contains none, and add here (or add here if not already set)
+    if (dialog.dialogs > 1) {
+      throw ArgumentError.value(dialog, 'dialog', '.dialogs must be <= 1');
+    }
     var id = nextDialogId;
     if (id == null) {
       throw StateError('no more dialog can fit into dialog trees');
@@ -1100,6 +1093,18 @@ class DialogTree extends IterableBase<DialogAsm> {
     return id;
   }
 
+  void addAll(List<DialogAsm> dialog) => dialog.forEach(add);
+
+  // todo: rename; somewhat misleading. more like "done with what's there"
+  void finish() {
+    for (var dialog in _dialogs) {
+      if (dialog.dialogs != 1) {
+        throw ArgumentError.value(dialog, 'dialog', '.dialogs must be == 1');
+      }
+    }
+  }
+
+  /// The ID of the next dialog that would be added.
   Byte? get nextDialogId =>
       _dialogs.length > Size.b.maxValue ? null : _dialogs.length.toByte;
 
@@ -1107,7 +1112,9 @@ class DialogTree extends IterableBase<DialogAsm> {
     return _dialogs[index];
   }
 
-  Asm toAsm() {
+  Asm toAsm({bool ensureFinished = true}) {
+    if (ensureFinished) finish();
+
     var all = Asm.empty();
 
     for (var i = 0; i < length; i++) {
@@ -1127,7 +1134,7 @@ class DialogTree extends IterableBase<DialogAsm> {
 
   @override
   String toString() {
-    return toAsm().toString();
+    return toAsm(ensureFinished: false).toString();
   }
 }
 

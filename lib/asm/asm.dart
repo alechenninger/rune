@@ -2,6 +2,11 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:characters/characters.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:quiver/strings.dart';
+
+import '../numbers.dart';
 import 'address.dart';
 import 'data.dart';
 
@@ -37,8 +42,7 @@ const TstMnemonic tst = TstMnemonic();
 final rts = cmd('rts', []);
 
 Asm newLine() => Asm.fromInstruction(_Instruction());
-Asm comment(String comment) => Asm.fromInstructions(LineSplitter()
-    .convert(comment)
+Asm comment(String comment) => Asm.fromInstructions(LineSplitter.split(comment)
     .map((e) => _Instruction(comment: comment))
     .toList(growable: false));
 
@@ -164,18 +168,15 @@ class Asm extends IterableBase<Instruction> {
   }
 
   Asm.fromRaw(String raw) {
-    LineSplitter.split(raw).map((e) => _RawInstruction(e)).forEach(addLine);
+    LineSplitter.split(raw).map((e) => _Instruction.parse(e)).forEach(addLine);
   }
 
   Asm withoutComments() => Asm.fromInstructions(lines.expand((line) {
-        var stringed = line.toString();
-        var withoutComment =
-            stringed.replaceFirst(RegExp(';.*'), '').trimRight();
-        if (withoutComment.trimLeft().isEmpty &&
-            stringed.trimLeft().isNotEmpty) {
+        var withoutComment = line.withoutComment();
+        if (withoutComment.isEmpty && line.isNotEmpty) {
           return <Instruction>[];
         }
-        return [_RawInstruction(withoutComment)];
+        return [withoutComment];
       }).toList(growable: false));
 
   /// returns position in list in which asm was added.
@@ -261,12 +262,23 @@ Asm cmd(String cmd, List operands, {String? label, String? comment}) {
 }
 
 abstract class Instruction {
+  static Asm parse(String asm) {
+    var lines = LineSplitter.split(asm).map((line) => _Instruction.parse(line));
+    return Asm.fromInstructions(lines.toList());
+  }
+
   Asm toAsm() {
     return Asm.fromInstruction(this);
   }
 
+  String? get label;
+  String? get cmd;
+  List get operands;
+  String? get comment;
   bool get isEmpty => toString().isEmpty;
   bool get isNotEmpty => toString().isNotEmpty;
+
+  Instruction withoutComment();
 
   @override
   String toString();
@@ -278,25 +290,6 @@ abstract class Instruction {
   int get hashCode;
 }
 
-class _RawInstruction extends Instruction {
-  final String _instruction;
-
-  _RawInstruction(this._instruction);
-
-  @override
-  String toString() {
-    return _instruction;
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Instruction && _instruction == other.toString();
-
-  @override
-  int get hashCode => super.hashCode ^ _instruction.hashCode;
-}
-
 class _Instruction extends Instruction {
   final String? label;
   final String? cmd;
@@ -306,15 +299,22 @@ class _Instruction extends Instruction {
   final String line;
 
   static final _validLabelPattern = RegExp(r'^[A-Za-z\d_@.+-]+[A-Za-z\d_+-]*$');
+  static final _noColonLabel = RegExp(r'^(\++|/+|-+|.\S+)$');
+
+  /// appends : depending on the kind of label
+  static String _delimitLabel(String label) {
+    if (_noColonLabel.hasMatch(label)) return label;
+    return '$label:';
+  }
 
   _Instruction({this.label, this.cmd, this.operands = const [], this.comment})
       : line = [
-          if (label == null) '' else '$label:',
+          if (label == null) '' else _delimitLabel(label),
           if (cmd != null) cmd,
           if (operands.isNotEmpty)
             if (operands is Data) operands else operands.join(', '),
           if (comment != null) '; $comment'
-        ].join('\t') {
+        ].join('\t').trimRight() {
     if (line.length > 255) {
       throw ArgumentError(
           'Instructions cannot be longer than 255 characters but was: $line');
@@ -325,6 +325,139 @@ class _Instruction extends Instruction {
       throw ArgumentError.value(label, 'label',
           'did not match allowed characters: $_validLabelPattern');
     }
+  }
+
+  factory _Instruction.parse(String line) {
+    String? label;
+    String? cmd;
+    List ops = [];
+    String? comment;
+
+    var state = _Token.root;
+    var chars = line.characters.iterator.toList();
+    bool escape = false;
+    String? stringDelimiter;
+    String? operand;
+
+    for (var i = 0; i < chars.length + 1; i++) {
+      var c = i == chars.length ? null : chars[i];
+      switch (state) {
+        case _Token.root:
+          if (isNotBlank(c)) {
+            if (c == ';') {
+              state = _Token.comment;
+            } else if (i == 0) {
+              state = _Token.label;
+              i--;
+            } else if (cmd == null) {
+              state = _Token.cmd;
+              i--;
+            } else if (c == ',') {
+              // skip
+            } else {
+              state = _Token.operand;
+              i--;
+            }
+          }
+          break;
+        case _Token.label:
+          if (c == ':' || isBlank(c)) {
+            state = _Token.root;
+          } else {
+            label ??= "";
+            label += c!;
+          }
+          break;
+        case _Token.cmd:
+          if (isBlank(c)) {
+            state = _Token.root;
+          } else {
+            cmd ??= "";
+            cmd += c!;
+          }
+          break;
+        case _Token.operand:
+          if (c == ',' || isBlank(c)) {
+            if (operand == null) throw StateError('bad operand');
+
+            if (operand.startsWith(_number) || operand.startsWith(r'$')) {
+              SizedValue sized;
+              bool hex = operand.startsWith(r'$');
+              var val = hex ? operand.substring(1).hex : int.parse(operand);
+              if (val <= Size.b.maxValue) {
+                sized = Byte(val);
+              } else if (val <= Size.w.maxValue) {
+                sized = Word(val);
+              } else {
+                sized = Longword(val);
+              }
+
+              if (ops.isEmpty && sized is Byte) {
+                ops = Bytes.from([sized]);
+              } else if (ops is Bytes && sized is Byte) {
+                ops += [sized];
+              } else {
+                ops.add(sized);
+              }
+            } else {
+              // todo could parse addresses and whatnot but jeeze
+              ops.add(operand);
+            }
+
+            operand = null;
+            state = _Token.root;
+          } else if (c == '"' || c == "'") {
+            stringDelimiter = c;
+            state = _Token.stringConstant;
+          } else {
+            operand ??= "";
+            operand += c!;
+          }
+          break;
+        case _Token.stringConstant:
+          if ((!escape && c == stringDelimiter) || c == null) {
+            if (ops.isEmpty) {
+              ops = Bytes.ascii(operand ?? "");
+            } else {
+              ops += Bytes.ascii(operand ?? "");
+            }
+            operand = null;
+            escape = false;
+            stringDelimiter = null;
+            state = _Token.root;
+          } else {
+            operand ??= "";
+            if (!escape) {
+              if (c == r'\') {
+                escape = true;
+              } else {
+                operand += c;
+              }
+            } else {
+              operand += '\\$c';
+              escape = false;
+            }
+          }
+          break;
+        case _Token.comment:
+          if (comment == null && isBlank(c)) {
+            break;
+          }
+          comment ??= "";
+          if (c != null) {
+            comment += c;
+          }
+          break;
+      }
+    }
+
+    return _Instruction(
+        label: label, cmd: cmd, operands: ops, comment: comment);
+  }
+
+  @override
+  Instruction withoutComment() {
+    return _Instruction(label: label, cmd: cmd, operands: operands);
   }
 
   @override
@@ -340,3 +473,7 @@ class _Instruction extends Instruction {
   @override
   int get hashCode => line.hashCode;
 }
+
+enum _Token { root, label, cmd, operand, stringConstant, comment }
+
+final _number = RegExp(r'\d');

@@ -1,3 +1,4 @@
+import 'package:rune/asm/asm.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
@@ -171,6 +172,65 @@ void main() {
       expect(asm.toString(), r'''	dc.b	$F4, $01
 	dc.b	"That you've always done this..."
 	dc.b	$F9, $3C''');
+    });
+  });
+
+  group('dialog count', () {
+    test('==0 if empty', () {
+      expect(DialogAsm.empty().dialogs, 0);
+      expect(DialogAsm([]).dialogs, 0);
+      expect(DialogAsm([comment('foo')]).dialogs, 0);
+    });
+
+    test('==0 if no terminator', () {
+      expect(DialogAsm([dc.b(Bytes.ascii("Hello"))]).dialogs, 0);
+    });
+
+    test('==1 with just 0xff', () {
+      expect(DialogAsm([dc.b(Bytes.of(0xff))]).dialogs, 1);
+    });
+
+    test('==1 with one dialog', () {
+      expect(
+          DialogAsm([
+            dc.b(Bytes.ascii("Hello")),
+            dc.b([Byte(0xff)])
+          ]).dialogs,
+          1);
+    });
+
+    test('==1 with one dialog terminator on same line', () {
+      expect(
+          DialogAsm([
+            dc.b(BytesAndAscii([
+              Bytes.ascii("Hello"),
+              Bytes.list([0xff])
+            ])),
+          ]).dialogs,
+          1);
+    });
+
+    test('==2 with one dialog and extra terminator', () {
+      expect(
+          DialogAsm([
+            dc.b(Bytes.ascii("Hello")),
+            dc.b([Byte(0xff)]),
+            dc.b([Byte(0xff)])
+          ]).dialogs,
+          2);
+    });
+
+    test('==2 with two dialogs on same line', () {
+      expect(
+          DialogAsm([
+            dc.b(BytesAndAscii([
+              Bytes.ascii("Hello"),
+              Bytes.list([0xff]),
+              Bytes.ascii("World"),
+              Bytes.list([0xff]),
+            ])),
+          ]).dialogs,
+          2);
     });
   });
 }

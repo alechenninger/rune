@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:quiver/check.dart';
+import 'package:rune/numbers.dart';
 
 import '../characters.dart';
 import 'asm.dart';
@@ -204,6 +205,13 @@ class Byte extends SizedValue {
   Byte(int value) : super(value);
 
   const Byte._(int value) : super._(value);
+
+  factory Byte.parse(String val) {
+    if (val.startsWith(r'$')) {
+      return Byte(val.substring(1).hex);
+    }
+    return Byte(int.parse(val));
+  }
 
   @override
   final size = Size.b;

@@ -127,7 +127,7 @@ void main() {
               Text(spans: [Span('of the millennium.')], groupSet: ofMillen),
             ]));
 
-    var tree = DialogTree(offset: Byte(5));
+    var tree = DialogTree();
     print(displayTextToAsm(display, dialogTree: tree));
     print(tree);
   });
