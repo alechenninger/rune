@@ -87,13 +87,38 @@ final _spriteArtLabels = {
   Sprite.Kroft: Label('Art_Kroft'),
 };
 
-final _mapObjectSpecRoutines = {AlysWaiting(): Word('68'.hex)};
+final _mapObjectSpecRoutines = {
+  AlysWaiting(): FieldRoutine(Word('68'.hex), Label('FieldObj_NPCAlysPiata'))
+};
 
 final _npcBehaviorRoutines = {
-  FaceDown: Word('38'.hex), // FieldObj_NPCType1
-  WanderAround: Word('3C'.hex), // FieldObj_NPCType2
-  SlowlyWanderAround: Word('40'.hex), // FieldObj_NPCType3
+  FaceDown: FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1')),
+  WanderAround: FieldRoutine(Word('3C'.hex), Label('FieldObj_NPCType2')),
+  SlowlyWanderAround: FieldRoutine(Word('40'.hex), Label('FieldObj_NPCType3')),
 };
+
+class FieldRoutine {
+  final Word index;
+  final Label label;
+
+  const FieldRoutine(this.index, this.label);
+
+  @override
+  String toString() {
+    return 'FieldRoutine{index: $index, label: $label}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FieldRoutine &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          label == other.label;
+
+  @override
+  int get hashCode => index.hashCode ^ label.hashCode;
+}
 
 class MapAsmBuilder {
   final GameMap _map;
@@ -187,7 +212,7 @@ class MapAsmBuilder {
             'no routine configured for npc behavior ${spec.behavior}');
       }
 
-      _objectsAsm.add(dc.w([routine]));
+      _objectsAsm.add(dc.w([routine.index]));
       _objectsAsm.add(facingAndDialog);
 
       // TODO: i think you can use 0 for invisible / no sprite
@@ -204,7 +229,7 @@ class MapAsmBuilder {
         throw Exception('no routine configured for spec $spec');
       }
 
-      _objectsAsm.add(dc.w([routine]));
+      _objectsAsm.add(dc.w([routine.index]));
       _objectsAsm.add(facingAndDialog);
       // in this case we assume the vram tile does not matter?
       // TODO: if it does we need to track so do not reuse same
@@ -230,8 +255,29 @@ class MapAsmBuilder {
   }
 }
 
+extension ObjectRoutine on MapObject {
+  FieldRoutine get routine {
+    var spec = this.spec;
+    var routine = spec is Npc
+        ? _npcBehaviorRoutines[spec.behavior.runtimeType]
+        : _mapObjectSpecRoutines[spec];
+    if (routine == null) {
+      if (routine == null) {
+        throw Exception('no routine configured for spec $spec');
+      }
+    }
+    return routine;
+  }
+}
+
 extension ObjectAddress on GameMap {
   Longword addressOf(MapObject obj) {
+    // ramaddr(Field_Obj_Secondary + 0x40 * object_index)
+    // For example, Alys_Piata is at ramaddr(FFFFC4C0) and at object_index 7
+    // ramaddr(FFFFC300 + 0x40 * 7) = ramaddr(FFFFC4C0)
+    // Then load this via lea into a4
+    // e.g. lea	(Alys_Piata).w, a4
+
     var index =
         objects.map((e) => e.id).toList(growable: false).indexOf(obj.id);
 
@@ -755,8 +801,3 @@ const _piataDialog = r'''
 	dc.b	"I'm putting you through."
 	dc.b	$FF
 ''';
-
-main() {
-  var asm = Asm.fromRaw(_piataDialog);
-  print(DialogAsm([asm]).dialogs);
-}

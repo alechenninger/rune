@@ -4,6 +4,7 @@ import 'package:rune/asm/events.dart';
 import 'package:rune/generator/map.dart';
 
 import '../asm/asm.dart';
+import '../asm/asm.dart' as asmlib;
 import '../model/model.dart';
 import 'event.dart';
 
@@ -151,6 +152,12 @@ extension IndividualMovesToAsm on IndividualMoves {
 
             toA4(moveable);
 
+            var mapObj = moveable.asMapObject(ctx);
+            if (mapObj != null) {
+              // Make map object scriptable
+              asm.add(asmlib.move.w(0x8194.i, asmlib.a4.indirect));
+            }
+
             if (i == lastMoveIndex) {
               asm.add(moveCharacter(x: x, y: y));
             } else {
@@ -175,6 +182,7 @@ extension IndividualMovesToAsm on IndividualMoves {
         asm.add(vIntPrepareLoop((8 * maxSteps.toInt).toWord));
       }
 
+      // todo: maybe move this after the loop?
       for (var move in done.entries) {
         var moveable = move.key;
         var movement = move.value;
@@ -188,6 +196,13 @@ extension IndividualMovesToAsm on IndividualMoves {
         toA4(moveable);
         asm.add(updateObjFacing(movement.direction.address));
         // }
+
+        var mapObj = moveable.asMapObject(ctx);
+        if (mapObj != null) {
+          var routine = mapObj.routine;
+          asm.add(asmlib.move.w(routine.index.i, asmlib.a4.indirect));
+          asm.add(jsr(routine.label.l));
+        }
       }
     }
 
@@ -217,7 +232,7 @@ extension Cap on int? {
   }
 }
 
-extension MoveableToA4 on FieldObject {
+extension FieldObjectAsm on FieldObject {
   Asm toA4(EventState ctx) {
     var moveable = this;
     var slot = moveable.slot(ctx);
@@ -226,6 +241,12 @@ extension MoveableToA4 on FieldObject {
       return characterBySlotToA4(slot);
     } else if (moveable is Character) {
       return characterByIdToA4(moveable.charId);
+    } else if (moveable is MapObjectById) {
+      var address = moveable.address(ctx);
+      return lea(Absolute.long(address), a4);
+    } else if (moveable is MapObject) {
+      var address = moveable.address(ctx);
+      return lea(Absolute.long(address), a4);
     }
 
     /*
@@ -246,36 +267,69 @@ extension MoveableToA4 on FieldObject {
     that is, just use findcharslot directly.
      */
 
-    // We could do this for any object in a map by knowing the ordering
-    // of objects within the map.
-    // ramaddr(Field_Obj_Secondary + 0x40 * object_index)
-    // For example, Alys_Piata is at ramaddr(FFFFC4C0) and at object_index 7
-    // ramaddr(FFFFC300 + 0x40 * 7) = ramaddr(FFFFC4C0)
-    // Then load this via lea into a4
-    // e.g. lea	(Alys_Piata).w, a4
-
     throw UnsupportedError('$this.toA4');
   }
 
   Asm toA3(EventState ctx) {
     var obj = this;
     if (obj is MapObject) {
-      var map = ctx.currentMap;
-      if (map == null) {
-        // todo: support, see above
-        throw UnsupportedError('must be field obj in map, but map was null');
-      }
-
-      var address = map.addressOf(obj);
+      var address = obj.address(ctx);
       return lea(Absolute.long(address), a3);
-    }
-
-    if (obj is Slot) {
+    } else if (obj is MapObjectById) {
+      var address = obj.address(ctx);
+      return lea(Absolute.long(address), a3);
+    } else if (obj is Slot) {
       // why word? this is what asm appears to do
       return lea('Character_${obj.index}'.toConstant.w, a3);
     }
 
     throw UnsupportedError('must be mapobject or slot');
+  }
+
+  MapObject? asMapObject(EventState ctx) {
+    var fieldObj = this;
+    MapObject? mapObject;
+
+    if (fieldObj is MapObjectById) {
+      var map = ctx.currentMap;
+      if (map == null) {
+        throw UnsupportedError('got field obj in map, but map was null');
+      }
+      mapObject = fieldObj.inMap(map);
+      if (mapObject == null) {
+        throw UnsupportedError('got field obj in map, '
+            'but <$this> is not in <$map>');
+      }
+    } else if (fieldObj is MapObject) {
+      mapObject = fieldObj;
+    }
+
+    return mapObject;
+  }
+}
+
+extension AddressOfMapObjectId on MapObjectById {
+  Longword address(EventState ctx) {
+    var map = ctx.currentMap;
+    if (map == null) {
+      throw UnsupportedError('got field obj in map, but map was null');
+    }
+    var obj = inMap(map);
+    if (obj == null) {
+      throw UnsupportedError('got field obj in map, '
+          'but <$this> is not in <$map>');
+    }
+    return map.addressOf(obj);
+  }
+}
+
+extension AddressOfMapObject on MapObject {
+  Longword address(EventState ctx) {
+    var map = ctx.currentMap;
+    if (map == null) {
+      throw UnsupportedError('got field obj in map, but map was null');
+    }
+    return map.addressOf(this);
   }
 }
 

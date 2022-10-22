@@ -398,6 +398,32 @@ abstract class FieldObject extends Moveable {
   int? slot(EventState c);
 }
 
+class MapObjectById extends FieldObject {
+  final MapObjectId id;
+
+  MapObjectById(this.id);
+
+  MapObject? inMap(GameMap map) => map.object(id);
+
+  @override
+  int? slot(EventState c) => null;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MapObjectById &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() {
+    return 'MapObjectById{s$id}';
+  }
+}
+
 // TODO: maybe don't do this
 abstract class ContextualMovement {
   Movement movementIn(EventState ctx);
