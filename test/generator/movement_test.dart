@@ -275,7 +275,7 @@ void main() {
             ]));
       });
     });
-  }, skip: true);
+  }, skip: false);
 
   group('generates asm for FacePlayer', () {
     late AsmGenerator generator;

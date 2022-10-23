@@ -339,6 +339,7 @@ class PartyMove extends Event {
 class IndividualMoves extends Event {
   // TODO: what if Slot and Character moveables refer to same Character?
   Map<FieldObject, Movement> moves = {};
+  StepSpeed speed = StepSpeed.fast;
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
@@ -865,4 +866,15 @@ class Move<T extends Moveable> {
 
   @override
   int get hashCode => moveable.hashCode ^ movement.hashCode;
+}
+
+enum StepSpeed {
+  verySlowWalk, // 080 3
+  slowWalk, // 100 0
+  walk, // 180 4
+  /// Default movement speed.
+  fast, // 200 1
+  double; // 400 2
+
+  static StepSpeed normal() => fast;
 }

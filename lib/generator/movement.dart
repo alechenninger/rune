@@ -40,6 +40,11 @@ extension IndividualMovesToAsm on IndividualMoves {
       asm.add(followLeader(ctx.followLead = false));
     }
 
+    if (speed != StepSpeed.fast) {
+      asm.add(
+          asmlib.move.b(speed.offset.i, Constant('FieldObj_Step_Offset').w));
+    }
+
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
     var remainingMoves = Map.of(moves);
@@ -49,6 +54,7 @@ extension IndividualMovesToAsm on IndividualMoves {
       var movesList =
           remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
       var done = <FieldObject, Movement>{};
+      var madeScriptable = <MapObjectId>{};
 
       // Sort by slot so we always start with lead character, which may allow the
       // following movements to simply follow the leader (using the follow lead
@@ -153,9 +159,10 @@ extension IndividualMovesToAsm on IndividualMoves {
             toA4(moveable);
 
             var mapObj = moveable.asMapObject(ctx);
-            if (mapObj != null) {
+            if (mapObj != null && !madeScriptable.contains(mapObj.id)) {
               // Make map object scriptable
               asm.add(asmlib.move.w(0x8194.i, asmlib.a4.indirect));
+              madeScriptable.add(mapObj.id);
             }
 
             if (i == lastMoveIndex) {
@@ -181,29 +188,32 @@ extension IndividualMovesToAsm on IndividualMoves {
         // look at x/y_step_constant and FieldObj_Move routine
         asm.add(vIntPrepareLoop((8 * maxSteps.toInt).toWord));
       }
+    }
 
-      // todo: maybe move this after the loop?
-      for (var move in done.entries) {
-        var moveable = move.key;
-        var movement = move.value;
-        // fixme: not setting facing can make characters appear
-        //  mid move when dialog comes up
-        // maybe we can detect when about to switch to dialog?
-        // or a way to override the optimization?
-        // maybe there is a way to express a force face because this would also
-        // solve for when we want to have just facing movements
-        // if (ctx.facing[moveable] != movement.direction) {
-        toA4(moveable);
-        asm.add(updateObjFacing(movement.direction.address));
-        // }
+    for (var move in moves.entries) {
+      var moveable = move.key;
+      var movement = move.value;
+      // fixme: not setting facing can make characters appear
+      //  mid move when dialog comes up
+      // maybe we can detect when about to switch to dialog?
+      // or a way to override the optimization?
+      // maybe there is a way to express a force face because this would also
+      // solve for when we want to have just facing movements
+      // if (ctx.facing[moveable] != movement.direction) {
+      asm.add(moveable.toA4(ctx));
+      asm.add(updateObjFacing(movement.direction.address));
+      // }
 
-        var mapObj = moveable.asMapObject(ctx);
-        if (mapObj != null) {
-          var routine = mapObj.routine;
-          asm.add(asmlib.move.w(routine.index.i, asmlib.a4.indirect));
-          asm.add(jsr(routine.label.l));
-        }
+      var mapObj = moveable.asMapObject(ctx);
+      if (mapObj != null) {
+        var routine = mapObj.routine;
+        asm.add(asmlib.move.w(routine.index.i, asmlib.a4.indirect));
+        asm.add(jsr(routine.label.l));
       }
+    }
+
+    if (speed != StepSpeed.fast) {
+      asm.add(asmlib.move.b(1.i, Constant('FieldObj_Step_Offset').w));
     }
 
     return asm;
@@ -391,5 +401,22 @@ extension DirectionToAddress on Direction {
 
   Address get address {
     return constant.i;
+  }
+}
+
+extension StepSpeedAsm on StepSpeed {
+  Byte get offset {
+    switch (this) {
+      case StepSpeed.verySlowWalk:
+        return Byte(3);
+      case StepSpeed.slowWalk:
+        return Byte.zero;
+      case StepSpeed.walk:
+        return Byte(4);
+      case StepSpeed.fast:
+        return Byte.one;
+      case StepSpeed.double:
+        return Byte.two;
+    }
   }
 }
