@@ -245,7 +245,7 @@ class FacePlayer extends Event {
           object == other.object;
 
   @override
-  int get hashCode => object.hashCode;
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// The party follows the leader
@@ -357,7 +357,7 @@ class IndividualMoves extends Event {
 
   @override
   String toString() {
-    return '$moves';
+    return 'IndividualMoves{moves: $moves, speed: $speed}';
   }
 
   @override
@@ -365,10 +365,11 @@ class IndividualMoves extends Event {
       identical(this, other) ||
       other is IndividualMoves &&
           runtimeType == other.runtimeType &&
-          MapEquality().equals(moves, other.moves);
+          const MapEquality().equals(moves, other.moves) &&
+          speed == other.speed;
 
   @override
-  int get hashCode => MapEquality().hash(moves);
+  int get hashCode => const MapEquality().hash(moves) ^ speed.hashCode;
 }
 
 class Party extends Moveable {
@@ -379,6 +380,22 @@ class Party extends Moveable {
 
 abstract class Moveable {
   const Moveable();
+
+  /// Throws [ResolveException] if cannot resolve.
+  Moveable resolve(EventState state) => this;
+}
+
+class ResolveException implements Exception {
+  final dynamic message;
+
+  ResolveException([this.message]);
+
+  @override
+  String toString() {
+    Object? message = this.message;
+    if (message == null) return "ResolveException";
+    return "ResolveException: $message";
+  }
 }
 
 // character by name? character by slot? party?
@@ -397,6 +414,9 @@ abstract class FieldObject extends Moveable {
   }
 
   int? slot(EventState c);
+
+  @override
+  FieldObject resolve(EventState state) => this;
 }
 
 class MapObjectById extends FieldObject {
@@ -405,6 +425,20 @@ class MapObjectById extends FieldObject {
   MapObjectById(this.id);
 
   MapObject? inMap(GameMap map) => map.object(id);
+
+  @override
+  MapObject resolve(EventState state) {
+    var map = state.currentMap;
+    if (map == null) {
+      throw ResolveException('got field obj in map, but map was null');
+    }
+    var obj = inMap(map);
+    if (obj == null) {
+      throw ResolveException('got field obj in map, '
+          'but <$this> is not in <$map>');
+    }
+    return obj;
+  }
 
   @override
   int? slot(EventState c) => null;
@@ -421,11 +455,15 @@ class MapObjectById extends FieldObject {
 
   @override
   String toString() {
-    return 'MapObjectById{s$id}';
+    return 'MapObjectById{$id}';
   }
 }
 
 // TODO: maybe don't do this
+// TODO: maybe instead generalize this as an event wrapper.
+// ContextDependentEvent which when processed produces an event based on the
+// context and then can generate asm for that instead
+// we could replace .resolve() in Moveable with this for example.
 abstract class ContextualMovement {
   Movement movementIn(EventState ctx);
 }

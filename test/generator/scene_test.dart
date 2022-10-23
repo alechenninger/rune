@@ -6,6 +6,7 @@ import 'package:rune/generator/cutscenes.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/generator/movement.dart';
 import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
@@ -402,6 +403,91 @@ ${dialog2.toAsm()}
             rts
           ]));
     });
+
+    test('movement then dialog update facing before dialog', () {
+      var scene = Scene([
+        SetContext((ctx) {
+          ctx.followLead = false;
+          ctx.slots[1] = alys;
+          ctx.positions[alys] = Position(0x50, 0x50);
+        }),
+        IndividualMoves()
+          ..moves[alys] = (StepPath()
+            ..distance = 2.steps
+            ..direction = Direction.right),
+        Dialog(spans: DialogSpan.parse('Hello')),
+      ]);
+
+      var program = Program();
+      var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            lea(Constant('Character_1').w, a4),
+            move.w(Word(0x70).i, d0),
+            move.w(Word(0x50).i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+            lea(Constant('Character_1').w, a4), // todo: can optimize this out
+            updateObjFacing(Direction.right.address),
+            getAndRunDialog3(Byte.zero.i),
+          ]));
+    }, skip: 'TODO: impl functionality');
+
+    test('facing then dialog update facing before dialog', () {
+      var scene = Scene([
+        SetContext((ctx) {
+          ctx.followLead = false;
+          ctx.slots[1] = alys;
+          ctx.positions[alys] = Position(0x50, 0x50);
+        }),
+        IndividualMoves()
+          ..moves[alys] = (StepPath()..direction = Direction.right),
+        Dialog(spans: DialogSpan.parse('Hello')),
+      ]);
+
+      var program = Program();
+      var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            lea(Constant('Character_1').w, a4), // todo: can optimize this out
+            updateObjFacing(Direction.right.address),
+            getAndRunDialog3(Byte.zero.i),
+          ]));
+    });
+
+    test('move then facing then dialog update facing before dialog', () {
+      var scene = Scene([
+        SetContext((ctx) {
+          ctx.followLead = false;
+          ctx.slots[1] = alys;
+          ctx.positions[alys] = Position(0x50, 0x50);
+        }),
+        IndividualMoves()
+          ..moves[alys] = (StepPaths()
+            ..step(StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps)
+            ..face(Direction.down)),
+        Dialog(spans: DialogSpan.parse('Hello')),
+      ]);
+
+      var program = Program();
+      var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            lea(Constant('Character_1').w, a4),
+            move.w(Word(0x70).i, d0),
+            move.w(Word(0x50).i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+            updateObjFacing(Direction.down.address),
+            getAndRunDialog3(Byte.zero.i),
+          ]));
+    });
   });
 
   group('conditional events', () {
@@ -659,7 +745,7 @@ ${dialog2.toAsm()}
         generator = SceneAsmGenerator.forInteraction(
             map, obj, SceneId('interact'), dialog, asm, eventRoutines);
         // todo:
-      }, skip: true);
+      }, skip: 'TODO:write test');
 
       test('in dialog, flag is checked in dialog', () {
         SceneAsmGenerator.forInteraction(

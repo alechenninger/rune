@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 import 'dart:math' as math;
 
 import 'package:rune/asm/events.dart';
@@ -9,10 +11,12 @@ import '../model/model.dart';
 import 'event.dart';
 
 const unitsPerStep = 16;
-const up = Constant('FacingDir_up');
-const down = Constant('FacingDir_Down');
-const left = Constant('FacingDir_Left');
-const right = Constant('FacingDir_Right');
+
+const FacingDir_Up = Constant('FacingDir_Up');
+const FacingDir_Down = Constant('FacingDir_Down');
+const FacingDir_Left = Constant('FacingDir_Left');
+const FacingDir_Right = Constant('FacingDir_Right');
+const FieldObj_Step_Offset = Constant('FieldObj_Step_Offset');
 
 /*
 Follow lead flag notes:
@@ -41,20 +45,29 @@ extension IndividualMovesToAsm on IndividualMoves {
     }
 
     if (speed != StepSpeed.fast) {
-      asm.add(
-          asmlib.move.b(speed.offset.i, Constant('FieldObj_Step_Offset').w));
+      asm.add(asmlib.move.b(speed.offset.i, FieldObj_Step_Offset.w));
     }
 
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
-    var remainingMoves = Map.of(moves);
+    var remainingMoves = Map.of(moves.map(
+        (moveable, movement) => MapEntry(moveable.resolve(ctx), movement)));
+
+    var madeScriptable = <MapObject>{};
+    FieldObject? a4;
+
+    void toA4(FieldObject moveable) {
+      if (a4 != moveable) {
+        asm.add(moveable.toA4(ctx));
+        a4 = moveable;
+      }
+    }
 
     while (remainingMoves.isNotEmpty) {
       // I tried using a sorted set but iterator was bugged and skipped elements
       var movesList =
           remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
       var done = <FieldObject, Movement>{};
-      var madeScriptable = <MapObjectId>{};
 
       // Sort by slot so we always start with lead character, which may allow the
       // following movements to simply follow the leader (using the follow lead
@@ -95,15 +108,6 @@ extension IndividualMovesToAsm on IndividualMoves {
             ? Axis.y
             : (ctx.startingAxis ?? Axis.x);
         maxSteps = maxStepsYFirst;
-      }
-
-      FieldObject? a4;
-
-      void toA4(FieldObject moveable) {
-        if (a4 != moveable) {
-          asm.add(moveable.toA4(ctx));
-          a4 = moveable;
-        }
       }
 
       if (ctx.startingAxis != firstAxis) {
@@ -158,11 +162,10 @@ extension IndividualMovesToAsm on IndividualMoves {
 
             toA4(moveable);
 
-            var mapObj = moveable.asMapObject(ctx);
-            if (mapObj != null && !madeScriptable.contains(mapObj.id)) {
+            if (moveable is MapObject && !madeScriptable.contains(moveable)) {
               // Make map object scriptable
-              asm.add(asmlib.move.w(0x8194.i, asmlib.a4.indirect));
-              madeScriptable.add(mapObj.id);
+              asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
+              madeScriptable.add(moveable);
             }
 
             if (i == lastMoveIndex) {
@@ -176,6 +179,12 @@ extension IndividualMovesToAsm on IndividualMoves {
         movement = movement.less(stepsToTake);
 
         if (movement.distance == 0.steps) {
+          if (movement.direction != ctx.getFacing(moveable)) {
+            toA4(moveable);
+            asm.add(updateObjFacing(movement.direction.address));
+            ctx.setFacing(moveable, movement.direction);
+          }
+
           remainingMoves.remove(moveable);
           done[moveable] = movement;
         } else {
@@ -190,30 +199,16 @@ extension IndividualMovesToAsm on IndividualMoves {
       }
     }
 
-    for (var move in moves.entries) {
-      var moveable = move.key;
-      var movement = move.value;
-      // fixme: not setting facing can make characters appear
-      //  mid move when dialog comes up
-      // maybe we can detect when about to switch to dialog?
-      // or a way to override the optimization?
-      // maybe there is a way to express a force face because this would also
-      // solve for when we want to have just facing movements
-      // if (ctx.facing[moveable] != movement.direction) {
-      asm.add(moveable.toA4(ctx));
-      asm.add(updateObjFacing(movement.direction.address));
-      // }
-
-      var mapObj = moveable.asMapObject(ctx);
-      if (mapObj != null) {
-        var routine = mapObj.routine;
-        asm.add(asmlib.move.w(routine.index.i, asmlib.a4.indirect));
-        asm.add(jsr(routine.label.l));
-      }
+    // Return objects back to normal behavior
+    for (var obj in madeScriptable) {
+      toA4(obj);
+      var routine = obj.routine;
+      asm.add(asmlib.move.w(routine.index.i, asmlib.a4.indirect));
+      asm.add(jsr(routine.label.l));
     }
 
     if (speed != StepSpeed.fast) {
-      asm.add(asmlib.move.b(1.i, Constant('FieldObj_Step_Offset').w));
+      asm.add(asmlib.move.b(1.i, FieldObj_Step_Offset.w));
     }
 
     return asm;
@@ -295,27 +290,6 @@ extension FieldObjectAsm on FieldObject {
 
     throw UnsupportedError('must be mapobject or slot');
   }
-
-  MapObject? asMapObject(EventState ctx) {
-    var fieldObj = this;
-    MapObject? mapObject;
-
-    if (fieldObj is MapObjectById) {
-      var map = ctx.currentMap;
-      if (map == null) {
-        throw UnsupportedError('got field obj in map, but map was null');
-      }
-      mapObject = fieldObj.inMap(map);
-      if (mapObject == null) {
-        throw UnsupportedError('got field obj in map, '
-            'but <$this> is not in <$map>');
-      }
-    } else if (fieldObj is MapObject) {
-      mapObject = fieldObj;
-    }
-
-    return mapObject;
-  }
 }
 
 extension AddressOfMapObjectId on MapObjectById {
@@ -388,13 +362,13 @@ extension DirectionToAddress on Direction {
   Constant get constant {
     switch (this) {
       case Direction.up:
-        return up;
+        return FacingDir_Up;
       case Direction.left:
-        return left;
+        return FacingDir_Left;
       case Direction.right:
-        return right;
+        return FacingDir_Right;
       case Direction.down:
-        return down;
+        return FacingDir_Down;
     }
     throw StateError('illegal direction $this');
   }

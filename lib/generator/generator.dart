@@ -362,6 +362,20 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     if (!inDialogLoop) {
+      // todo: differentiate "walking" from "still" states
+      /*
+      idea here is that if done moving for a frame, or have called update
+      facing, then the character is known to be still.
+      otherwise, the character might be mid-movement frame, which is awkward
+      when going to dialog. if walking, and going to dialog, we could call
+      update facing to ensure still.
+       */
+      // var lastEvent = _lastEventInCurrentDialog;
+      // if (lastEvent is IndividualMoves) {
+      //   for (var obj in lastEvent.moves.keys) {
+      //   }
+      // }
+
       _eventAsm.add(Asm([comment('${_eventCounter++}: $Dialog')]));
 
       // todo if null, have to check somehow?

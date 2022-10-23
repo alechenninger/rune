@@ -70,6 +70,35 @@ void main() {
             ]));
       });
 
+      test('with different movement speed', () {
+        var program = Program();
+        var sceneAsm = program.addScene(
+            SceneId('testscene'),
+            Scene([
+              SetContext((ctx) {
+                ctx.followLead = false;
+                ctx.slots[1] = alys;
+                ctx.positions[alys] = Position(0x50, 0x50);
+              }),
+              IndividualMoves()
+                ..speed = StepSpeed.slowWalk
+                ..moves[alys] = (StepPath()
+                  ..distance = 2.steps
+                  ..direction = Direction.right)
+            ]));
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              move.b(4.toByte.i, FieldObj_Step_Offset.w),
+              lea(Constant('Character_1').w, a4),
+              move.w(Word(0x70).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              move.b(1.i, FieldObj_Step_Offset.w),
+            ]));
+      });
+
       test('move right different distances, previously following lead', () {
         var ctx = EventState();
         ctx.slots[1] = alys;
@@ -175,14 +204,12 @@ void main() {
               move.w('1f0'.hex.toWord.i, d0),
               move.w('250'.hex.toWord.i, d1),
               jsr(Label('Event_MoveCharacter').l),
-              lea('Character_1'.toConstant.w, a4),
               move.w('1e0'.hex.toWord.i, a4.plus('dest_x_pos'.toConstant)),
               move.w('250'.hex.toWord.i, a4.plus('dest_y_pos'.toConstant)),
               lea(Constant('Character_2').w, a4),
               move.w('240'.hex.toWord.i, d0),
               move.w('240'.hex.toWord.i, d1),
               jsr('Event_MoveCharacter'.toLabel.l),
-              lea('Character_2'.toConstant.w, a4),
               move.w('260'.hex.toWord.i, d0),
               move.w('240'.hex.toWord.i, d1),
               jsr('Event_MoveCharacter'.toLabel.l)
@@ -263,19 +290,93 @@ void main() {
         var asm = moves.toAsm(ctx);
 
         print(asm);
+      });
+    });
+
+    group('npcs', () {
+      var map = GameMap(MapId.Test);
+      var npc = MapObject(
+          id: 'testnpc',
+          startPosition: Position(0x50, 0x50),
+          spec: Npc(Sprite.PalmanOldMan1, WanderAround(Direction.down)));
+      map.addObject(npc);
+
+      var program = Program();
+
+      setUp(() {
+        program = Program();
+      });
+
+      test('moves ncps', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            // todo: follow flag shouldn't matter for moving npc
+            ctx.followLead = false;
+            ctx.positions[npc] = Position(0x50, 0x50);
+            ctx.currentMap = map;
+          }),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] = (StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps)
+        ]);
+
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
 
         expect(
-            asm,
+            sceneAsm.event.withoutComments().trim(),
             Asm([
-              bset(Byte.zero.i, Char_Move_Flags.w),
-              lea(Constant('Character_1').w, a4),
-              move.w('280'.hex.toWord.i, d0),
-              move.w('200'.hex.toWord.i, d1),
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x70).i, d0),
+              move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
+              move.w(npc.routine.index.i, a4.indirect),
+              jsr(npc.routine.label.l),
+            ]));
+      });
+
+      test('multiple moves of the same npc only replaces field routine once',
+          () {
+        var scene = Scene([
+          SetContext((ctx) {
+            // todo: follow flag shouldn't matter for moving npc
+            ctx.followLead = false;
+            ctx.positions[npc] = Position(0x50, 0x50);
+            ctx.positions[alys] = Position(0x50, 0x40);
+            ctx.currentMap = map;
+          }),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] = (StepPaths()
+              ..step(StepPath()
+                ..direction = Direction.right
+                ..distance = 2.steps)
+              ..step(StepPath()
+                ..delay = 1.step
+                ..direction = Direction.right
+                ..distance = 2.steps))
+        ]);
+
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x70).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              vIntPrepareLoop(Word(8 /*8 frames per step?*/)),
+              move.w(Word(0x90).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              move.w(npc.routine.index.i, a4.indirect),
+              jsr(npc.routine.label.l),
             ]));
       });
     });
-  }, skip: false);
+  });
 
   group('generates asm for FacePlayer', () {
     late AsmGenerator generator;

@@ -57,6 +57,7 @@ class EventState {
   late final Positions _positions;
   Positions get positions => _positions;
 
+  /// 1-indexed (zero is invalid).
   final Slots slots = Slots._();
 
   Axis? startingAxis = Axis.x;
@@ -133,29 +134,20 @@ class Positions {
     _positions.forEach(func);
   }
 
-  Position? operator [](FieldObject m) {
-    if (m is Slot) {
-      var inSlot = _ctx.slots[m.index];
-      if (inSlot == null) return null;
-      m = inSlot;
+  Position? operator [](FieldObject obj) {
+    try {
+      return _positions[obj.resolve(_ctx)];
+    } on ResolveException {
+      return null;
     }
-
-    return _positions[m];
   }
 
-  void operator []=(FieldObject m, Position? p) {
-    if (m is Slot) {
-      var inSlot = _ctx.slots[m.index];
-      if (inSlot == null) {
-        throw ArgumentError('no character in slot ${m.index}');
-      }
-      m = inSlot;
-    }
-
+  void operator []=(FieldObject obj, Position? p) {
+    obj = obj.resolve(_ctx);
     if (p == null) {
-      _positions.remove(m);
+      _positions.remove(obj);
     } else {
-      _positions[m] = p;
+      _positions[obj] = p;
     }
   }
 }
@@ -361,6 +353,15 @@ class Slot extends FieldObject {
   final int index;
 
   Slot(this.index);
+
+  @override
+  Character resolve(EventState state) {
+    var inSlot = state.slots[index];
+    if (inSlot == null) {
+      throw ResolveException('no character in slot $index');
+    }
+    return inSlot;
+  }
 
   @override
   String toString() {
