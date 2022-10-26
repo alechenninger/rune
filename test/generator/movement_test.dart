@@ -8,7 +8,6 @@ import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 void main() {
-  // skipped because of update facing at end of each movement
   group('generates asm for individual movements', () {
     group('step in one direction', () {
       test('move right, after previously not following leader', () {
@@ -81,7 +80,7 @@ void main() {
                 ctx.positions[alys] = Position(0x50, 0x50);
               }),
               IndividualMoves()
-                ..speed = StepSpeed.slowWalk
+                ..speed = StepSpeed.walk
                 ..moves[alys] = (StepPath()
                   ..distance = 2.steps
                   ..direction = Direction.right)
@@ -290,6 +289,55 @@ void main() {
         var asm = moves.toAsm(ctx);
 
         print(asm);
+      });
+
+      test('multiple moves with facing', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[alys] = Position(0x1f0, 0x0a0);
+            ctx.positions[shay] = Position(0x1f0, 0x090);
+          }),
+          IndividualMoves()
+            ..moves[alys] = (StepPaths()
+              ..step(StepPath()
+                ..distance = 2.steps
+                ..direction = Direction.down)
+              ..step(StepPath()
+                ..distance = 4.steps
+                ..direction = Direction.left)
+              ..face(Direction.right))
+            ..moves[shay] = (StepPaths()
+              ..step(StepPath()
+                ..distance = 3.steps
+                ..direction = Direction.down)
+              ..step(StepPath()
+                ..distance = 3.steps
+                ..direction = Direction.left))
+        ]);
+
+        var program = Program();
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+        print(sceneAsm);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              bset(0.toByte.i, Char_Move_Flags.w),
+              bset(1.toByte.i, Char_Move_Flags.w),
+              moveq(alys.charId, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(0x1b0.toWord.i, dest_x_pos(a4)),
+              move.w(0x0c0.toWord.i, dest_y_pos(a4)),
+              moveq(shay.charId, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(0x1c0.toWord.i, d0),
+              move.w(0x0c0.toWord.i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              moveq(alys.charId, d0),
+              jsr(Label('Event_GetCharacter').l),
+              moveq(FacingDir_Right.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+            ]));
       });
     });
 

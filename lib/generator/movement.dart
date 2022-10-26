@@ -1,5 +1,6 @@
 // ignore_for_file: constant_identifier_names
 
+import 'dart:collection';
 import 'dart:math' as math;
 
 import 'package:rune/asm/events.dart';
@@ -63,6 +64,12 @@ extension IndividualMovesToAsm on IndividualMoves {
       }
     }
 
+    void updateFacing(FieldObject obj, Direction dir) {
+      toA4(obj);
+      asm.add(updateObjFacing(dir.address));
+      ctx.setFacing(obj, dir);
+    }
+
     while (remainingMoves.isNotEmpty) {
       // I tried using a sorted set but iterator was bugged and skipped elements
       var movesList =
@@ -124,6 +131,7 @@ extension IndividualMovesToAsm on IndividualMoves {
       // If no movement code is generated because all moves are delayed, we'll
       // have to add an artificial delay later.
       var allDelay = true;
+      var updatesOnMove = Queue<Function>();
       // The ASM for the last character movement should use data registers, the
       // others use memory
       var lastMoveIndex = movesList
@@ -170,6 +178,10 @@ extension IndividualMovesToAsm on IndividualMoves {
 
             if (i == lastMoveIndex) {
               asm.add(moveCharacter(x: x, y: y));
+              while (updatesOnMove.isNotEmpty) {
+                var update = updatesOnMove.removeFirst();
+                update();
+              }
             } else {
               asm.add(setDestination(x: x, y: y));
             }
@@ -180,9 +192,14 @@ extension IndividualMovesToAsm on IndividualMoves {
 
         if (movement.distance == 0.steps) {
           if (movement.direction != ctx.getFacing(moveable)) {
-            toA4(moveable);
-            asm.add(updateObjFacing(movement.direction.address));
-            ctx.setFacing(moveable, movement.direction);
+            if (i == lastMoveIndex) {
+              updateFacing(moveable, movement.direction);
+            } else {
+              // Movement has not actually triggered yet;
+              // queue for after it is.
+              updatesOnMove
+                  .add(() => updateFacing(moveable, movement.direction));
+            }
           }
 
           remainingMoves.remove(moveable);
