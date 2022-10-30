@@ -395,4 +395,8 @@ void main() {
       });
     });
   });
+
+  group('experiments with parsing asm', () {
+    test('parses a map', () {});
+  });
 }

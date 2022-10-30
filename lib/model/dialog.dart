@@ -64,7 +64,11 @@ class Dialog extends Event {
 
   @override
   String toString() {
-    return 'Dialog{speaker: $speaker, _spans: $_spans}';
+    return 'Dialog{'
+        'speaker: $speaker, '
+        'hidePanelsOnClose: $hidePanelsOnClose, '
+        '_spans: $_spans'
+        '}';
   }
 
   @override
@@ -83,6 +87,7 @@ class Dialog extends Event {
       other is Dialog &&
           runtimeType == other.runtimeType &&
           speaker == other.speaker &&
+          hidePanelsOnClose == other.hidePanelsOnClose &&
           const ListEquality().equals(_spans, other._spans);
 
   @override
@@ -143,7 +148,7 @@ class Span {
 
   // TODO: markup parsing belongs in parse layer
   static List<Span> parse(String markup) {
-    var _spans = <Span>[];
+    var spans = <Span>[];
     var italic = false;
     var text = StringBuffer();
 
@@ -152,7 +157,7 @@ class Span {
       // _ not otherwise a supported character in dialog.
       if (c == '_') {
         if (text.isNotEmpty) {
-          _spans.add(Span(text.toString(), italic: italic));
+          spans.add(Span(text.toString(), italic: italic));
           text.clear();
         }
         italic = !italic;
@@ -163,10 +168,10 @@ class Span {
     }
 
     if (text.isNotEmpty) {
-      _spans.add(Span(text.toString(), italic: italic));
+      spans.add(Span(text.toString(), italic: italic));
     }
 
-    return _spans;
+    return spans;
   }
 
   @override

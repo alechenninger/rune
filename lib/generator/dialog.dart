@@ -2,7 +2,9 @@ import 'dart:math';
 
 import 'package:characters/characters.dart';
 import 'package:charcode/ascii.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/conditional.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -48,7 +50,7 @@ class DialogAsm extends Asm {
               }
             }
           } else {
-            // ignored
+            // ignored (likely a constant)
           }
         }
 
@@ -93,6 +95,143 @@ extension DialogToAsm on Dialog {
     return asm;
   }
 }
+
+Future<Scene> toScene(int dialogId, DialogTree tree) async {
+  var dialogs = <Dialog>[];
+
+  var dialogIndex = 0;
+  Speaker? speaker;
+  EventFlag? flag;
+
+  for (var ins in tree.toAsm()) {
+    if (ins.cmd != 'dc.b') {
+      throw UnimplementedError();
+      // return dialogs;
+    }
+
+    var bytes = ins.operands as List<Expression>;
+
+    for (var i = 0; i < bytes.length; ++i) {
+      var b = bytes[i];
+
+      // parse() {
+      //   var result = parseState(b);
+      //
+      //   var newState = result.newState;
+      //   if (newState != null) {
+      //     if (parseState is _SpanParse) {
+      //       var span = parseState.span();
+      //     }
+      //   }
+      //
+      //   if (!result.parsed) {
+      //     parse();
+      //   }
+      // }
+      //
+      // parse();
+    }
+  }
+
+  throw UnimplementedError();
+  // return dialogs;
+}
+
+abstract class DialogParseState {
+  ContinueParse call(Expression byte);
+}
+
+// class Root implements DialogParseState {
+//   DialogParseState? state;
+//
+//   ContinueParse call(Expression byte) {}
+// }
+
+class ContinueParse {
+  /// Whether or not the byte was processed already or should be processed
+  /// by another state.
+  final bool parsed;
+
+  /// Next state to set which processes the next byte.
+  ///
+  /// The next byte is the last byte is [parsed] is [false].
+  final DialogParseState? newState;
+
+  ContinueParse()
+      : parsed = true,
+        newState = null;
+  ContinueParse.unparsed()
+      : parsed = false,
+        newState = null;
+  ContinueParse.newState(DialogParseState state, {this.parsed = true})
+      : newState = state;
+}
+
+class _SpanParse implements DialogParseState {
+  final _buffer = StringBuffer();
+
+  Span span() {
+    return Span(_buffer.toString());
+  }
+
+  @override
+  ContinueParse call(Expression byte) {
+    if (byte is! Byte) {
+      // ignored? constant? TODO
+      return ContinueParse.unparsed();
+    }
+
+    if (byte.value >= 0xF2) {
+      // just continue from this instruction
+      return ContinueParse.unparsed();
+    }
+
+    _buffer.write(String.fromCharCode(byte.value));
+
+    return ContinueParse();
+  }
+}
+
+class _EventCheck implements DialogParseState {
+  EventFlag? flag;
+  int? ifSetOffset;
+  List<Event> ifSet = [];
+  List<Event> ifUnset = [];
+
+  // DialogParseState state = Root();
+
+  @override
+  ContinueParse call(Expression byte) {
+    if (flag == null) {
+      flag = toEventFlag(byte);
+      return ContinueParse();
+    }
+
+    if (byte is! Byte) {
+      throw ArgumentError.value(byte.runtimeType, 'byte.runtimeType',
+          'expected byte expression to be of type Byte');
+    }
+
+    if (ifSetOffset == null) {
+      ifSetOffset = byte.value;
+      return ContinueParse();
+    }
+
+    // state(byte);
+    return ContinueParse();
+  }
+}
+
+EventFlag? toEventFlag(Expression byte) {
+  // TODO
+  return EventFlag('TODO');
+}
+
+/*
+parse states:
+event flag (may have child states)
+portrait
+ */
 
 final _transforms = {
   '‘': '[',

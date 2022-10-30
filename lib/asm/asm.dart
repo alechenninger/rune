@@ -298,7 +298,8 @@ class _Instruction extends Instruction {
 
   final String line;
 
-  static final _validLabelPattern = RegExp(r'^[A-Za-z\d_@.+-]+[A-Za-z\d_+-]*$');
+  static final _validLabelPattern =
+      RegExp(r'^[A-Za-z\d_@.+-/]+[A-Za-z\d_/+-]*$');
   static final _noColonLabel = RegExp(r'^(\++|/+|-+|.\S+)$');
 
   /// appends : depending on the kind of label
@@ -328,14 +329,15 @@ class _Instruction extends Instruction {
   }
 
   factory _Instruction.parse(String line) {
+    var chars = line.characters.iterator.toList();
+
     String? label;
     String? cmd;
     List ops = [];
     String? comment;
 
     var state = _Token.root;
-    var chars = line.characters.iterator.toList();
-    bool escape = false;
+    var escape = false;
     String? stringDelimiter;
     String? operand;
 
@@ -374,6 +376,11 @@ class _Instruction extends Instruction {
           } else {
             cmd ??= "";
             cmd += c!;
+
+            if (['if', 'endif', 'elseif', 'else'].contains(cmd)) {
+              // ignore this line for now
+              return _Instruction();
+            }
           }
           break;
         case _Token.operand:
@@ -397,10 +404,16 @@ class _Instruction extends Instruction {
               } else if (ops is Bytes && sized is Byte) {
                 ops += [sized];
               } else {
+                if (ops is Bytes) {
+                  ops = List.from(ops);
+                }
                 ops.add(sized);
               }
             } else {
               // todo could parse addresses and whatnot but jeeze
+              if (ops is Bytes) {
+                ops = List.from(ops);
+              }
               ops.add(operand);
             }
 
@@ -418,8 +431,11 @@ class _Instruction extends Instruction {
           if ((!escape && c == stringDelimiter) || c == null) {
             if (ops.isEmpty) {
               ops = Bytes.ascii(operand ?? "");
-            } else {
+            } else if (ops is Bytes) {
               ops += Bytes.ascii(operand ?? "");
+            } else {
+              ops = List.from(ops);
+              ops.addAll(Bytes.ascii(operand ?? ""));
             }
             operand = null;
             escape = false;
@@ -476,4 +492,4 @@ class _Instruction extends Instruction {
 
 enum _Token { root, label, cmd, operand, stringConstant, comment }
 
-final _number = RegExp(r'^\$?\d+$');
+final _number = RegExp(r'^(\$[0-9a-fA-F]+|\d+)$');

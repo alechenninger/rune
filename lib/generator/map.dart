@@ -292,6 +292,31 @@ extension ObjectAddress on GameMap {
   }
 }
 
+GameMap asmToMap(Label mapLabel, Asm asm) {
+  var sprites = <Word, Label>{};
+  // asm = readSprites(asm, sprites);
+  // asm = skipToObjects(asm);
+  // var asmObjects = <AsmObject>[];
+  // asm = readObjects(asm, asmObjects);
+  // asm = skipToDialogTree(asm);
+  var dialogTree = DialogTree();
+  // asm = readNextDialogTree(asm, dialogTree);
+  // var mapObjects = buildObjects(sprites, asmObjects, dialogTree);
+
+  // var map = GameMap(labelToId(mapLabel));
+  // mapObjects.forEach(map.addObject);
+
+  // return map;
+  throw UnimplementedError();
+}
+
+// class AsmObject {
+//   FieldRoutine routine;
+//   Direction facing;
+//   Byte dialogId;
+//   Position position;
+// }
+
 const _piataDialog = r'''
 ; $40
 	dc.b	$FA

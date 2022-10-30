@@ -446,6 +446,26 @@ abstract class Data<T extends List<int>, E extends SizedValue,
 class Bytes extends Data<Uint8List, Byte, Bytes> {
   Bytes(Uint8List bytes) : super(bytes, bytes.elementSizeInBytes);
 
+  factory Bytes.fromExpressions(List<Expression> expressions) {
+    var bytes = <int>[];
+    for (var exp in expressions) {
+      if (exp is Byte) {
+        bytes.add(exp.value);
+      } else if (exp is Word) {
+        bytes.add(exp.value >> 8);
+        bytes.add(exp.value & 0xff);
+      } else if (exp is Longword) {
+        bytes.add(exp.value >> 24);
+        bytes.add((exp.value & 0xffffff) >> 16);
+        bytes.add((exp.value & 0xffff) >> 8);
+        bytes.add(exp.value & 0xff);
+      } else {
+        throw ArgumentError.value(exp, 'expressions[n]', 'is not a SizedValue');
+      }
+    }
+    return Bytes.list(bytes);
+  }
+
   static Ascii ascii(String d) {
     var runes = d.runes.toList(growable: false);
     if (runes.any((element) => element > 127)) {
@@ -717,6 +737,44 @@ class Words extends Data<Uint16List, Word, Words> {
 
   factory Words.hex(String d) {
     return Words.fromWord(int.parse('0x$d'));
+  }
+
+  factory Words.fromExpressions(List<Expression> expressions) {
+    var words = <int>[];
+    // not 100% sure partial stuff is right
+    int? partial;
+    for (var exp in expressions) {
+      if (exp is Byte) {
+        if (partial == null) {
+          partial = exp.value << 8;
+        } else {
+          partial += exp.value;
+          words.add(partial);
+          partial = null;
+        }
+      } else if (exp is Word) {
+        if (partial == null) {
+          words.add(exp.value);
+        } else {
+          partial += exp.value >> 8;
+          words.add(partial);
+          partial = exp.value & 0xff;
+        }
+      } else if (exp is Longword) {
+        if (partial == null) {
+          words.add(exp.value >> 16);
+          words.add(exp.value & 0xffff);
+        } else {
+          partial += exp.value >> 24;
+          words.add(partial);
+          words.add((exp.value & 0xffffff) >> 8);
+          partial = exp.value & 0xff;
+        }
+      } else {
+        throw ArgumentError.value(exp, 'expressions[n]', 'is not a SizedValue');
+      }
+    }
+    return Words(Uint16List.fromList(words));
   }
 
   @override
