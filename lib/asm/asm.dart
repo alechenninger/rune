@@ -69,6 +69,8 @@ class DcMnemonic {
       cmd('dc.w', c, comment: comment);
   Asm l(List<Expression> c, {String? comment}) =>
       cmd('dc.l', c, comment: comment);
+
+  Asm size(Size size, List<Expression> constants) => cmd('dc.$size', constants);
 }
 
 class MoveMnemonic {
@@ -205,6 +207,10 @@ class Asm extends IterableBase<Instruction> {
     lines.add(_Instruction());
   }
 
+  Asm range(int start) {
+    return Asm.fromInstructions(lines.sublist(start));
+  }
+
   Asm head(int lines) {
     lines = min(lines, length);
     return Asm.fromInstructions(this.lines.sublist(0, lines));
@@ -273,6 +279,16 @@ abstract class Instruction {
 
   String? get label;
   String? get cmd;
+  String? get attribute {
+    var split = cmd?.split('.');
+    return split?[1];
+  }
+
+  String? get cmdWithoutAttribute {
+    var split = cmd?.split('.');
+    return split?[0];
+  }
+
   List get operands;
   String? get comment;
   bool get isEmpty => toString().isEmpty;

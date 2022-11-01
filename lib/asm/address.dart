@@ -100,7 +100,7 @@ class IndirectAddressRegister extends _Address {
   IndirectAddressRegister(this.register,
       {this.displacement = Byte.zero, this.variableDisplacement})
       : super('(${[
-          if (displacement.isKnownNotZero) displacement,
+          if (displacement.isNotKnownZero) displacement,
           'A$register',
           if (variableDisplacement != null) variableDisplacement,
         ].join(',')})') {

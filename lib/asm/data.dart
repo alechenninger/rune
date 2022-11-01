@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:quiver/check.dart';
 import 'package:rune/numbers.dart';
+import 'package:rune/src/iterables.dart';
 
 import '../characters.dart';
 import 'asm.dart';
@@ -15,7 +16,7 @@ const long = Size.l;
 abstract class Expression {
   // todo: maybe remove?
   bool get isKnownZero;
-  bool get isKnownNotZero => !isKnownZero;
+  bool get isNotKnownZero => !isKnownZero;
 
   Expression();
 
@@ -60,7 +61,7 @@ class ArithmaticExpression extends Expression {
   ArithmaticExpression(this.operator, this.operand1, this.operand2);
 
   @override
-  bool get isKnownZero => false;
+  bool get isKnownZero => operand1.isKnownZero && operand2.isKnownZero;
 
   @override
   String toString() {
@@ -169,9 +170,27 @@ class Label extends Expression implements Address {
   int get hashCode => name.hashCode;
 }
 
+abstract class Sized extends Expression {
+  Size get size;
+}
+
+class _Sized extends Sized {
+  @override
+  final Size size;
+  final Expression expression;
+
+  _Sized(this.size, this.expression);
+
+  @override
+  bool get isKnownZero => expression.isKnownZero;
+
+  @override
+  String toString() => expression.toString();
+}
+
 // TODO: unsigned. what about signed?
 // see: http://mrjester.hapisan.com/04_MC68/Sect04Part02/Index.html
-abstract class SizedValue extends Value {
+abstract class SizedValue extends Value implements Sized {
   SizedValue(int value) : super(value) {
     if (value > size.maxValue) {
       throw AsmError(value, 'too large to fit in ${size.bytes} bytes');
@@ -181,12 +200,13 @@ abstract class SizedValue extends Value {
   const SizedValue._(int value) : super.constant(value);
 
   /// Size in bytes
+  @override
   Size get size;
 
   @override
   bool get isKnownZero => value == 0;
   @override
-  bool get isKnownNotZero => !isKnownZero;
+  bool get isNotKnownZero => !isKnownZero;
 
   /// Hex representation including $ prefix.
   String get hex =>
@@ -236,8 +256,20 @@ class Byte extends SizedValue {
 class Word extends SizedValue {
   Word(int value) : super(value);
 
+  factory Word.concatBytes(Byte b1, Byte b2) {
+    return Word((b1.value << 8) + b2.value);
+  }
+
   @override
   final size = Size.w;
+
+  Bytes split() {
+    return Bytes.list([value >> 8, value & 0xff]);
+  }
+
+  Longword append(Word other) {
+    return Longword(value << 16 + other.value);
+  }
 
   @override
   Expression operator +(Expression other) {
@@ -266,8 +298,25 @@ class Word extends SizedValue {
 
 class Longword extends SizedValue {
   Longword(int value) : super(value);
+
+  factory Longword.concatBytes(Byte b1, Byte b2, Byte b3, Byte b4) {
+    return Longword(
+        (b1.value << 24) + (b2.value << 16) + (b3.value << 8) + b4.value);
+  }
+
   @override
   final size = Size.l;
+
+  Bytes splitToBytes() {
+    /*
+
+        bytes.add(exp.value >> 24);
+        bytes.add((exp.value & 0xffffff) >> 16);
+        bytes.add((exp.value & 0xffff) >> 8);
+        bytes.add(exp.value & 0xff);
+     */
+    return Bytes.list([value >> 24])
+  }
 
   Word get lowerWord => Word(value & 0xffff);
 
@@ -295,6 +344,42 @@ class Size {
 
   const Size._(this.bytes, this.code, this.maxValue);
 
+  bool operator <(Size other) {
+    return bytes < other.bytes;
+  }
+
+  bool operator >(Size other) {
+    return bytes > other.bytes;
+  }
+
+  SizedValue get maxValueSized => sizedValue(maxValue);
+
+  SizedValue sizedValue(int value) {
+    switch (code) {
+      case 'b':
+        return Byte(value);
+      case 'w':
+        return Word(value);
+      case 'l':
+        throw Longword(value);
+      default:
+        throw StateError('missing swith case');
+    }
+  }
+
+  List<SizedValue> sizedList(List<Expression> expressions) {
+    switch (code) {
+      case 'b':
+        return Bytes.fromExpressions(expressions);
+      case 'w':
+        return Words.fromExpressions(expressions);
+      case 'l':
+        throw UnimplementedError();
+      default:
+        throw StateError('missing swith case');
+    }
+  }
+
   @override
   String toString() => code;
 
@@ -305,6 +390,18 @@ class Size {
 
   @override
   int get hashCode => bytes.hashCode;
+
+  static Size? valueOf(String string) {
+    switch (string.toLowerCase()) {
+      case 'b':
+        return b;
+      case 'w':
+        return w;
+      case 'l':
+        return l;
+    }
+    return null;
+  }
 }
 
 extension ToValue on int {
@@ -387,6 +484,11 @@ abstract class Data<T extends List<int>, E extends SizedValue,
 
   D trimTrailing(int byte) {
     return _new(bytes.trimTrailing(value: byte));
+  }
+
+  @override
+  D skip(int count) {
+    return _new(bytes.skip(1).toList());
   }
 
   @override
@@ -681,7 +783,13 @@ class BytesBuilder {
 
   Bytes bytes() {
     _finishSpan();
-    return BytesAndAscii(_spans);
+    return _spans.length > 1 ? BytesAndAscii(_spans) : _spans[0];
+  }
+
+  int get length {
+    return _spans
+        .map((e) => e.length)
+        .reduceOr((s1, s2) => s1 + s2, ifEmpty: 0);
   }
 
   int? get lastByte {
@@ -706,13 +814,17 @@ class BytesBuilder {
     _currentSpan.add(c.codePoint);
   }
 
-  void writeByte(int byte) {
+  void writeByteValue(int byte) {
     if (_ascii) {
       _finishSpan();
       _ascii = false;
     }
 
     _currentSpan.add(byte);
+  }
+
+  void writeByte(Byte byte) {
+    writeByteValue(byte.value);
   }
 
   void _finishSpan() {

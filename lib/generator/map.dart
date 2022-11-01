@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:collection/collection.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/generator/scene.dart';
@@ -293,8 +295,9 @@ extension ObjectAddress on GameMap {
 }
 
 GameMap asmToMap(Label mapLabel, Asm asm) {
+  asm = _skipSections(asm, 1, terminator: Size.w.maxValueSized);
   var sprites = <Word, Label>{};
-  // asm = readSprites(asm, sprites);
+  asm = _readSprites(asm, sprites);
   // asm = skipToObjects(asm);
   // var asmObjects = <AsmObject>[];
   // asm = readObjects(asm, asmObjects);
@@ -308,6 +311,150 @@ GameMap asmToMap(Label mapLabel, Asm asm) {
 
   // return map;
   throw UnimplementedError();
+}
+
+Asm _skipSections(Asm asm, int skip, {required SizedValue terminator}) {
+  for (var i = 0; i < asm.length; ++i) {
+    var inst = asm[i].single;
+    if (inst.cmdWithoutAttribute != 'dc') {
+      throw ArgumentError('asm contained non-constants. inst=$inst');
+    }
+
+    var size = Size.valueOf(inst.attribute!)!;
+    if (size < terminator.size) {
+      // for now assume terminators are not embedded across smaller constants
+      continue;
+    }
+    var values = terminator.size.sizedList(inst.operands as List<Expression>);
+    for (var v = 0; v < values.length; ++v) {
+      var value = values[v];
+      if (value == terminator) {
+        var remainingValues = values.sublist(v);
+        var remaining = asm.range(i + 1);
+        if (remainingValues.isEmpty) return remaining;
+        remaining.insert(0, dc.size(size, remainingValues));
+        return remaining;
+      }
+    }
+  }
+  return asm;
+}
+
+Asm _readSprites(Asm asm, Map<Word, Label> sprites) {
+  var iter = ConstantIterator(asm);
+  while (true) {
+    var vramTile = iter.readWord();
+    if (vramTile.value == 0xffff) {
+      return iter.remaining;
+    }
+  }
+}
+
+class ConstantIterator {
+  final Asm _asm;
+  Asm get remaining {
+    if (_byteNum == 0) {
+      return _asm.range(_lineNum);
+    }
+    var remaining = Asm([_asm]);
+    remaining.insert(0, dc.b(_lineBytes.sublist(_byteNum)));
+    return remaining;
+  }
+
+  var _lineNum = 0;
+  var _byteNum = 0;
+  late Instruction _line;
+  late Bytes _lineBytes;
+  late List<Expression> _remainingLineConstants;
+  var _done = false;
+  bool get isDone => _done;
+
+  ConstantIterator(this._asm) {
+    _loadLineBytes();
+  }
+
+  _loadLineBytes() {
+    _byteNum = 0;
+
+    if (_lineNum == _asm.length) {
+      _done = true;
+      _lineBytes = Bytes.empty();
+      return;
+    }
+
+    var next = _asm[_lineNum].single;
+    if (next.cmdWithoutAttribute != 'dc') {
+      _done = true;
+      _lineBytes = Bytes.empty();
+      return;
+    }
+
+    _lineBytes = Bytes.fromExpressions(next.operands as List<Expression>);
+  }
+
+  Sized _next() {
+    // // todo: null check?
+    // var attribute = _line.attribute!;
+    // if (attribute == size.code) {
+    //   // todo length check
+    //   if (_byteNum % size.bytes == 0) {
+    //     return _line.operands[_byteNum ~/ size.bytes] as Expression;
+    //   } else {
+    //     // split
+    //   }
+    // } else {
+    //   var attr = Size.valueOf(attribute);
+    //   if (attr == null) {
+    //     throw 'wot';
+    //   }
+    //   if (attr < size) {
+    //     // combine
+    //   } else {
+    //     // split
+    //   }
+    // }
+
+    // var next = BytesBuilder();
+    // while (next.length < count) {
+    //   for (;
+    //       _byteNum < min(count - next.length, _lineBytes.length);
+    //       _byteNum++) {
+    //     next.writeByte(_lineBytes[_byteNum]);
+    //   }
+    //
+    //   if (_byteNum == _lineBytes.length) {
+    //     _lineNum = _lineNum + 1;
+    //     _loadLineBytes();
+    //   }
+    // }
+    //
+    // return next.bytes();
+  }
+
+  Byte readByte() {
+    /*
+    if line is b
+    return next expression
+    if line is w or l, split (must be splittable)
+     */
+  }
+
+  Word readWord() {
+    /*
+    if line is b, combine (may require splitting next line)
+    if line is w, return next expression
+    if line is l, split
+     */
+    var bytes = _nextBytes(2);
+    var next = Word.concatBytes(bytes[0], bytes[1]);
+    return next;
+  }
+
+  Longword readLong() {
+    var bytes = _nextBytes(4);
+    var next = Longword.concatBytes(bytes[0], bytes[1], bytes[2], bytes[3]);
+    return next;
+  }
 }
 
 // class AsmObject {

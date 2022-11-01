@@ -299,13 +299,13 @@ extension SpanToAscii on Span {
 
       var other = _italicizedOther[c];
       if (other != null) {
-        builder.writeByte(other);
+        builder.writeByteValue(other);
         continue;
       }
 
       if (_uppercase.hasMatch(c)) {
         var code = c.codePoint - _uppercaseStart + _uppercaseTileStart;
-        builder.writeByte(code);
+        builder.writeByteValue(code);
         continue;
       }
 
@@ -318,7 +318,7 @@ extension SpanToAscii on Span {
           }
         }
         code = code - skips;
-        builder.writeByte(code);
+        builder.writeByteValue(code);
         continue;
       }
 
