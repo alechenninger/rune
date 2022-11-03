@@ -150,11 +150,14 @@ class Constant extends Expression {
   int get hashCode => constant.hashCode;
 }
 
-class Label extends Expression implements Address {
+class Label extends Sized implements Address {
   final String name;
 
   @override
   final bool isKnownZero = false;
+
+  @override
+  Size get size => Size.l;
 
   const Label(this.name) : super.constant();
 
@@ -171,13 +174,52 @@ class Label extends Expression implements Address {
 }
 
 abstract class Sized extends Expression {
+  Sized();
+  const Sized.constant() : super.constant();
+
   Size get size;
+
+  bool get canSplit => false;
+
+  bool get canAppend => false;
+
+  /// [size] must be ≤ [this.size].
+  List<Sized> splitInto(Size size) => canSplit
+      ? throw UnimplementedError('splitInto')
+      : throw StateError('cannot split');
+
+  Sized appendLower(Sized s) => canAppend
+      ? throw UnimplementedError('appendLower')
+      : throw StateError('cannot append');
+
+  // Sized append
+
+  static Sized expression(Size size, Expression expression) {
+    return _Sized(size, expression);
+  }
 }
 
 class _Sized extends Sized {
   @override
   final Size size;
   final Expression expression;
+
+  @override
+  bool get canSplit => expression is Sized && (expression as Sized).canSplit;
+
+  @override
+  bool get canAppend => expression is Sized && (expression as Sized).canAppend;
+
+  /// [size] must be ≤ [this.size].
+  @override
+  List<Sized> splitInto(Size size) => canSplit
+      ? (expression as Sized).splitInto(size)
+      : throw StateError('cannot split $this');
+
+  @override
+  Sized appendLower(Sized s) => canAppend
+      ? (expression as Sized).appendLower(s)
+      : throw StateError('cannot split $this');
 
   _Sized(this.size, this.expression);
 
@@ -208,6 +250,12 @@ abstract class SizedValue extends Value implements Sized {
   @override
   bool get isNotKnownZero => !isKnownZero;
 
+  @override
+  bool get canSplit => true;
+
+  @override
+  bool get canAppend => true;
+
   /// Hex representation including $ prefix.
   String get hex =>
       '\$${value.toRadixString(16).toUpperCase().padLeft(size.bytes * 2, '0')}';
@@ -237,6 +285,25 @@ class Byte extends SizedValue {
   final size = Size.b;
 
   @override
+  List<Sized> splitInto(Size size) {
+    switch (size) {
+      case Size.b:
+        return [this];
+      default:
+        throw ArgumentError.value(
+            size, 'size', 'must be less than ${this.size}');
+    }
+  }
+
+  @override
+  Sized appendLower(Sized s) {
+    if (s is Byte) {
+      return Word.concatBytes(this, s);
+    }
+    throw ArgumentError.value(s, 's', 'cannot append to $this');
+  }
+
+  @override
   Expression operator +(Expression other) {
     if (other is Value) {
       return Byte(value + other.value);
@@ -263,7 +330,28 @@ class Word extends SizedValue {
   @override
   final size = Size.w;
 
-  Bytes split() {
+  @override
+  List<Sized> splitInto(Size size) {
+    switch (size) {
+      case Size.b:
+        return splitToBytes();
+      case Size.w:
+        return [this];
+      default:
+        throw ArgumentError.value(
+            size, 'size', 'must be less than ${this.size}');
+    }
+  }
+
+  @override
+  Sized appendLower(Sized s) {
+    if (s is Word) {
+      return Longword.concatWords(this, s);
+    }
+    throw ArgumentError.value(s, 's', 'cannot append to $this');
+  }
+
+  Bytes splitToBytes() {
     return Bytes.list([value >> 8, value & 0xff]);
   }
 
@@ -304,20 +392,42 @@ class Longword extends SizedValue {
         (b1.value << 24) + (b2.value << 16) + (b3.value << 8) + b4.value);
   }
 
-  @override
-  final size = Size.l;
-
-  Bytes splitToBytes() {
-    /*
-
-        bytes.add(exp.value >> 24);
-        bytes.add((exp.value & 0xffffff) >> 16);
-        bytes.add((exp.value & 0xffff) >> 8);
-        bytes.add(exp.value & 0xff);
-     */
-    return Bytes.list([value >> 24])
+  factory Longword.concatWords(Word w1, Word w2) {
+    return Longword((w1.value << 16) + w2.value);
   }
 
+  @override
+  final size = Size.l;
+  @override
+  final canAppend = false;
+
+  @override
+  List<Sized> splitInto(Size size) {
+    switch (size) {
+      case Size.b:
+        return splitToBytes();
+      case Size.w:
+        return splitToWords();
+      case Size.l:
+        return [this];
+    }
+  }
+
+  @override
+  Sized appendLower(Sized s) {
+    throw ArgumentError.value(s, 's', 'cannot append to $this');
+  }
+
+  Bytes splitToBytes() => Bytes.list([
+        value >> 24,
+        (value & 0xffffff) >> 16,
+        (value & 0xffff) >> 8,
+        value & 0xff
+      ]);
+
+  Words splitToWords() => Words.fromExpressions([upperWord, lowerWord]);
+
+  Word get upperWord => Word(value >> 16);
   Word get lowerWord => Word(value & 0xffff);
 
   @override
@@ -329,10 +439,10 @@ class Longword extends SizedValue {
   }
 }
 
-class Size {
-  static const b = Size._(1, 'b', 0xFF);
-  static const w = Size._(2, 'w', 0xFFFF);
-  static const l = Size._(4, 'l', 0xFFFFFFFF);
+enum Size {
+  b(1, 'b', 0xFF),
+  w(2, 'w', 0xFFFF),
+  l(4, 'l', 0xFFFFFFFF);
 
   final int bytes;
   final int maxValue;
@@ -342,7 +452,7 @@ class Size {
   bool get isW => this == w;
   bool get isL => this == l;
 
-  const Size._(this.bytes, this.code, this.maxValue);
+  const Size(this.bytes, this.code, this.maxValue);
 
   bool operator <(Size other) {
     return bytes < other.bytes;
@@ -354,6 +464,22 @@ class Size {
 
   SizedValue get maxValueSized => sizedValue(maxValue);
 
+  Sized sizedExpression(Expression expression) {
+    if (expression is Sized) {
+      if (expression.size != this) {
+        throw ArgumentError.value(
+            expression, 'expression', 'incompatible size ${expression.size}');
+      }
+      return expression;
+    }
+
+    if (expression is Value) {
+      return sizedValue(expression.value);
+    }
+
+    return Sized.expression(this, expression);
+  }
+
   SizedValue sizedValue(int value) {
     switch (code) {
       case 'b':
@@ -361,7 +487,7 @@ class Size {
       case 'w':
         return Word(value);
       case 'l':
-        throw Longword(value);
+        return Longword(value);
       default:
         throw StateError('missing swith case');
     }
@@ -382,14 +508,6 @@ class Size {
 
   @override
   String toString() => code;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Size && runtimeType == other.runtimeType && bytes == other.bytes;
-
-  @override
-  int get hashCode => bytes.hashCode;
 
   static Size? valueOf(String string) {
     switch (string.toLowerCase()) {
@@ -851,6 +969,10 @@ class Words extends Data<Uint16List, Word, Words> {
     return Words.fromWord(int.parse('0x$d'));
   }
 
+  factory Words.list(List<int> list) {
+    return Words(Uint16List.fromList(list));
+  }
+
   factory Words.fromExpressions(List<Expression> expressions) {
     var words = <int>[];
     // not 100% sure partial stuff is right
@@ -890,7 +1012,7 @@ class Words extends Data<Uint16List, Word, Words> {
   }
 
   @override
-  Words _new(List<int> bytes) => Words(Uint16List.fromList(bytes));
+  Words _new(List<int> l) => Words(Uint16List.fromList(l));
 
   @override
   Word _newElement(int v) => Word(v);
@@ -911,7 +1033,7 @@ class Longwords extends Data<Uint32List, Longword, Longwords> {
   }
 
   @override
-  Longwords _new(List<int> bytes) => Longwords(Uint32List.fromList(bytes));
+  Longwords _new(List<int> l) => Longwords(Uint32List.fromList(l));
 
   @override
   Longword _newElement(int v) => Longword(v);

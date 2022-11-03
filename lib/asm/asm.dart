@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:characters/characters.dart';
+import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/strings.dart';
+import 'package:rune/src/iterables.dart';
+import 'package:rune/src/null.dart';
 
 import '../numbers.dart';
 import 'address.dart';
@@ -349,6 +352,7 @@ class _Instruction extends Instruction {
 
     String? label;
     String? cmd;
+    String? attribute;
     List ops = [];
     String? comment;
 
@@ -397,6 +401,8 @@ class _Instruction extends Instruction {
               // ignore this line for now
               return _Instruction();
             }
+
+            attribute = cmd.split('.').skip(1).firstOrNull;
           }
           break;
         case _Token.operand:
@@ -407,7 +413,11 @@ class _Instruction extends Instruction {
               SizedValue sized;
               bool hex = operand.startsWith(r'$');
               var val = hex ? operand.substring(1).hex : int.parse(operand);
-              if (val <= Size.b.maxValue) {
+
+              var size = attribute?.map((a) => Size.valueOf(a));
+              if (size != null) {
+                sized = size.sizedValue(val);
+              } else if (val <= Size.b.maxValue) {
                 sized = Byte(val);
               } else if (val <= Size.w.maxValue) {
                 sized = Word(val);
@@ -509,3 +519,144 @@ class _Instruction extends Instruction {
 enum _Token { root, label, cmd, operand, stringConstant, comment }
 
 final _number = RegExp(r'^(\$[0-9a-fA-F]+|\d+)$');
+
+class ConstantIterator implements Iterator<Sized> {
+  final Iterator<Instruction> _asm;
+  late Queue<Sized> _remainingLineConstants;
+  bool _done = false;
+  Sized? _current;
+
+  ConstantIterator(this._asm) {
+    _loadNextLine();
+  }
+
+  Asm get remaining {
+    // todo: remaining line constants
+    return Asm.fromInstructions(_asm.toList());
+  }
+
+  _loadNextLine() {
+    if (!_asm.moveNext()) {
+      _done = true;
+      _remainingLineConstants = Queue();
+      return;
+    }
+
+    var next = _asm.current;
+    if (next.cmdWithoutAttribute != 'dc') {
+      _done = true;
+      _remainingLineConstants = Queue();
+      return;
+    }
+
+    var size = Size.valueOf(next.attribute!);
+    if (size == null) {
+      throw 'todo';
+    }
+
+    _remainingLineConstants = Queue.of((next.operands as List<Expression>)
+        .map((e) => size.sizedExpression(e)));
+  }
+
+  @override
+  bool moveNext() {
+    if (_done) return false;
+    if (_remainingLineConstants.isNotEmpty) {
+      _current = _remainingLineConstants.removeFirst();
+      return true;
+    }
+    _loadNextLine();
+    return moveNext();
+  }
+
+  @override
+  Sized get current {
+    var current = _current;
+    if (current == null) {
+      throw StateError('no remaining elements');
+    }
+    return current;
+  }
+}
+
+class ConstantReader {
+  final ConstantIterator _iter;
+  final _queue = Queue<Sized>();
+
+  Asm get remaining => _iter.remaining;
+
+  ConstantReader.asm(Asm asm) : this(ConstantIterator(asm.iterator));
+  ConstantReader(this._iter);
+
+  Sized _next() {
+    if (_queue.isNotEmpty) {
+      return _queue.removeFirst();
+    }
+    if (_iter.moveNext()) {
+      return _iter.current;
+    }
+    throw 'empty';
+  }
+
+  Byte readByte() {
+    var c = _next();
+    if (c is Byte) return c;
+    if (c.canSplit) {
+      c.splitInto(Size.b).reversed.forEach(_queue.addFirst);
+      return readByte();
+    }
+    throw StateError('cannot read byte from $c');
+  }
+
+  Word readWord() {
+    var c = _next();
+    if (c is Word) return c;
+    if (c.size == Size.l && c.canSplit) {
+      c.splitInto(Size.w).reversed.forEach(_queue.addFirst);
+      return readWord();
+    }
+    if (c.size == Size.b && c.canAppend) {
+      var word = c.appendLower(readByte());
+      if (word is Word) return word;
+    }
+    throw StateError('cannot read word from $c');
+  }
+
+  Longword readLong() {
+    var c = _next();
+    if (c is Longword) return c;
+    if (c.canAppend) {
+      var constants = <Sized>[c];
+      int bytes;
+      while ((bytes = constants
+              .map((e) => e.size.bytes)
+              .reduceOr((b1, b2) => b1 + b2, ifEmpty: 0)) <
+          4) {
+        var c = _next();
+        if (bytes % 2 == 1) {
+          if (c.size == Size.w && c.canAppend) {
+            constants.add(c);
+            continue;
+          }
+        } else if (c.size == Size.b && c.canAppend) {
+          constants.add(c);
+          continue;
+        }
+        throw StateError('cannot read longword from $constants and $c');
+      }
+      var long =
+          constants.reduce((value, element) => value.appendLower(element));
+      if (long is Longword) {
+        return long;
+      }
+      throw StateError('cannot read longword from $long');
+    }
+    throw StateError('cannot read longword from $c');
+  }
+
+  Label readLabel() {
+    var c = _next();
+    if (c is Label) return c;
+    throw StateError('cannot read label from $c');
+  }
+}
