@@ -28,6 +28,10 @@ main() {
       test('dc.w with words', () {
         expect(Asm.fromRaw(r' dc.w $00'), dc.w([Word(0)]));
       });
+
+      test('dc.l with label', () {
+        expect(Asm.fromRaw(r' dc.l a_label'), dc.l([Label('a_label')]));
+      });
     });
 
     group('equivalent back to string', () {
@@ -148,6 +152,12 @@ main() {
         expect(reader.readLabel(), Label('test'));
       });
 
+      test('raw label', () {
+        var asm = Asm.fromRaw(' dc.l test');
+        var reader = ConstantReader.asm(asm);
+        expect(reader.readLabel(), Label('test'));
+      });
+
       test('mix', () {
         var asm = Asm([
           dc.l(Longwords.fromLongword(0x12345678)),
@@ -159,6 +169,37 @@ main() {
         expect(reader.readWord(), Word(0x5678));
         expect(reader.readLabel(), Label('test'));
         expect(reader.readWord(), Word(0xffff));
+      });
+
+      test('skip over label', () {
+        var asm = Asm([
+          dc.l(Longwords.fromLongword(0x12345678)),
+          dc.l([Label('test')]),
+          dc.w([Word(0xffff)]),
+        ]);
+        var reader = ConstantReader.asm(asm);
+        reader.skipThrough(value: Word(0xffff), times: 1);
+        expect(reader.remaining, isEmpty);
+      });
+
+      test('skip to end', () {
+        var asm = Asm([
+          dc.l(Longwords.fromLongword(0x12345678)),
+          dc.w([Word(0xffff)]),
+        ]);
+        var reader = ConstantReader.asm(asm);
+        reader.skipThrough(value: Word(0xffff), times: 1);
+        expect(reader.remaining, isEmpty);
+      });
+
+      test('skip within long', () {
+        var asm = Asm([
+          dc.l(Longwords.fromLongword(0x1234ffff)),
+          dc.w([Word(0xffff)]),
+        ]);
+        var reader = ConstantReader.asm(asm);
+        reader.skipThrough(value: Word(0xffff), times: 1);
+        expect(reader.remaining, dc.w([Word(0xffff)]));
       });
     });
   });

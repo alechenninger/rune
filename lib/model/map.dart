@@ -93,7 +93,6 @@ class MapObject extends FieldObject {
       onInteract.hashCode;
 }
 
-// generator will need to track labels corresponding to each sprite
 enum Sprite {
   PalmanMan1,
   PalmanMan2,

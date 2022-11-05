@@ -1274,3 +1274,7 @@ class Condition {
     return 'Condition{$_flags}';
   }
 }
+
+abstract class DialogRegistry {
+  DialogTree forLabel(Label lbl);
+}

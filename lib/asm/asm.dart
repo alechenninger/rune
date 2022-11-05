@@ -310,16 +310,20 @@ abstract class Instruction {
 }
 
 class _Instruction extends Instruction {
+  @override
   final String? label;
+  @override
   final String? cmd;
+  @override
   final List operands;
+  @override
   final String? comment;
 
   final String line;
 
   static final _validLabelPattern =
       RegExp(r'^[A-Za-z\d_@.+-/]+[A-Za-z\d_/+-]*$');
-  static final _noColonLabel = RegExp(r'^(\++|/+|-+|.\S+)$');
+  static final _noColonLabel = RegExp(r'^(\++|/+|-+|\.\S+)$');
 
   /// appends : depending on the kind of label
   static String _delimitLabel(String label) {
@@ -440,7 +444,11 @@ class _Instruction extends Instruction {
               if (ops is Bytes) {
                 ops = List.from(ops);
               }
-              ops.add(operand);
+              // fixme: we assume operand may be Expression in some cases
+              // when string, may be constant or label
+              // how to tell?
+              // we may need to be able to resolve constant values
+              ops.add(LabelOrConstant(operand));
             }
 
             operand = null;
@@ -543,6 +551,12 @@ class ConstantIterator implements Iterator<Sized> {
     }
 
     var next = _asm.current;
+    if (next.cmd == null) {
+      // just comment or label, skip
+      _loadNextLine();
+      return;
+    }
+
     if (next.cmdWithoutAttribute != 'dc') {
       _done = true;
       _remainingLineConstants = Queue();
@@ -554,8 +568,8 @@ class ConstantIterator implements Iterator<Sized> {
       throw 'todo';
     }
 
-    _remainingLineConstants = Queue.of((next.operands as List<Expression>)
-        .map((e) => size.sizedExpression(e)));
+    _remainingLineConstants = Queue.of(
+        next.operands.cast<Expression>().map((e) => size.sizedExpression(e)));
   }
 
   @override
@@ -579,8 +593,24 @@ class ConstantIterator implements Iterator<Sized> {
   }
 }
 
+class ConstantReadException implements Exception {
+  final Size sizeToRead;
+  final List<Sized> valuesRead;
+
+  ConstantReadException(this.sizeToRead, this.valuesRead);
+
+  @override
+  String toString() => 'ConstantReadException: '
+      'could not read $sizeToRead from $valuesRead';
+}
+
 class ConstantReader {
   final ConstantIterator _iter;
+  // TODO: need to do this because there are sometimes constants in mapdata
+  //   like facing direction
+  // could probably define a global default constant table since they are...
+  // well... constants :)
+  final Map<Constant, SizedValue> _constantTable = {};
   final _queue = Queue<Sized>();
 
   Asm get remaining => _iter.remaining;
@@ -595,7 +625,66 @@ class ConstantReader {
     if (_iter.moveNext()) {
       return _iter.current;
     }
-    throw 'empty';
+    throw StateError('no more constants');
+  }
+
+  /// Iterates by bytes, looking for [value], and skipping ahead until it is
+  /// seen [times] times.
+  void skipThrough(
+      // todo: variable chunk size?
+      {/*required Size chunk,*/ required SizedValue value,
+      required int times}) {
+    var skipped = 0;
+    var buffer = QueueList<Byte>();
+
+    Byte readByteSkippingLabels() {
+      try {
+        return readByte();
+      } on ConstantReadException catch (e) {
+        if (e.valuesRead.first is! Value && e.valuesRead.length == 1) {
+          // clear buffer because we're skipping data,
+          // so it can't match consecutively now.
+          buffer.clear();
+          return readByteSkippingLabels();
+        }
+        rethrow;
+      }
+    }
+
+    while (skipped < times) {
+      buffer.add(readByteSkippingLabels());
+
+      switch (value.size) {
+        case Size.b:
+          if (value == buffer[0]) {
+            skipped++;
+          }
+          buffer.clear();
+          break;
+        case Size.w:
+          if (buffer.length == 2) {
+            if (value == buffer[0].appendLower(buffer[1])) {
+              skipped++;
+              buffer.clear();
+            } else {
+              buffer.removeFirst();
+            }
+          }
+          break;
+        case Size.l:
+          if (buffer.length == 4) {
+            if (value ==
+                Longword.concatBytes(
+                    buffer[0], buffer[1], buffer[2], buffer[3])) {
+              skipped++;
+              buffer.clear();
+            } else {
+              buffer.removeFirst();
+            }
+          }
+          break;
+      }
+    }
   }
 
   Byte readByte() {
@@ -605,7 +694,7 @@ class ConstantReader {
       c.splitInto(Size.b).reversed.forEach(_queue.addFirst);
       return readByte();
     }
-    throw StateError('cannot read byte from $c');
+    throw ConstantReadException(Size.b, [c]);
   }
 
   Word readWord() {
@@ -619,7 +708,7 @@ class ConstantReader {
       var word = c.appendLower(readByte());
       if (word is Word) return word;
     }
-    throw StateError('cannot read word from $c');
+    throw ConstantReadException(Size.w, [c]);
   }
 
   Longword readLong() {
@@ -642,21 +731,22 @@ class ConstantReader {
           constants.add(c);
           continue;
         }
-        throw StateError('cannot read longword from $constants and $c');
+        throw ConstantReadException(Size.l, [...constants, c]);
       }
       var long =
           constants.reduce((value, element) => value.appendLower(element));
       if (long is Longword) {
         return long;
       }
-      throw StateError('cannot read longword from $long');
+      throw ConstantReadException(Size.l, [long]);
     }
-    throw StateError('cannot read longword from $c');
+    throw ConstantReadException(Size.l, [c]);
   }
 
   Label readLabel() {
     var c = _next();
     if (c is Label) return c;
+    if (c is! Value) return Label('$c');
     throw StateError('cannot read label from $c');
   }
 }

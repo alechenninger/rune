@@ -151,6 +151,9 @@ class Constant extends Expression {
 }
 
 class Label extends Sized implements Address {
+  static final _validLabelPattern =
+      RegExp(r'^[A-Za-z\d_@.+-/]+[A-Za-z\d_/+-]*$');
+
   final String name;
 
   @override
@@ -159,7 +162,12 @@ class Label extends Sized implements Address {
   @override
   Size get size => Size.l;
 
-  const Label(this.name) : super.constant();
+  Label(this.name) {
+    if (!_validLabelPattern.hasMatch(name)) {
+      throw ArgumentError.value(
+          name, 'name', 'invalid label. must match: $_validLabelPattern');
+    }
+  }
 
   @override
   String toString() => name;
@@ -168,6 +176,28 @@ class Label extends Sized implements Address {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Label && runtimeType == other.runtimeType && name == other.name;
+
+  @override
+  int get hashCode => name.hashCode;
+}
+
+class LabelOrConstant extends Expression {
+  final String name;
+
+  @override
+  final bool isKnownZero = false;
+
+  const LabelOrConstant(this.name) : super.constant();
+
+  @override
+  String toString() => name;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LabelOrConstant &&
+          runtimeType == other.runtimeType &&
+          name == other.name;
 
   @override
   int get hashCode => name.hashCode;
@@ -296,7 +326,7 @@ class Byte extends SizedValue {
   }
 
   @override
-  Sized appendLower(Sized s) {
+  Word appendLower(Sized s) {
     if (s is Byte) {
       return Word.concatBytes(this, s);
     }
@@ -344,7 +374,7 @@ class Word extends SizedValue {
   }
 
   @override
-  Sized appendLower(Sized s) {
+  Longword appendLower(Sized s) {
     if (s is Word) {
       return Longword.concatWords(this, s);
     }
@@ -353,10 +383,6 @@ class Word extends SizedValue {
 
   Bytes splitToBytes() {
     return Bytes.list([value >> 8, value & 0xff]);
-  }
-
-  Longword append(Word other) {
-    return Longword(value << 16 + other.value);
   }
 
   @override

@@ -397,6 +397,197 @@ void main() {
   });
 
   group('experiments with parsing asm', () {
-    test('parses a map', () {});
+    test('parses a map', () {
+      var asm = Asm.fromRaw(tonoeAsm);
+      asmToMap(Label('Map_Tonoe'), asm);
+    });
   });
 }
+
+var tonoeAsm = r'''Map_Tonoe:
+	dc.b	$08
+	dc.b	MusicID_TonoeDePon
+	dc.w	$0010
+	dc.l	loc_11C808
+	dc.w	$0111
+	dc.l	loc_11DE68
+	dc.w	$0213
+	dc.l	loc_13E19C
+	dc.l	$FFFF02A8
+	dc.l	loc_13C4A0
+	dc.w	$02F0
+	dc.l	loc_13C9BA
+	dc.w	$0338
+	dc.l	loc_13CE54
+	dc.w	$FFFF
+	dc.b	$FF, $FF, $1F, $1F, $1F, $1F, $01, $00, $00, $01, $00, $01 ;0x0 (0x0013E048-0x0013E054, Entry count: 0x0000000C) [Unknown data]
+	dc.l	loc_122A90
+	dc.l	loc_13EECC
+	dc.w	$FFFF
+
+; Map update
+	dc.b	$00
+	dc.b	$FF
+
+; Map transition data
+	dc.b	$0A, $00
+	dc.w	4
+	dc.w	MapID_Motavia
+	dc.b	$97, $58, $00, $00
+
+	dc.b	$36, $00
+	dc.w	5
+	dc.w	MapID_Motavia
+	dc.b	$97, $58, $00, $00
+
+	dc.b	$00, $05
+	dc.w	6
+	dc.w	MapID_Motavia
+	dc.b	$97, $58, $00, $00
+
+	dc.b	$00, $37
+	dc.w	7
+	dc.w	MapID_Motavia
+	dc.b	$97, $58, $00, $00
+
+	dc.w	$FFFF
+
+; Map transition data 2
+	dc.b	$1F, $0A
+	dc.w	9
+	dc.w	MapID_TonoeStorageRoom
+	dc.b	$1E, $26, $04, $04
+
+	dc.b	$2D, $14
+	dc.w	9
+	dc.w	MapID_TonoeGryzHouse
+	dc.b	$1E, $26, $04, $04
+
+	dc.b	$1D, $26
+	dc.w	9
+	dc.w	MapID_TonoeHouse1
+	dc.b	$1E, $26, $04, $04
+
+	dc.b	$1D, $2C
+	dc.w	9
+	dc.w	MapID_TonoeHouse2
+	dc.b	$1E, $26, $04, $04
+
+	dc.b	$13, $28
+	dc.w	9
+	dc.w	MapID_TonoeInn
+	dc.b	$16, $26, $04, $04
+
+	dc.w	$FFFF
+
+; Objects
+	dc.w	$3C
+	dc.b	$00, $04
+	dc.w	$2A8
+	dc.w	$2E, $58
+
+	dc.w	$44
+	dc.b	$00, $07
+	dc.w	$338
+	dc.w	$34, $46
+
+	dc.w	$3C
+	dc.b	$00, $09
+	dc.w	$2A8
+	dc.w	$42, $50
+
+	dc.w	$3C
+	dc.b	$00, $0A
+	dc.w	$2F0
+	dc.w	$54, $5C
+
+	dc.w	$3C
+	dc.b	$00, $0B
+	dc.w	$2A8
+	dc.w	$60, $3E
+
+	dc.w	$60
+	dc.b	$00, $0C
+	dc.w	$2F0
+	dc.w	$50, $4C
+
+	dc.w	$58
+	dc.b	$04, $0D
+	dc.w	$2A8
+	dc.w	$2A, $14
+
+	dc.w	$FFFF
+
+; Treasure chests
+	dc.w	$FFFF
+
+; Tile animations
+	dc.w	$FFFF
+
+	dc.l	loc_13F23C
+	dc.l	loc_13F3AC
+	dc.l	DialogueTree7
+
+; Interaction areas
+	dc.w	$4C, $48
+	dc.w	9
+	dc.b	0, 0, 5, 9
+
+	dc.w	$4C, $54
+	dc.w	9
+	dc.b	0, 0, 5, $A
+
+	dc.w	$54, $54
+	dc.w	9
+	dc.b	0, 0, 5, $B
+
+	dc.w	$48, $48
+	dc.w	9
+	dc.b	0, 0, 0, $74
+
+	dc.w	$50, $48
+	dc.w	9
+	dc.b	0, 0, 0, $75
+
+	dc.w	$54, $48
+	dc.w	9
+	dc.b	0, 0, 0, $76
+
+	dc.w	$58, $48
+	dc.w	9
+	dc.b	0, 0, 0, $77
+
+	dc.w	$5C, $48
+	dc.w	9
+	dc.b	0, 0, 0, $78
+
+	dc.w	$44, $54
+	dc.w	9
+	dc.b	0, 0, 0, $79
+
+	dc.w	$48, $54
+	dc.w	9
+	dc.b	0, 0, 0, $7A
+
+	dc.w	$50, $54
+	dc.w	9
+	dc.b	0, 0, 0, $7B
+
+	dc.w	$58, $54
+	dc.w	9
+	dc.b	0, 0, 0, $7C
+
+	dc.w	$FFFF
+
+; Events
+	dc.b	$00
+	dc.b	$FF
+
+; Palettes address
+	dc.l	Pal_Tonoe
+
+	dc.b	$00, $00, $00, $00
+
+; Map data manager
+	dc.w	$FFFF
+	''';

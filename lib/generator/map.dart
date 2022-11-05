@@ -1,12 +1,9 @@
-import 'dart:math';
-
 import 'package:collection/collection.dart';
+import 'package:quiver/collection.dart';
 import 'package:rune/generator/movement.dart';
-import 'package:rune/generator/scene.dart';
 import 'package:rune/numbers.dart';
 
 import '../asm/asm.dart';
-import '../asm/dialog.dart';
 import '../model/model.dart';
 import 'dialog.dart';
 import 'event.dart';
@@ -46,6 +43,9 @@ class MapAsm {
   }
 }
 
+// todo: looks like this is actually different per sprite, just most sprites
+// are the same
+// see objects in chaz house map
 final _vramOffsetPerSprite = '48'.hex;
 
 // These offsets are used to account for assembly specifics, which allows for
@@ -73,37 +73,58 @@ final _defaultDialogs = {
 DialogTree _defaultDialogTree(MapId map) =>
     _defaultDialogs[map] ?? DialogTree();
 
-final _spriteArtLabels = {
-  Sprite.PalmanMan1: Label('Art_PalmanMan1'),
-  Sprite.PalmanMan2: Label('Art_PalmanMan2'),
-  Sprite.PalmanMan3: Label('Art_PalmanMan3'),
-  Sprite.PalmanWoman1: Label('Art_PalmanWoman1'),
-  Sprite.PalmanWoman2: Label('Art_PalmanWoman2'),
-  Sprite.PalmanWoman3: Label('Art_PalmanWoman3'),
-  Sprite.PalmanFighter1: Label('Art_PalmanFighter1'),
-  Sprite.PalmanFighter2: Label('Art_PalmanFighter2'),
-  Sprite.PalmanFighter3: Label('Art_PalmanFighter3'),
-  Sprite.PalmanStudent1: Label('Art_PalmanStudent1'),
-  Sprite.PalmanProfessor1: Label('Art_PalmanProfessor1'),
-  Sprite.PalmanProfessor2: Label('Art_PalmanProfessor2'),
-  Sprite.Kroft: Label('Art_Kroft'),
-};
+final _spriteArtLabels = BiMap<Sprite, Label>()
+  ..addAll({
+    Sprite.PalmanMan1: Label('Art_PalmanMan1'),
+    Sprite.PalmanMan2: Label('Art_PalmanMan2'),
+    Sprite.PalmanMan3: Label('Art_PalmanMan3'),
+    Sprite.PalmanWoman1: Label('Art_PalmanWoman1'),
+    Sprite.PalmanWoman2: Label('Art_PalmanWoman2'),
+    Sprite.PalmanWoman3: Label('Art_PalmanWoman3'),
+    Sprite.PalmanFighter1: Label('Art_PalmanFighter1'),
+    Sprite.PalmanFighter2: Label('Art_PalmanFighter2'),
+    Sprite.PalmanFighter3: Label('Art_PalmanFighter3'),
+    Sprite.PalmanStudent1: Label('Art_PalmanStudent1'),
+    Sprite.PalmanProfessor1: Label('Art_PalmanProfessor1'),
+    Sprite.PalmanProfessor2: Label('Art_PalmanProfessor2'),
+    Sprite.Kroft: Label('Art_Kroft'),
+  });
 
 final _mapObjectSpecRoutines = {
-  AlysWaiting(): FieldRoutine(Word('68'.hex), Label('FieldObj_NPCAlysPiata'))
+  AlysWaiting(): FieldRoutine(
+      Word('68'.hex), Label('FieldObj_NPCAlysPiata'), (s, d) => AlysWaiting())
 };
 
 final _npcBehaviorRoutines = {
-  FaceDown: FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1')),
-  WanderAround: FieldRoutine(Word('3C'.hex), Label('FieldObj_NPCType2')),
-  SlowlyWanderAround: FieldRoutine(Word('40'.hex), Label('FieldObj_NPCType3')),
+  FaceDown: FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1'),
+      (s, _) => Npc(s!, FaceDown())),
+  WanderAround: FieldRoutine(Word('3C'.hex), Label('FieldObj_NPCType2'),
+      (s, d) => Npc(s!, WanderAround(d))),
+  SlowlyWanderAround: FieldRoutine(Word('40'.hex), Label('FieldObj_NPCType3'),
+      (s, d) => Npc(s!, SlowlyWanderAround(d))),
 };
+
+typedef SpecFactory = MapObjectSpec Function(Sprite? sprite, Direction facing);
+
+final _specFactories = _buildSpecFactories();
+
+Map<Word, SpecFactory> _buildSpecFactories() {
+  var factories = <Word, SpecFactory>{};
+  for (var routine in [
+    ..._mapObjectSpecRoutines.values,
+    ..._npcBehaviorRoutines.values
+  ]) {
+    factories[routine.index] = routine.factory;
+  }
+  return factories;
+}
 
 class FieldRoutine {
   final Word index;
   final Label label;
+  final SpecFactory factory;
 
-  const FieldRoutine(this.index, this.label);
+  const FieldRoutine(this.index, this.label, this.factory);
 
   @override
   String toString() {
@@ -294,68 +315,180 @@ extension ObjectAddress on GameMap {
   }
 }
 
+/*
+...
+ffff
+sprites
+ffff < sometimes included in l
+ffff < sometimes split across b
+ffff < sometimes split across b
+map updates
+ff
+map transition data
+ffff
+map transition data 2
+ffff
+objects
+ffff
+treasure
+ffff
+tile animations
+ffff
+dialog
+interaction areas
+ffff
+events
+ff
+palettes
+map data mgr
+ffff
+ */
 GameMap asmToMap(Label mapLabel, Asm asm) {
-  asm = _skipSections(asm, 1, terminator: Size.w.maxValueSized);
+  var reader = ConstantReader.asm(asm);
+
+  // todo: can make return instead of mutate args
+
+  // skip general var, music, something else
+  reader.skipThrough(times: 1, value: Size.w.maxValueSized);
+
   var sprites = <Word, Label>{};
-  asm = _readSprites(asm, sprites);
-  // asm = skipToObjects(asm);
-  // var asmObjects = <AsmObject>[];
-  // asm = readObjects(asm, asmObjects);
-  // asm = skipToDialogTree(asm);
+  _readSprites(reader, sprites);
+
+  // skip ??
+  reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+
+  // skip map updates
+  reader.skipThrough(value: Size.b.maxValueSized, times: 1);
+
+  // skip transition data 1 & 2
+  reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+
+  var asmObjects = <_AsmObject>[];
+  _readObjects(reader, asmObjects);
+
+  // skip treasure and tile animations
+  reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+
+  // on maps there are 2 labels before dialog,
+  // except on motavia and dezolis
+  // (this is simply hard coded based on map IDs)
+  Label dialogLabel;
+  if ([Label('Map_Motavia'), Label('Map_Dezolis')].contains(mapLabel)) {
+    dialogLabel = reader.readLabel();
+  } else {
+    reader.readLabel();
+    reader.readLabel();
+    dialogLabel = reader.readLabel();
+  }
+
   var dialogTree = DialogTree();
+
   // asm = readNextDialogTree(asm, dialogTree);
-  // var mapObjects = buildObjects(sprites, asmObjects, dialogTree);
+  var mapObjects = _buildObjects(sprites, asmObjects, dialogTree);
 
-  // var map = GameMap(labelToId(mapLabel));
-  // mapObjects.forEach(map.addObject);
+  var map = GameMap(_labelToMapId(mapLabel));
+  mapObjects.forEach(map.addObject);
 
-  // return map;
-  throw UnimplementedError();
+  return map;
 }
 
-Asm _skipSections(Asm asm, int skip, {required SizedValue terminator}) {
-  for (var i = 0; i < asm.length; ++i) {
-    var inst = asm[i].single;
-    if (inst.cmdWithoutAttribute != 'dc') {
-      throw ArgumentError('asm contained non-constants. inst=$inst');
-    }
-
-    var size = Size.valueOf(inst.attribute!)!;
-    if (size < terminator.size) {
-      // for now assume terminators are not embedded across smaller constants
-      continue;
-    }
-    var values = terminator.size.sizedList(inst.operands as List<Expression>);
-    for (var v = 0; v < values.length; ++v) {
-      var value = values[v];
-      if (value == terminator) {
-        var remainingValues = values.sublist(v);
-        var remaining = asm.range(i + 1);
-        if (remainingValues.isEmpty) return remaining;
-        remaining.insert(0, dc.size(size, remainingValues));
-        return remaining;
-      }
-    }
-  }
-  return asm;
-}
-
-Asm _readSprites(Asm asm, Map<Word, Label> sprites) {
-  var iter = ConstantReader(ConstantIterator(asm.iterator));
+void _readSprites(ConstantReader reader, Map<Word, Label> sprites) {
   while (true) {
-    var vramTile = iter.readWord();
+    var vramTile = reader.readWord();
     if (vramTile.value == 0xffff) {
-      return iter.remaining;
+      return;
     }
+    var sprite = reader.readLabel();
+    sprites[vramTile] = sprite;
   }
 }
 
-// class AsmObject {
-//   FieldRoutine routine;
-//   Direction facing;
-//   Byte dialogId;
-//   Position position;
-// }
+void _readObjects(ConstantReader reader, List<_AsmObject> objects) {
+  while (true) {
+    var routineOrTerminate = reader.readWord();
+
+    if (routineOrTerminate == Word(0xffff)) {
+      return;
+    }
+
+    var facing = reader.readByte();
+    var dialogId = reader.readByte();
+    var vramTile = reader.readWord();
+    var x = reader.readWord();
+    var y = reader.readWord();
+
+    var spec = _specFactories[routineOrTerminate];
+    // todo: may want to have a spec which simply refers to the index
+    // this could be useful for keeping objects
+    // that we don't want to override.
+    // actually the whole parsing could be useful for keeping objects
+    // at their original memory locations
+    if (spec == null) {
+      throw StateError(
+          'unknown map object routine at index $routineOrTerminate');
+    }
+
+    var position = Position(x.value * 8, y.value * 8);
+
+    objects.add(_AsmObject(
+        spec: spec,
+        facing: _byteToFacingDirection(facing),
+        dialogId: dialogId,
+        vramTile: vramTile,
+        position: position));
+  }
+}
+
+Direction _byteToFacingDirection(Byte w) {
+  if (w == Byte(0)) return Direction.down;
+  if (w == Byte(4)) return Direction.up;
+  if (w == Byte(8)) return Direction.right;
+  if (w == Byte(0xC)) return Direction.left;
+  throw ArgumentError.value(w, 'w', 'is not a direction');
+}
+
+class _AsmObject {
+  final SpecFactory spec;
+  final Direction facing;
+  final Byte dialogId;
+  final Word vramTile;
+  final Position position;
+
+  _AsmObject(
+      {required this.spec,
+      required this.facing,
+      required this.dialogId,
+      required this.vramTile,
+      required this.position});
+}
+
+List<MapObject> _buildObjects(Map<Word, Label> sprites,
+    List<_AsmObject> asmObjects, DialogTree dialogTree) {
+  return asmObjects.map((asm) {
+    var spriteLbl = sprites[asm.vramTile];
+    var sprite = _spriteArtLabels.inverse[spriteLbl];
+    var spec = asm.spec(sprite, asm.facing);
+
+    // todo: scene from dialog
+
+    return MapObject(startPosition: asm.position, spec: spec);
+  }).toList(growable: false);
+}
+
+MapId _labelToMapId(Label lbl) {
+  var m = MapId.values.firstWhereOrNull((id) => Label('Map_$id') == lbl);
+  if (m != null) return m;
+  m = _fallbackMapIdsByLabel[lbl];
+  if (m == null) {
+    throw 'todo';
+  }
+  return m;
+}
+
+final _fallbackMapIdsByLabel = {
+  Label('Map_AcademyPrincipalOffice'): MapId.PiataAcademyPrincipalOffice,
+  Label('Map_ChazHouse'): MapId.ShayHouse,
+};
 
 const _piataDialog = r'''
 ; $40
