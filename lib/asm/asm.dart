@@ -463,6 +463,8 @@ class _Instruction extends Instruction {
           break;
         case _Token.stringConstant:
           if ((!escape && c == stringDelimiter) || c == null) {
+            // todo: this assumes each character represents a byte,
+            // but this depends on the attribute of the dc instruction
             if (ops.isEmpty) {
               ops = Bytes.ascii(operand ?? "");
             } else if (ops is Bytes) {

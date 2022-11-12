@@ -43,6 +43,7 @@ enum MapId {
   PiataAcademyF1,
   PiataAcademyPrincipalOffice,
   ShayHouse,
+  Tonoe,
   Test
 }
 

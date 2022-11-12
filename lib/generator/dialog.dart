@@ -96,99 +96,143 @@ extension DialogToAsm on Dialog {
   }
 }
 
-Future<Scene> toScene(int dialogId, DialogTree tree) async {
-  var dialogs = <Dialog>[];
+Scene toScene(int dialogId, DialogTree tree) {
+  var context = ParseContext(dialogId, tree);
 
-  var dialogIndex = 0;
-  Speaker? speaker;
-  EventFlag? flag;
-
-  for (var ins in tree.toAsm()) {
-    if (ins.cmd != 'dc.b') {
+  for (var ins in tree[dialogId]) {
+    if (ins.cmd != null && ins.cmd != 'dc.b') {
       throw UnimplementedError();
       // return dialogs;
     }
 
-    var bytes = ins.operands as List<Expression>;
+    var bytes = ins.operands.cast<Expression>();
 
-    for (var i = 0; i < bytes.length; ++i) {
-      var b = bytes[i];
-
-      // parse() {
-      //   var result = parseState(b);
-      //
-      //   var newState = result.newState;
-      //   if (newState != null) {
-      //     if (parseState is _SpanParse) {
-      //       var span = parseState.span();
-      //     }
-      //   }
-      //
-      //   if (!result.parsed) {
-      //     parse();
-      //   }
-      // }
-      //
-      // parse();
+    for (context.next = 0; context.next < bytes.length;) {
+      // based on what this byte is, and what the current state is,
+      // we might switch to a different state of the parsing
+      // some parsing states recurse (like when there is an event flag check)
+      context.parse(bytes);
     }
   }
 
-  throw UnimplementedError();
-  // return dialogs;
+  return Scene(context.events);
+}
+
+class ParseContext {
+  int dialogId;
+  DialogTree tree;
+
+  int next = 0;
+  DialogParseState state = DialogState();
+  final events = <Event>[];
+
+  ParseContext(this.dialogId, this.tree);
+
+  void parse(List<Expression> bytes) {
+    state(bytes[next++], this);
+  }
+
+  void reparseWith(DialogParseState state) {
+    next--;
+    this.state = state;
+  }
 }
 
 abstract class DialogParseState {
-  ContinueParse call(Expression byte);
+  void call(Expression byte, ParseContext context);
 }
 
-// class Root implements DialogParseState {
-//   DialogParseState? state;
+// just keeping this around in case i want to go this route again
+// each parse state was a callable class...
+// parse() {
+//   var result = parseState(b);
 //
-//   ContinueParse call(Expression byte) {}
+//   var newState = result.newState;
+//   if (newState != null) {
+//     if (parseState is _SpanParse) {
+//       var span = parseState.span();
+//     }
+//   }
+//
+//   if (!result.parsed) {
+//     parse();
+//   }
 // }
+//
+// parse();
+class DialogState implements DialogParseState {
+  Speaker? speaker;
 
-class ContinueParse {
-  /// Whether or not the byte was processed already or should be processed
-  /// by another state.
-  final bool parsed;
+  @override
+  void call(Expression byte, ParseContext context) {
+    if (byte is! Byte) {
+      throw ArgumentError.value(byte, 'byte', 'expected Byte');
+    }
 
-  /// Next state to set which processes the next byte.
-  ///
-  /// The next byte is the last byte is [parsed] is [false].
-  final DialogParseState? newState;
-
-  ContinueParse()
-      : parsed = true,
-        newState = null;
-  ContinueParse.unparsed()
-      : parsed = false,
-        newState = null;
-  ContinueParse.newState(DialogParseState state, {this.parsed = true})
-      : newState = state;
+    if (byte == Byte(0xF4)) {
+      context.state = PortraitState(this);
+    } else if (byte.value >= 0xF2) {
+      // todo: this should be the state that handles all that stuff
+    } else {
+      context.reparseWith(SpanState(speaker));
+    }
+  }
 }
 
-class _SpanParse implements DialogParseState {
+class PortraitState implements DialogParseState {
+  final DialogState parent;
+
+  PortraitState(this.parent);
+
+  @override
+  void call(Expression byte, ParseContext context) {
+    if (byte is! Byte) {
+      throw ArgumentError.value(byte, 'byte', 'expected Byte');
+    }
+
+    parent.speaker = toSpeaker(byte);
+    context.state = parent;
+  }
+}
+
+class SpanState implements DialogParseState {
+  final Speaker? speaker;
   final _buffer = StringBuffer();
 
-  Span span() {
-    return Span(_buffer.toString());
+  SpanState(this.speaker);
+
+  DialogSpan span() {
+    return DialogSpan(_buffer.toString());
   }
 
   @override
-  ContinueParse call(Expression byte) {
+  void call(Expression byte, ParseContext context) {
     if (byte is! Byte) {
-      // ignored? constant? TODO
-      return ContinueParse.unparsed();
+      done(context);
+      return;
     }
 
-    if (byte.value >= 0xF2) {
-      // just continue from this instruction
-      return ContinueParse.unparsed();
+    if (byte == Byte(0xFC)) {
+      // TODO: should do newline?
+      _buffer.write(' ');
+    } else {
+      if (byte.value >= 0xF2) {
+        // unsupported control code or terminator...
+        done(context);
+        return;
+      }
+
+      _buffer.write(String.fromCharCode(byte.value));
     }
+  }
 
-    _buffer.write(String.fromCharCode(byte.value));
-
-    return ContinueParse();
+  void done(ParseContext context) {
+    var s = span();
+    if (s.text.isNotEmpty) {
+      var dialog = Dialog(speaker: speaker, spans: [s]);
+      context.events.add(dialog);
+    }
+    context.reparseWith(DialogState());
   }
 }
 
@@ -198,13 +242,14 @@ class _EventCheck implements DialogParseState {
   List<Event> ifSet = [];
   List<Event> ifUnset = [];
 
-  // DialogParseState state = Root();
+  late ParseContext branchContext; // todo
+  DialogParseState branchState = DialogState();
 
   @override
-  ContinueParse call(Expression byte) {
+  void call(Expression byte, ParseContext context) {
     if (flag == null) {
       flag = toEventFlag(byte);
-      return ContinueParse();
+      return;
     }
 
     if (byte is! Byte) {
@@ -214,11 +259,13 @@ class _EventCheck implements DialogParseState {
 
     if (ifSetOffset == null) {
       ifSetOffset = byte.value;
-      return ContinueParse();
+      return;
     }
 
+    // continue for if unset branch
     // state(byte);
-    return ContinueParse();
+
+    // then do if set branch at different dialog in tree
   }
 }
 
@@ -345,9 +392,9 @@ class Quotes {
 
 extension Portrait on Speaker {
   static final _index = [
-    UnnamedSpeaker, // dc.l	0						; 0
-    Shay, // dc.l	ArtNem_ChazDialPortrait	; 1
-    Alys, // dc.l	ArtNem_AlysDialPortrait	; 2
+    UnnamedSpeaker(), // dc.l	0						; 0
+    Shay(), // dc.l	ArtNem_ChazDialPortrait	; 1
+    Alys(), // dc.l	ArtNem_AlysDialPortrait	; 2
     null, // dc.l	ArtNem_HahnDialPortrait	; 3
     null, // dc.l	ArtNem_RuneDialPortrait	; 4
     null, // dc.l	ArtNem_GryzDialPortrait	; 5
@@ -359,7 +406,7 @@ extension Portrait on Speaker {
     null, // dc.l	ArtNem_SethDialPortrait	; $B
     null, // dc.l	ArtNem_SayaDialPortrait	; $C
     null, // dc.l	ArtNem_HoltDialPortrait	; $D
-    PrincipalKroft, // dc.l	ArtNem_PrincipalDialPortrait	; $E
+    PrincipalKroft(), // dc.l	ArtNem_PrincipalDialPortrait	; $E
     null, // dc.l	ArtNem_DorinDialPortrait	; $F
     null, // dc.l	ArtNem_PanaDialPortrait	; $10
     null, // dc.l	ArtNem_HntGuildReceptionistDialPortrait	; $11
@@ -388,8 +435,22 @@ extension Portrait on Speaker {
   ];
 
   Byte get portraitCode {
-    var index = _index.indexOf(runtimeType);
+    var index = _index.indexOf(this);
 
     return Byte(max(0, index));
   }
+}
+
+Speaker toSpeaker(Byte byte) {
+  if (byte.value >= Portrait._index.length) {
+    throw ArgumentError.value(byte.value, 'byte', 'invalid portrait index');
+  }
+
+  var speaker = Portrait._index[byte.value];
+
+  if (speaker == null) {
+    throw UnsupportedError('$byte');
+  }
+
+  return speaker;
 }

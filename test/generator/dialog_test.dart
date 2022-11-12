@@ -1,5 +1,6 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/generator/dialog.dart';
+import 'package:rune/generator/generator.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
@@ -231,6 +232,65 @@ void main() {
             ])),
           ]).dialogs,
           2);
+    });
+  });
+
+  group('parses scene from dialog', () {
+    test('simple scene with just text', () {
+      var asm = DialogAsm.fromRaw(r'''	dc.b	"Thank you very much!"
+	dc.b	$FC
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+      var scene = toScene(0, DialogTree()..add(asm));
+
+      expect(
+          scene,
+          Scene([
+            Dialog(
+                spans: DialogSpan.parse('Thank you very much! '
+                    'I feel much safer now.'))
+          ]));
+    });
+
+    test('lines comments are ignored during parsing', () {
+      var asm = DialogAsm.fromRaw(r'''	dc.b	"Thank you very much!"
+	dc.b	$FC
+	; some comment
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+      var scene = toScene(0, DialogTree()..add(asm));
+
+      expect(
+          scene,
+          Scene([
+            Dialog(
+                spans: DialogSpan.parse('Thank you very much! '
+                    'I feel much safer now.'))
+          ]));
+    });
+
+    test('parses speaker from portrait', () {
+      var asm = DialogAsm.fromRaw(r'''	dc.b	$F4, $02	
+	dc.b	"Hello world!"
+	dc.b	$FF''');
+
+      var scene = toScene(0, DialogTree()..add(asm));
+
+      expect(
+          scene,
+          Scene([
+            Dialog(speaker: alys, spans: DialogSpan.parse('Hello world!'))
+          ]));
+    });
+
+    test('empty scene', () {
+      var asm = DialogAsm.fromRaw(r'''	dc.b	$FF''');
+
+      var scene = toScene(0, DialogTree()..add(asm));
+
+      expect(scene, Scene([]));
     });
   });
 }

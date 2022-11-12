@@ -1275,6 +1275,6 @@ class Condition {
   }
 }
 
-abstract class DialogRegistry {
-  DialogTree forLabel(Label lbl);
+abstract class DialogTreeLookup {
+  DialogTree byLabel(Label lbl);
 }

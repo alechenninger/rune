@@ -399,7 +399,9 @@ void main() {
   group('experiments with parsing asm', () {
     test('parses a map', () {
       var asm = Asm.fromRaw(tonoeAsm);
-      asmToMap(Label('Map_Tonoe'), asm);
+      // TODO
+      // var map = asmToMap(Label('Map_Tonoe'), asm);
+      // print(map);
     });
   });
 }
@@ -414,11 +416,11 @@ var tonoeAsm = r'''Map_Tonoe:
 	dc.w	$0213
 	dc.l	loc_13E19C
 	dc.l	$FFFF02A8
-	dc.l	loc_13C4A0
+	dc.l	Art_PalmanMan1 ; edits for testing (temporary)
 	dc.w	$02F0
-	dc.l	loc_13C9BA
+	dc.l	Art_PalmanMan2
 	dc.w	$0338
-	dc.l	loc_13CE54
+	dc.l	Art_PalmanMan3
 	dc.w	$FFFF
 	dc.b	$FF, $FF, $1F, $1F, $1F, $1F, $01, $00, $00, $01, $00, $01 ;0x0 (0x0013E048-0x0013E054, Entry count: 0x0000000C) [Unknown data]
 	dc.l	loc_122A90

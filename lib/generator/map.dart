@@ -46,6 +46,8 @@ class MapAsm {
 // todo: looks like this is actually different per sprite, just most sprites
 // are the same
 // see objects in chaz house map
+// for now it should work since the only examples i know of that are different
+// use _less_ vram tiles. so inefficient but it works.
 final _vramOffsetPerSprite = '48'.hex;
 
 // These offsets are used to account for assembly specifics, which allows for
@@ -91,20 +93,51 @@ final _spriteArtLabels = BiMap<Sprite, Label>()
   });
 
 final _mapObjectSpecRoutines = {
-  AlysWaiting(): FieldRoutine(
-      Word('68'.hex), Label('FieldObj_NPCAlysPiata'), (s, d) => AlysWaiting())
+  AlysWaiting(): FieldRoutine(Word('68'.hex), Label('FieldObj_NPCAlysPiata'),
+      SpecFactory((d) => AlysWaiting()))
 };
 
 final _npcBehaviorRoutines = {
   FaceDown: FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1'),
-      (s, _) => Npc(s!, FaceDown())),
+      SpecFactory.npc((s, _) => Npc(s, FaceDown()))),
   WanderAround: FieldRoutine(Word('3C'.hex), Label('FieldObj_NPCType2'),
-      (s, d) => Npc(s!, WanderAround(d))),
+      SpecFactory.npc((s, d) => Npc(s, WanderAround(d)))),
   SlowlyWanderAround: FieldRoutine(Word('40'.hex), Label('FieldObj_NPCType3'),
-      (s, d) => Npc(s!, SlowlyWanderAround(d))),
+      SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)))),
 };
 
-typedef SpecFactory = MapObjectSpec Function(Sprite? sprite, Direction facing);
+abstract class SpecFactory {
+  bool get requiresSprite;
+  MapObjectSpec call(Sprite? sprite, Direction facing);
+
+  factory SpecFactory.npc(
+      MapObjectSpec Function(Sprite sprite, Direction facing) factory) {
+    return _NpcFactory(factory);
+  }
+
+  factory SpecFactory(MapObjectSpec Function(Direction facing) factory) {
+    return _SpecFactory(factory);
+  }
+}
+
+class _NpcFactory implements SpecFactory {
+  @override
+  final requiresSprite = true;
+  final MapObjectSpec Function(Sprite sprite, Direction facing) _factory;
+  _NpcFactory(this._factory);
+  @override
+  MapObjectSpec call(Sprite? sprite, Direction facing) =>
+      _factory(sprite!, facing);
+}
+
+class _SpecFactory implements SpecFactory {
+  @override
+  final requiresSprite = false;
+  final MapObjectSpec Function(Direction facing) _factory;
+  _SpecFactory(this._factory);
+  @override
+  MapObjectSpec call(Sprite? sprite, Direction facing) => _factory(facing);
+}
 
 final _specFactories = _buildSpecFactories();
 
@@ -148,7 +181,7 @@ class MapAsmBuilder {
   final EventRoutines _eventRoutines;
   final int _spriteVramOffset;
   final DialogTree _tree;
-  final _spritesTileNumbers = <Sprite, Word>{};
+  final _spritesTileNumbers = <Label, Word>{};
   final _spritesAsm = Asm.empty();
   final _objectsAsm = Asm.empty();
   final _eventsAsm = EventAsm.empty();
@@ -193,27 +226,42 @@ class MapAsmBuilder {
     return dialogId;
   }
 
-  Word? _configureSprite(MapObject obj) {
+  /// Configures vram tile for sprite of [obj] and returns it.
+  Word _configureSprite(MapObject obj) {
     var spec = obj.spec;
-    if (spec is! Npc) {
-      return null;
+    Label artLbl;
+
+    if (spec is Npc) {
+      var sprite = spec.sprite;
+      var maybeLbl = _spriteArtLabels[sprite];
+
+      if (maybeLbl == null) {
+        throw Exception('no art label configured for sprite: $sprite');
+      }
+
+      artLbl = maybeLbl;
+    } else if (spec is AsmSpec) {
+      var maybeLbl = spec.artLabel;
+      if (maybeLbl == null) {
+        // Sprite is managed by routine, so vram tile not assigned at map level.
+        return Word(0);
+      }
+
+      artLbl = maybeLbl;
+    } else {
+      // Sprite is managed by routine, so vram tile not assigned at map level.
+      return Word(0);
     }
 
-    var sprite = spec.sprite;
-    var artLbl = _spriteArtLabels[sprite];
-
-    if (artLbl == null) {
-      throw Exception('no art label configured for sprite: $sprite');
-    }
-
-    var existing = _spritesTileNumbers[sprite];
+    var existing = _spritesTileNumbers[artLbl];
     if (existing != null) {
       return existing;
     }
 
+    // todo: vram tile width is actually variable per sprite
     var tileNumber = Word(
         _spriteVramOffset + _spritesTileNumbers.length * _vramOffsetPerSprite);
-    _spritesTileNumbers[sprite] = tileNumber;
+    _spritesTileNumbers[artLbl] = tileNumber;
 
     _spritesAsm.add(dc.w([tileNumber]));
     _spritesAsm.add(dc.l([artLbl]));
@@ -221,29 +269,32 @@ class MapAsmBuilder {
     return tileNumber;
   }
 
-  void _writeMapConfiguration(MapObject obj, Word? tileNumber, Byte dialogId) {
+  void _writeMapConfiguration(MapObject obj, Word tileNumber, Byte dialogId) {
     var spec = obj.spec;
     var facingAndDialog = dc.b([spec.startFacing.constant, dialogId]);
 
     _objectsAsm.add(comment(obj.id.toString()));
 
-    if (spec is Npc) {
-      var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
+    // hacky?
+    if (spec is Npc || spec is AsmSpec) {
+      Word routineIndex;
+      if (spec is Npc) {
+        var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
 
-      if (routine == null) {
-        throw Exception(
-            'no routine configured for npc behavior ${spec.behavior}');
+        if (routine == null) {
+          throw Exception(
+              'no routine configured for npc behavior ${spec.behavior}');
+        }
+        routineIndex = routine.index;
+      } else {
+        // analyzer should be smart enough to know spec is AsmSpec?
+        // but its not :(
+        spec = spec as AsmSpec;
+        routineIndex = spec.routine;
       }
 
-      _objectsAsm.add(dc.w([routine.index]));
+      _objectsAsm.add(dc.w([routineIndex]));
       _objectsAsm.add(facingAndDialog);
-
-      // TODO: i think you can use 0 for invisible / no sprite
-      // see Map_ZioFort
-      if (tileNumber == null) {
-        throw Exception('no tile number for sprite ${spec.sprite}');
-      }
-
       _objectsAsm.add(dc.w([tileNumber]));
     } else {
       var routine = _mapObjectSpecRoutines[spec];
@@ -343,7 +394,7 @@ palettes
 map data mgr
 ffff
  */
-GameMap asmToMap(Label mapLabel, Asm asm) {
+GameMap asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) {
   var reader = ConstantReader.asm(asm);
 
   // todo: can make return instead of mutate args
@@ -364,7 +415,7 @@ GameMap asmToMap(Label mapLabel, Asm asm) {
   reader.skipThrough(value: Size.w.maxValueSized, times: 2);
 
   var asmObjects = <_AsmObject>[];
-  _readObjects(reader, asmObjects);
+  _readObjects(reader, sprites, asmObjects);
 
   // skip treasure and tile animations
   reader.skipThrough(value: Size.w.maxValueSized, times: 2);
@@ -381,9 +432,7 @@ GameMap asmToMap(Label mapLabel, Asm asm) {
     dialogLabel = reader.readLabel();
   }
 
-  var dialogTree = DialogTree();
-
-  // asm = readNextDialogTree(asm, dialogTree);
+  var dialogTree = dialogLookup.byLabel(dialogLabel);
   var mapObjects = _buildObjects(sprites, asmObjects, dialogTree);
 
   var map = GameMap(_labelToMapId(mapLabel));
@@ -403,7 +452,8 @@ void _readSprites(ConstantReader reader, Map<Word, Label> sprites) {
   }
 }
 
-void _readObjects(ConstantReader reader, List<_AsmObject> objects) {
+void _readObjects(
+    ConstantReader reader, Map<Word, Label> sprites, List<_AsmObject> objects) {
   while (true) {
     var routineOrTerminate = reader.readWord();
 
@@ -418,19 +468,20 @@ void _readObjects(ConstantReader reader, List<_AsmObject> objects) {
     var y = reader.readWord();
 
     var spec = _specFactories[routineOrTerminate];
-    // todo: may want to have a spec which simply refers to the index
-    // this could be useful for keeping objects
-    // that we don't want to override.
-    // actually the whole parsing could be useful for keeping objects
-    // at their original memory locations
+
     if (spec == null) {
-      throw StateError(
-          'unknown map object routine at index $routineOrTerminate');
+      // In this case, we don't have this routine incorporated in the model
+      // So populate the model with an escape hatch: raw ASM
+      // We can decide to model in later if needed
+      var spriteLbl = sprites[vramTile];
+      spec = SpecFactory((d) => AsmSpec(
+          artLabel: spriteLbl, routine: routineOrTerminate, startFacing: d));
     }
 
     var position = Position(x.value * 8, y.value * 8);
 
     objects.add(_AsmObject(
+        routine: routineOrTerminate,
         spec: spec,
         facing: _byteToFacingDirection(facing),
         dialogId: dialogId,
@@ -448,6 +499,7 @@ Direction _byteToFacingDirection(Byte w) {
 }
 
 class _AsmObject {
+  final Word routine;
   final SpecFactory spec;
   final Direction facing;
   final Byte dialogId;
@@ -455,7 +507,8 @@ class _AsmObject {
   final Position position;
 
   _AsmObject(
-      {required this.spec,
+      {required this.routine,
+      required this.spec,
       required this.facing,
       required this.dialogId,
       required this.vramTile,
@@ -465,18 +518,34 @@ class _AsmObject {
 List<MapObject> _buildObjects(Map<Word, Label> sprites,
     List<_AsmObject> asmObjects, DialogTree dialogTree) {
   return asmObjects.map((asm) {
-    var spriteLbl = sprites[asm.vramTile];
-    var sprite = _spriteArtLabels.inverse[spriteLbl];
+    var artLbl = sprites[asm.vramTile];
+    var sprite = _spriteArtLabels.inverse[artLbl];
+    if (asm.spec.requiresSprite && sprite == null) {
+      // is it weird that we can't translate the asm to a label in round
+      // trip through the model even though we know it?
+      // maybe need to rethink how handling sprites
+      // it's an enum now but...
+      // maybe there should be a known list but not exclusive.
+      // on the other hand this would couple the model to the asm sort of
+      throw StateError('field object routine ${asm.routine} requires sprite '
+          'but none defined for art label: $artLbl');
+    }
     var spec = asm.spec(sprite, asm.facing);
 
-    // todo: scene from dialog
+    var scene = toScene(asm.dialogId.value, dialogTree);
 
-    return MapObject(startPosition: asm.position, spec: spec);
+    return MapObject(
+        startPosition: asm.position,
+        spec: spec,
+        onInteract: scene,
+        // Facing player (or not) will be parsed from the assembly,
+        // so don't automatically add here.
+        onInteractFacePlayer: false);
   }).toList(growable: false);
 }
 
 MapId _labelToMapId(Label lbl) {
-  var m = MapId.values.firstWhereOrNull((id) => Label('Map_$id') == lbl);
+  var m = MapId.values.firstWhereOrNull((id) => Label('Map_${id.name}') == lbl);
   if (m != null) return m;
   m = _fallbackMapIdsByLabel[lbl];
   if (m == null) {
@@ -489,6 +558,15 @@ final _fallbackMapIdsByLabel = {
   Label('Map_AcademyPrincipalOffice'): MapId.PiataAcademyPrincipalOffice,
   Label('Map_ChazHouse'): MapId.ShayHouse,
 };
+
+class AsmSpec extends MapObjectSpec {
+  final Label? artLabel;
+  final Word routine;
+  @override
+  final Direction startFacing;
+
+  AsmSpec({this.artLabel, required this.routine, required this.startFacing});
+}
 
 const _piataDialog = r'''
 ; $40

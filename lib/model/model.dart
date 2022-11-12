@@ -403,10 +403,26 @@ class Alys extends Character {
   const Alys();
   @override
   String toString() => 'Alys';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Alys && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => 0;
 }
 
 class Shay extends Character {
   const Shay();
   @override
   String toString() => 'Shay';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Shay && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => 0;
 }
