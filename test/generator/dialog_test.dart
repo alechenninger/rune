@@ -1,6 +1,7 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
@@ -291,6 +292,94 @@ void main() {
       var scene = toScene(0, DialogTree()..add(asm));
 
       expect(scene, Scene([]));
+    });
+
+    test('continue control code parses to separate dialogs', () {
+      var asm = DialogAsm.fromRaw(r'''	dc.b	"Thank you very much!"
+	dc.b	$FD
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+      var scene = toScene(0, DialogTree()..add(asm));
+
+      expect(
+          scene,
+          Scene([
+            Dialog(spans: DialogSpan.parse('Thank you very much!')),
+            Dialog(spans: DialogSpan.parse('I feel much safer now.'))
+          ]));
+    });
+
+    group('with event flag checks', () {
+      test('single branch scene', () {
+        var asm = DialogAsm.fromRaw(r'''	dc.b	$FA
+	dc.b	$0B, $01
+	dc.b	"Are you a hunter?"
+	dc.b	$FF
+
+	dc.b	"Thank you very much!"
+	dc.b	$FC
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+        var scene = toScene(0, DialogTree()..addAll(asm.split()));
+
+        expect(
+            scene,
+            Scene([
+              IfFlag(EventFlag('Igglanova'), isSet: [
+                Dialog(
+                    spans: DialogSpan.parse(
+                        'Thank you very much! I feel much safer now.'))
+              ], isUnset: [
+                Dialog(spans: DialogSpan.parse('Are you a hunter?'))
+              ])
+            ]));
+      });
+
+      test('multi branch scene', () {
+        var asm = DialogAsm.fromRaw(r'''; 0
+	dc.b	$FA
+	dc.b	$DA, $03
+	dc.b	$FA
+	dc.b	$34, $02
+	dc.b	$FA
+	dc.b	$0B, $01
+	dc.b	"Are you a hunter?"
+	dc.b	$FF
+
+; $1
+	dc.b	"Thank you very much!"
+	dc.b	$FF
+
+; $2
+	dc.b	"Thank you again"
+	dc.b	$FF
+
+; $3
+	dc.b	"What's going to happen now?"
+	dc.b	$FF''');
+
+        var scene = toScene(0, DialogTree()..addAll(asm.split()));
+
+        expect(
+            scene,
+            Scene([
+              IfFlag(EventFlag('Reunion'), isSet: [
+                Dialog(spans: DialogSpan.parse("What's going to happen now?"))
+              ], isUnset: [
+                IfFlag(EventFlag('BioPlantEscape'), isSet: [
+                  Dialog(spans: DialogSpan.parse('Thank you again'))
+                ], isUnset: [
+                  IfFlag(EventFlag('Igglanova'), isSet: [
+                    Dialog(spans: DialogSpan.parse('Thank you very much!'))
+                  ], isUnset: [
+                    Dialog(spans: DialogSpan.parse('Are you a hunter?'))
+                  ])
+                ])
+              ]),
+            ]));
+      });
     });
   });
 }

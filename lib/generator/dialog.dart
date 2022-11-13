@@ -1,15 +1,17 @@
+import 'dart:collection';
 import 'dart:math';
 
 import 'package:characters/characters.dart';
 import 'package:charcode/ascii.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
-import 'package:rune/generator/generator.dart';
-import 'package:rune/model/conditional.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
+import '../asm/events.dart';
 import '../characters.dart';
+import '../model/conditional.dart';
 import '../model/model.dart';
+import 'generator.dart';
 
 class DialogAsm extends Asm {
   DialogAsm.empty() : super.empty();
@@ -97,44 +99,87 @@ extension DialogToAsm on Dialog {
 }
 
 Scene toScene(int dialogId, DialogTree tree) {
-  var context = ParseContext(dialogId, tree);
+  var constants =
+      ConstantIterator(tree[dialogId].iterator).toList(growable: false);
+  var events = <Event>[];
 
-  for (var ins in tree[dialogId]) {
-    if (ins.cmd != null && ins.cmd != 'dc.b') {
-      throw UnimplementedError();
-      // return dialogs;
-    }
+  var lastByteIds = Queue<int>();
+  var lastDialogIds = Queue<int>();
+  var lastConstants = Queue<List<Sized>>();
 
-    var bytes = ins.operands.cast<Expression>();
+  var byteId = 0;
 
-    for (context.next = 0; context.next < bytes.length;) {
-      // based on what this byte is, and what the current state is,
-      // we might switch to a different state of the parsing
-      // some parsing states recurse (like when there is an event flag check)
-      context.parse(bytes);
-    }
+  advanceDialog(int offset) {
+    lastByteIds.add(byteId);
+    lastDialogIds.add(dialogId);
+    lastConstants.add(constants);
+    // since we want to start at the beginning of offset dialog,
+    // set to -1 prior to for loop increment
+    byteId = -1;
+    dialogId = dialogId + offset;
+    constants =
+        ConstantIterator(tree[dialogId].iterator).toList(growable: false);
   }
 
-  return Scene(context.events);
+  returnDialog() {
+    // subtract once since byteId will advance after this iteration
+    // and we want to return to last byte, not move past it.
+    byteId = lastByteIds.removeLast() - 1;
+    dialogId = lastDialogIds.removeLast();
+    constants = lastConstants.removeLast();
+  }
+
+  var context = ParseContext(
+    events,
+    moveBack: () => byteId--,
+    advance: advanceDialog,
+    returnToLast: returnDialog,
+  );
+
+  for (; byteId < constants.length; byteId++) {
+    var byte = constants[byteId];
+    context.state(byte, context);
+  }
+
+  return Scene(events);
 }
 
 class ParseContext {
-  int dialogId;
-  DialogTree tree;
+  /// should not be used by states directly
+  final Function() _moveBack;
 
-  int next = 0;
-  DialogParseState state = DialogState();
-  final events = <Event>[];
+  /// should not be used by states directly
+  final Function(int) _advance;
 
-  ParseContext(this.dialogId, this.tree);
+  /// should not be used by states directly
+  final Function() _returnToLast;
 
-  void parse(List<Expression> bytes) {
-    state(bytes[next++], this);
+  late DialogParseState state;
+
+  ParseContext(List<Event> events,
+      {required Function() moveBack,
+      required Function(int) advance,
+      required Function() returnToLast})
+      : _moveBack = moveBack,
+        _advance = advance,
+        _returnToLast = returnToLast {
+    state = DialogState(events);
   }
 
+  /// reparses the last byte with new state of [state]
   void reparseWith(DialogParseState state) {
-    next--;
+    _moveBack();
     this.state = state;
+  }
+
+  void advanceDialogsBy(int offset, {required DialogState newState}) {
+    _advance(offset);
+    state = newState;
+  }
+
+  void returnToLastDialog({required DialogState newState}) {
+    _returnToLast();
+    state = newState;
   }
 }
 
@@ -142,26 +187,11 @@ abstract class DialogParseState {
   void call(Expression byte, ParseContext context);
 }
 
-// just keeping this around in case i want to go this route again
-// each parse state was a callable class...
-// parse() {
-//   var result = parseState(b);
-//
-//   var newState = result.newState;
-//   if (newState != null) {
-//     if (parseState is _SpanParse) {
-//       var span = parseState.span();
-//     }
-//   }
-//
-//   if (!result.parsed) {
-//     parse();
-//   }
-// }
-//
-// parse();
 class DialogState implements DialogParseState {
   Speaker? speaker;
+  final List<Event> events;
+
+  DialogState(this.events);
 
   @override
   void call(Expression byte, ParseContext context) {
@@ -171,11 +201,26 @@ class DialogState implements DialogParseState {
 
     if (byte == Byte(0xF4)) {
       context.state = PortraitState(this);
+    } else if (byte == Byte(0xFA)) {
+      context.state = EventCheckState(this);
+    } else if (byte == Byte(0xFF)) {
+      terminate(context);
     } else if (byte.value >= 0xF2) {
       // todo: this should be the state that handles all that stuff
     } else {
-      context.reparseWith(SpanState(speaker));
+      context.reparseWith(SpanState(this));
     }
+  }
+
+  void terminate(ParseContext context) {
+    context.state = DoneState();
+  }
+}
+
+class DoneState implements DialogParseState {
+  @override
+  void call(Expression byte, ParseContext context) {
+    throw StateError('todo');
   }
 }
 
@@ -196,10 +241,10 @@ class PortraitState implements DialogParseState {
 }
 
 class SpanState implements DialogParseState {
-  final Speaker? speaker;
+  final DialogState parent;
   final _buffer = StringBuffer();
 
-  SpanState(this.speaker);
+  SpanState(this.parent);
 
   DialogSpan span() {
     return DialogSpan(_buffer.toString());
@@ -229,21 +274,19 @@ class SpanState implements DialogParseState {
   void done(ParseContext context) {
     var s = span();
     if (s.text.isNotEmpty) {
-      var dialog = Dialog(speaker: speaker, spans: [s]);
-      context.events.add(dialog);
+      var dialog = Dialog(speaker: parent.speaker, spans: [s]);
+      parent.events.add(dialog);
     }
-    context.reparseWith(DialogState());
+    context.reparseWith(parent);
   }
 }
 
-class _EventCheck implements DialogParseState {
+class EventCheckState implements DialogParseState {
   EventFlag? flag;
-  int? ifSetOffset;
-  List<Event> ifSet = [];
-  List<Event> ifUnset = [];
 
-  late ParseContext branchContext; // todo
-  DialogParseState branchState = DialogState();
+  final DialogState parent;
+
+  EventCheckState(this.parent);
 
   @override
   void call(Expression byte, ParseContext context) {
@@ -257,21 +300,47 @@ class _EventCheck implements DialogParseState {
           'expected byte expression to be of type Byte');
     }
 
-    if (ifSetOffset == null) {
-      ifSetOffset = byte.value;
-      return;
-    }
-
-    // continue for if unset branch
-    // state(byte);
-
-    // then do if set branch at different dialog in tree
+    var ifSetOffset = byte.value;
+    context.state = IfUnsetState(flag!, ifSetOffset, parent);
   }
 }
 
-EventFlag? toEventFlag(Expression byte) {
-  // TODO
-  return EventFlag('TODO');
+class IfUnsetState extends DialogState {
+  final EventFlag flag;
+  final int ifSetOffset;
+  final DialogState parent;
+
+  IfUnsetState(this.flag, this.ifSetOffset, this.parent) : super([]);
+
+  @override
+  void terminate(ParseContext context) {
+    context.advanceDialogsBy(ifSetOffset,
+        newState: IfSetState(flag, parent, events));
+  }
+}
+
+class IfSetState extends DialogState {
+  final EventFlag flag;
+  final DialogState parent;
+  final List<Event> ifUnset;
+
+  IfSetState(this.flag, this.parent, this.ifUnset) : super([]);
+
+  @override
+  void terminate(ParseContext context) {
+    context.returnToLastDialog(newState: parent);
+    parent.events.add(IfFlag(flag, isSet: events, isUnset: ifUnset));
+  }
+}
+
+// todo: relies on constant globals. fine?
+EventFlag toEventFlag(Expression byte) {
+  var constant = eventFlags.inverse[byte];
+  if (constant == null) {
+    throw ArgumentError.value(byte, 'byte', 'is not a known event flag');
+  }
+  var name = constant.constant.replaceFirst('EventFlag_', '');
+  return EventFlag(name);
 }
 
 /*
