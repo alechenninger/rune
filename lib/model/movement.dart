@@ -161,13 +161,16 @@ const down = Direction.down;
 const left = Direction.left;
 const right = Direction.right;
 
-class Direction {
+// This can just be an enum! Let's fix it to make generation easier.
+// That was easy :D
+enum Direction {
+  up(Position(0, -1)),
+  left(Position(-1, 0)),
+  right(Position(1, 0)),
+  down(Position(0, 1));
+
   final Position normal;
-  const Direction._(this.normal);
-  static const up = Direction._(Position(0, -1));
-  static const left = Direction._(Position(-1, 0));
-  static const right = Direction._(Position(1, 0));
-  static const down = Direction._(Position(0, 1));
+  const Direction(this.normal);
 
   static Direction ofPosition(Position p) {
     if (p.x * p.y != 0 || p.x + p.y == 0) {
@@ -195,25 +198,27 @@ class Direction {
   }
 }
 
-class Axis {
-  final Position _normal;
+enum Axis {
+  x(Direction.right),
+  y(Direction.down);
 
-  const Axis._(this._normal);
+  final Direction _normal;
 
-  static final x = Axis._(Position(1, 0));
-  static final y = Axis._(Position(0, 1));
+  const Axis(this._normal);
 
   // todo: eh?
-  Direction get direction => Direction._(_normal);
-  Axis get perpendicular => Axis._(Position(_normal.y, _normal.x));
-
-  Position operator *(Position p) {
-    return Position(p.x * _normal.x, p.y * _normal.y);
+  Direction get direction => _normal;
+  Axis get perpendicular {
+    switch (this) {
+      case Axis.x:
+        return y;
+      case Axis.y:
+        return x;
+    }
   }
 
-  @override
-  String toString() {
-    return 'Axis.${_normal.x > 0 ? 'x' : 'y'}';
+  Position operator *(Position p) {
+    return Position(p.x * _normal.normal.x, p.y * _normal.normal.y);
   }
 }
 

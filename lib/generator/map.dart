@@ -75,11 +75,13 @@ final _defaultDialogs = {
 DialogTree _defaultDialogTree(MapId map) =>
     _defaultDialogs[map] ?? DialogTree();
 
+// todo: default to convention & allow override
 final _spriteArtLabels = BiMap<Sprite, Label>()
   ..addAll({
     Sprite.PalmanMan1: Label('Art_PalmanMan1'),
     Sprite.PalmanMan2: Label('Art_PalmanMan2'),
     Sprite.PalmanMan3: Label('Art_PalmanMan3'),
+    Sprite.PalmanOldMan1: Label('Art_PalmanOldMan1'),
     Sprite.PalmanWoman1: Label('Art_PalmanWoman1'),
     Sprite.PalmanWoman2: Label('Art_PalmanWoman2'),
     Sprite.PalmanWoman3: Label('Art_PalmanWoman3'),

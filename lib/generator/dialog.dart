@@ -23,6 +23,8 @@ class DialogAsm extends Asm {
           dc.b([Byte(0xff)])
         ]);
 
+  DialogTree splitToTree() => DialogTree()..addAll(split());
+
   /// If the ASM contains multiple dialogs, split each into their own element.
   ///
   /// A dialog must be terminated for it to be considered.
@@ -103,42 +105,42 @@ Scene toScene(int dialogId, DialogTree tree) {
       ConstantIterator(tree[dialogId].iterator).toList(growable: false);
   var events = <Event>[];
 
-  var lastByteIds = Queue<int>();
+  var lastConstIds = Queue<int>();
   var lastDialogIds = Queue<int>();
   var lastConstants = Queue<List<Sized>>();
 
-  var byteId = 0;
+  var constId = 0;
 
   advanceDialog(int offset) {
-    lastByteIds.add(byteId);
+    lastConstIds.add(constId);
     lastDialogIds.add(dialogId);
     lastConstants.add(constants);
     // since we want to start at the beginning of offset dialog,
     // set to -1 prior to for loop increment
-    byteId = -1;
+    constId = -1;
     dialogId = dialogId + offset;
     constants =
         ConstantIterator(tree[dialogId].iterator).toList(growable: false);
   }
 
   returnDialog() {
-    // subtract once since byteId will advance after this iteration
-    // and we want to return to last byte, not move past it.
-    byteId = lastByteIds.removeLast() - 1;
+    // subtract once since constId will advance after this iteration
+    // and we want to return to last constant, not move past it.
+    constId = lastConstIds.removeLast() - 1;
     dialogId = lastDialogIds.removeLast();
     constants = lastConstants.removeLast();
   }
 
   var context = ParseContext(
     events,
-    moveBack: () => byteId--,
+    moveBack: () => constId--,
     advance: advanceDialog,
     returnToLast: returnDialog,
   );
 
-  for (; byteId < constants.length; byteId++) {
-    var byte = constants[byteId];
-    context.state(byte, context);
+  for (; constId < constants.length; constId++) {
+    var constant = constants[constId];
+    context.state(constant, context);
   }
 
   return Scene(events);
@@ -184,7 +186,7 @@ class ParseContext {
 }
 
 abstract class DialogParseState {
-  void call(Expression byte, ParseContext context);
+  void call(Expression constant, ParseContext context);
 }
 
 class DialogState implements DialogParseState {
@@ -194,18 +196,21 @@ class DialogState implements DialogParseState {
   DialogState(this.events);
 
   @override
-  void call(Expression byte, ParseContext context) {
-    if (byte is! Byte) {
-      throw ArgumentError.value(byte, 'byte', 'expected Byte');
-    }
-
-    if (byte == Byte(0xF4)) {
+  void call(Expression constant, ParseContext context) {
+    if (constant == Byte(0xF2)) {
+      // todo: action in next byte
+    } else if (constant == Byte(0xF4)) {
       context.state = PortraitState(this);
-    } else if (byte == Byte(0xFA)) {
-      context.state = EventCheckState(this);
-    } else if (byte == Byte(0xFF)) {
+    } else if (constant == Byte(0xF6)) {
+      // todo: add event and terminate
+      // just terminate now for testing
+      events.add(Dialog(spans: DialogSpan.parse('------event-----')));
       terminate(context);
-    } else if (byte.value >= 0xF2) {
+    } else if (constant == Byte(0xFA)) {
+      context.state = EventCheckState(this);
+    } else if (constant == Byte(0xFF)) {
+      terminate(context);
+    } else if (constant is Byte && constant.value >= 0xF2) {
       // todo: this should be the state that handles all that stuff
     } else {
       context.reparseWith(SpanState(this));
@@ -219,8 +224,8 @@ class DialogState implements DialogParseState {
 
 class DoneState implements DialogParseState {
   @override
-  void call(Expression byte, ParseContext context) {
-    throw StateError('todo');
+  void call(Expression constant, ParseContext context) {
+    //throw StateError('todo');
   }
 }
 
@@ -230,12 +235,12 @@ class PortraitState implements DialogParseState {
   PortraitState(this.parent);
 
   @override
-  void call(Expression byte, ParseContext context) {
-    if (byte is! Byte) {
-      throw ArgumentError.value(byte, 'byte', 'expected Byte');
+  void call(Expression constant, ParseContext context) {
+    if (constant is! Byte) {
+      throw ArgumentError.value(constant, 'byte', 'expected Byte');
     }
 
-    parent.speaker = toSpeaker(byte);
+    parent.speaker = toSpeaker(constant);
     context.state = parent;
   }
 }
@@ -251,23 +256,23 @@ class SpanState implements DialogParseState {
   }
 
   @override
-  void call(Expression byte, ParseContext context) {
-    if (byte is! Byte) {
+  void call(Expression constant, ParseContext context) {
+    if (constant is! Byte) {
       done(context);
       return;
     }
 
-    if (byte == Byte(0xFC)) {
+    if (constant == Byte(0xFC)) {
       // TODO: should do newline?
       _buffer.write(' ');
     } else {
-      if (byte.value >= 0xF2) {
+      if (constant.value >= 0xF2) {
         // unsupported control code or terminator...
         done(context);
         return;
       }
 
-      _buffer.write(String.fromCharCode(byte.value));
+      _buffer.write(String.fromCharCode(constant.value));
     }
   }
 
@@ -289,18 +294,18 @@ class EventCheckState implements DialogParseState {
   EventCheckState(this.parent);
 
   @override
-  void call(Expression byte, ParseContext context) {
+  void call(Expression constant, ParseContext context) {
     if (flag == null) {
-      flag = toEventFlag(byte);
+      flag = toEventFlag(constant);
       return;
     }
 
-    if (byte is! Byte) {
-      throw ArgumentError.value(byte.runtimeType, 'byte.runtimeType',
+    if (constant is! Byte) {
+      throw ArgumentError.value(constant.runtimeType, 'byte.runtimeType',
           'expected byte expression to be of type Byte');
     }
 
-    var ifSetOffset = byte.value;
+    var ifSetOffset = constant.value;
     context.state = IfUnsetState(flag!, ifSetOffset, parent);
   }
 }
@@ -342,12 +347,6 @@ EventFlag toEventFlag(Expression byte) {
   var name = constant.constant.replaceFirst('EventFlag_', '');
   return EventFlag(name);
 }
-
-/*
-parse states:
-event flag (may have child states)
-portrait
- */
 
 final _transforms = {
   '‘': '[',
@@ -518,7 +517,9 @@ Speaker toSpeaker(Byte byte) {
   var speaker = Portrait._index[byte.value];
 
   if (speaker == null) {
-    throw UnsupportedError('$byte');
+    // FIXME temporary hack
+    return UnnamedSpeaker();
+    // throw UnsupportedError('$byte');
   }
 
   return speaker;

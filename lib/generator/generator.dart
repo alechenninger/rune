@@ -1275,6 +1275,20 @@ class Condition {
   }
 }
 
+// TODO implement DialogTreeLookup
 abstract class DialogTreeLookup {
   DialogTree byLabel(Label lbl);
+}
+
+class TestDialogTreeLookup extends DialogTreeLookup {
+  final _treeByLabel = <Label, DialogTree>{};
+
+  TestDialogTreeLookup(Map<Label, DialogTree> trees) {
+    _treeByLabel.addAll(trees);
+  }
+
+  @override
+  DialogTree byLabel(Label lbl) =>
+      // wow what a hack :laugh:
+      _treeByLabel[lbl] ?? (throw StateError('no such dialog tree: $lbl'));
 }
