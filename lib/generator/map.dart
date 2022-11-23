@@ -368,34 +368,7 @@ extension ObjectAddress on GameMap {
   }
 }
 
-/*
-...
-ffff
-sprites
-ffff < sometimes included in l
-ffff < sometimes split across b
-ffff < sometimes split across b
-map updates
-ff
-map transition data
-ffff
-map transition data 2
-ffff
-objects
-ffff
-treasure
-ffff
-tile animations
-ffff
-dialog
-interaction areas
-ffff
-events
-ff
-palettes
-map data mgr
-ffff
- */
+// todo: maplabel should probably just be MapId?
 GameMap asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) {
   var reader = ConstantReader.asm(asm);
 
@@ -425,8 +398,9 @@ GameMap asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) {
   // on maps there are 2 labels before dialog,
   // except on motavia and dezolis
   // (this is simply hard coded based on map IDs)
+  var mapId = _labelToMapId(mapLabel);
   Label dialogLabel;
-  if ([Label('Map_Motavia'), Label('Map_Dezolis')].contains(mapLabel)) {
+  if ([MapId.Motavia, MapId.Dezolis].contains(mapId)) {
     dialogLabel = reader.readLabel();
   } else {
     reader.readLabel();
@@ -437,7 +411,7 @@ GameMap asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) {
   var dialogTree = dialogLookup.byLabel(dialogLabel);
   var mapObjects = _buildObjects(sprites, asmObjects, dialogTree);
 
-  var map = GameMap(_labelToMapId(mapLabel));
+  var map = GameMap(mapId);
   mapObjects.forEach(map.addObject);
 
   return map;

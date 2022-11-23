@@ -39,12 +39,14 @@ class GameMap {
 
 enum MapId {
   Aiedo,
+  Dezolis,
+  Motavia,
   Piata,
   PiataAcademyF1,
   PiataAcademyPrincipalOffice,
   ShayHouse,
   Tonoe,
-  Test
+  Test,
 }
 
 class MapObject extends FieldObject {
