@@ -192,6 +192,9 @@ class Span {
 }
 
 abstract class Speaker {
+  /// Returns the [Speaker] if they have a well known [name].
+  ///
+  /// Case insensitive.
   static Speaker? byName(String name) {
     switch (name.toLowerCase()) {
       case 'alys':
@@ -207,7 +210,7 @@ abstract class Speaker {
 }
 
 class UnnamedSpeaker implements Speaker {
-  const UnnamedSpeaker();
+  //const UnnamedSpeaker();
 
   @override
   bool operator ==(Object other) =>

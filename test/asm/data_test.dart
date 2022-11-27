@@ -14,6 +14,49 @@ void main() {
       var b = Byte(254);
       expect(b.toString(), equals(r'$FE'));
     });
+
+    test('isNegative & isPositive', () {
+      expect(Byte(0x80).isNegative, isTrue);
+      expect(Byte(0x80).isPositive, isFalse);
+      expect(Byte(0xFF).isNegative, isTrue);
+      expect(Byte(0xFF).isPositive, isFalse);
+      expect(Byte(0x7F).isPositive, isTrue);
+      expect(Byte(0x7F).isNegative, isFalse);
+      expect(Byte(0x00).isNegative, isFalse);
+      expect(Byte(0x00).isPositive, isTrue);
+      expect(Byte(0x01).isNegative, isFalse);
+      expect(Byte(0x01).isPositive, isTrue);
+    });
+  });
+
+  group('word', () {
+    test('isNegative & isPositive', () {
+      expect(Word(0x8000).isNegative, isTrue);
+      expect(Word(0x8000).isPositive, isFalse);
+      expect(Word(0xFFFF).isNegative, isTrue);
+      expect(Word(0xFFFF).isPositive, isFalse);
+      expect(Word(0x7FFF).isPositive, isTrue);
+      expect(Word(0x7FFF).isNegative, isFalse);
+      expect(Word(0x0000).isNegative, isFalse);
+      expect(Word(0x0000).isPositive, isTrue);
+      expect(Word(0x0001).isNegative, isFalse);
+      expect(Word(0x0001).isPositive, isTrue);
+    });
+  });
+
+  group('longword', () {
+    test('isNegative & isPositive', () {
+      expect(Longword(0x80000000).isNegative, isTrue);
+      expect(Longword(0x80000000).isPositive, isFalse);
+      expect(Longword(0xFFFFFFFF).isNegative, isTrue);
+      expect(Longword(0xFFFFFFFF).isPositive, isFalse);
+      expect(Longword(0x7FFFFFFF).isPositive, isTrue);
+      expect(Longword(0x7FFFFFFF).isNegative, isFalse);
+      expect(Longword(0x00000000).isNegative, isFalse);
+      expect(Longword(0x00000000).isPositive, isTrue);
+      expect(Longword(0x00000001).isNegative, isFalse);
+      expect(Longword(0x00000001).isPositive, isTrue);
+    });
   });
 
   group('bytes', () {

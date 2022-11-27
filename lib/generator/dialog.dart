@@ -100,7 +100,11 @@ extension DialogToAsm on Dialog {
   }
 }
 
-Scene toScene(int dialogId, DialogTree tree) {
+Scene toScene(int dialogId, DialogTree tree, {Speaker? defaultSpeaker}) {
+  if (dialogId >= tree.length) {
+    return Scene.none();
+  }
+
   var constants =
       ConstantIterator(tree[dialogId].iterator).toList(growable: false);
   var events = <Event>[];
@@ -133,6 +137,7 @@ Scene toScene(int dialogId, DialogTree tree) {
 
   var context = ParseContext(
     events,
+    defaultSpeaker: defaultSpeaker,
     moveBack: () => constId--,
     advance: advanceDialog,
     returnToLast: returnDialog,
@@ -161,11 +166,12 @@ class ParseContext {
   ParseContext(List<Event> events,
       {required Function() moveBack,
       required Function(int) advance,
-      required Function() returnToLast})
+      required Function() returnToLast,
+      Speaker? defaultSpeaker})
       : _moveBack = moveBack,
         _advance = advance,
         _returnToLast = returnToLast {
-    state = DialogState(events);
+    state = DialogState(events, defaultSpeaker: defaultSpeaker);
   }
 
   /// reparses the last byte with new state of [state]
@@ -193,12 +199,14 @@ class DialogState implements DialogParseState {
   Speaker? speaker;
   final List<Event> events;
 
-  DialogState(this.events);
+  DialogState(this.events, {Speaker? defaultSpeaker})
+      : speaker = defaultSpeaker;
 
   @override
   void call(Expression constant, ParseContext context) {
     if (constant == Byte(0xF2)) {
       // todo: action in next byte
+      throw 'todo action control code';
     } else if (constant == Byte(0xF4)) {
       context.state = PortraitState(this);
     } else if (constant == Byte(0xF6)) {
@@ -315,6 +323,9 @@ class IfUnsetState extends DialogState {
   final int ifSetOffset;
   final DialogState parent;
 
+  @override
+  Speaker? get speaker => parent.speaker;
+
   IfUnsetState(this.flag, this.ifSetOffset, this.parent) : super([]);
 
   @override
@@ -329,6 +340,9 @@ class IfSetState extends DialogState {
   final DialogState parent;
   final List<Event> ifUnset;
 
+  @override
+  Speaker? get speaker => parent.speaker;
+
   IfSetState(this.flag, this.parent, this.ifUnset) : super([]);
 
   @override
@@ -342,7 +356,7 @@ class IfSetState extends DialogState {
 EventFlag toEventFlag(Expression byte) {
   var constant = eventFlags.inverse[byte];
   if (constant == null) {
-    throw ArgumentError.value(byte, 'byte', 'is not a known event flag');
+    return EventFlag('unknown_$byte');
   }
   var name = constant.constant.replaceFirst('EventFlag_', '');
   return EventFlag(name);

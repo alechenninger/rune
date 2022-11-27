@@ -271,6 +271,13 @@ abstract class SizedValue extends Value implements Sized {
 
   const SizedValue._(int value) : super.constant(value);
 
+  bool get isNegative => value > size.maxValue ~/ 2;
+  bool get isPositive => value <= size.maxValue ~/ 2;
+
+  // TODO: need a model representation of this
+  // can't use Value because negative integers aren't valid expressions
+  // int get signed => isPositive ? value :
+
   /// Size in bytes
   @override
   Size get size;

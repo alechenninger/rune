@@ -98,6 +98,7 @@ class ClrMnemonic {
   Asm w(Address dst) => cmd('clr.w', [dst]);
 }
 
+/// http://68k.hax.com/TST
 class TstMnemonic {
   const TstMnemonic();
   Asm b(Address dst) => cmd('tst.b', [dst]);

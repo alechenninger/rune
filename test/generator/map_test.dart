@@ -91,7 +91,7 @@ void main() {
         ]));
   });
 
-  test('multiples sprites tile numbers are separated by 0x48', () {
+  test('multiple sprites tile numbers are separated by 0x48', () {
     testMap.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
@@ -157,6 +157,76 @@ void main() {
     expect(objectsAsm[12], dc.w(['360'.hex.toWord]));
   });
 
+  test('objects requiring fewer tiles use fewer tiles', () {
+    testMap.addObject(MapObject(
+        startPosition: Position('1e0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan1, FaceDownLegsHiddenNoInteraction()),
+        onInteract: Scene([
+          Dialog(spans: [DialogSpan('Hello world!')])
+        ])));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('1f0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanWoman1, FaceDown()),
+        onInteract: Scene([
+          Dialog(spans: [DialogSpan('Hello world!')])
+        ])));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('200'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()),
+        onInteract: Scene([
+          Dialog(spans: [DialogSpan('Hello world!')])
+        ])));
+
+    var mapAsm = program.addMap(testMap);
+
+    expect(
+        mapAsm.sprites,
+        Asm([
+          dc.w(['2d0'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan1')]),
+          dc.w(['2d8'.hex.toWord]),
+          dc.l([Constant('Art_PalmanWoman1')]),
+          dc.w(['320'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan2')]),
+        ]));
+  });
+
+  test('sprite uses the max needed vram tile width when reused', () {
+    testMap.addObject(MapObject(
+        startPosition: Position('1e0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan1, FaceDownLegsHiddenNoInteraction()),
+        onInteract: Scene([
+          Dialog(spans: [DialogSpan('Hello world!')])
+        ])));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('1f0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
+        onInteract: Scene([
+          Dialog(spans: [DialogSpan('Hello world!')])
+        ])));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('200'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()),
+        onInteract: Scene([
+          Dialog(spans: [DialogSpan('Hello world!')])
+        ])));
+
+    var mapAsm = program.addMap(testMap);
+
+    expect(
+        mapAsm.sprites,
+        Asm([
+          dc.w(['2d0'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan1')]),
+          dc.w(['318'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan2')]),
+        ]));
+  });
+
   test('sprites are reused for multiple objects of the same sprite', () {
     testMap.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
@@ -195,9 +265,9 @@ void main() {
     expect(objectsAsm[12], dc.w(['2d0'.hex.toWord]));
   });
 
-  test('objects use position divided by 8', () {});
+  test('objects use position divided by 8', () {}, skip: 'todo');
 
-  test('objects use correct facing direction', () {});
+  test('objects use correct facing direction', () {}, skip: 'todo');
 
   test('objects with no dialog still terminate dialog', () {
     var obj = MapObject(
@@ -403,6 +473,63 @@ void main() {
       // var map = asmToMap(Label('Map_Tonoe'), asm);
       // print(map);
     });
+  }, skip: 'need to implement for real');
+
+  group('parses map from asm', () {
+    test('dialog without portraits in npc interactions assumes npc is speaker',
+        () async {
+      // not sure how much i like this...
+
+      var asm = Asm.fromRaw(testMapAsm);
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogTree()
+          ..add(DialogAsm([
+            dc.b(Bytes.ascii('Hi there!')),
+            dc.b([Byte(0xff)])
+          ]))
+      });
+      var map = await asmToMap(Label('Map_Test'), asm, dialog);
+
+      expect(map.objects, hasLength(1));
+
+      var obj = map.objects.first;
+
+      expect(obj.onInteract,
+          Scene([Dialog(speaker: obj, spans: DialogSpan.parse('Hi there!'))]));
+    });
+
+    test(
+        'dialog without portraits in conditional npc interactions assumes npc is speaker',
+        () async {
+      // not sure how much i like this...
+
+      var asm = Asm.fromRaw(testMapAsm);
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogAsm([
+          dc.b([Byte(0xfa)]),
+          dc.b(Bytes.list([0x0b, 0x01])),
+          dc.b(Bytes.ascii('Hi there!')),
+          dc.b([Byte(0xff)]),
+          dc.b(Bytes.ascii('Bye!')),
+          dc.b([Byte(0xff)])
+        ]).splitToTree()
+      });
+      var map = await asmToMap(Label('Map_Test'), asm, dialog);
+
+      expect(map.objects, hasLength(1));
+
+      var obj = map.objects.first;
+
+      expect(
+          obj.onInteract,
+          Scene([
+            IfFlag(toEventFlag(Byte(0x0b)), isUnset: [
+              Dialog(speaker: obj, spans: DialogSpan.parse('Hi there!'))
+            ], isSet: [
+              Dialog(speaker: obj, spans: DialogSpan.parse('Bye!'))
+            ])
+          ]));
+    });
   });
 }
 
@@ -579,6 +706,61 @@ var tonoeAsm = r'''Map_Tonoe:
 	dc.w	9
 	dc.b	0, 0, 0, $7C
 
+	dc.w	$FFFF
+
+; Events
+	dc.b	$00
+	dc.b	$FF
+
+; Palettes address
+	dc.l	Pal_Tonoe
+
+	dc.b	$00, $00, $00, $00
+
+; Map data manager
+	dc.w	$FFFF
+	''';
+
+var testMapAsm = r'''Map_Test:
+	dc.b	$08
+	dc.b	MusicID_TonoeDePon
+	dc.l	$FFFF02A8
+	dc.l	Art_PalmanMan1
+	dc.w	$FFFF
+	dc.b	$FF, $FF, $1F, $1F, $1F, $1F, $01, $00, $00, $01, $00, $01
+	dc.l	loc_122A90
+	dc.l	loc_13EECC
+	dc.w	$FFFF
+
+; Map update
+	dc.b	$00
+	dc.b	$FF
+
+; Map transition data
+	dc.w	$FFFF
+
+; Map transition data 2
+	dc.w	$FFFF
+
+; Objects
+	dc.w	$3C
+	dc.b	$00, $00
+	dc.w	$2A8
+	dc.w	$2E, $58
+
+	dc.w	$FFFF
+
+; Treasure chests
+	dc.w	$FFFF
+
+; Tile animations
+	dc.w	$FFFF
+
+	dc.l	loc_13F23C
+	dc.l	loc_13F3AC
+	dc.l	TestDialogTree
+
+; Interaction areas
 	dc.w	$FFFF
 
 ; Events

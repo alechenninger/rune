@@ -44,6 +44,21 @@ import 'text.dart' as text;
 export '../asm/asm.dart' show Asm;
 export 'deprecated.dart';
 
+// These offsets are used to account for assembly specifics, which allows for
+// variances in maps to be coded manually (such as objects).
+// todo: it might be nice to manage these with the assembly or the compiler
+//  itself rather than hard coding here.
+//  Program API would be the right place now that we have that.
+// todo: see generator/map.dart for more of stuff like this
+
+final _spriteVramOffsets = {
+  MapId.Test: 0x2d0,
+  MapId.Aiedo: 0x29A,
+  MapId.Piata: 0x360, // Map_Pata, normally 2D0
+  MapId.PiataAcademyF1: 0x27F, // Map_PiataAcademy_F1
+  MapId.PiataAcademyPrincipalOffice: 0x27F, // Map_AcademyPrincipalOffice
+};
+
 // tracks global state about the program code
 // e.g. event pointers
 // could also use to save generation as it is done, relative to the state
@@ -106,11 +121,11 @@ class Program {
   }
 
   MapAsm addMap(GameMap map) {
-    var builder = MapAsmBuilder(map, _ProgramEventRoutines(this));
-    for (var obj in map.objects) {
-      builder.addObject(obj);
-    }
-    return _maps[map.id] = builder.build();
+    // todo: can we inject these differently so it's more testable?
+    // fixme: nonnull assertion
+    var spriteVramOffset = _spriteVramOffsets[map.id]!;
+    return _maps[map.id] =
+        compileMap(map, _ProgramEventRoutines(this), spriteVramOffset);
   }
 }
 
@@ -1275,9 +1290,8 @@ class Condition {
   }
 }
 
-// TODO implement DialogTreeLookup
 abstract class DialogTreeLookup {
-  DialogTree byLabel(Label lbl);
+  Future<DialogTree> byLabel(Label lbl);
 }
 
 class TestDialogTreeLookup extends DialogTreeLookup {
@@ -1288,7 +1302,8 @@ class TestDialogTreeLookup extends DialogTreeLookup {
   }
 
   @override
-  DialogTree byLabel(Label lbl) =>
-      // wow what a hack :laugh:
-      _treeByLabel[lbl] ?? (throw StateError('no such dialog tree: $lbl'));
+  Future<DialogTree> byLabel(Label lbl) async {
+    // wow what a hack :laugh:
+    return _treeByLabel[lbl] ?? (throw StateError('no such dialog tree: $lbl'));
+  }
 }

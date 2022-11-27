@@ -393,6 +393,7 @@ abstract class Character extends FieldObject with Speaker {
     return null;
   }
 
+  @override
   int? slot(EventState c) => c.slotFor(this);
 }
 
