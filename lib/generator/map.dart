@@ -406,6 +406,8 @@ extension ObjectAddress on GameMap {
 }
 
 // todo: maplabel should probably just be MapId?
+// TODO: way to ignore some objects interactions
+//  see https://trello.com/c/4tSbpk4U/
 Future<GameMap> asmToMap(
     Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) async {
   var reader = ConstantReader.asm(asm);
@@ -551,6 +553,7 @@ List<MapObject> _buildObjects(Map<Word, Label> sprites,
     var spec = asm.spec(sprite, asm.facing);
 
     var object = MapObject(startPosition: asm.position, spec: spec);
+    // todo: some scenes are invalid/inaccessible
     var scene = toScene(asm.dialogId.value, dialogTree, defaultSpeaker: object);
     object.onInteract = scene;
     return object;

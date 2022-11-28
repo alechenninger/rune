@@ -100,6 +100,8 @@ extension DialogToAsm on Dialog {
   }
 }
 
+// todo: this might belong in generator.dart due to symmetry with
+//  SceneAsmGenerator
 Scene toScene(int dialogId, DialogTree tree, {Speaker? defaultSpeaker}) {
   if (dialogId >= tree.length) {
     return Scene.none();
@@ -205,8 +207,7 @@ class DialogState implements DialogParseState {
   @override
   void call(Expression constant, ParseContext context) {
     if (constant == Byte(0xF2)) {
-      // todo: action in next byte
-      throw 'todo action control code';
+      context.state = ActionState(this);
     } else if (constant == Byte(0xF4)) {
       context.state = PortraitState(this);
     } else if (constant == Byte(0xF6)) {
@@ -227,6 +228,101 @@ class DialogState implements DialogParseState {
 
   void terminate(ParseContext context) {
     context.state = DoneState();
+  }
+}
+
+class ActionState extends DialogParseState {
+  final DialogState parent;
+
+  ActionState(this.parent);
+
+  @override
+  void call(Expression constant, ParseContext context) {
+    if (constant is! Value) {
+      throw Exception('cannot parse constant from non-value '
+          '(need constant/symbol table)');
+    }
+
+    switch (constant.value) {
+      case 0:
+        context.state = PanelState(parent);
+        break;
+      case 1:
+        parent.events.add(HideTopPanels(1));
+        context.state = parent;
+        break;
+      case 2:
+        parent.events.add(HideAllPanels());
+        context.state = parent;
+        break;
+      case 3:
+      case 4:
+        context.state = SoundState(parent);
+        break;
+      case 5:
+        throw Exception('unknown action 5');
+      case 6:
+        throw Exception('unsupported event 6, update palettes');
+      case 7:
+        throw Exception("unsupported event 7, update zio's eyes");
+      case 8:
+        throw Exception("unsupported event 8, pause music");
+      case 9:
+        throw Exception("unsupported event 9, resume music");
+      case 0xA:
+        throw Exception("unsupported event 0xA, alarm");
+      case 0xB:
+        context.state = SetEventFlagState(parent);
+        break;
+      case 0xC:
+        throw Exception("unsupported event 0xC, elsydeon breaks");
+    }
+  }
+}
+
+class PanelState extends DialogParseState {
+  final DialogState parent;
+
+  PanelState(this.parent);
+
+  @override
+  void call(Expression constant, ParseContext context) {
+    if (constant is! Word) {
+      throw Exception('expected word but got $constant');
+    }
+
+    var index = constant.value;
+    parent.events.add(ShowPanel(PanelByIndex(index)));
+    context.state = parent;
+  }
+}
+
+class SoundState extends DialogParseState {
+  final DialogState parent;
+
+  SoundState(this.parent);
+
+  @override
+  void call(Expression constant, ParseContext context) {
+    // TODO parse sound pointer -> sound in model
+    //parent.events.add(PlaySound(Sound.));
+  }
+}
+
+class SetEventFlagState extends DialogParseState {
+  final DialogState parent;
+
+  SetEventFlagState(this.parent);
+
+  @override
+  void call(Expression constant, ParseContext context) {
+    if (constant is! Byte) {
+      throw Exception('expected byte but got $constant');
+    }
+
+    var eventFlag = toEventFlag(constant);
+    parent.events.add(SetFlag(eventFlag));
+    context.state = parent;
   }
 }
 
@@ -477,17 +573,17 @@ extension Portrait on Speaker {
     UnnamedSpeaker(), // dc.l	0						; 0
     Shay(), // dc.l	ArtNem_ChazDialPortrait	; 1
     Alys(), // dc.l	ArtNem_AlysDialPortrait	; 2
-    null, // dc.l	ArtNem_HahnDialPortrait	; 3
-    null, // dc.l	ArtNem_RuneDialPortrait	; 4
-    null, // dc.l	ArtNem_GryzDialPortrait	; 5
-    null, // dc.l	ArtNem_RikaDialPortrait	; 6
-    null, // dc.l	ArtNem_DemiDialPortrait	; 7
-    null, // dc.l	ArtNem_WrenDialPortrait	; 8
-    null, // dc.l	ArtNem_RajaDialPortrait	; 9
-    null, // dc.l	ArtNem_KyraDialPortrait	; $A
-    null, // dc.l	ArtNem_SethDialPortrait	; $B
-    null, // dc.l	ArtNem_SayaDialPortrait	; $C
-    null, // dc.l	ArtNem_HoltDialPortrait	; $D
+    Hahn(), // dc.l	ArtNem_HahnDialPortrait	; 3
+    Rune(), // dc.l	ArtNem_RuneDialPortrait	; 4
+    Gryz(), // dc.l	ArtNem_GryzDialPortrait	; 5
+    Rika(), // dc.l	ArtNem_RikaDialPortrait	; 6
+    Demi(), // dc.l	ArtNem_DemiDialPortrait	; 7
+    Wren(), // dc.l	ArtNem_WrenDialPortrait	; 8
+    Raja(), // dc.l	ArtNem_RajaDialPortrait	; 9
+    Kyra(), // dc.l	ArtNem_KyraDialPortrait	; $A
+    Seth(), // dc.l	ArtNem_SethDialPortrait	; $B
+    Saya(), // dc.l	ArtNem_SayaDialPortrait	; $C
+    Holt(), // dc.l	ArtNem_HoltDialPortrait	; $D
     PrincipalKroft(), // dc.l	ArtNem_PrincipalDialPortrait	; $E
     null, // dc.l	ArtNem_DorinDialPortrait	; $F
     null, // dc.l	ArtNem_PanaDialPortrait	; $10

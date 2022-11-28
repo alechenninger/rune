@@ -427,3 +427,135 @@ class Shay extends Character {
   @override
   int get hashCode => 0;
 }
+
+class Hahn extends Character {
+  const Hahn();
+  @override
+  String toString() => 'Hahn';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Hahn && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Rune extends Character {
+  const Rune();
+  @override
+  String toString() => 'Rune';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Rune && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Gryz extends Character {
+  const Gryz();
+  @override
+  String toString() => 'Gryz';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Gryz && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Rika extends Character {
+  const Rika();
+  @override
+  String toString() => 'Rika';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Rika && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Demi extends Character {
+  const Demi();
+  @override
+  String toString() => 'Demi';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Demi && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Wren extends Character {
+  const Wren();
+  @override
+  String toString() => 'Wren';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Wren && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Raja extends Character {
+  const Raja();
+  @override
+  String toString() => 'Raja';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Raja && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Kyra extends Character {
+  const Kyra();
+  @override
+  String toString() => 'Kyra';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Kyra && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Seth extends Character {
+  const Seth();
+  @override
+  String toString() => 'Seth';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Seth && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Saya extends Character {
+  const Saya();
+  @override
+  String toString() => 'Saya';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Saya && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}
+
+class Holt extends Character {
+  const Holt();
+  @override
+  String toString() => 'Holt';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Holt && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => 0;
+}

@@ -140,3 +140,9 @@ enum MeetingHahnPanel implements Panel {
   hahn,
   hahnSweatsBeforeAlys,
 }
+
+class PanelByIndex implements Panel {
+  final int index;
+
+  PanelByIndex(this.index);
+}

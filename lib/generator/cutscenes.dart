@@ -15,9 +15,15 @@ final _panelData = <Panel>[
 
 extension PanelIndex on Panel {
   int get panelIndex {
-    var i = _panelData.indexOf(this);
+    var self = this;
+
+    if (self is PanelByIndex) {
+      return self.index;
+    }
+
+    var i = _panelData.indexOf(self);
     if (i < 0) {
-      throw UnimplementedError('no panel data for $this');
+      throw UnimplementedError('no panel data for $self');
     }
     return i;
   }

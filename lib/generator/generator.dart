@@ -1251,42 +1251,10 @@ what is steps per second?
  */
 
 extension EventFlagConstant on EventFlag {
-  Constant get toConstant => Constant('EventFlag_$name');
-}
-
-class Condition {
-  final IMap<EventFlag, bool> _flags;
-
-  Condition(Map<EventFlag, bool> flags) : _flags = flags.lock;
-  const Condition.empty() : _flags = const IMapConst({});
-
-  Condition withFlag(EventFlag flag, bool isSet) => Condition(_flags.unlock
-    ..[flag] = isSet
-    ..lock);
-
-  Condition withSet(EventFlag flag) => withFlag(flag, true);
-  Condition withNotSet(EventFlag flag) => withFlag(flag, false);
-  Condition without(EventFlag flag) => Condition(_flags.unlock
-    ..remove(flag)
-    ..lock);
-
-  Iterable<MapEntry<EventFlag, bool>> get entries => _flags.entries;
-
-  bool? operator [](EventFlag flag) => _flags[flag];
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Condition &&
-          runtimeType == other.runtimeType &&
-          _flags == other._flags;
-
-  @override
-  int get hashCode => _flags.hashCode;
-
-  @override
-  String toString() {
-    return 'Condition{$_flags}';
+  Constant get toConstant {
+    // todo: not all event flags are named constants
+    // see toEventFlag
+    return Constant('EventFlag_$name');
   }
 }
 
