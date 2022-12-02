@@ -38,9 +38,9 @@ class GameMap {
 }
 
 enum MapId {
-  Aiedo,
   Dezolis,
   Motavia,
+  Rykros,
   Piata,
   PiataAcademy,
   PiataAcademyF1,
@@ -57,13 +57,13 @@ enum MapId {
   PiataDorm,
   PiataInn,
   PiataHouse1,
-  Rykros,
+  PiataHouse2,
+  PiataItemShop,
+  Aiedo,
   ShayHouse,
   //ChazHouse,
   Tonoe,
   Test,
-  PiataItemShop,
-  PiataHouse2,
   Mile,
   MileDead,
   MileWeaponShop,
@@ -413,6 +413,11 @@ class MapObject extends FieldObject with UnnamedSpeaker {
   // note: can only be in multiples of 8 pixels
   final Position startPosition;
   final MapObjectSpec spec;
+
+  // todo: should scene really be a part of spec? yes.
+  // since some objects effectively don't have interactions?
+  // see FaceDownLegsHiddenNoInteraction
+  // also elevator routine ($120), others
   late Scene onInteract;
 
   MapObject(
@@ -426,8 +431,6 @@ class MapObject extends FieldObject with UnnamedSpeaker {
         ? onInteract.startingWith([FacePlayer(this)])
         : onInteract;
   }
-
-  // todo: additive conditional on interact
 
   @override
   int? slot(EventState c) => null;
@@ -453,6 +456,88 @@ class MapObject extends FieldObject with UnnamedSpeaker {
       startPosition.hashCode ^
       spec.hashCode ^
       onInteract.hashCode;
+}
+
+final _random = Random();
+
+class MapObjectId {
+  final String id;
+
+  MapObjectId(this.id) {
+    checkArgument(onlyWordCharacters.hasMatch(id),
+        message: 'id must match $onlyWordCharacters but got $id');
+  }
+
+  // todo: this kinda sucks
+  MapObjectId.random() : id = _randomId();
+
+  static String _randomId() {
+    final b = Uint8List(4);
+
+    for (var i = 0; i < 4; i++) {
+      b[i] = _random.nextInt(256);
+    }
+
+    return b.map((e) => e.toRadixString(25)).join();
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MapObjectId &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() => id;
+}
+
+/// Defines an object: how it behaves and how it is displayed.
+abstract class MapObjectSpec {
+  MapObjectSpec();
+
+  const MapObjectSpec.constant();
+
+  Direction get startFacing;
+}
+
+abstract class ExtendableObject {
+  // can use MapObject if MapObject is not implicitly Interactable
+  // which it shouldn't be, in hindsight
+  // then this makes this a potentially elegant solution
+  // it still doesn't necessarily de-duplicate interactions, though
+  // since MapObjects can still have interactable specs
+  List<MapObject> get extendsTo;
+}
+
+abstract class Interactive {
+  set onInteract(Scene scene);
+  Scene get onInteract;
+}
+
+/// Spec for class of behaviors with interchangeable sprites.
+class Npc extends MapObjectSpec {
+  final Sprite sprite;
+  final NpcBehavior behavior;
+
+  @override
+  Direction get startFacing => behavior.startFacing;
+
+  Npc(this.sprite, this.behavior);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Npc &&
+          runtimeType == other.runtimeType &&
+          sprite == other.sprite &&
+          behavior == other.behavior;
+
+  @override
+  int get hashCode => sprite.hashCode ^ behavior.hashCode;
 }
 
 enum Sprite {
@@ -538,74 +623,6 @@ Sprite? spriteByName(String name) {
   return null;
 }
 
-final _random = Random();
-
-class MapObjectId {
-  final String id;
-
-  MapObjectId(this.id) {
-    checkArgument(onlyWordCharacters.hasMatch(id),
-        message: 'id must match $onlyWordCharacters but got $id');
-  }
-
-  // todo: this kinda sucks
-  MapObjectId.random() : id = _randomId();
-
-  static String _randomId() {
-    final b = Uint8List(4);
-
-    for (var i = 0; i < 4; i++) {
-      b[i] = _random.nextInt(256);
-    }
-
-    return b.map((e) => e.toRadixString(25)).join();
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is MapObjectId &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
-
-  @override
-  int get hashCode => id.hashCode;
-
-  @override
-  String toString() => id;
-}
-
-/// Defines an object: how it behaves and how it is displayed.
-abstract class MapObjectSpec {
-  MapObjectSpec();
-
-  const MapObjectSpec.constant();
-
-  Direction get startFacing;
-}
-
-/// Spec for class of behaviors with interchangeable sprites.
-class Npc extends MapObjectSpec {
-  final Sprite sprite;
-  final NpcBehavior behavior;
-
-  @override
-  Direction get startFacing => behavior.startFacing;
-
-  Npc(this.sprite, this.behavior);
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Npc &&
-          runtimeType == other.runtimeType &&
-          sprite == other.sprite &&
-          behavior == other.behavior;
-
-  @override
-  int get hashCode => sprite.hashCode ^ behavior.hashCode;
-}
-
 class AlysWaiting extends MapObjectSpec {
   factory AlysWaiting() {
     return const AlysWaiting._();
@@ -660,6 +677,10 @@ class AiedoShopperMom extends MapObjectSpec {
   String toString() {
     return 'AiedoShopperMom{}';
   }
+}
+
+class InvisibleBlock extends MapObjectSpec, Interactable {
+
 }
 
 abstract class NpcBehavior {

@@ -449,7 +449,7 @@ Future<GameMap> asmToMap(
   }
 
   var dialogTree = await dialogLookup.byLabel(dialogLabel);
-  var mapObjects = _buildObjects(sprites, asmObjects, dialogTree);
+  var mapObjects = _buildObjects(mapId, sprites, asmObjects, dialogTree);
 
   var map = GameMap(mapId);
   mapObjects.forEach(map.addObject);
@@ -535,9 +535,9 @@ class _AsmObject {
       required this.position});
 }
 
-List<MapObject> _buildObjects(Map<Word, Label> sprites,
+List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
     List<_AsmObject> asmObjects, DialogTree dialogTree) {
-  return asmObjects.map((asm) {
+  return asmObjects.mapIndexed((i, asm) {
     var artLbl = sprites[asm.vramTile];
     var sprite = _spriteArtLabels.inverse[artLbl];
     if (asm.spec.requiresSprite && sprite == null) {
@@ -552,7 +552,8 @@ List<MapObject> _buildObjects(Map<Word, Label> sprites,
     }
     var spec = asm.spec(sprite, asm.facing);
 
-    var object = MapObject(startPosition: asm.position, spec: spec);
+    var object = MapObject(
+        id: '${mapId.name}_$i', startPosition: asm.position, spec: spec);
     // todo: some scenes are invalid/inaccessible
     var scene = toScene(asm.dialogId.value, dialogTree, defaultSpeaker: object);
     object.onInteract = scene;

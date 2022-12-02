@@ -278,6 +278,16 @@ class SetContext extends Event {
     // todo: detect if mirrors avail and output source?
     return 'SetContext{$_setCtx}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SetContext &&
+          runtimeType == other.runtimeType &&
+          _setCtx == other._setCtx;
+
+  @override
+  int get hashCode => _setCtx.hashCode;
 }
 
 class Pause extends Event {
