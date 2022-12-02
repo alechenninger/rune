@@ -418,18 +418,36 @@ class MapObject extends FieldObject with UnnamedSpeaker {
   // since some objects effectively don't have interactions?
   // see FaceDownLegsHiddenNoInteraction
   // also elevator routine ($120), others
-  late Scene onInteract;
+  Scene get onInteract {
+    var spec = this.spec;
+    if (spec is Interactive) {
+      return (spec as Interactive).onInteract;
+    }
+    return Scene.none();
+  }
+
+  //@Deprecated('check if interactive first')
+  set onInteract(Scene scene) {
+    var spec = this.spec;
+    if (spec is Interactive) {
+      (spec as Interactive).onInteract = scene;
+    } else if (scene != const Scene.none()) {
+      throw ModelException('object is not interactive; cannot set scene');
+    }
+  }
 
   MapObject(
       {String? id,
       required this.startPosition,
       required this.spec,
-      Scene onInteract = const Scene.none(),
+      @Deprecated("use spec") Scene onInteract = const Scene.none(),
       bool onInteractFacePlayer = true})
       : id = id == null ? MapObjectId.random() : MapObjectId(id) {
-    this.onInteract = onInteractFacePlayer
-        ? onInteract.startingWith([FacePlayer(this)])
-        : onInteract;
+    if (onInteract != Scene.none() || spec is Interactive) {
+      this.onInteract = onInteractFacePlayer
+          ? onInteract.startingWith([FacePlayer(this)])
+          : onInteract;
+    }
   }
 
   @override
@@ -447,15 +465,10 @@ class MapObject extends FieldObject with UnnamedSpeaker {
           runtimeType == other.runtimeType &&
           id == other.id &&
           startPosition == other.startPosition &&
-          spec == other.spec &&
-          onInteract == other.onInteract;
+          spec == other.spec;
 
   @override
-  int get hashCode =>
-      id.hashCode ^
-      startPosition.hashCode ^
-      spec.hashCode ^
-      onInteract.hashCode;
+  int get hashCode => id.hashCode ^ startPosition.hashCode ^ spec.hashCode;
 }
 
 final _random = Random();
@@ -504,18 +517,8 @@ abstract class MapObjectSpec {
   Direction get startFacing;
 }
 
-abstract class ExtendableObject {
-  // can use MapObject if MapObject is not implicitly Interactable
-  // which it shouldn't be, in hindsight
-  // then this makes this a potentially elegant solution
-  // it still doesn't necessarily de-duplicate interactions, though
-  // since MapObjects can still have interactable specs
-  List<MapObject> get extendsTo;
-}
-
 abstract class Interactive {
-  set onInteract(Scene scene);
-  Scene get onInteract;
+  Scene onInteract = Scene.none();
 }
 
 /// Spec for class of behaviors with interchangeable sprites.
@@ -526,7 +529,14 @@ class Npc extends MapObjectSpec {
   @override
   Direction get startFacing => behavior.startFacing;
 
-  Npc(this.sprite, this.behavior);
+  factory Npc(Sprite sprite, NpcBehavior behavior) {
+    if (behavior is InteractiveNpcBehavior) {
+      return InteractiveNpc._(sprite, behavior);
+    }
+    return Npc._(sprite, behavior);
+  }
+
+  Npc._(this.sprite, this.behavior);
 
   @override
   bool operator ==(Object other) =>
@@ -538,6 +548,11 @@ class Npc extends MapObjectSpec {
 
   @override
   int get hashCode => sprite.hashCode ^ behavior.hashCode;
+}
+
+class InteractiveNpc extends Npc with Interactive {
+  InteractiveNpc._(Sprite sprite, InteractiveNpcBehavior behavior)
+      : super._(sprite, behavior);
 }
 
 enum Sprite {
@@ -623,12 +638,7 @@ Sprite? spriteByName(String name) {
   return null;
 }
 
-class AlysWaiting extends MapObjectSpec {
-  factory AlysWaiting() {
-    return const AlysWaiting._();
-  }
-  const AlysWaiting._() : super.constant();
-
+class AlysWaiting extends MapObjectSpec with Interactive {
   @override
   final startFacing = Direction.down;
 
@@ -636,11 +646,19 @@ class AlysWaiting extends MapObjectSpec {
   String toString() {
     return 'AlysWaiting{}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AlysWaiting && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => 0;
 }
 
 // Sprite is currently not configurable (defined in RAM).
 // We could technically make it configurable but not needed at this time.
-class AiedoShopperWithBags extends MapObjectSpec {
+class AiedoShopperWithBags extends MapObjectSpec with Interactive {
   @override
   final Direction startFacing;
 
@@ -664,12 +682,7 @@ class AiedoShopperWithBags extends MapObjectSpec {
 
 // Sprite is currently not configurable (defined in RAM).
 // We could technically make it configurable but not needed at this time.
-class AiedoShopperMom extends MapObjectSpec {
-  factory AiedoShopperMom() {
-    return const AiedoShopperMom._();
-  }
-  const AiedoShopperMom._() : super.constant();
-
+class AiedoShopperMom extends MapObjectSpec with Interactive {
   @override
   final startFacing = Direction.right;
 
@@ -677,10 +690,19 @@ class AiedoShopperMom extends MapObjectSpec {
   String toString() {
     return 'AiedoShopperMom{}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiedoShopperMom && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => 1;
 }
 
-class InvisibleBlock extends MapObjectSpec, Interactable {
-
+class InvisibleBlock extends MapObjectSpec with Interactive {
+  @override
+  final startFacing = Direction.down;
 }
 
 abstract class NpcBehavior {
@@ -689,39 +711,60 @@ abstract class NpcBehavior {
   Direction get startFacing;
 }
 
-class FaceDown extends NpcBehavior {
-  factory FaceDown() {
-    return const FaceDown._();
-  }
-  const FaceDown._();
+abstract class InteractiveNpcBehavior extends NpcBehavior
+    implements Interactive {
+  @override
+  Scene onInteract;
 
+  InteractiveNpcBehavior({this.onInteract = const Scene.none()});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InteractiveNpcBehavior &&
+          runtimeType == other.runtimeType &&
+          onInteract == other.onInteract;
+
+  @override
+  int get hashCode => onInteract.hashCode;
+}
+
+class FaceDown extends InteractiveNpcBehavior {
   @override
   final startFacing = Direction.down;
 
+  FaceDown({super.onInteract});
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FaceDown && runtimeType == other.runtimeType;
+      super == other && other is FaceDown && runtimeType == other.runtimeType;
 
   @override
-  int get hashCode => runtimeType.hashCode;
+  int get hashCode => runtimeType.hashCode ^ super.hashCode;
+
+  @override
+  String toString() {
+    return 'FaceDown{}';
+  }
 }
 
-class WanderAround extends NpcBehavior {
+class WanderAround extends InteractiveNpcBehavior {
   @override
   final Direction startFacing;
 
-  WanderAround(this.startFacing);
+  WanderAround(this.startFacing, {super.onInteract});
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is WanderAround &&
+      super == other &&
+          other is WanderAround &&
           runtimeType == other.runtimeType &&
           startFacing == other.startFacing;
 
   @override
-  int get hashCode => startFacing.hashCode;
+  int get hashCode => startFacing.hashCode ^ super.hashCode;
 
   @override
   String toString() {
@@ -729,21 +772,22 @@ class WanderAround extends NpcBehavior {
   }
 }
 
-class SlowlyWanderAround extends NpcBehavior {
+class SlowlyWanderAround extends InteractiveNpcBehavior {
   @override
   final Direction startFacing;
 
-  SlowlyWanderAround(this.startFacing);
+  SlowlyWanderAround(this.startFacing, {super.onInteract});
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SlowlyWanderAround &&
+      super == other &&
+          other is SlowlyWanderAround &&
           runtimeType == other.runtimeType &&
           startFacing == other.startFacing;
 
   @override
-  int get hashCode => startFacing.hashCode;
+  int get hashCode => startFacing.hashCode ^ super.hashCode;
 
   @override
   String toString() {
@@ -752,14 +796,14 @@ class SlowlyWanderAround extends NpcBehavior {
 }
 
 /// Does not collide or trigger dialog interaction.
-class FaceDownLegsHiddenNoInteraction extends NpcBehavior {
+class FaceDownLegsHiddenNonInteractive extends NpcBehavior {
   @override
   final startFacing = Direction.down;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FaceDownLegsHiddenNoInteraction &&
+      other is FaceDownLegsHiddenNonInteractive &&
           runtimeType == other.runtimeType &&
           startFacing == other.startFacing;
 
@@ -773,19 +817,22 @@ class FaceDownLegsHiddenNoInteraction extends NpcBehavior {
 }
 
 /// Does not move when spoken to.
-class FixedFaceDownLegsHidden extends NpcBehavior {
+class FixedFaceDownLegsHidden extends InteractiveNpcBehavior {
   @override
   final startFacing = Direction.down;
+
+  FixedFaceDownLegsHidden({super.onInteract});
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FixedFaceDownLegsHidden &&
+      super == other &&
+          other is FixedFaceDownLegsHidden &&
           runtimeType == other.runtimeType &&
           startFacing == other.startFacing;
 
   @override
-  int get hashCode => startFacing.hashCode;
+  int get hashCode => startFacing.hashCode ^ super.hashCode;
 
   @override
   String toString() {
@@ -794,19 +841,22 @@ class FixedFaceDownLegsHidden extends NpcBehavior {
 }
 
 /// Does not move when spoken to.
-class FixedFaceRight extends NpcBehavior {
+class FixedFaceRight extends InteractiveNpcBehavior {
   @override
-  final startFacing = Direction.down;
+  final startFacing = Direction.right;
+
+  FixedFaceRight({super.onInteract});
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FixedFaceRight &&
+      super == other &&
+          other is FixedFaceRight &&
           runtimeType == other.runtimeType &&
           startFacing == other.startFacing;
 
   @override
-  int get hashCode => startFacing.hashCode;
+  int get hashCode => startFacing.hashCode ^ super.hashCode;
 
   @override
   String toString() {

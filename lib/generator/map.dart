@@ -87,10 +87,10 @@ final _npcBehaviorRoutines = {
       SpecFactory.npc((s, d) => Npc(s, WanderAround(d)))),
   SlowlyWanderAround: FieldRoutine(Word('40'.hex), Label('FieldObj_NPCType3'),
       SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)))),
-  FaceDownLegsHiddenNoInteraction: FieldRoutine(
+  FaceDownLegsHiddenNonInteractive: FieldRoutine(
       Word(0x140),
       Label('loc_49502'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNoInteraction()),
+      SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNonInteractive()),
           spriteMappingTiles: 8)),
   FixedFaceDownLegsHidden: FieldRoutine(
       Word(0x108),
@@ -554,9 +554,10 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
 
     var object = MapObject(
         id: '${mapId.name}_$i', startPosition: asm.position, spec: spec);
-    // todo: some scenes are invalid/inaccessible
     var scene = toScene(asm.dialogId.value, dialogTree, defaultSpeaker: object);
-    object.onInteract = scene;
+    if (spec is Interactive) {
+      (spec as Interactive).onInteract = scene;
+    }
     return object;
   }).toList(growable: false);
 }
@@ -579,7 +580,7 @@ final _fallbackMapIdsByLabel = {
   Label('Map_AcademyBasement_B2'): MapId.PiataAcademyBasementB2,
 };
 
-class AsmSpec extends MapObjectSpec {
+class AsmSpec extends MapObjectSpec with Interactive {
   final Label? artLabel;
   final Word routine;
   @override

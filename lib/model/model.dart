@@ -30,6 +30,19 @@ abstract class Event {
   void visit(EventVisitor visitor);
 }
 
+class ModelException implements Exception {
+  final dynamic message;
+
+  ModelException([this.message]);
+
+  @override
+  String toString() {
+    Object? message = this.message;
+    if (message == null) return "ModelException";
+    return "ModelException: $message";
+  }
+}
+
 abstract class EventVisitor {
   void asm(Asm asm); // todo: ?
   void dialog(Dialog dialog);
@@ -185,21 +198,19 @@ class Slots {
 }
 
 class Scene {
-  @Deprecated('unused')
-  final String? name;
   final List<Event> events;
 
-  Scene([List<Event> events = const [], this.name]) : events = [] {
+  Scene([List<Event> events = const []]) : events = [] {
     this.events.addAll(events);
   }
 
   Scene.forNpcInteractionWith(FieldObject npc, [List<Event> events = const []])
       : this([FacePlayer(npc), ...events]);
 
-  const Scene.none({this.name}) : events = const [];
+  const Scene.none() : events = const [];
 
   Scene startingWith(List<Event> events) {
-    return Scene([...events, ...this.events], name);
+    return Scene([...events, ...this.events]);
   }
 
   Scene unlessSet(EventFlag flag, {required List<Event> then}) {
@@ -216,7 +227,7 @@ class Scene {
 
   @override
   String toString() {
-    return 'Scene{name: $name, events: $events}';
+    return 'Scene{events: $events}';
   }
 
   @override
@@ -224,11 +235,10 @@ class Scene {
       identical(this, other) ||
       other is Scene &&
           runtimeType == other.runtimeType &&
-          name == other.name &&
           const ListEquality<Event>().equals(events, other.events);
 
   @override
-  int get hashCode => name.hashCode ^ const ListEquality<Event>().hash(events);
+  int get hashCode => const ListEquality<Event>().hash(events);
 }
 
 final onlyWordCharacters = RegExp(r'^\w+$');
