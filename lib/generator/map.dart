@@ -78,6 +78,8 @@ final _mapObjectSpecRoutines = {
       SpecFactory((d) => AiedoShopperWithBags(d))),
   AiedoShopperMom: FieldRoutine(
       Word(0x13C), Label('loc_49128'), SpecFactory((_) => AiedoShopperMom())),
+  Elevator: FieldRoutine(
+      Word(0x120), Label('FieldObj_Elevator'), SpecFactory((d) => Elevator(d))),
 };
 
 final _npcBehaviorRoutines = {
@@ -103,6 +105,21 @@ final _npcBehaviorRoutines = {
       SpecFactory.npc((s, _) => Npc(s, FixedFaceRight()),
           spriteMappingTiles: 8)),
 };
+
+/// Routines which are noninteractive therefore do not have any interactive
+/// scene to parse, regardless of what dialog ID refers to in the tree.
+///
+/// These objects are kept mainly to retain their presence in the compiled
+/// assembly. They may be converted to modeled object specs as needed.
+final _noninteractiveAsmSpecRoutines = [
+  0x1f8, // FieldObj_ChestBarrier
+  0x1fc, // FieldObj_ChestBarrierSplinter
+  0x184, // FieldObj_Xanafalgue
+  0x18, // FieldObj_Rika
+  0x16C, // FieldObj_Mouse
+  0x30c, // FieldObj_PrisonDoor
+  0x1b0, // FieldObj_DorinChair
+];
 
 abstract class SpecFactory {
   bool get requiresSprite;
@@ -247,7 +264,7 @@ Map<MapObjectId, Word> _compileMapSpriteData(
       var tiles = routine.factory.spriteMappingTiles!;
       mappingTiles.update(maybeLbl, (current) => max(current, tiles),
           ifAbsent: () => tiles);
-    } else if (spec is AsmSpec) {
+    } else if (spec is InteractiveAsmSpec) {
       maybeLbl = spec.artLabel;
       if (maybeLbl != null) {
         mappingTiles.update(
@@ -325,7 +342,7 @@ void _compileMapObjectData(
   asm.add(comment(obj.id.toString()));
 
   // hacky?
-  if (spec is Npc || spec is AsmSpec) {
+  if (spec is Npc || spec is InteractiveAsmSpec) {
     Word routineIndex;
     if (spec is Npc) {
       var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
@@ -338,7 +355,7 @@ void _compileMapObjectData(
     } else {
       // analyzer should be smart enough to know spec is AsmSpec?
       // but its not :(
-      spec = spec as AsmSpec;
+      spec = spec as InteractiveAsmSpec;
       routineIndex = spec.routine;
     }
 
@@ -406,8 +423,6 @@ extension ObjectAddress on GameMap {
 }
 
 // todo: maplabel should probably just be MapId?
-// TODO: way to ignore some objects interactions
-//  see https://trello.com/c/4tSbpk4U/
 Future<GameMap> asmToMap(
     Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) async {
   var reader = ConstantReader.asm(asm);
@@ -417,10 +432,10 @@ Future<GameMap> asmToMap(
   // skip general var, music, something else
   reader.skipThrough(times: 1, value: Size.w.maxValueSized);
 
-  var sprites = <Word, Label>{};
-  _readSprites(reader, sprites);
+  var sprites = _readSprites(reader);
 
-  // skip ??
+  // skip secondary sprite data
+  // such as those loaded into ram instead of vram
   reader.skipThrough(value: Size.w.maxValueSized, times: 2);
 
   // skip map updates
@@ -429,8 +444,7 @@ Future<GameMap> asmToMap(
   // skip transition data 1 & 2
   reader.skipThrough(value: Size.w.maxValueSized, times: 2);
 
-  var asmObjects = <_AsmObject>[];
-  _readObjects(reader, sprites, asmObjects);
+  var asmObjects = _readObjects(reader, sprites);
 
   // skip treasure and tile animations
   reader.skipThrough(value: Size.w.maxValueSized, times: 2);
@@ -457,27 +471,30 @@ Future<GameMap> asmToMap(
   return map;
 }
 
-void _readSprites(ConstantReader reader, Map<Word, Label> sprites) {
+Map<Word, Label> _readSprites(ConstantReader reader) {
+  var sprites = <Word, Label>{};
+
   while (true) {
     var vramTile = reader.readWord();
     //loc_519D2:
     // 	tst.w	(a0)
     // 	bmi.w	loc_51A14
     if (vramTile.isNegative) {
-      return;
+      return sprites;
     }
     var sprite = reader.readLabel();
     sprites[vramTile] = sprite;
   }
 }
 
-void _readObjects(
-    ConstantReader reader, Map<Word, Label> sprites, List<_AsmObject> objects) {
+List<_AsmObject> _readObjects(ConstantReader reader, Map<Word, Label> sprites) {
+  var objects = <_AsmObject>[];
+
   while (true) {
     var routineOrTerminate = reader.readWord();
 
     if (routineOrTerminate == Word(0xffff)) {
-      return;
+      return objects;
     }
 
     var facing = reader.readByte();
@@ -494,8 +511,13 @@ void _readObjects(
       // We can decide to model in later if needed
 
       var spriteLbl = sprites[vramTile];
+      var isInteractive =
+          !_noninteractiveAsmSpecRoutines.contains(routineOrTerminate.value);
       spec = SpecFactory((d) => AsmSpec(
-          artLabel: spriteLbl, routine: routineOrTerminate, startFacing: d));
+          artLabel: spriteLbl,
+          routine: routineOrTerminate,
+          startFacing: d,
+          isInteractive: isInteractive));
     }
 
     var position = Position(x.value * 8, y.value * 8);
@@ -540,24 +562,28 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
   return asmObjects.mapIndexed((i, asm) {
     var artLbl = sprites[asm.vramTile];
     var sprite = _spriteArtLabels.inverse[artLbl];
+
     if (asm.spec.requiresSprite && sprite == null) {
       // is it weird that we can't translate the asm to a label in round
       // trip through the model even though we know it?
-      // maybe need to rethink how handling sprites
+      // TODO: maybe need to rethink how handling sprites
       // it's an enum now but...
       // maybe there should be a known list but not exclusive.
       // on the other hand this would couple the model to the asm sort of
       throw StateError('field object routine ${asm.routine} requires sprite '
           'but none defined for art label: $artLbl');
     }
-    var spec = asm.spec(sprite, asm.facing);
 
+    var spec = asm.spec(sprite, asm.facing);
     var object = MapObject(
         id: '${mapId.name}_$i', startPosition: asm.position, spec: spec);
-    var scene = toScene(asm.dialogId.value, dialogTree, defaultSpeaker: object);
+
     if (spec is Interactive) {
+      var scene =
+          toScene(asm.dialogId.value, dialogTree, defaultSpeaker: object);
       (spec as Interactive).onInteract = scene;
     }
+
     return object;
   }).toList(growable: false);
 }
@@ -580,13 +606,32 @@ final _fallbackMapIdsByLabel = {
   Label('Map_AcademyBasement_B2'): MapId.PiataAcademyBasementB2,
 };
 
-class AsmSpec extends MapObjectSpec with Interactive {
+class InteractiveAsmSpec extends AsmSpec with Interactive {
+  InteractiveAsmSpec(
+      {super.artLabel, required super.routine, required super.startFacing})
+      : super._();
+}
+
+class AsmSpec extends MapObjectSpec {
   final Label? artLabel;
   final Word routine;
   @override
   final Direction startFacing;
 
-  AsmSpec({this.artLabel, required this.routine, required this.startFacing});
+  AsmSpec._({this.artLabel, required this.routine, required this.startFacing});
+
+  factory AsmSpec(
+      {Label? artLabel,
+      required Word routine,
+      required Direction startFacing,
+      required bool isInteractive}) {
+    if (isInteractive) {
+      return InteractiveAsmSpec(
+          routine: routine, startFacing: startFacing, artLabel: artLabel);
+    }
+    return AsmSpec._(
+        artLabel: artLabel, routine: routine, startFacing: startFacing);
+  }
 }
 
 const _piataDialog = r'''

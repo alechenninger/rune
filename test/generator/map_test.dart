@@ -458,6 +458,9 @@ void main() {
   }, skip: 'need to implement for real');
 
   group('parses map from asm', () {
+    // todo: some kind of map asm fixture for generating test map asm
+    // would need its own tests
+
     test('dialog without portraits in npc interactions assumes npc is speaker',
         () async {
       // not sure how much i like this...
@@ -472,7 +475,7 @@ void main() {
       });
       var map = await asmToMap(Label('Map_Test'), asm, dialog);
 
-      expect(map.objects, hasLength(1));
+      expect(map.objects, hasLength(3));
 
       var obj = map.objects.first;
 
@@ -498,7 +501,7 @@ void main() {
       });
       var map = await asmToMap(Label('Map_Test'), asm, dialog);
 
-      expect(map.objects, hasLength(1));
+      expect(map.objects, hasLength(3));
 
       var obj = map.objects.first;
 
@@ -511,6 +514,26 @@ void main() {
               Dialog(speaker: obj, spans: DialogSpan.parse('Bye!'))
             ])
           ]));
+    });
+
+    test('objects which are not interactive do not parse scenes', () async {
+      var asm = Asm.fromRaw(testMapAsm);
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogAsm([
+          dc.b(Bytes.ascii('one')),
+          dc.b([Byte(0xff)]),
+          dc.b(Bytes.ascii('two')),
+          dc.b([Byte(0xff)]),
+          dc.b(Bytes.ascii('three')),
+          dc.b([Byte(0xff)])
+        ]).splitToTree()
+      });
+      var map = await asmToMap(Label('Map_Test'), asm, dialog);
+
+      expect(map.objects, hasLength(3));
+
+      expect(map.objects[1].onInteract, Scene.none());
+      expect(map.objects[2].onInteract, Scene.none());
     });
   });
 }
@@ -729,6 +752,16 @@ var testMapAsm = r'''Map_Test:
 	dc.b	$00, $00
 	dc.w	$2A8
 	dc.w	$2E, $58
+	
+	dc.w	$120
+	dc.b	$00, $01
+	dc.w	0
+	dc.w	$20, $50
+	
+	dc.w	$184
+	dc.b	$00, $02
+	dc.w	$2A8
+	dc.w	$30, $50
 
 	dc.w	$FFFF
 

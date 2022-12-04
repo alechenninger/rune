@@ -414,12 +414,7 @@ class MapObject extends FieldObject with UnnamedSpeaker {
   final Position startPosition;
   final MapObjectSpec spec;
 
-  // todo: should scene really be a part of spec? yes.
-  // since some objects effectively don't have interactions?
-  // see FaceDownLegsHiddenNoInteraction
-  // also elevator routine ($120), others
   Scene get onInteract {
-    var spec = this.spec;
     if (spec is Interactive) {
       return (spec as Interactive).onInteract;
     }
@@ -653,7 +648,7 @@ class AlysWaiting extends MapObjectSpec with Interactive {
       other is AlysWaiting && runtimeType == other.runtimeType;
 
   @override
-  int get hashCode => 0;
+  int get hashCode => toString().hashCode;
 }
 
 // Sprite is currently not configurable (defined in RAM).
@@ -697,12 +692,47 @@ class AiedoShopperMom extends MapObjectSpec with Interactive {
       other is AiedoShopperMom && runtimeType == other.runtimeType;
 
   @override
-  int get hashCode => 1;
+  int get hashCode => toString().hashCode;
 }
 
 class InvisibleBlock extends MapObjectSpec with Interactive {
   @override
   final startFacing = Direction.down;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InvisibleBlock && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => toString().hashCode;
+
+  @override
+  String toString() {
+    return 'InvisibleBlock{}';
+  }
+}
+
+class Elevator extends MapObjectSpec {
+  @override
+  final Direction startFacing;
+
+  Elevator(this.startFacing);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Elevator &&
+          runtimeType == other.runtimeType &&
+          startFacing == other.startFacing;
+
+  @override
+  int get hashCode => startFacing.hashCode;
+
+  @override
+  String toString() {
+    return 'Elevator{startFacing: $startFacing}';
+  }
 }
 
 abstract class NpcBehavior {
