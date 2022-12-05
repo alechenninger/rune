@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/numbers.dart';
+import 'package:rune/src/null.dart';
 
 import '../asm/asm.dart';
 import '../model/model.dart';
@@ -68,7 +69,7 @@ DialogTree _defaultDialogTree(MapId map) =>
 
 // todo: default to convention & allow override
 final _spriteArtLabels = BiMap<Sprite, Label>()
-  ..addAll(Sprite.values.groupFoldBy(
+  ..addAll(Sprite.wellKnown.groupFoldBy(
       (sprite) => sprite, (previous, sprite) => Label('Art_${sprite.name}')));
 
 final _mapObjectSpecRoutines = {
@@ -561,19 +562,14 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
     List<_AsmObject> asmObjects, DialogTree dialogTree) {
   return asmObjects.mapIndexed((i, asm) {
     var artLbl = sprites[asm.vramTile];
-    var sprite = _spriteArtLabels.inverse[artLbl];
 
-    if (asm.spec.requiresSprite && sprite == null) {
-      // is it weird that we can't translate the asm to a label in round
-      // trip through the model even though we know it?
-      // TODO: maybe need to rethink how handling sprites
-      // it's an enum now but...
-      // maybe there should be a known list but not exclusive.
-      // on the other hand this would couple the model to the asm sort of
+    if (asm.spec.requiresSprite && artLbl == null) {
       throw StateError('field object routine ${asm.routine} requires sprite '
-          'but none defined for art label: $artLbl');
+          'but art label was null for tile number ${asm.vramTile}');
     }
 
+    var sprite =
+        _spriteArtLabels.inverse[artLbl] ?? artLbl?.map((l) => Sprite(l.name));
     var spec = asm.spec(sprite, asm.facing);
     var object = MapObject(
         id: '${mapId.name}_$i', startPosition: asm.position, spec: spec);

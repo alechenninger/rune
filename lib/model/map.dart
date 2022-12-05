@@ -1,9 +1,10 @@
-// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
 import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
 
 import 'model.dart';
@@ -550,84 +551,134 @@ class InteractiveNpc extends Npc with Interactive {
       : super._(sprite, behavior);
 }
 
-enum Sprite {
+class Sprite {
+  final String name;
+
+  Sprite(this.name);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Sprite && runtimeType == other.runtimeType && name == other.name;
+
+  @override
+  int get hashCode => name.hashCode;
+
+  @override
+  String toString() {
+    return 'Sprite.$name';
+  }
+
   /// blue hair, green shirt, white pants
-  PalmanMan1,
+  static final PalmanMan1 = byName['PalmanMan1']!;
 
   /// black hair, gray suit, brown vest
-  PalmanMan2,
+  static final PalmanMan2 = byName['PalmanMan2']!;
 
   /// brown hair, blue shirt, red tie, white pants
-  PalmanMan3,
+  static final PalmanMan3 = byName['PalmanMan3']!;
 
   /// balding, black hair, green shirt, gray pants
-  PalmanMan4,
-  PalmanOldMan1,
+  static final PalmanMan4 = byName['PalmanMan4']!;
+  static final PalmanOldMan1 = byName['PalmanOldMan1']!;
 
   /// Gray hair, white shirt
-  PalmanOldWoman1,
+  static final PalmanOldWoman1 = byName['PalmanOldWoman1']!;
 
   /// Gray hair, gray suit, blue vest, glasses
-  PalmanOldWoman2,
+  static final PalmanOldWoman2 = byName['PalmanOldWoman2']!;
 
   /// brown shirt, gray pants, walking stick
-  PalmanOldMan2,
+  static final PalmanOldMan2 = byName['PalmanOldMan2']!;
 
   /// guard
-  PalmanFighter1,
+  static final PalmanFighter1 = byName['PalmanFighter1']!;
 
   /// green headband, open vest, white pants, blue shoes
-  PalmanFighter2,
+  static final PalmanFighter2 = byName['PalmanFighter2']!;
 
   /// white turban and cape
-  PalmanFighter3,
+  static final PalmanFighter3 = byName['PalmanFighter3']!;
 
   /// brown hair, orange shirt, red pants
-  PalmanWoman1,
+  static final PalmanWoman1 = byName['PalmanWoman1']!;
 
   /// long orange hair, blue and white dress
-  PalmanWoman2,
+  static final PalmanWoman2 = byName['PalmanWoman2']!;
 
   /// green hair in pony tail, blue dress
-  PalmanWoman3,
+  static final PalmanWoman3 = byName['PalmanWoman3']!;
 
   /// black hair yellow vest
-  PalmanWoman4,
-  PalmanStudent1,
-  PalmanStripper1,
-  Kroft,
+  static final PalmanWoman4 = byName['PalmanWoman4']!;
+  static final PalmanStudent1 = byName['PalmanStudent1']!;
+  static final PalmanStripper1 = byName['PalmanStripper1']!;
+  static final Kroft = byName['Kroft']!;
 
   /// Old professor.
-  PalmanProfessor1,
+  static final PalmanProfessor1 = byName['PalmanProfessor1']!;
 
   /// Old professor humped over with hands behind his back.
-  PalmanProfessor2,
-  PalmanPeddler1,
+  static final PalmanProfessor2 = byName['PalmanProfessor2']!;
+  static final PalmanPeddler1 = byName['PalmanPeddler1']!;
 
   /// Tall, light tan robes, green feet
-  Motavian1,
+  static final Motavian1 = byName['Motavian1']!;
 
   /// Shorter, dark tan robes, green feet
-  Motavian2,
+  static final Motavian2 = byName['Motavian2']!;
 
   /// Small and blue
-  Motavian3,
-  GrandfatherDorin,
-  GuildReceptionist,
+  static final Motavian3 = byName['Motavian3']!;
+  static final GrandfatherDorin = byName['GrandfatherDorin']!;
+  static final GuildReceptionist = byName['GuildReceptionist']!;
 
   /// Short blue hair
-  ZioWorshipper1,
+  static final ZioWorshipper1 = byName['ZioWorshipper1']!;
 
   /// Long green hair
-  ZioWorshipper2,
+  static final ZioWorshipper2 = byName['ZioWorshipper2']!;
 
   /// White hair. Faints.
-  ZioPriest,
+  static final ZioPriest = byName['ZioPriest']!;
+
+  static final wellKnown = [
+    Sprite('PalmanMan1'),
+    Sprite('PalmanMan2'),
+    Sprite('PalmanMan3'),
+    Sprite('PalmanMan4'),
+    Sprite('PalmanOldMan1'),
+    Sprite('PalmanOldWoman1'),
+    Sprite('PalmanOldWoman2'),
+    Sprite('PalmanOldMan2'),
+    Sprite('PalmanFighter1'),
+    Sprite('PalmanFighter2'),
+    Sprite('PalmanFighter3'),
+    Sprite('PalmanWoman1'),
+    Sprite('PalmanWoman2'),
+    Sprite('PalmanWoman3'),
+    Sprite('PalmanWoman4'),
+    Sprite('PalmanStudent1'),
+    Sprite('PalmanStripper1'),
+    Sprite('Kroft'),
+    Sprite('PalmanProfessor1'),
+    Sprite('PalmanProfessor2'),
+    Sprite('PalmanPeddler1'),
+    Sprite('Motavian1'),
+    Sprite('Motavian2'),
+    Sprite('Motavian3'),
+    Sprite('GrandfatherDorin'),
+    Sprite('GuildReceptionist'),
+    Sprite('ZioWorshipper1'),
+    Sprite('ZioWorshipper2'),
+    Sprite('ZioPriest'),
+  ];
+  static final byName = wellKnown.groupFoldBy((s) => s.name, (_, s) => s);
 }
 
 Sprite? spriteByName(String name) {
   name = name.trim().toLowerCase();
-  for (var s in Sprite.values) {
+  for (var s in Sprite.wellKnown) {
     if (s.name.toLowerCase() == name) return s;
   }
   return null;
