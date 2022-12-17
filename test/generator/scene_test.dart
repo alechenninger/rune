@@ -16,7 +16,11 @@ import '../fixtures.dart';
 
 void main() {
   var generator = AsmGenerator();
-  var program = Program();
+  late Program program;
+
+  setUp(() {
+    program = Program();
+  });
 
   group('a cursor separates', () {
     test('between dialogs', () {
@@ -71,15 +75,7 @@ ${dialog2.toAsm()}
     var moves = IndividualMoves();
     moves.moves[alys] = StepPath()..distance = 1.step;
 
-    var map = GameMap(MapId.Test);
-    var obj = MapObject(
-        id: 'testObj', startPosition: Position(0, 0), spec: AlysWaiting());
-    obj.onInteract = Scene([
-      SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)),
-      dialog1,
-      moves
-    ]);
-    map.addObject(obj);
+    late GameMap map;
 
     setUp(() {
       state = EventState()
@@ -88,6 +84,16 @@ ${dialog2.toAsm()}
       origState = EventState()
         ..positions[alys] = Position('50'.hex, '50'.hex)
         ..positions[shay] = Position('60'.hex, '60'.hex);
+
+      map = GameMap(MapId.Test);
+      var obj = MapObject(
+          id: 'testObj', startPosition: Position(0, 0), spec: AlysWaiting());
+      obj.onInteract = Scene([
+        SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)),
+        dialog1,
+        moves
+      ]);
+      map.addObject(obj);
     });
 
     test(
@@ -132,28 +138,31 @@ ${dialog2.toAsm()}
       test(
           'when facing player is first but there are other events, faces player from within event',
           () {
+        var map = GameMap(MapId.Test);
+
         var obj = MapObject(
+            id: '0',
             startPosition: Position(0x200, 0x200),
             spec: AlysWaiting(),
             onInteractFacePlayer: true,
             onInteract: Scene([
+              SetContext((ctx) => ctx.positions[alys] = state.positions[alys]),
               Dialog(spans: [DialogSpan('Hi')]),
               IndividualMoves()..moves[alys] = (StepPath()..distance = 1.step)
             ]));
 
-        var ctx = AsmContext.forInteractionWith(obj, state);
-        var sceneId = SceneId('Interact');
+        map.addObject(obj);
 
-        var sceneAsm = generator.sceneToAsm(obj.onInteract, ctx, id: sceneId);
+        var mapAsm = program.addMap(map);
 
-        print(sceneAsm);
+        print(mapAsm);
 
         expect(
-            sceneAsm.event.withoutComments(),
+            mapAsm.events.withoutComments().trim(),
             Asm([
-              setLabel('Event_GrandCross_Interact'),
-              FacePlayer(obj).generateAsm(generator, ctx),
-              getAndRunDialog(Byte.one.i),
+              setLabel('Event_GrandCross_Test_0'),
+              jsr(Label('Interaction_UpdateObj').l),
+              getAndRunDialog3(Byte.one.i),
               generator
                   .individualMovesToAsm(
                       IndividualMoves()
@@ -345,7 +354,7 @@ ${dialog2.toAsm()}
       ];
 
       var generator = SceneAsmGenerator.forInteraction(
-          map, obj, SceneId('testscene'), dialog, asm, eventRoutines)
+          map, SceneId('testscene'), dialog, asm, eventRoutines)
         ..runEventFromInteractionIfNeeded(events);
 
       for (var event in events) {
@@ -381,7 +390,7 @@ ${dialog2.toAsm()}
       ];
 
       var generator = SceneAsmGenerator.forInteraction(
-          map, obj, SceneId('testscene'), dialog, asm, eventRoutines)
+          map, SceneId('testscene'), dialog, asm, eventRoutines)
         ..runEventFromInteractionIfNeeded(events);
 
       for (var event in events) {
@@ -743,18 +752,18 @@ ${dialog2.toAsm()}
 
       test('in event, flag is checked in event code', () {
         generator = SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm, eventRoutines);
+            map, SceneId('interact'), dialog, asm, eventRoutines);
         // todo:
       }, skip: 'TODO:write test');
 
       test('in dialog, flag is checked in dialog', () {
         SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            map, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
-            FacePlayer(obj),
+            InteractionObject.facePlayer(),
             Dialog(spans: DialogSpan.parse('Flag1 is set'))
           ], isUnset: [
-            FacePlayer(obj),
+            InteractionObject.facePlayer(),
             Dialog(spans: DialogSpan.parse('Flag1 is not set'))
           ]))
           ..finish();
@@ -779,11 +788,11 @@ ${dialog2.toAsm()}
 
       test('in dialog, if no dialog when flag set, terminate', () {
         SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            map, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
-            FacePlayer(obj),
+            InteractionObject.facePlayer(),
           ], isUnset: [
-            FacePlayer(obj),
+            InteractionObject.facePlayer(),
             Dialog(spans: DialogSpan.parse('Flag1 is not set'))
           ]))
           ..finish();
@@ -806,18 +815,18 @@ ${dialog2.toAsm()}
 
       test('in dialog, dead branches are pruned', () {
         SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            map, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
             // redundant check
             IfFlag(EventFlag('flag1'), isSet: [
-              FacePlayer(obj),
+              InteractionObject.facePlayer(),
               Dialog(spans: DialogSpan.parse('Flag1 is set'))
             ], isUnset: [
               // dead code
               Pause(1.second)
             ])
           ], isUnset: [
-            FacePlayer(obj),
+            InteractionObject.facePlayer(),
             Dialog(spans: DialogSpan.parse('Flag1 is not set'))
           ]))
           ..finish();
@@ -842,16 +851,16 @@ ${dialog2.toAsm()}
 
       test('in dialog, alternate flags are checked in same dialog', () {
         SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            map, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
-            FacePlayer(obj),
+            InteractionObject.facePlayer(),
             Dialog(spans: DialogSpan.parse('Flag1 is set'))
           ], isUnset: [
             IfFlag(EventFlag('flag2'), isSet: [
-              FacePlayer(obj),
+              InteractionObject.facePlayer(),
               Dialog(spans: DialogSpan.parse('Flag1 is not set, but 2 is'))
             ], isUnset: [
-              FacePlayer(obj),
+              InteractionObject.facePlayer(),
               Dialog(spans: DialogSpan.parse('Flag1 and 2 are not set'))
             ]),
           ]))
@@ -883,21 +892,21 @@ ${dialog2.toAsm()}
 
       test('in dialog, nested flags are checked in consecutive dialog', () {
         SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            map, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
             IfFlag(EventFlag('flag3'), isSet: [
-              FacePlayer(obj),
+              InteractionObject.facePlayer(),
               Dialog(spans: DialogSpan.parse('Flag1 and 3 are set'))
             ], isUnset: [
-              FacePlayer(obj),
+              InteractionObject.facePlayer(),
               Dialog(spans: DialogSpan.parse('Flag1 is set, but 3 is not'))
             ]),
           ], isUnset: [
             IfFlag(EventFlag('flag2'), isSet: [
-              FacePlayer(obj),
+              InteractionObject.facePlayer(),
               Dialog(spans: DialogSpan.parse('Flag1 is not set, but 2 is'))
             ], isUnset: [
-              FacePlayer(obj),
+              InteractionObject.facePlayer(),
               Dialog(spans: DialogSpan.parse('Flag1 and 2 are not set'))
             ]),
           ]))
@@ -933,12 +942,12 @@ ${dialog2.toAsm()}
 
       test('dialog branches that need events run events', () {
         SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            map, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
             SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)),
             IndividualMoves()..moves[alys] = (StepPath()..distance = 1.steps)
           ], isUnset: [
-            FacePlayer(obj),
+            InteractionObject.facePlayer(),
             Dialog(spans: DialogSpan.parse('Flag1 is not set'))
           ]))
           ..finish();
@@ -966,9 +975,9 @@ ${dialog2.toAsm()}
 
       test('unset event returns to map', () {
         SceneAsmGenerator.forInteraction(
-            map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+            map, SceneId('interact'), dialog, asm, eventRoutines)
           ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
-            FacePlayer(obj),
+            InteractionObject.facePlayer(),
             Dialog(spans: DialogSpan.parse('Flag1 is set'))
           ], isUnset: [
             SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)),
@@ -1003,7 +1012,7 @@ ${dialog2.toAsm()}
       test('does not need event if branches only contain dialog', () {
         expect(
             SceneAsmGenerator.forInteraction(
-                    map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+                    map, SceneId('interact'), dialog, asm, eventRoutines)
                 .needsEvent([
               IfFlag(EventFlag('flag1'), isSet: [
                 Dialog(spans: DialogSpan.parse('Flag1 is set'))
@@ -1017,7 +1026,7 @@ ${dialog2.toAsm()}
       test('does not need event even if a branch has events', () {
         expect(
             SceneAsmGenerator.forInteraction(
-                    map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+                    map, SceneId('interact'), dialog, asm, eventRoutines)
                 .needsEvent([
               IfFlag(EventFlag('flag1'), isSet: [
                 Dialog(spans: DialogSpan.parse('Flag1 is set')),
@@ -1032,7 +1041,7 @@ ${dialog2.toAsm()}
       test('does need event if there are unconditional events', () {
         expect(
             SceneAsmGenerator.forInteraction(
-                    map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+                    map, SceneId('interact'), dialog, asm, eventRoutines)
                 .needsEvent([
               IfFlag(EventFlag('flag1'), isSet: [
                 Dialog(spans: DialogSpan.parse('Flag1 is set')),
@@ -1048,7 +1057,7 @@ ${dialog2.toAsm()}
       group('cannot then run event in interaction', () {
         test('if another event other than IfFlag has occurred', () {
           var generator = SceneAsmGenerator.forInteraction(
-              map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+              map, SceneId('interact'), dialog, asm, eventRoutines)
             ..dialog(Dialog(spans: DialogSpan.parse('Flag1 is set')));
 
           expect(() => generator.runEventFromInteraction(), throwsStateError);
@@ -1063,7 +1072,7 @@ ${dialog2.toAsm()}
 
         test('if already run event in interaction', () {
           var generator = SceneAsmGenerator.forInteraction(
-              map, obj, SceneId('interact'), dialog, asm, eventRoutines)
+              map, SceneId('interact'), dialog, asm, eventRoutines)
             ..runEventFromInteraction();
 
           expect(() => generator.runEventFromInteraction(), throwsStateError);

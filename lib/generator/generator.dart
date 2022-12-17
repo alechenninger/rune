@@ -194,14 +194,14 @@ class SceneAsmGenerator implements EventVisitor {
   final _stateGraph = <Condition, Memory>{};
 
   // todo: This might be a subclass really
-  SceneAsmGenerator.forInteraction(GameMap map, FieldObject obj, this.id,
-      this._dialogTree, this._eventAsm, EventRoutines eventRoutines)
+  SceneAsmGenerator.forInteraction(GameMap map, this.id, this._dialogTree,
+      this._eventAsm, EventRoutines eventRoutines)
       : _dialogIdOffset = _dialogTree.nextDialogId!,
-        _interactingWith = obj,
+        _interactingWith = const InteractionObject(),
         _eventRoutines = eventRoutines {
     _gameMode = Mode.dialog;
 
-    _memory.putInAddress(a3, obj);
+    _memory.putInAddress(a3, const InteractionObject());
     _memory.hasSavedDialogPosition = false;
     _memory.currentMap = map;
     _stateGraph[Condition.empty()] = _memory;

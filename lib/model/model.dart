@@ -204,8 +204,8 @@ class Scene {
     this.events.addAll(events);
   }
 
-  Scene.forNpcInteractionWith(FieldObject npc, [List<Event> events = const []])
-      : this([FacePlayer(npc), ...events]);
+  Scene.forNpcInteraction([List<Event> events = const []])
+      : this([InteractionObject.facePlayer(), ...events]);
 
   const Scene.none() : events = const [];
 

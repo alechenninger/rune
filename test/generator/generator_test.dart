@@ -8,7 +8,7 @@ main() {
     var program = Program(cutsceneIndexOffset: Word(0));
     var map = GameMap(MapId.Test);
     var obj = MapObject(startPosition: Position(0, 0), spec: AlysWaiting());
-    obj.onInteract = Scene.forNpcInteractionWith(obj, [
+    obj.onInteract = Scene.forNpcInteraction([
       FadeOut(),
       Dialog(spans: DialogSpan.parse('Hello world')),
       FadeInField(),

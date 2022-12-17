@@ -1,12 +1,9 @@
-import 'dart:math';
-
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/map.dart';
-import 'package:rune/generator/scene.dart';
 import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
@@ -255,7 +252,7 @@ void main() {
     var obj = MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
         spec: Npc(Sprite.PalmanMan1, FaceDown()));
-    obj.onInteract = Scene.forNpcInteractionWith(obj, []);
+    obj.onInteract = Scene.forNpcInteraction([]);
 
     testMap.addObject(obj);
 
@@ -377,13 +374,13 @@ void main() {
       var comparisonDialogTree = DialogTree();
       var comparisonEventAsm = EventAsm.empty();
 
-      SceneAsmGenerator.forInteraction(testMap, npc1, SceneId('Test_npc1'),
+      SceneAsmGenerator.forInteraction(testMap, SceneId('Test_npc1'),
           comparisonDialogTree, comparisonEventAsm, testEventRoutines)
         ..runEventFromInteraction()
         ..scene(npc1.onInteract)
         ..finish(appendNewline: true);
 
-      SceneAsmGenerator.forInteraction(testMap, npc2, SceneId('Test_npc2'),
+      SceneAsmGenerator.forInteraction(testMap, SceneId('Test_npc2'),
           comparisonDialogTree, comparisonEventAsm, testEventRoutines)
         ..runEventFromInteraction()
         ..scene(npc2.onInteract)
@@ -409,7 +406,7 @@ void main() {
           id: 'CutsceneNpc',
           startPosition: Position(0x1d0, 0x2e0),
           spec: AlysWaiting());
-      cutsceneNpc.onInteract = Scene.forNpcInteractionWith(cutsceneNpc, [
+      cutsceneNpc.onInteract = Scene.forNpcInteraction([
         FadeOut(),
         Dialog(spans: [DialogSpan('Test!')]),
       ]);

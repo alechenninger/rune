@@ -287,6 +287,7 @@ MapAsm compileMap(
       _compileMapSpriteData(map.objects, spritesAsm, spriteVramOffset);
 
   for (var obj in map.objects) {
+    // todo: if scenes are identical, reuse dialog ID
     var dialogId = _compileInteractionScene(
         map, obj, dialogTree, eventsAsm, eventRoutines);
     var tileNumber = objectsTileNumbers[obj.id] ?? Word(0);
@@ -388,7 +389,7 @@ Byte _compileInteractionScene(GameMap map, MapObject obj, DialogTree tree,
   var dialogId = tree.nextDialogId!;
 
   SceneAsmGenerator generator =
-      SceneAsmGenerator.forInteraction(map, obj, id, tree, asm, eventRoutines);
+      SceneAsmGenerator.forInteraction(map, id, tree, asm, eventRoutines);
 
   generator.runEventFromInteractionIfNeeded(events);
 
@@ -628,6 +629,9 @@ class _AsmObject {
 
 List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
     List<_AsmObject> asmObjects, DialogTree dialogTree) {
+  // The same scene must reuse same object in memory
+  var scenesById = <Byte, Scene>{};
+
   return asmObjects.mapIndexed((i, asm) {
     var artLbl = sprites[asm.vramTile];
 
@@ -643,8 +647,12 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
         id: '${mapId.name}_$i', startPosition: asm.position, spec: spec);
 
     if (spec is Interactive) {
-      var scene =
-          toScene(asm.dialogId.value, dialogTree, defaultSpeaker: object);
+      var scene = scenesById.putIfAbsent(
+          asm.dialogId,
+          // todo: if shared scene, default speaker may be misleading
+          // but maybe better than nothing
+          () =>
+              toScene(asm.dialogId.value, dialogTree, defaultSpeaker: object));
       (spec as Interactive).onInteract = scene;
     }
 

@@ -464,6 +464,29 @@ class MapObjectById extends FieldObject {
   }
 }
 
+/// Object being interacted with.
+class InteractionObject extends FieldObject {
+  const InteractionObject();
+
+  static FacePlayer facePlayer() => FacePlayer(const InteractionObject());
+
+  @override
+  int? slot(EventState c) => null;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InteractionObject && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => toString().hashCode;
+
+  @override
+  String toString() {
+    return 'InteractionObject{}';
+  }
+}
+
 // TODO: maybe don't do this
 // TODO: maybe instead generalize this as an event wrapper.
 // ContextDependentEvent which when processed produces an event based on the
