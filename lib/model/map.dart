@@ -576,6 +576,11 @@ class MapObject extends FieldObject with UnnamedSpeaker {
       {String? id,
       required this.startPosition,
       required this.spec,
+      // todo: maybe use event list instead of Scene model?
+      // issue is modifying scene w/ onInteractFacePlayer
+      // –it's a misleading API
+      // -> or maybe get rid of onInteractFacePlayer now that
+      // it is not necessary to use reference to object itself
       @Deprecated("use spec") Scene onInteract = const Scene.none(),
       bool onInteractFacePlayer = true})
       : id = id == null ? MapObjectId.random() : MapObjectId(id) {
@@ -614,15 +619,15 @@ class MapObject extends FieldObject with UnnamedSpeaker {
 final _random = Random();
 
 class MapObjectId {
-  final String id;
+  final String value;
 
-  MapObjectId(this.id) {
-    checkArgument(onlyWordCharacters.hasMatch(id),
-        message: 'id must match $onlyWordCharacters but got $id');
+  MapObjectId(this.value) {
+    checkArgument(onlyWordCharacters.hasMatch(value),
+        message: 'id must match $onlyWordCharacters but got $value');
   }
 
   // todo: this kinda sucks
-  MapObjectId.random() : id = _randomId();
+  MapObjectId.random() : value = _randomId();
 
   static String _randomId() {
     final b = Uint8List(4);
@@ -639,13 +644,13 @@ class MapObjectId {
       identical(this, other) ||
       other is MapObjectId &&
           runtimeType == other.runtimeType &&
-          id == other.id;
+          value == other.value;
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => value.hashCode;
 
   @override
-  String toString() => id;
+  String toString() => value;
 }
 
 /// Defines an object: how it behaves and how it is displayed.
@@ -948,6 +953,9 @@ abstract class InteractiveNpcBehavior extends NpcBehavior
   @override
   Scene onInteract;
 
+  // todo: maybe use event list instead of Scene model?
+  // issue is modifying scene w/ onInteractFacePlayer
+  // –it's a misleading API
   InteractiveNpcBehavior({this.onInteract = const Scene.none()});
 
   @override
@@ -956,9 +964,6 @@ abstract class InteractiveNpcBehavior extends NpcBehavior
       other is InteractiveNpcBehavior &&
           runtimeType == other.runtimeType &&
           onInteract == other.onInteract;
-
-  @override
-  int get hashCode => onInteract.hashCode;
 }
 
 class FaceDown extends InteractiveNpcBehavior {

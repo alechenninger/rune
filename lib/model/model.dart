@@ -1,3 +1,5 @@
+import 'dart:collection';
+import 'dart:core';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
@@ -8,16 +10,61 @@ import 'package:rune/model/conditional.dart';
 import 'package:rune/model/cutscenes.dart';
 import 'package:rune/model/text.dart';
 
+import '../src/iterables.dart';
 import 'dialog.dart';
 import 'map.dart';
 import 'movement.dart';
 import 'sound.dart';
 
-export 'dialog.dart';
-export 'movement.dart';
-export 'map.dart';
 export 'cutscenes.dart';
+export 'dialog.dart';
+export 'map.dart';
+export 'movement.dart';
 export 'sound.dart';
+
+class Game {
+  final _maps =
+      SplayTreeMap<MapId, GameMap>((a, b) => a.index.compareTo(b.index));
+
+  List<GameMap> get maps => _maps.values.toList(growable: false);
+
+  /// Returns the [Game] split into subsets based on what objects in the game
+  /// share the same [Scene].
+  ///
+  /// The resulting map keys (scenes) are sorted by [MapId] of the first object
+  /// referring to that scene.
+  Map<Scene, Game> byInteraction() {
+    // todo: return type might be misleading
+    // a scene should probably not be reused across object
+    // which span multiple maps.
+    // technically possible?
+    // but probably doesn't make much sense?
+    // well it could i guess depending on what's in the scene.
+    // let's keep this and roll with it.
+
+    var interactions = Map<Scene, Game>.identity();
+
+    for (var map in _maps.values) {
+      for (var obj in map.objects) {
+        var maps = interactions.putIfAbsent(obj.onInteract, () => Game());
+        var objects = maps.getOrStartMap(map.id);
+        objects.addObject(obj);
+      }
+    }
+
+    return interactions;
+  }
+
+  GameMap getOrStartMap(MapId id) {
+    return _maps.putIfAbsent(id, () => GameMap(id));
+  }
+
+  int countObjects() => _maps.values.map((e) => e.objects.length).reduce(sum);
+
+  void addMap(GameMap map) => _maps[map.id] = map;
+
+  void addMaps(List<GameMap> maps) => maps.forEach(addMap);
+}
 
 abstract class Event {
   const Event();

@@ -274,7 +274,7 @@ MapAsm compileMap(
     GameMap map, EventRoutines eventRoutines, int spriteVramOffset,
     {DialogTree? dialogTree}) {
   // TODO: move this out?
-  dialogTree ??= _defaultDialogTree(map.id);
+  var tree = dialogTree ?? _defaultDialogTree(map.id);
   var spritesAsm = Asm.empty();
   var objectsAsm = Asm.empty();
   var eventsAsm = EventAsm.empty();
@@ -286,10 +286,21 @@ MapAsm compileMap(
   var objectsTileNumbers =
       _compileMapSpriteData(map.objects, spritesAsm, spriteVramOffset);
 
+  var scenes = Map<Scene, Byte>.identity();
+
   for (var obj in map.objects) {
-    // todo: if scenes are identical, reuse dialog ID
-    var dialogId = _compileInteractionScene(
-        map, obj, dialogTree, eventsAsm, eventRoutines);
+    var scene = obj.onInteract;
+    var dialogId = scenes.putIfAbsent(
+        scene,
+        () => _compileInteractionScene(
+            map,
+            scene,
+            // todo: scene id arbitrarily refers to first object referenced.
+            // maybe scene id should be a part of scene after all
+            SceneId('${map.id.name}_${obj.id}'),
+            tree,
+            eventsAsm,
+            eventRoutines));
     var tileNumber = objectsTileNumbers[obj.id] ?? Word(0);
     _compileMapObjectData(objectsAsm, obj, tileNumber, dialogId);
   }
@@ -297,7 +308,7 @@ MapAsm compileMap(
   return MapAsm(
       sprites: spritesAsm,
       objects: objectsAsm,
-      dialog: dialogTree.toAsm(),
+      dialog: tree.toAsm(),
       events: eventsAsm,
       cutscenes: Asm.empty());
 }
@@ -380,10 +391,9 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   return objectTiles;
 }
 
-Byte _compileInteractionScene(GameMap map, MapObject obj, DialogTree tree,
-    EventAsm asm, EventRoutines eventRoutines) {
-  var events = obj.onInteract.events;
-  var id = SceneId('${map.id.name}_${obj.id}');
+Byte _compileInteractionScene(GameMap map, Scene scene, SceneId id,
+    DialogTree tree, EventAsm asm, EventRoutines eventRoutines) {
+  var events = scene.events;
 
   // todo: handle max
   var dialogId = tree.nextDialogId!;
@@ -492,12 +502,9 @@ extension ObjectAddress on GameMap {
   }
 }
 
-// todo: maplabel should probably just be MapId?
 Future<GameMap> asmToMap(
     Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) async {
   var reader = ConstantReader.asm(asm);
-
-  // todo: can make return instead of mutate args
 
   // skip general var, music, something else
   reader.skipThrough(times: 1, value: Size.w.maxValueSized);

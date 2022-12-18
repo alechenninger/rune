@@ -532,7 +532,160 @@ void main() {
       expect(map.objects[1].onInteract, Scene.none());
       expect(map.objects[2].onInteract, Scene.none());
     });
+
+    test('objects which refer to the same scene use identical Scenes',
+        () async {
+      var asm = (MapAsmFixture()
+            ..sprites[0x200] = 'Art_PalmanMan1'
+            ..addObject(
+                routine: 0x3c,
+                direction: 0,
+                dialog: 0,
+                tileNumber: 0x200,
+                x: 0x10,
+                y: 0x10)
+            ..addObject(
+                routine: 0x3c,
+                direction: 0,
+                dialog: 0,
+                tileNumber: 0x200,
+                x: 0x10,
+                y: 0x12))
+          .toAsm();
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogAsm([
+          dc.b(Bytes.ascii('one')),
+          dc.b([Byte(0xff)]),
+        ]).splitToTree()
+      });
+      var map = await asmToMap(Label('Map_Test'), asm, dialog);
+
+      expect(map.objects, hasLength(2));
+      expect(map.objects[0].onInteract, same(map.objects[1].onInteract));
+    });
   });
+}
+
+var testMapAsm = (MapAsmFixture()
+      ..sprites[0x2a8] = 'Art_PalmanMan1'
+      ..addObject(
+          routine: 0x3c,
+          direction: 0,
+          dialog: 0,
+          tileNumber: 0x2a8,
+          x: 0x2e,
+          y: 0x58)
+      ..addObject(
+          routine: 0x120,
+          direction: 0,
+          dialog: 1,
+          tileNumber: 0,
+          x: 0x20,
+          y: 0x50)
+      ..addObject(
+          routine: 0x184,
+          direction: 0,
+          dialog: 2,
+          tileNumber: 0x2a8,
+          x: 0x30,
+          y: 0x50))
+    .toAsm()
+    .toString();
+
+class MapAsmFixture {
+  var mapName = 'Test';
+  var dialogTreeLabel = 'TestDialogTree';
+  var sprites = <int, String>{};
+
+  final _objects = <List<int>>[];
+  int addObject(
+      {required int routine,
+      required int direction,
+      required int dialog,
+      required int tileNumber,
+      required int x,
+      required int y}) {
+    _objects.add([routine, direction, dialog, tileNumber, x, y]);
+    return _objects.length - 1;
+  }
+
+  Asm toAsm() => Asm.fromRaw('''Map_$mapName:
+	dc.b	\$08
+	dc.b	MusicID_TonoeDePon
+	dc.l	\$FFFF
+	${_spritesAsm()}
+	dc.w	\$FFFF
+	dc.b	\$FF, \$FF, \$1F, \$1F, \$1F, \$1F, \$01, \$00, \$00, \$01, \$00, \$01
+	dc.l	loc_122A90
+	dc.l	loc_13EECC
+	dc.w	\$FFFF
+
+; Map update
+	dc.b	\$00
+	dc.b	\$FF
+
+; Map transition data
+	dc.w	\$FFFF
+
+; Map transition data 2
+	dc.w	\$FFFF
+
+; Objects
+	${_objectsAsm()}
+	dc.w	\$FFFF
+
+; Treasure chests
+	dc.w	\$FFFF
+
+; Tile animations
+	dc.w	\$FFFF
+
+	dc.l	loc_13F23C
+	dc.l	loc_13F3AC
+	dc.l	$dialogTreeLabel
+
+; Interaction areas
+	dc.w	\$FFFF
+
+; Events
+	dc.b	\$00
+	dc.b	\$FF
+
+; Palettes address
+	dc.l	Pal_Tonoe
+
+	dc.b	\$00, \$00, \$00, \$00
+
+; Map data manager
+	dc.w	\$FFFF
+	''');
+
+  String _spritesAsm() {
+    var asm = Asm.empty();
+    for (var sprite in sprites.entries) {
+      asm.add(dc.w([Word(sprite.key)]));
+      asm.add(dc.l([Label(sprite.value)]));
+    }
+    return asm.toString();
+  }
+
+  String _objectsAsm() {
+    var asm = Asm.empty();
+    for (var obj in _objects) {
+      var routine = obj[0];
+      var direction = obj[1];
+      var dialog = obj[2];
+      var tileNumber = obj[3];
+      var x = obj[3];
+      var y = obj[4];
+      asm.add(dc.w([Word(routine)]));
+      asm.add(dc.b(Bytes.list([direction, dialog])));
+      asm.add(dc.w([Word(tileNumber)]));
+      asm.add(dc.w(Words.list([x, y])));
+      asm.addNewline();
+    }
+    return asm.toString();
+  }
 }
 
 var tonoeAsm = r'''Map_Tonoe:
@@ -708,71 +861,6 @@ var tonoeAsm = r'''Map_Tonoe:
 	dc.w	9
 	dc.b	0, 0, 0, $7C
 
-	dc.w	$FFFF
-
-; Events
-	dc.b	$00
-	dc.b	$FF
-
-; Palettes address
-	dc.l	Pal_Tonoe
-
-	dc.b	$00, $00, $00, $00
-
-; Map data manager
-	dc.w	$FFFF
-	''';
-
-var testMapAsm = r'''Map_Test:
-	dc.b	$08
-	dc.b	MusicID_TonoeDePon
-	dc.l	$FFFF02A8
-	dc.l	Art_PalmanMan1
-	dc.w	$FFFF
-	dc.b	$FF, $FF, $1F, $1F, $1F, $1F, $01, $00, $00, $01, $00, $01
-	dc.l	loc_122A90
-	dc.l	loc_13EECC
-	dc.w	$FFFF
-
-; Map update
-	dc.b	$00
-	dc.b	$FF
-
-; Map transition data
-	dc.w	$FFFF
-
-; Map transition data 2
-	dc.w	$FFFF
-
-; Objects
-	dc.w	$3C
-	dc.b	$00, $00
-	dc.w	$2A8
-	dc.w	$2E, $58
-	
-	dc.w	$120
-	dc.b	$00, $01
-	dc.w	0
-	dc.w	$20, $50
-	
-	dc.w	$184
-	dc.b	$00, $02
-	dc.w	$2A8
-	dc.w	$30, $50
-
-	dc.w	$FFFF
-
-; Treasure chests
-	dc.w	$FFFF
-
-; Tile animations
-	dc.w	$FFFF
-
-	dc.l	loc_13F23C
-	dc.l	loc_13F3AC
-	dc.l	TestDialogTree
-
-; Interaction areas
 	dc.w	$FFFF
 
 ; Events

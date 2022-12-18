@@ -17,3 +17,5 @@ extension OnIterableOfComparable<E extends Comparable> on Iterable<E> {
 T greater<T extends Comparable>(T value, T element) {
   return value.compareTo(element) > 0 ? value : element;
 }
+
+T sum<T extends num>(T a, T b) => a + b as T;
