@@ -23,6 +23,9 @@ export 'movement.dart';
 export 'sound.dart';
 
 class Game {
+  // todo: should also include non-interaction Scenes?
+  // see DocsParser
+
   final _maps =
       SplayTreeMap<MapId, GameMap>((a, b) => a.index.compareTo(b.index));
 

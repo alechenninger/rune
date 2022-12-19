@@ -104,7 +104,10 @@ extension DialogToAsm on Dialog {
 //  SceneAsmGenerator
 Scene toScene(int dialogId, DialogTree tree, {Speaker? defaultSpeaker}) {
   if (dialogId >= tree.length) {
-    throw ArgumentError.value(dialogId, 'dialogId', 'is not available in tree');
+    // todo: i think this is required b/c some original asm refers to these
+    // but check on it
+    return Scene.none();
+    //throw ArgumentError.value(dialogId, 'dialogId', 'is not available in tree');
   }
 
   var constants =

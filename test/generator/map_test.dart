@@ -552,12 +552,14 @@ void main() {
                 x: 0x10,
                 y: 0x12))
           .toAsm();
+
       var dialog = TestDialogTreeLookup({
         Label('TestDialogTree'): DialogAsm([
           dc.b(Bytes.ascii('one')),
           dc.b([Byte(0xff)]),
         ]).splitToTree()
       });
+
       var map = await asmToMap(Label('Map_Test'), asm, dialog);
 
       expect(map.objects, hasLength(2));
