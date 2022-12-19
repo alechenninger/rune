@@ -345,7 +345,7 @@ Map<MapObjectId, Word> _compileMapSpriteData(
       var tiles = routine.factory.spriteMappingTiles!;
       mappingTiles.update(maybeLbl, (current) => max(current, tiles),
           ifAbsent: () => tiles);
-    } else if (spec is InteractiveAsmSpec) {
+    } else if (spec is AsmSpec) {
       maybeLbl = spec.artLabel;
       if (maybeLbl != null) {
         mappingTiles.update(
@@ -422,7 +422,7 @@ void _compileMapObjectData(
   asm.add(comment(obj.id.toString()));
 
   // hacky?
-  if (spec is Npc || spec is InteractiveAsmSpec) {
+  if (spec is Npc || spec is AsmSpec) {
     Word routineIndex;
     if (spec is Npc) {
       var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
@@ -435,7 +435,7 @@ void _compileMapObjectData(
     } else {
       // analyzer should be smart enough to know spec is AsmSpec?
       // but its not :(
-      spec = spec as InteractiveAsmSpec;
+      spec = spec as AsmSpec;
       routineIndex = spec.routine;
     }
 
