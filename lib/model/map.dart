@@ -39,6 +39,7 @@ class GameMap {
 }
 
 enum Area {
+  Test('Test Area'),
   Piata,
   Mile,
   Zema,
@@ -79,7 +80,6 @@ enum Area {
   TowerOfAnger('Tower of Anger'),
   SacellumOfQuietude('Sacellum of Quietude'),
   ElsydeonCave('Elsydeon Cave'),
-  Test,
   ;
 
   final String? _readableName;

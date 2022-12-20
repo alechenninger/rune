@@ -381,5 +381,43 @@ void main() {
             ]));
       });
     });
+
+    group('interactions', () {
+      test('starting with f3 do not start with face player', () {
+        var asm = DialogAsm.fromRaw(r'''	dc.b	$F3
+	dc.b	"Thank you very much!"
+	dc.b	$FC
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+        var scene = toScene(0, DialogTree()..add(asm), isInteraction: true);
+
+        expect(
+            scene,
+            Scene([
+              Dialog(
+                  spans: DialogSpan.parse('Thank you very much! '
+                      'I feel much safer now.'))
+            ]));
+      });
+
+      test('starting without f3 start with face player', () {
+        var asm = DialogAsm.fromRaw(r'''	dc.b	"Thank you very much!"
+	dc.b	$FC
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+        var scene = toScene(0, DialogTree()..add(asm), isInteraction: true);
+
+        expect(
+            scene,
+            Scene([
+              InteractionObject.facePlayer(),
+              Dialog(
+                  spans: DialogSpan.parse('Thank you very much! '
+                      'I feel much safer now.'))
+            ]));
+      });
+    });
   });
 }

@@ -102,7 +102,8 @@ extension DialogToAsm on Dialog {
 
 // todo: this might belong in generator.dart due to symmetry with
 //  SceneAsmGenerator
-Scene toScene(int dialogId, DialogTree tree, {Speaker? defaultSpeaker}) {
+Scene toScene(int dialogId, DialogTree tree,
+    {Speaker? defaultSpeaker, bool isInteraction = false}) {
   if (dialogId >= tree.length) {
     // todo: i think this is required b/c some original asm refers to these
     // but check on it
@@ -146,6 +147,7 @@ Scene toScene(int dialogId, DialogTree tree, {Speaker? defaultSpeaker}) {
     moveBack: () => constId--,
     advance: advanceDialog,
     returnToLast: returnDialog,
+    isInteraction: isInteraction,
   );
 
   for (; constId < constants.length; constId++) {
@@ -172,11 +174,13 @@ class ParseContext {
       {required Function() moveBack,
       required Function(int) advance,
       required Function() returnToLast,
-      Speaker? defaultSpeaker})
+      Speaker? defaultSpeaker,
+      bool isInteraction = false})
       : _moveBack = moveBack,
         _advance = advance,
         _returnToLast = returnToLast {
-    state = DialogState(events, defaultSpeaker: defaultSpeaker);
+    var dialog = DialogState(events, defaultSpeaker: defaultSpeaker);
+    state = isInteraction ? UpdateNpcState(dialog) : dialog;
   }
 
   /// reparses the last byte with new state of [state]
@@ -231,6 +235,22 @@ class DialogState implements DialogParseState {
 
   void terminate(ParseContext context) {
     context.state = DoneState();
+  }
+}
+
+class UpdateNpcState extends DialogParseState {
+  final DialogState next;
+
+  UpdateNpcState(this.next);
+
+  @override
+  void call(Expression constant, ParseContext context) {
+    if (constant is Byte && constant.value == 0xF3) {
+      context.state = next;
+    } else {
+      next.events.add(InteractionObject.facePlayer());
+      context.reparseWith(next);
+    }
   }
 }
 
