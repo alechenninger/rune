@@ -259,6 +259,12 @@ class Scene {
 
   const Scene.none() : events = const [];
 
+  // note:
+  // because these return new scenes, they kind of break the memory model if
+  // we are treating the identity of a scene as the instance itself in memory
+  // that is, we may actually want to modify the same scene, but are instead
+  // producing a new one.
+
   Scene startingWith(List<Event> events) {
     return Scene([...events, ...this.events]);
   }
@@ -266,6 +272,12 @@ class Scene {
   Scene unlessSet(EventFlag flag, {required List<Event> then}) {
     return Scene([IfFlag(flag, isSet: then, isUnset: events)]);
   }
+
+  /// Returns [true] if the scene has no game-state-changing events.
+  bool get isEmpty => events
+      .whereNot((e) => e is SetContext || _isIfFlagWithEmptyBranches(e))
+      .isEmpty;
+  bool get isNotEmpty => !isEmpty;
 
   void addEvent(Event event) {
     events.add(event);
@@ -289,6 +301,11 @@ class Scene {
 
   @override
   int get hashCode => const ListEquality<Event>().hash(events);
+}
+
+bool _isIfFlagWithEmptyBranches(Event e) {
+  if (e is! IfFlag) return false;
+  return Scene(e.isSet).isEmpty & Scene(e.isUnset).isEmpty;
 }
 
 final onlyWordCharacters = RegExp(r'^\w+$');

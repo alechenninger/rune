@@ -658,8 +658,8 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
           asm.dialogId,
           // todo: if shared scene, default speaker may be misleading
           // but maybe better than nothing
-          () =>
-              toScene(asm.dialogId.value, dialogTree, defaultSpeaker: object));
+          () => toScene(asm.dialogId.value, dialogTree,
+              defaultSpeaker: object, isInteraction: true));
       (spec as Interactive).onInteract = scene;
     }
 

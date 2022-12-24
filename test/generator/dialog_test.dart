@@ -1,4 +1,5 @@
 import 'package:rune/asm/asm.dart';
+import 'package:rune/asm/events.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/conditional.dart';
@@ -416,6 +417,30 @@ void main() {
               Dialog(
                   spans: DialogSpan.parse('Thank you very much! '
                       'I feel much safer now.'))
+            ]));
+      });
+
+      test('after event checks without f3 start branches with face player', () {
+        var asm = DialogAsm.fromRaw(r'''        dc.b    $FA
+        dc.b    $08, $01
+	dc.b	"Thank you very much!"
+	dc.b	$FF
+	
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+        var scene = toScene(0, asm.splitToTree(), isInteraction: true);
+
+        expect(
+            scene,
+            Scene([
+              IfFlag(EventFlag('AlysFound'), isSet: [
+                InteractionObject.facePlayer(),
+                Dialog(spans: DialogSpan.parse('I feel much safer now.'))
+              ], isUnset: [
+                InteractionObject.facePlayer(),
+                Dialog(spans: DialogSpan.parse('Thank you very much!'))
+              ])
             ]));
       });
     });

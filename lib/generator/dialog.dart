@@ -147,7 +147,7 @@ Scene toScene(int dialogId, DialogTree tree,
     moveBack: () => constId--,
     advance: advanceDialog,
     returnToLast: returnDialog,
-    isInteraction: isInteraction,
+    isInteractionRoot: isInteraction,
   );
 
   for (; constId < constants.length; constId++) {
@@ -175,12 +175,12 @@ class ParseContext {
       required Function(int) advance,
       required Function() returnToLast,
       Speaker? defaultSpeaker,
-      bool isInteraction = false})
+      bool isInteractionRoot = false})
       : _moveBack = moveBack,
         _advance = advance,
         _returnToLast = returnToLast {
-    var dialog = DialogState(events, defaultSpeaker: defaultSpeaker);
-    state = isInteraction ? UpdateNpcState(dialog) : dialog;
+    state = DialogState(events,
+        defaultSpeaker: defaultSpeaker, isInteractionRoot: isInteractionRoot);
   }
 
   /// reparses the last byte with new state of [state]
@@ -208,14 +208,22 @@ class DialogState implements DialogParseState {
   Speaker? speaker;
   final List<Event> events;
 
-  DialogState(this.events, {Speaker? defaultSpeaker})
-      : speaker = defaultSpeaker;
+  bool _needsFacePlayer;
+
+  DialogState(this.events,
+      {Speaker? defaultSpeaker, bool isInteractionRoot = false})
+      : speaker = defaultSpeaker,
+        _needsFacePlayer = isInteractionRoot;
 
   @override
   void call(Expression constant, ParseContext context) {
     if (constant == Byte(0xF2)) {
+      _facePlayerIfNeeded();
       context.state = ActionState(this);
+    } else if (constant == Byte(0xF3)) {
+      _needsFacePlayer = false;
     } else if (constant == Byte(0xF4)) {
+      _facePlayerIfNeeded();
       context.state = PortraitState(this);
     } else if (constant == Byte(0xF6)) {
       // todo: add event and terminate
@@ -223,12 +231,18 @@ class DialogState implements DialogParseState {
       events.add(Dialog(spans: DialogSpan.parse('------event-----')));
       terminate(context);
     } else if (constant == Byte(0xFA)) {
-      context.state = EventCheckState(this);
+      context.state =
+          EventCheckState(this, isInteractionRoot: _needsFacePlayer);
+      // Will be handled by branches instead.
+      _needsFacePlayer = false;
     } else if (constant == Byte(0xFF)) {
+      _facePlayerIfNeeded();
       terminate(context);
     } else if (constant is Byte && constant.value >= 0xF2) {
       // todo: this should be the state that handles all that stuff
+      _needsFacePlayer = false; // ?
     } else {
+      _facePlayerIfNeeded();
       context.reparseWith(SpanState(this));
     }
   }
@@ -236,20 +250,11 @@ class DialogState implements DialogParseState {
   void terminate(ParseContext context) {
     context.state = DoneState();
   }
-}
 
-class UpdateNpcState extends DialogParseState {
-  final DialogState next;
-
-  UpdateNpcState(this.next);
-
-  @override
-  void call(Expression constant, ParseContext context) {
-    if (constant is Byte && constant.value == 0xF3) {
-      context.state = next;
-    } else {
-      next.events.add(InteractionObject.facePlayer());
-      context.reparseWith(next);
+  void _facePlayerIfNeeded() {
+    if (_needsFacePlayer) {
+      events.add(InteractionObject.facePlayer());
+      _needsFacePlayer = false;
     }
   }
 }
@@ -417,8 +422,9 @@ class EventCheckState implements DialogParseState {
   EventFlag? flag;
 
   final DialogState parent;
+  final bool isInteractionRoot;
 
-  EventCheckState(this.parent);
+  EventCheckState(this.parent, {required this.isInteractionRoot});
 
   @override
   void call(Expression constant, ParseContext context) {
@@ -433,7 +439,8 @@ class EventCheckState implements DialogParseState {
     }
 
     var ifSetOffset = constant.value;
-    context.state = IfUnsetState(flag!, ifSetOffset, parent);
+    context.state = IfUnsetState(flag!, ifSetOffset, parent,
+        isInteractionRoot: isInteractionRoot);
   }
 }
 
@@ -441,16 +448,20 @@ class IfUnsetState extends DialogState {
   final EventFlag flag;
   final int ifSetOffset;
   final DialogState parent;
+  final bool isInteractionRoot;
 
   @override
   Speaker? get speaker => parent.speaker;
 
-  IfUnsetState(this.flag, this.ifSetOffset, this.parent) : super([]);
+  IfUnsetState(this.flag, this.ifSetOffset, this.parent,
+      {required this.isInteractionRoot})
+      : super([], isInteractionRoot: isInteractionRoot);
 
   @override
   void terminate(ParseContext context) {
     context.advanceDialogsBy(ifSetOffset,
-        newState: IfSetState(flag, parent, events));
+        newState: IfSetState(flag, parent, events,
+            isInteractionRoot: isInteractionRoot));
   }
 }
 
@@ -462,7 +473,9 @@ class IfSetState extends DialogState {
   @override
   Speaker? get speaker => parent.speaker;
 
-  IfSetState(this.flag, this.parent, this.ifUnset) : super([]);
+  IfSetState(this.flag, this.parent, this.ifUnset,
+      {required super.isInteractionRoot})
+      : super([]);
 
   @override
   void terminate(ParseContext context) {
