@@ -1,6 +1,7 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/dialog.dart';
+import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
@@ -48,6 +49,75 @@ void main() {
 	dc.b	$4E, $73, $80, $7A, " ", $77, $6C, $6C, $79, $6C, $6B, " ", $76, $7C, $7B, " ", $76, $7D, $6C, $79, " ", $7B, $6F, $6C
 	dc.b	$FC
 	dc.b	$5A, $76, $7B, $68, $7D, $70, $68, $75, " ", $7E, $70, $73, $6B, $7A, ", ", $68, $7A, " ", $7B, $6F, $6C, " ", $79, $70, $7A, $70, $75, $6E''');
+  });
+
+  group('sets portrait control codes', () {
+    late DialogTree dialogTree;
+    late EventAsm eventAsm;
+
+    setUp(() {
+      dialogTree = DialogTree();
+      eventAsm = EventAsm.empty();
+    });
+
+    test('only when not already displayed', () {
+      SceneAsmGenerator.forEvent(SceneId('test'), dialogTree, eventAsm)
+        ..dialog(Dialog(speaker: alys, spans: DialogSpan.parse('Hello')))
+        ..dialog(Dialog(speaker: alys, spans: DialogSpan.parse('Hello')))
+        ..finish();
+
+      var dialog = dialogTree[0];
+
+      expect(
+          dialog.withoutComments().trim(),
+          DialogAsm([
+            dc.b([Byte(0xf4), Byte(2)]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xfd)]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xff)]),
+          ]));
+    });
+
+    test('for new speakers', () {
+      SceneAsmGenerator.forEvent(SceneId('test'), dialogTree, eventAsm)
+        ..dialog(Dialog(speaker: alys, spans: DialogSpan.parse('Hello')))
+        ..dialog(Dialog(speaker: shay, spans: DialogSpan.parse('Hello')))
+        ..finish();
+
+      var dialog = dialogTree[0];
+
+      expect(
+          dialog.withoutComments().trim(),
+          DialogAsm([
+            dc.b([Byte(0xf4), Byte(2)]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xfd)]),
+            dc.b([Byte(0xf4), Byte(1)]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xff)]),
+          ]));
+    });
+
+    test('for unnamed speakers', () {
+      SceneAsmGenerator.forEvent(SceneId('test'), dialogTree, eventAsm)
+        ..dialog(Dialog(spans: DialogSpan.parse('Hello')))
+        ..dialog(Dialog(spans: DialogSpan.parse('Hello')))
+        ..finish();
+
+      var dialog = dialogTree[0];
+
+      expect(
+          dialog.withoutComments().trim(),
+          DialogAsm([
+            // todo: technically this could be ommitted?
+            dc.b([Byte(0xf4), Byte(0)]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xfd)]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xff)]),
+          ]));
+    });
   });
 
   group('a cursor separates', () {
@@ -421,8 +491,8 @@ void main() {
       });
 
       test('after event checks without f3 start branches with face player', () {
-        var asm = DialogAsm.fromRaw(r'''        dc.b    $FA
-        dc.b    $08, $01
+        var asm = DialogAsm.fromRaw(r'''	dc.b	$FA
+	dc.b	$08, $01
 	dc.b	"Thank you very much!"
 	dc.b	$FF
 	
@@ -439,6 +509,54 @@ void main() {
                 Dialog(spans: DialogSpan.parse('I feel much safer now.'))
               ], isUnset: [
                 InteractionObject.facePlayer(),
+                Dialog(spans: DialogSpan.parse('Thank you very much!'))
+              ])
+            ]));
+      });
+
+      test('after event checks with f3 start branches without face player', () {
+        var asm = DialogAsm.fromRaw(r'''	dc.b	$FA
+	dc.b	$08, $01
+	dc.b	$F3
+	dc.b	"Thank you very much!"
+	dc.b	$FF
+
+	dc.b	$F3
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+        var scene = toScene(0, asm.splitToTree(), isInteraction: true);
+
+        expect(
+            scene,
+            Scene([
+              IfFlag(EventFlag('AlysFound'), isSet: [
+                Dialog(spans: DialogSpan.parse('I feel much safer now.'))
+              ], isUnset: [
+                Dialog(spans: DialogSpan.parse('Thank you very much!'))
+              ])
+            ]));
+      });
+
+      test('after event checks some with and without f3', () {
+        var asm = DialogAsm.fromRaw(r'''	dc.b	$FA
+	dc.b	$08, $01
+	dc.b	$F3
+	dc.b	"Thank you very much!"
+	dc.b	$FF
+
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+        var scene = toScene(0, asm.splitToTree(), isInteraction: true);
+
+        expect(
+            scene,
+            Scene([
+              IfFlag(EventFlag('AlysFound'), isSet: [
+                InteractionObject.facePlayer(),
+                Dialog(spans: DialogSpan.parse('I feel much safer now.'))
+              ], isUnset: [
                 Dialog(spans: DialogSpan.parse('Thank you very much!'))
               ])
             ]));

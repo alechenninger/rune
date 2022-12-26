@@ -5,14 +5,18 @@ import 'package:rune/generator/generator.dart';
 import 'model.dart';
 
 class Dialog extends Event {
-  // todo: make not nullable
-  Speaker? speaker;
+  Speaker speaker;
   // fixme: toString/==/etc
   bool hidePanelsOnClose = false;
   final List<DialogSpan> _spans = [];
   List<DialogSpan> get spans => UnmodifiableListView(_spans);
 
-  Dialog({this.speaker, List<DialogSpan> spans = const []}) {
+  factory Dialog.parse(String markup) {
+    return Dialog(spans: DialogSpan.parse(markup));
+  }
+
+  Dialog({Speaker? speaker, List<DialogSpan> spans = const []})
+      : speaker = speaker ?? const UnnamedSpeaker() {
     var skipped = false;
 
     for (var i = 0; i < spans.length; i++) {
@@ -210,7 +214,7 @@ abstract class Speaker {
 }
 
 class UnnamedSpeaker implements Speaker {
-  //const UnnamedSpeaker();
+  const UnnamedSpeaker();
 
   @override
   bool operator ==(Object other) =>

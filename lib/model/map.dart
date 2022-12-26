@@ -549,7 +549,7 @@ enum MapId {
 }
 
 // todo: 'with UnnamedSpeaker' – aren't some objects named speakers?
-class MapObject extends FieldObject with UnnamedSpeaker {
+class MapObject extends FieldObject implements UnnamedSpeaker {
   final MapObjectId id;
   // note: can only be in multiples of 8 pixels
   final Position startPosition;
@@ -588,11 +588,11 @@ class MapObject extends FieldObject with UnnamedSpeaker {
       this.onInteract = onInteractFacePlayer
           ? onInteract.startingWith([InteractionObject.facePlayer()])
           : onInteract;
-    } else if (spec is Interactive && onInteractFacePlayer) {
+    } /* else if (spec is Interactive && onInteractFacePlayer) {
       var interactive = (spec as Interactive);
       interactive.onInteract =
           interactive.onInteract.startingWith([InteractionObject.facePlayer()]);
-    }
+    }*/
   }
 
   @override

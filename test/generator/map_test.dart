@@ -476,8 +476,12 @@ void main() {
 
       var obj = map.objects.first;
 
-      expect(obj.onInteract,
-          Scene([Dialog(speaker: obj, spans: DialogSpan.parse('Hi there!'))]));
+      expect(
+          obj.onInteract,
+          Scene([
+            InteractionObject.facePlayer(),
+            Dialog(speaker: obj, spans: DialogSpan.parse('Hi there!'))
+          ]));
     });
 
     test(
@@ -506,8 +510,10 @@ void main() {
           obj.onInteract,
           Scene([
             IfFlag(toEventFlag(Byte(0x0b)), isUnset: [
+              InteractionObject.facePlayer(),
               Dialog(speaker: obj, spans: DialogSpan.parse('Hi there!'))
             ], isSet: [
+              InteractionObject.facePlayer(),
               Dialog(speaker: obj, spans: DialogSpan.parse('Bye!'))
             ])
           ]));

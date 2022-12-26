@@ -72,13 +72,16 @@ class DialogAsm extends Asm {
 }
 
 extension DialogToAsm on Dialog {
-  DialogAsm toAsm() {
+  DialogAsm toAsm([EventState? state]) {
     var asm = DialogAsm.empty();
     var quotes = Quotes();
 
     // i think byte zero removes portrait if already present.
     // todo: could optimize if we know there is no portrait
-    asm.add(portrait(speaker?.portraitCode ?? Byte.zero));
+    if (state?.visiblePortrait != speaker) {
+      asm.add(portrait(speaker?.portraitCode ?? Byte.zero));
+      state?.visiblePortrait = speaker;
+    }
 
     var ascii = BytesAndAscii([]);
     var pausePoints = <Byte?>[];
@@ -226,10 +229,7 @@ class DialogState implements DialogParseState {
       _facePlayerIfNeeded();
       context.state = PortraitState(this);
     } else if (constant == Byte(0xF6)) {
-      // todo: add event and terminate
-      // just terminate now for testing
-      events.add(Dialog(spans: DialogSpan.parse('------event-----')));
-      terminate(context);
+      context.state = RunEventState(this);
     } else if (constant == Byte(0xFA)) {
       context.state =
           EventCheckState(this, isInteractionRoot: _needsFacePlayer);
@@ -256,6 +256,18 @@ class DialogState implements DialogParseState {
       events.add(InteractionObject.facePlayer());
       _needsFacePlayer = false;
     }
+  }
+}
+
+class RunEventState extends DialogParseState {
+  final DialogState dialog;
+
+  RunEventState(this.dialog);
+
+  @override
+  void call(Expression constant, ParseContext context) {
+    dialog.events.add(AsmEvent(comment('run event index $constant')));
+    context.state = dialog;
   }
 }
 
@@ -450,12 +462,11 @@ class IfUnsetState extends DialogState {
   final DialogState parent;
   final bool isInteractionRoot;
 
-  @override
-  Speaker? get speaker => parent.speaker;
-
   IfUnsetState(this.flag, this.ifSetOffset, this.parent,
       {required this.isInteractionRoot})
-      : super([], isInteractionRoot: isInteractionRoot);
+      : super([], isInteractionRoot: isInteractionRoot) {
+    speaker = parent.speaker;
+  }
 
   @override
   void terminate(ParseContext context) {
@@ -470,12 +481,11 @@ class IfSetState extends DialogState {
   final DialogState parent;
   final List<Event> ifUnset;
 
-  @override
-  Speaker? get speaker => parent.speaker;
-
   IfSetState(this.flag, this.parent, this.ifUnset,
       {required super.isInteractionRoot})
-      : super([]);
+      : super([]) {
+    speaker = parent.speaker;
+  }
 
   @override
   void terminate(ParseContext context) {

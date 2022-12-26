@@ -146,11 +146,6 @@ class _ProgramEventRoutines extends EventRoutines {
   Word addCutscene(Label routine) => _program._addCutscenePointer(routine);
 }
 
-class _AsmEvent extends Event {
-  @override
-  void visit(EventVisitor visitor) {}
-}
-
 class SceneAsmGenerator implements EventVisitor {
   final SceneId id;
 
@@ -361,8 +356,8 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
-  void asm(Asm asm) {
-    _addToEvent(_AsmEvent(), (i) => asm);
+  void asm(AsmEvent asm) {
+    _addToEvent(asm, (i) => asm.asm);
   }
 
   @override
@@ -457,7 +452,7 @@ class SceneAsmGenerator implements EventVisitor {
       _addToDialog(interrupt());
     }
 
-    _addToDialog(dialog.toAsm());
+    _addToDialog(dialog.toAsm(_memory));
     _lastEventInCurrentDialog = dialog;
   }
 

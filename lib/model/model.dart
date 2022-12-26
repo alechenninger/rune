@@ -94,7 +94,7 @@ class ModelException implements Exception {
 }
 
 abstract class EventVisitor {
-  void asm(Asm asm); // todo: ?
+  void asm(AsmEvent asm);
   void dialog(Dialog dialog);
   void displayText(DisplayText text);
   void facePlayer(FacePlayer face);
@@ -131,6 +131,8 @@ class EventState {
   bool? cameraLock = false;
 
   bool? isFieldShown = true;
+
+  Speaker? visiblePortrait;
 
   GameMap? currentMap;
 
@@ -328,6 +330,31 @@ class SceneId {
 
   @override
   int get hashCode => id.hashCode;
+}
+
+class AsmEvent implements Event {
+  final Asm asm;
+
+  AsmEvent(this.asm);
+
+  @override
+  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
+    // raw asm a bit fragile! ctx not updated
+    return asm;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsmEvent && runtimeType == other.runtimeType && asm == other.asm;
+
+  @override
+  int get hashCode => asm.hashCode;
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.asm(this);
+  }
 }
 
 class SetContext extends Event {
