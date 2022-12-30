@@ -12,6 +12,7 @@ import '../characters.dart';
 import '../model/conditional.dart';
 import '../model/model.dart';
 import 'generator.dart';
+import 'cutscenes.dart';
 
 class DialogAsm extends Asm {
   DialogAsm.empty() : super.empty();
@@ -78,13 +79,13 @@ extension DialogToAsm on Dialog {
 
     // i think byte zero removes portrait if already present.
     // todo: could optimize if we know there is no portrait
-    if (state?.visiblePortrait != speaker) {
-      asm.add(portrait(speaker?.portraitCode ?? Byte.zero));
-      state?.visiblePortrait = speaker;
+    if (state?.dialogPortrait != speaker) {
+      asm.add(portrait(speaker.portraitCode));
+      state?.dialogPortrait = speaker;
     }
 
     var ascii = BytesAndAscii([]);
-    var pausePoints = <Byte?>[];
+    var codePoints = <List<ControlCode>?>[];
 
     for (var i = 0; i < spans.length; i++) {
       var span = spans[i];
@@ -92,12 +93,21 @@ extension DialogToAsm on Dialog {
       ascii += spanAscii;
 
       if (span.pause > Duration.zero) {
-        pausePoints.length = ascii.length + 1;
-        pausePoints[ascii.length] = span.pause.toFrames().toByte;
+        codePoints.length = ascii.length + 1;
+        codePoints[ascii.length] = [PauseCode(span.pause.toFrames().toByte)];
+      }
+
+      var panel = span.panel;
+      if (panel != null) {
+        state?.addPanel();
+        codePoints.length = ascii.length + 1;
+        var codes = codePoints[ascii.length] ?? [];
+        codes.add(PanelCode(panel.panelIndex.toWord));
+        codePoints[ascii.length] = codes;
       }
     }
 
-    asm.add(dialog(ascii, pausePoints: pausePoints));
+    asm.add(dialog(ascii, codePoints: codePoints));
 
     return asm;
   }

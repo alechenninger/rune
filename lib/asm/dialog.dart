@@ -7,7 +7,7 @@ import 'package:rune/generator/map.dart';
 import 'asm.dart';
 
 class _ControlCodes {
-  static final action = Bytes.hex('F2');
+  static final action = Byte(0xf2);
   static final keepNpcFacingDirection = Bytes.hex('F3');
   static final portrait = Bytes.hex('F4');
   static final yesNo = Bytes.hex('F5');
@@ -61,6 +61,13 @@ Asm eventCheck(Expression flag, Byte dialogOffset) {
   return Asm([
     dc.b(_ControlCodes.eventCheck),
     dc.b([flag, dialogOffset])
+  ]);
+}
+
+Asm panel(Word panelIndex) {
+  return Asm([
+    dc.b([_ControlCodes.action, Byte.zero]),
+    dc.w([panelIndex]),
   ]);
 }
 
@@ -136,12 +143,34 @@ class LineAsm {
       required this.asm});
 }
 
-Asm dialog(Bytes dialog, {List<Byte?> pausePoints = const []}) {
-  if (pausePoints.isNotEmpty) {
-    var maxPausePoint = pausePoints.length - 1;
-    if (maxPausePoint > dialog.length) {
-      throw ArgumentError.value(maxPausePoint, 'pausePoints',
-          'all pause points must be >= 0 and <= dialog.length');
+abstract class ControlCode {
+  Asm toAsm();
+}
+
+class PauseCode extends ControlCode {
+  final Byte frames;
+
+  PauseCode(this.frames);
+
+  @override
+  Asm toAsm() => delay(frames);
+}
+
+class PanelCode extends ControlCode {
+  final Word panelIndex;
+
+  PanelCode(this.panelIndex);
+
+  @override
+  Asm toAsm() => panel(panelIndex);
+}
+
+Asm dialog(Bytes dialog, {List<List<ControlCode>?> codePoints = const []}) {
+  if (codePoints.isNotEmpty) {
+    var maxCodePoint = codePoints.length - 1;
+    if (maxCodePoint > dialog.length) {
+      throw ArgumentError.value(maxCodePoint, 'codePoints',
+          'all code points must be >= 0 and <= dialog.length');
     }
   }
 
@@ -163,27 +192,27 @@ Asm dialog(Bytes dialog, {List<Byte?> pausePoints = const []}) {
     }
 
     // split line bytes up where there are pauses
-    var lastPauseChar = 0;
-    if (start < pausePoints.length) {
-      var pausesInLine = pausePoints.sublist(
-          start, min(line.length + start, pausePoints.length));
-      for (var i = 0; i < pausesInLine.length; i++) {
-        var pause = pausesInLine[i];
-        if (pause != null) {
-          var charOfPause = i;
-          var beforePause = line.sublist(lastPauseChar, charOfPause);
-          if (beforePause.isNotEmpty) {
-            asm.add(dc.b(beforePause));
+    var lastCodeIndex = 0;
+    if (start < codePoints.length) {
+      var codesInLine = codePoints.sublist(
+          start, min(line.length + start, codePoints.length));
+      for (var i = 0; i < codesInLine.length; i++) {
+        var codes = codesInLine[i];
+        if (codes != null) {
+          var indexOfCode = i;
+          var beforeCode = line.sublist(lastCodeIndex, indexOfCode);
+          if (beforeCode.isNotEmpty) {
+            asm.add(dc.b(beforeCode));
           }
-          asm.add(delay(pause));
-          lastPauseChar = charOfPause;
+          codes.map((c) => c.toAsm()).forEach(asm.add);
+          lastCodeIndex = indexOfCode;
         }
       }
     }
 
-    var afterPause = line.sublist(lastPauseChar);
-    if (afterPause.isNotEmpty) {
-      asm.add(dc.b(afterPause));
+    var afterCode = line.sublist(lastCodeIndex);
+    if (afterCode.isNotEmpty) {
+      asm.add(dc.b(afterCode));
     }
 
     dialogLines++;
@@ -210,10 +239,10 @@ Asm dialog(Bytes dialog, {List<Byte?> pausePoints = const []}) {
 
   append(lineStart);
 
-  if (pausePoints.length > dialog.length) {
-    var frames = pausePoints[dialog.length];
-    if (frames != null) {
-      asm.add(delay(frames));
+  if (codePoints.length > dialog.length) {
+    var codes = codePoints[dialog.length];
+    if (codes != null) {
+      codes.map((c) => c.toAsm()).forEach(asm.add);
     }
   }
 

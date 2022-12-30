@@ -350,6 +350,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _addToDialog(asmdialog.runEvent(eventIndex));
+    _memory.dialogPortrait = UnnamedSpeaker();
     _eventType = type;
 
     _terminateDialog();
@@ -509,6 +510,10 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void pause(Pause pause) {
+    // Cannot be done in dialog because,
+    // while dialog supports pausing,
+    // it will show a dialog window during the pause.
+
     _addToEvent(pause, (i) {
       var frames = pause.duration.toFrames();
       return EventAsm.of(vIntPrepareLoop(Word(frames)));
@@ -729,35 +734,16 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void showPanel(ShowPanel showPanel) {
-    _checkNotFinished();
-
     var index = showPanel.panel.panelIndex;
-    if (inDialogLoop) {
-      // todo: support optionally including panel with dialog?
-      // fixme: need ShowPanel in needsEvent check
-      if (_lastEventInCurrentDialog is Dialog) {
-        // Panel should come after this Dialog;
-        // otherwise gets rendered before player continues
-        _addToDialog(interrupt());
-      }
 
+    _addToEvent(showPanel, (_) {
       _memory.addPanel();
-      _addToDialog(Asm([
-        dc.b([Byte(0xf2), Byte.zero]),
-        dc.w([Word(index)]),
-      ]));
-
-      _lastEventInCurrentDialog = showPanel;
-    } else {
-      _addToEvent(showPanel, (_) {
-        _memory.addPanel();
-        return Asm([
-          move.w(index.toWord.i, d0),
-          jsr('Panel_Create'.toLabel.l),
-          dmaPlanesVInt(),
-        ]);
-      });
-    }
+      return Asm([
+        move.w(index.toWord.i, d0),
+        jsr('Panel_Create'.toLabel.l),
+        dmaPlanesVInt(),
+      ]);
+    });
   }
 
   @override
@@ -1076,6 +1062,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   // fixme: should get similar treatment as _addToEvent to handle common dialog
   // stuff like adding interrupts
+  // fixme: also portraits need to be cleared if there is a dialog event
+  //   without a portrait?
   int _addToDialog(Asm asm) {
     _checkNotFinished();
 
@@ -1094,9 +1082,16 @@ class SceneAsmGenerator implements EventVisitor {
     if (!_inEvent) {
       throw StateError("can't add event when not in event loop");
     } else if (inDialogLoop) {
+      // 🐞 note that if we need to do this after a dialog loop event
+      // which does not show a dialog box (e.g. panel)
+      // then this will result in an extra dialog box appearing and
+      // extra button press required before breaking to the event
+      // see: https://trello.com/c/LhjcgZkZ
+
       _addToDialog(comment('scene event $eventIndex'));
       _lastEventBreak = _addToDialog(eventBreak());
       _memory.hasSavedDialogPosition = true;
+      _memory.dialogPortrait = UnnamedSpeaker();
       _gameMode = Mode.event;
     }
 

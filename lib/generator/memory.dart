@@ -118,13 +118,13 @@ class Memory implements EventState {
       (map, m) => m._eventState.currentMap = map));
 
   @override
-  Speaker? get visiblePortrait => _eventState.visiblePortrait;
+  Speaker? get dialogPortrait => _eventState.dialogPortrait;
 
   @override
-  set visiblePortrait(Speaker? speaker) => _apply(SetValue<Speaker>(
+  set dialogPortrait(Speaker? speaker) => _apply(SetValue<Speaker>(
       speaker,
-      (m) => m._eventState.visiblePortrait,
-      (s, m) => m._eventState.visiblePortrait = s));
+      (m) => m._eventState.dialogPortrait,
+      (s, m) => m._eventState.dialogPortrait = s));
 
   @override
   Direction? getFacing(FieldObject obj) => _eventState.getFacing(obj);

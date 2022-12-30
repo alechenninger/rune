@@ -51,7 +51,9 @@ void main() {
   });
 
   test('only pause', () {
-    var asm = dialog(Bytes.empty(), pausePoints: [Byte(60)]);
+    var asm = dialog(Bytes.empty(), codePoints: [
+      [PauseCode(Byte(60))]
+    ]);
     expect(asm.toString(), equals(r'''	dc.b	$F9, $3C'''));
   });
 }

@@ -69,6 +69,7 @@ class Game {
   void addMaps(List<GameMap> maps) => maps.forEach(addMap);
 }
 
+// todo: use sealed type once supported in dart
 abstract class Event {
   const Event();
 
@@ -132,7 +133,7 @@ class EventState {
 
   bool? isFieldShown = true;
 
-  Speaker? visiblePortrait;
+  Speaker? dialogPortrait;
 
   GameMap? currentMap;
 

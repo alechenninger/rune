@@ -29,13 +29,13 @@ class Dialog extends Event {
         span = span.trimRight();
       }
 
-      if (span.text.isEmpty) {
-        // empty span is merged or just skipped unless contains pause
+      if (span.text.isEmpty && span.panel == null) {
+        // empty span is merged or just skipped unless contains pause or panel
         if (span.pause == Duration.zero) {
           skipped = true;
           continue;
         } else if (_spans.isNotEmpty) {
-          // merge
+          // merge if only one panel
           var previous = _spans.last;
           _spans.last = previous.withPause(previous.pause + span.pause);
           skipped = true;
@@ -61,6 +61,8 @@ class Dialog extends Event {
     }
 
     if (_spans.isEmpty) {
+      // todo: consider relaxing this rule to allow reusing dialog to
+      //   simply control potraits
       throw ArgumentError.value(
           spans, 'spans', 'must contain at least one span with text');
     }
@@ -100,22 +102,30 @@ class Dialog extends Event {
 
 class DialogSpan {
   final Span span;
+
+  /// Duration to pause for after the [span].
   final Duration pause;
+
+  /// Panel to be displayed after the [span].
+  final Panel? panel;
 
   String get text => span.text;
   bool get italic => span.italic;
 
-  DialogSpan(String text, {bool italic = false, this.pause = Duration.zero})
+  DialogSpan(String text,
+      {bool italic = false, this.pause = Duration.zero, this.panel})
       : span = Span(text, italic: italic);
 
   DialogSpan.italic(String text) : this(text, italic: true);
 
-  DialogSpan.fromSpan(this.span, {this.pause = Duration.zero});
+  DialogSpan.fromSpan(this.span, {this.pause = Duration.zero, this.panel});
 
-  DialogSpan trimLeft() => DialogSpan.fromSpan(span.trimLeft(), pause: pause);
-  DialogSpan trimRight() => DialogSpan.fromSpan(span.trimRight(), pause: pause);
+  DialogSpan trimLeft() =>
+      DialogSpan.fromSpan(span.trimLeft(), pause: pause, panel: panel);
+  DialogSpan trimRight() =>
+      DialogSpan.fromSpan(span.trimRight(), pause: pause, panel: panel);
   DialogSpan withPause(Duration pause) =>
-      DialogSpan.fromSpan(span, pause: pause);
+      DialogSpan.fromSpan(span, pause: pause, panel: panel);
 
   // TODO: markup parsing belongs in parse layer
   static List<DialogSpan> parse(String markup) {
@@ -124,7 +134,11 @@ class DialogSpan {
 
   @override
   String toString() {
-    return 'DialogSpan{text: $text, italic: $italic, pause: $pause}';
+    return 'DialogSpan{'
+        'text: $text, '
+        'italic: $italic, '
+        'pause: $pause, '
+        'panel: $panel}';
   }
 
   @override
@@ -133,10 +147,11 @@ class DialogSpan {
       other is DialogSpan &&
           runtimeType == other.runtimeType &&
           span == other.span &&
-          pause == other.pause;
+          pause == other.pause &&
+          panel == other.panel;
 
   @override
-  int get hashCode => span.hashCode ^ pause.hashCode;
+  int get hashCode => span.hashCode ^ pause.hashCode ^ panel.hashCode;
 }
 
 class Span {

@@ -40,8 +40,8 @@ ${dialog2.toAsm()}
       var sceneAsm = program.addScene(
           SceneId('test'),
           Scene([
-            Dialog(speaker: alys, spans: DialogSpan.parse('Hi')),
-            ShowPanel(PrincipalPanel.principal),
+            Dialog(speaker: alys, spans: [DialogSpan('Hi')]),
+            Dialog(spans: [DialogSpan('', panel: PrincipalPanel.principal)])
           ]));
 
       expect(
@@ -50,6 +50,7 @@ ${dialog2.toAsm()}
             dc.b([Byte(0xF4), alys.portraitCode]),
             dc.b(Bytes.ascii('Hi')),
             dc.b([Byte(0xFD)]),
+            dc.b([Byte(0xF4), UnnamedSpeaker().portraitCode]),
             dc.b([Byte(0xF2), Byte.zero]),
             dc.w([Word(PrincipalPanel.principal.panelIndex)]),
             dc.b([Byte(0xff)])
@@ -495,6 +496,40 @@ ${dialog2.toAsm()}
             jsr(Label('Event_MoveCharacter').l),
             updateObjFacing(Direction.down.address),
             getAndRunDialog3(Byte.zero.i),
+          ]));
+    });
+
+    test(
+        'dialog then event then dialog with same speaker shows portrait after event',
+        () {
+      var scene = Scene([
+        SetContext((ctx) {
+          ctx.followLead = false;
+          ctx.slots[1] = alys;
+          ctx.positions[alys] = Position(0x50, 0x50);
+        }),
+        Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),
+        IndividualMoves()
+          ..moves[alys] = (StepPaths()
+            ..step(StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps)
+            ..face(Direction.down)),
+        Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),
+      ]);
+
+      var program = Program();
+      var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+      expect(
+          sceneAsm.allDialog.withoutComments().trim(),
+          Asm([
+            dc.b([Byte(0xf4), alys.portraitCode]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xf7)]),
+            dc.b([Byte(0xf4), alys.portraitCode]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xff)])
           ]));
     });
   });
