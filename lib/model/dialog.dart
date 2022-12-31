@@ -29,19 +29,24 @@ class Dialog extends Event {
         span = span.trimRight();
       }
 
-      if (span.text.isEmpty && span.panel == null) {
+      if (span.text.isEmpty) {
         // empty span is merged or just skipped unless contains pause or panel
-        if (span.pause == Duration.zero) {
+        if (span.pause == Duration.zero && span.panel == null) {
           skipped = true;
           continue;
         } else if (_spans.isNotEmpty) {
-          // merge if only one panel
+          // merge if previous has no panel
           var previous = _spans.last;
-          _spans.last = previous.withPause(previous.pause + span.pause);
-          skipped = true;
-          continue;
+          if (previous.panel == null) {
+            _spans.last = span.withPause(previous.pause + span.pause);
+            skipped = true;
+            continue;
+          }
+
+          // fall through (keep)
         }
-        // keep for pause
+
+        // fall through (keep)
       }
 
       skipped = false;

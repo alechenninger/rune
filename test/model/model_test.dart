@@ -2,6 +2,8 @@ import 'package:rune/generator/generator.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
+import '../generator/scene_test.dart';
+
 void main() {
   group('==', () {
     test('IndividualMoves', () {
@@ -349,5 +351,29 @@ void main() {
 
   group('dialog', () {
     test('combines spans', () {});
+
+    test('combines pause then pause and panel', () {
+      var dialog = Dialog(spans: [
+        DialogSpan('', pause: 1.second),
+        DialogSpan('', pause: 2.seconds, panel: PrincipalPanel.principal)
+      ]);
+
+      expect(dialog.spans, hasLength(1));
+      expect(dialog.spans,
+          [DialogSpan('', pause: 3.seconds, panel: PrincipalPanel.principal)]);
+    });
+
+    test('does not combine pause and panel then pause', () {
+      var dialog = Dialog(spans: [
+        DialogSpan('', pause: 2.seconds, panel: PrincipalPanel.principal),
+        DialogSpan('', pause: 1.second),
+      ]);
+
+      expect(dialog.spans, hasLength(2));
+      expect(dialog.spans, [
+        DialogSpan('', pause: 2.seconds, panel: PrincipalPanel.principal),
+        DialogSpan('', pause: 1.second),
+      ]);
+    });
   });
 }
