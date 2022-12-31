@@ -17,7 +17,7 @@ class Dialog extends Event {
 
   Dialog({Speaker? speaker, List<DialogSpan> spans = const []})
       : speaker = speaker ?? const UnnamedSpeaker() {
-    var skipped = false;
+    var lastSpanSkipped = false;
 
     for (var i = 0; i < spans.length; i++) {
       var span = spans[i];
@@ -32,14 +32,14 @@ class Dialog extends Event {
       if (span.text.isEmpty) {
         // empty span is merged or just skipped unless contains pause or panel
         if (span.pause == Duration.zero && span.panel == null) {
-          skipped = true;
+          lastSpanSkipped = true;
           continue;
         } else if (_spans.isNotEmpty) {
           // merge if previous has no panel
           var previous = _spans.last;
           if (previous.panel == null) {
             _spans.last = span.withPause(previous.pause + span.pause);
-            skipped = true;
+            lastSpanSkipped = true;
             continue;
           }
 
@@ -49,11 +49,13 @@ class Dialog extends Event {
         // fall through (keep)
       }
 
-      skipped = false;
+      lastSpanSkipped = false;
       _spans.add(span);
     }
 
-    if (skipped) {
+    if (lastSpanSkipped) {
+      // Remove other trailing empty spans that were kept assuming more
+      // spans would come after
       for (var i = _spans.length - 1; i >= 0; i--) {
         var span = _spans[i].trimRight();
         if (span.text.isEmpty && span.pause == Duration.zero) {
