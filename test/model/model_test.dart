@@ -383,10 +383,47 @@ void main() {
       var alys = MapObject(
           id: 'alys', startPosition: Position(0, 0), spec: AlysWaiting());
       var other = MapObject(
-          id: '0', startPosition: Position(0x10, 0), spec: AlysWaiting());
+          id: 'other', startPosition: Position(0x10, 0), spec: AlysWaiting());
       map.addObject(alys, at: 1);
       map.addObject(other);
-      expect(map.objects, [other, alys]);
+      expect(map.orderedObjects, [other, alys]);
+    });
+
+    test('indexes are assigned lazily if not explicitly assigned', () {
+      var map = GameMap(MapId.Test);
+      var alys = MapObject(
+          id: 'alys', startPosition: Position(0, 0), spec: AlysWaiting());
+      var other = MapObject(
+          id: 'other', startPosition: Position(0x10, 0), spec: AlysWaiting());
+      var other2 = MapObject(
+          id: 'other2', startPosition: Position(0x20, 0), spec: AlysWaiting());
+      map.addObject(other);
+      map.addObject(other2);
+      map.addObject(alys, at: 1);
+      expect(map.orderedObjects, [other, alys, other2]);
+    });
+
+    test('map object indexes can be retrieved across different map aggregates',
+        () {
+      var original = GameMap(MapId.Test);
+      var alys = MapObject(
+          id: 'alys', startPosition: Position(0, 0), spec: AlysWaiting());
+      var other = MapObject(
+          id: 'other', startPosition: Position(0x10, 0), spec: AlysWaiting());
+      var other2 = MapObject(
+          id: 'other2', startPosition: Position(0x20, 0), spec: AlysWaiting());
+      original.addObject(other);
+      original.addObject(other2);
+      original.addObject(alys, at: 1);
+
+      var view = GameMap(MapId.Test);
+
+      original.indexedObjects
+          .where((obj) => obj.object.id.value.startsWith('other'))
+          .forEach(view.addIndexedObject);
+
+      expect(view.indexedObjects,
+          [IndexedMapObject(0, other), IndexedMapObject(2, other2)]);
     });
   });
 }

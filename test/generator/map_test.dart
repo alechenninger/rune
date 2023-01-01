@@ -472,9 +472,9 @@ void main() {
       });
       var map = await asmToMap(Label('Map_Test'), asm, dialog);
 
-      expect(map.objects, hasLength(3));
+      expect(map.orderedObjects, hasLength(3));
 
-      var obj = map.objects.first;
+      var obj = map.orderedObjects.first;
 
       expect(
           obj.onInteract,
@@ -502,9 +502,9 @@ void main() {
       });
       var map = await asmToMap(Label('Map_Test'), asm, dialog);
 
-      expect(map.objects, hasLength(3));
+      expect(map.orderedObjects, hasLength(3));
 
-      var obj = map.objects.first;
+      var obj = map.orderedObjects.first;
 
       expect(
           obj.onInteract,
@@ -533,10 +533,10 @@ void main() {
       });
       var map = await asmToMap(Label('Map_Test'), asm, dialog);
 
-      expect(map.objects, hasLength(3));
+      expect(map.orderedObjects, hasLength(3));
 
-      expect(map.objects[1].onInteract, Scene.none());
-      expect(map.objects[2].onInteract, Scene.none());
+      expect(map.orderedObjects[1].onInteract, Scene.none());
+      expect(map.orderedObjects[2].onInteract, Scene.none());
     });
 
     test('objects which refer to the same scene use identical Scenes',
@@ -568,8 +568,9 @@ void main() {
 
       var map = await asmToMap(Label('Map_Test'), asm, dialog);
 
-      expect(map.objects, hasLength(2));
-      expect(map.objects[0].onInteract, same(map.objects[1].onInteract));
+      expect(map.orderedObjects, hasLength(2));
+      expect(map.orderedObjects[0].onInteract,
+          same(map.orderedObjects[1].onInteract));
     });
   });
 }

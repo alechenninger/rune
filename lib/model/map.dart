@@ -18,38 +18,69 @@ class GameMap {
   final MapId id;
 
   // limited to 64 objects in ram currently
-  final _objects = <MapObjectId, _IndexedMapObject>{};
+  final _objects = <MapObjectId, _MapObjectAt>{};
   final _indexedObjects = <MapObject?>[];
 
   GameMap(this.id);
 
-  List<MapObject> get objects {
-    var answer = <MapObject>[];
-    var objects = Queue.of(_objects.values);
-    for (var i = 0; i < _objects.length; i++) {
-      var indexed = i < _indexedObjects.length ? _indexedObjects[i] : null;
-      if (indexed != null) {
-        answer.add(indexed);
-      } else {
-        if (objects.isEmpty) {
+  // TODO: we may want a way to retrieve back
+  //  whether an object was explicitly assigned an index or not
+
+  Iterable<MapObject> get objects =>
+      UnmodifiableListView(_objects.values.map((o) => o.object));
+
+  List<MapObject> get orderedObjects => _iterateIndexedObjects().map((indexed) {
+        if (indexed == null) {
           // todo: add something invisible which doesn't collide or interact?
           throw StateError('not enough objects to maintain object indexes');
         }
-        var obj = objects.removeFirst();
-        while (obj.index != null) {
-          obj = objects.removeFirst();
-        }
-        answer.add(obj.object);
-      }
-    }
-    return answer;
-  }
+        return indexed.object;
+      }).toList(growable: false);
+
+  Iterable<IndexedMapObject> get indexedObjects =>
+      _iterateIndexedObjects().whereNotNull();
+
+  bool get isNotEmpty => _objects.isNotEmpty;
+  bool get isEmpty => _objects.isEmpty;
 
   //final onMove = <Event>[];
 
   bool containsObject(MapObjectId id) => _objects.containsKey(id);
 
   MapObject? object(MapObjectId id) => _objects[id]?.object;
+
+  int? indexOf(MapObjectId id) => _iterateIndexedObjects()
+      .whereNotNull()
+      .firstWhereOrNull((indexed) => indexed.object.id == id)
+      ?.index;
+
+  /// Iterates through all objects with indexes, where each object's position
+  /// in the iterable == its index.
+  Iterable<IndexedMapObject?> _iterateIndexedObjects() sync* {
+    var objects = Queue.of(_objects.values);
+    var limit = max(_objects.length, _indexedObjects.length);
+
+    forobjects:
+    for (var i = 0; i < limit; i++) {
+      var indexed = i < _indexedObjects.length ? _indexedObjects[i] : null;
+      if (indexed != null) {
+        yield IndexedMapObject(i, indexed);
+      } else if (objects.isEmpty) {
+        yield null;
+      } else {
+        var obj = objects.removeFirst();
+        while (obj.index != null) {
+          if (objects.isEmpty) {
+            yield null;
+            continue forobjects;
+          } else {
+            obj = objects.removeFirst();
+          }
+        }
+        yield IndexedMapObject(i, obj.object);
+      }
+    }
+  }
 
   void addObject(MapObject obj, {int? at}) {
     if (_objects.containsKey(obj.id)) {
@@ -68,15 +99,42 @@ class GameMap {
         _indexedObjects[at] = obj;
       }
     }
-    _objects[obj.id] = _IndexedMapObject(obj, at);
+    _objects[obj.id] = _MapObjectAt(obj, at);
+  }
+
+  void addIndexedObject(IndexedMapObject obj) {
+    addObject(obj.object, at: obj.index);
   }
 }
 
-class _IndexedMapObject {
+class _MapObjectAt {
   final int? index;
   final MapObject object;
 
-  _IndexedMapObject(this.object, [this.index]);
+  _MapObjectAt(this.object, [this.index]);
+}
+
+class IndexedMapObject {
+  final int index;
+  final MapObject object;
+
+  IndexedMapObject(this.index, this.object);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IndexedMapObject &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          object == other.object;
+
+  @override
+  int get hashCode => index.hashCode ^ object.hashCode;
+
+  @override
+  String toString() {
+    return 'IndexedMapObject{index: $index, object: $object}';
+  }
 }
 
 enum Area {

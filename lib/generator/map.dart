@@ -279,16 +279,18 @@ MapAsm compileMap(
   var objectsAsm = Asm.empty();
   var eventsAsm = EventAsm.empty();
 
-  if (map.objects.length > 64) {
+  var objects = map.orderedObjects;
+
+  if (objects.length > 64) {
     throw 'too many objects';
   }
 
   var objectsTileNumbers =
-      _compileMapSpriteData(map.objects, spritesAsm, spriteVramOffset);
+      _compileMapSpriteData(objects, spritesAsm, spriteVramOffset);
 
   var scenes = Map<Scene, Byte>.identity();
 
-  for (var obj in map.objects) {
+  for (var obj in objects) {
     var scene = obj.onInteract;
     var dialogId = scenes.putIfAbsent(
         scene,
@@ -488,10 +490,9 @@ extension ObjectAddress on GameMap {
     // Then load this via lea into a4
     // e.g. lea	(Alys_Piata).w, a4
 
-    var index =
-        objects.map((e) => e.id).toList(growable: false).indexOf(obj.id);
+    var index = this.indexOf(obj.id);
 
-    if (index == -1) {
+    if (index == null) {
       throw StateError('map object not found in map. obj=$obj map=$this');
     }
 

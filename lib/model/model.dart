@@ -48,11 +48,12 @@ class Game {
     var interactions = Map<Scene, Game>.identity();
 
     for (var map in _maps.values) {
-      for (var obj in map.objects) {
+      map.orderedObjects.forEachIndexed((i, obj) {
         var maps = interactions.putIfAbsent(obj.onInteract, () => Game());
         var objects = maps.getOrStartMap(map.id);
-        objects.addObject(obj);
-      }
+        // keep original index in new maps
+        objects.addObject(obj, at: i);
+      });
     }
 
     return interactions;
@@ -62,7 +63,8 @@ class Game {
     return _maps.putIfAbsent(id, () => GameMap(id));
   }
 
-  int countObjects() => _maps.values.map((e) => e.objects.length).reduce(sum);
+  int countObjects() =>
+      _maps.values.map((e) => e.orderedObjects.length).reduce(sum);
 
   void addMap(GameMap map) => _maps[map.id] = map;
 
@@ -358,6 +360,7 @@ class AsmEvent implements Event {
   }
 }
 
+// todo: this event is not like the others, and routinely causes some issues
 class SetContext extends Event {
   final void Function(EventState ctx) _setCtx;
 
