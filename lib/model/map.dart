@@ -18,24 +18,65 @@ class GameMap {
   final MapId id;
 
   // limited to 64 objects in ram currently
-  final _objects = <MapObjectId, MapObject>{};
+  final _objects = <MapObjectId, _IndexedMapObject>{};
+  final _indexedObjects = <MapObject?>[];
 
   GameMap(this.id);
 
-  List<MapObject> get objects => UnmodifiableListView(_objects.values);
+  List<MapObject> get objects {
+    var answer = <MapObject>[];
+    var objects = Queue.of(_objects.values);
+    for (var i = 0; i < _objects.length; i++) {
+      var indexed = i < _indexedObjects.length ? _indexedObjects[i] : null;
+      if (indexed != null) {
+        answer.add(indexed);
+      } else {
+        if (objects.isEmpty) {
+          // todo: add something invisible which doesn't collide or interact?
+          throw StateError('not enough objects to maintain object indexes');
+        }
+        var obj = objects.removeFirst();
+        while (obj.index != null) {
+          obj = objects.removeFirst();
+        }
+        answer.add(obj.object);
+      }
+    }
+    return answer;
+  }
 
   //final onMove = <Event>[];
 
   bool containsObject(MapObjectId id) => _objects.containsKey(id);
 
-  MapObject? object(MapObjectId id) => _objects[id];
+  MapObject? object(MapObjectId id) => _objects[id]?.object;
 
-  void addObject(MapObject obj) {
+  void addObject(MapObject obj, {int? at}) {
     if (_objects.containsKey(obj.id)) {
       throw ArgumentError('map already contains object with id: ${obj.id}');
     }
-    _objects[obj.id] = obj;
+    if (at != null) {
+      if (at < _indexedObjects.length) {
+        var existing = _indexedObjects[at];
+        if (existing != null) {
+          throw ArgumentError(
+              'map already contains object at index $at: ${existing.id}');
+        }
+        _indexedObjects[at] = obj;
+      } else {
+        _indexedObjects.length = at + 1;
+        _indexedObjects[at] = obj;
+      }
+    }
+    _objects[obj.id] = _IndexedMapObject(obj, at);
   }
+}
+
+class _IndexedMapObject {
+  final int? index;
+  final MapObject object;
+
+  _IndexedMapObject(this.object, [this.index]);
 }
 
 enum Area {

@@ -376,4 +376,17 @@ void main() {
       ]);
     });
   });
+
+  group('map', () {
+    test('adding objects at index', () {
+      var map = GameMap(MapId.Test);
+      var alys = MapObject(
+          id: 'alys', startPosition: Position(0, 0), spec: AlysWaiting());
+      var other = MapObject(
+          id: '0', startPosition: Position(0x10, 0), spec: AlysWaiting());
+      map.addObject(alys, at: 1);
+      map.addObject(other);
+      expect(map.objects, [other, alys]);
+    });
+  });
 }
