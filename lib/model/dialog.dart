@@ -38,7 +38,8 @@ class Dialog extends Event {
           // merge if previous has no panel
           var previous = _spans.last;
           if (previous.panel == null) {
-            _spans.last = span.withPause(previous.pause + span.pause);
+            _spans.last = DialogSpan.fromSpan(previous.span,
+                panel: span.panel, pause: span.pause + previous.pause);
             lastSpanSkipped = true;
             continue;
           }
@@ -131,8 +132,6 @@ class DialogSpan {
       DialogSpan.fromSpan(span.trimLeft(), pause: pause, panel: panel);
   DialogSpan trimRight() =>
       DialogSpan.fromSpan(span.trimRight(), pause: pause, panel: panel);
-  DialogSpan withPause(Duration pause) =>
-      DialogSpan.fromSpan(span, pause: pause, panel: panel);
 
   // TODO: markup parsing belongs in parse layer
   static List<DialogSpan> parse(String markup) {
@@ -235,6 +234,7 @@ abstract class Speaker {
   }
 }
 
+// todo: this is really more like "unseen" speaker
 class UnnamedSpeaker implements Speaker {
   const UnnamedSpeaker();
 

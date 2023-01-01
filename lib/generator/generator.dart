@@ -25,9 +25,9 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
-import '../asm/dialog.dart' as asmdialog;
+import '../asm/dialog.dart' as asmdialoglib;
 import '../asm/events.dart';
-import '../asm/events.dart' as asmevents;
+import '../asm/events.dart' as asmeventslib;
 import '../asm/text.dart';
 import '../model/conditional.dart';
 import '../model/model.dart';
@@ -39,7 +39,7 @@ import 'map.dart';
 import 'memory.dart';
 import 'movement.dart';
 import 'scene.dart';
-import 'text.dart' as text;
+import 'text.dart' as textlib;
 
 export '../asm/asm.dart' show Asm;
 export 'deprecated.dart';
@@ -257,23 +257,15 @@ class SceneAsmGenerator implements EventVisitor {
 		$C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
    */
   EventType? needsEvent(List<Event> events) {
-    /*
-    to determine if needs *cutscene* we need to know if there is dialog during
-    a fade out
-    OR we fake the cutscene bit
-    OR we add some other flag and modify the runtext subroutines
-     */
-
     if (events.length == 1 && events[0] is IfFlag) return null;
-
-    // todo: if we do the hidePanelsOnClose thing in dialog
-    // we need an event if any dialog has that set that isn't the last event
 
     var dialogCheck = 0;
     var dialogChecks = <bool Function(Event, int)>[
       (event, i) => event is FacePlayer && event.object == _interactingWith,
       (event, i) =>
-          (event is Dialog && !event.hidePanelsOnClose) || event is PlaySound,
+          (event is Dialog && !event.hidePanelsOnClose) ||
+          event is PlaySound ||
+          event is ShowPanel,
       (event, i) =>
           event is Dialog && event.hidePanelsOnClose && i == events.length - 1,
     ];
@@ -349,7 +341,7 @@ class SceneAsmGenerator implements EventVisitor {
       _eventAsm.add(setLabel(eventRoutine.name));
     }
 
-    _addToDialog(asmdialog.runEvent(eventIndex));
+    _addToDialog(asmdialoglib.runEvent(eventIndex));
     _memory.dialogPortrait = UnnamedSpeaker();
     _eventType = type;
 
@@ -364,95 +356,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void dialog(Dialog dialog) {
     _checkNotFinished();
-
-    if (!_inEvent &&
-        _isProcessingInteraction &&
-        _lastEventInCurrentDialog == null) {
-      // Not starting with face player, so signal not to.
-      _addToDialog(dc.b(Bytes.of(0xf3)));
-    }
-
-    if (!inDialogLoop) {
-      // todo: differentiate "walking" from "still" states
-      /*
-      idea here is that if done moving for a frame, or have called update
-      facing, then the character is known to be still.
-      otherwise, the character might be mid-movement frame, which is awkward
-      when going to dialog. if walking, and going to dialog, we could call
-      update facing to ensure still.
-       */
-      // var lastEvent = _lastEventInCurrentDialog;
-      // if (lastEvent is IndividualMoves) {
-      //   for (var obj in lastEvent.moves.keys) {
-      //   }
-      // }
-
-      _eventAsm.add(Asm([comment('${_eventCounter++}: $Dialog')]));
-
-      // todo if null, have to check somehow?
-      // todo: not sure if this is right
-      if (_memory.isFieldShown == false) {
-        // fake a cutscene ... hehehe
-        // todo: save in model of ram to prevent unnecessary repetition
-        // todo: but does this break saving?
-        // _eventAsm.add(bset(7.i, Constant('Event_Index').w));
-        _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
-      }
-
-      /*
-      differences in panel handling after button press:
-
-      rundialog - destory panels, then destroy window
-      rundialog2 - leave everything up, but reset counts - used before battles
-      rundialog3 - destroy window, don't touch panels
-      rundialog4 - destroy window, don't touch panels
-        (but uses runtext3 instead - used in ending for non-interactive dialog)
-      rundialog5 - destroy window, then fade screen (then destroy panels silently)
-
-      problem is we have to know how we want to handle panels in the future
-      before we run dialog.
-
-      we could lookahead and see what's about to happen:
-
-      - if no more events
-        - if there are panels
-          - if field is faded
-            - run5
-          - run regular
-        - run regular
-      - run3
-
-      we could also look back? remember where the last rundialog routine was
-      and change it accordingly?
-
-      the behavior of destroying a panel before the window is more like a dialog
-      behavior. so we'd set a flag on the dialog to say whether it should close
-      panels with it, and then look ahead in dialog for that.
-
-      fade out can just be done explicitly, but might check if we have already
-      faded the field, in which case only call the palfadeout routine. that is,
-      default to rundialog3.
-       */
-
-      if (_memory.hasSavedDialogPosition) {
-        _eventAsm.add(popdlg);
-        var line = _eventAsm.add(jsr(Label('Event_RunDialogue3').l));
-        _replaceDialogRoutine = ([i]) => _eventAsm.replace(
-            line, jsr(Label('Event_RunDialogue${i ?? ""}').l));
-      } else {
-        var dialogId = _currentDialogIdOrStart().i;
-        _eventAsm.add(moveq(dialogId, d0));
-        var line = _eventAsm.add(jsr(Label('Event_GetAndRunDialogue3').l));
-        _replaceDialogRoutine = ([i]) => _eventAsm.replace(
-            line, jsr(Label('Event_GetAndRunDialogue${i ?? ""}').l));
-      }
-
-      _gameMode = Mode.dialog;
-    } else if (_lastEventInCurrentDialog is Dialog) {
-      // Consecutive dialog, new cursor in between each dialog
-      _addToDialog(interrupt());
-    }
-
+    _runOrInterruptDialog();
     _addToDialog(dialog.toAsm(_memory));
     _lastEventInCurrentDialog = dialog;
   }
@@ -461,7 +365,7 @@ class SceneAsmGenerator implements EventVisitor {
   void displayText(DisplayText display) {
     _addToEvent(display, (i) {
       _terminateDialog();
-      var asm = text.displayTextToAsm(display, dialogTree: _dialogTree);
+      var asm = textlib.displayTextToAsm(display, dialogTree: _dialogTree);
       return asm.event;
     });
   }
@@ -500,7 +404,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void lockCamera(LockCamera lock) {
     _addToEvent(lock,
-        (i) => EventAsm.of(asmevents.lockCamera(_memory.cameraLock = true)));
+        (i) => EventAsm.of(asmeventslib.lockCamera(_memory.cameraLock = true)));
   }
 
   @override
@@ -528,8 +432,10 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void unlockCamera(UnlockCamera unlock) {
-    _addToEvent(unlock,
-        (i) => EventAsm.of(asmevents.lockCamera(_memory.cameraLock = false)));
+    _addToEvent(
+        unlock,
+        (i) =>
+            EventAsm.of(asmeventslib.lockCamera(_memory.cameraLock = false)));
   }
 
   @override
@@ -736,14 +642,28 @@ class SceneAsmGenerator implements EventVisitor {
   void showPanel(ShowPanel showPanel) {
     var index = showPanel.panel.panelIndex;
 
-    _addToEvent(showPanel, (_) {
+    if (showPanel.showDialogBox) {
+      _runOrInterruptDialog();
       _memory.addPanel();
-      return Asm([
-        move.w(index.toWord.i, d0),
-        jsr('Panel_Create'.toLabel.l),
-        dmaPlanesVInt(),
-      ]);
-    });
+
+      _addToDialog(Asm([
+        if (_memory.dialogPortrait != const UnnamedSpeaker())
+          portrait(const UnnamedSpeaker().portraitCode),
+        dc.b([Byte(0xf2), Byte.zero]),
+        dc.w([Word(index)]),
+      ]));
+
+      _lastEventInCurrentDialog = showPanel;
+    } else {
+      _addToEvent(showPanel, (_) {
+        _memory.addPanel();
+        return Asm([
+          move.w(index.toWord.i, d0),
+          jsr('Panel_Create'.toLabel.l),
+          dmaPlanesVInt(),
+        ]);
+      });
+    }
   }
 
   @override
@@ -1000,6 +920,105 @@ class SceneAsmGenerator implements EventVisitor {
 
     _memory.clearChanges();
     sibling?.clearChanges();
+  }
+
+  void _runOrInterruptDialog() {
+    _expectFacePlayerFirstIfInteraction();
+
+    if (!inDialogLoop) {
+      _runDialog();
+    } else if (_lastEventInCurrentDialog is Dialog) {
+      // Add cursor for previous dialog
+      // This is delayed because this interrupt may be a termination
+      _addToDialog(interrupt());
+    }
+  }
+
+  void _expectFacePlayerFirstIfInteraction() {
+    if (!_inEvent &&
+        _isProcessingInteraction &&
+        _lastEventInCurrentDialog == null) {
+      // Not starting with face player, so signal not to.
+      _addToDialog(dc.b(Bytes.of(0xf3)));
+    }
+  }
+
+  void _runDialog() {
+    // todo: differentiate "walking" from "still" states
+    /*
+      idea here is that if done moving for a frame, or have called update
+      facing, then the character is known to be still.
+      otherwise, the character might be mid-movement frame, which is awkward
+      when going to dialog. if walking, and going to dialog, we could call
+      update facing to ensure still.
+       */
+    // var lastEvent = _lastEventInCurrentDialog;
+    // if (lastEvent is IndividualMoves) {
+    //   for (var obj in lastEvent.moves.keys) {
+    //   }
+    // }
+
+    _eventAsm.add(Asm([comment('${_eventCounter++}: $Dialog')]));
+
+    // todo if null, have to check somehow?
+    // todo: not sure if this is right
+    if (_memory.isFieldShown == false) {
+      // fake a cutscene ... hehehe
+      // todo: save in model of ram to prevent unnecessary repetition
+      // todo: but does this break saving?
+      // _eventAsm.add(bset(7.i, Constant('Event_Index').w));
+      _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
+    }
+
+    /*
+    differences in panel handling after button press:
+
+    rundialog - destory panels, then destroy window
+    rundialog2 - leave everything up, but reset counts - used before battles
+    rundialog3 - destroy window, don't touch panels
+    rundialog4 - destroy window, don't touch panels
+      (but uses runtext3 instead - used in ending for non-interactive dialog)
+    rundialog5 - destroy window, then fade screen (then destroy panels silently)
+
+    problem is we have to know how we want to handle panels in the future
+    before we run dialog.
+
+    we could lookahead and see what's about to happen:
+
+    - if no more events
+      - if there are panels
+        - if field is faded
+          - run5
+        - run regular
+      - run regular
+    - run3
+
+    we could also look back? remember where the last rundialog routine was
+    and change it accordingly?
+
+    the behavior of destroying a panel before the window is more like a dialog
+    behavior. so we'd set a flag on the dialog to say whether it should close
+    panels with it, and then look ahead in dialog for that.
+
+    fade out can just be done explicitly, but might check if we have already
+    faded the field, in which case only call the palfadeout routine. that is,
+    default to rundialog3.
+     */
+
+    if (_memory.hasSavedDialogPosition) {
+      _eventAsm.add(popdlg);
+      var line = _eventAsm.add(jsr(Label('Event_RunDialogue3').l));
+      _replaceDialogRoutine = ([i]) =>
+          _eventAsm.replace(line, jsr(Label('Event_RunDialogue${i ?? ""}').l));
+    } else {
+      var dialogId = _currentDialogIdOrStart().i;
+      _eventAsm.add(moveq(dialogId, d0));
+      var line = _eventAsm.add(jsr(Label('Event_GetAndRunDialogue3').l));
+      _replaceDialogRoutine = ([i]) => _eventAsm.replace(
+          line, jsr(Label('Event_GetAndRunDialogue${i ?? ""}').l));
+    }
+
+    _gameMode = Mode.dialog;
   }
 
   /// Terminates the current dialog, if there is any,

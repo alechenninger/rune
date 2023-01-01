@@ -2,8 +2,9 @@ import 'model.dart';
 
 class ShowPanel extends Event {
   final Panel panel;
+  final bool showDialogBox;
 
-  const ShowPanel(this.panel);
+  const ShowPanel(this.panel, {this.showDialogBox = false});
 
   @override
   void visit(EventVisitor visitor) {

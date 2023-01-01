@@ -7,6 +7,8 @@ import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
+import 'scene_test.dart';
+
 void main() {
   test('generates asm from dialog', () {
     var dialog = Dialog(
@@ -378,6 +380,44 @@ void main() {
           Scene([
             Dialog(spans: DialogSpan.parse('Thank you very much!')),
             Dialog(spans: DialogSpan.parse('I feel much safer now.'))
+          ]));
+    });
+
+    test('F9 parses pauses in span', () {
+      var asm = DialogAsm.fromRaw(r'''	dc.b	"Thank you very much!"
+	dc.b	$F9, $3C
+	dc.b  $FC
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+      var scene = toScene(0, DialogTree()..add(asm));
+
+      expect(
+          scene,
+          Scene([
+            Dialog(spans: [
+              DialogSpan('Thank you very much!', pause: 1.second),
+              DialogSpan(' I feel much safer now.')
+            ]),
+          ]));
+    });
+
+    test('F9 parses pauses in beginning of span', () {
+      var asm = DialogAsm.fromRaw(r'''	dc.b	$F9, $3C
+	dc.b	"Thank you very much!"
+	dc.b  $FC
+	dc.b	"I feel much safer now."
+	dc.b	$FF''');
+
+      var scene = toScene(0, DialogTree()..add(asm));
+
+      expect(
+          scene,
+          Scene([
+            Dialog(spans: [
+              DialogSpan('', pause: 1.second),
+              DialogSpan('Thank you very much! I feel much safer now.')
+            ]),
           ]));
     });
 

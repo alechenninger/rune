@@ -248,7 +248,9 @@ class DialogState implements DialogParseState {
     } else if (constant == Byte(0xFF)) {
       _facePlayerIfNeeded();
       terminate(context);
-    } else if (constant is Byte && constant.value >= 0xF2) {
+    } else if (constant is Byte &&
+        constant.value >= 0xF2 &&
+        constant.value != 0xF9) {
       // todo: this should be the state that handles all that stuff
       _needsFacePlayer = false; // ?
     } else {
@@ -401,12 +403,24 @@ class PortraitState implements DialogParseState {
 
 class SpanState implements DialogParseState {
   final DialogState parent;
+  final _spans = <DialogSpan>[];
   final _buffer = StringBuffer();
+  Duration _pause = Duration.zero;
 
   SpanState(this.parent);
 
-  DialogSpan span() {
-    return DialogSpan(_buffer.toString());
+  List<DialogSpan> spans() {
+    _flush();
+    return _spans;
+  }
+
+  void _flush() {
+    if (_buffer.isNotEmpty || _pause > Duration.zero) {
+      var next = DialogSpan(_buffer.toString(), pause: _pause);
+      _spans.add(next);
+      _buffer.clear();
+      _pause = Duration.zero;
+    }
   }
 
   @override
@@ -419,6 +433,12 @@ class SpanState implements DialogParseState {
     if (constant == Byte(0xFC)) {
       // TODO: should do newline?
       _buffer.write(' ');
+    } else if (constant == Byte(0xF9)) {
+      context.state = SpanPauseState((p) {
+        _pause = p;
+        _flush();
+        context.state = this;
+      });
     } else {
       if (constant.value >= 0xF2) {
         // unsupported control code or terminator...
@@ -431,12 +451,30 @@ class SpanState implements DialogParseState {
   }
 
   void done(ParseContext context) {
-    var s = span();
-    if (s.text.isNotEmpty) {
-      var dialog = Dialog(speaker: parent.speaker, spans: [s]);
+    var s = spans();
+    if (s.isNotEmpty) {
+      var dialog = Dialog(speaker: parent.speaker, spans: s);
       parent.events.add(dialog);
     }
     context.reparseWith(parent);
+  }
+}
+
+class SpanPauseState extends DialogParseState {
+  final Function(Duration) _setPause;
+
+  SpanPauseState(this._setPause);
+
+  @override
+  void call(Expression constant, ParseContext context) {
+    if (constant is! Value) {
+      throw ArgumentError.value(constant.runtimeType, 'constant.runtimeType',
+          'expected constant expression to be of type Value');
+    }
+
+    var frames = constant.value;
+    // NOTE: assumes timings were tuned for english translation
+    _setPause(Duration(seconds: frames ~/ 60));
   }
 }
 
