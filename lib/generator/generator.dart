@@ -21,6 +21,7 @@ library generator.dart;
 import 'dart:collection';
 import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
 import '../asm/asm.dart';
@@ -257,6 +258,9 @@ class SceneAsmGenerator implements EventVisitor {
 		$C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
    */
   EventType? needsEvent(List<Event> events) {
+    // SetContext is not a perceivable event, so ignore
+    events = events.whereNot((e) => e is SetContext).toList(growable: false);
+
     if (events.length == 1 && events[0] is IfFlag) return null;
 
     var dialogCheck = 0;

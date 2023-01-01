@@ -173,6 +173,54 @@ ${dialog2.toAsm()}
               returnFromDialogEvent()
             ]));
       });
+
+      test('when only facing player and dialog, does not run event', () {
+        var map = GameMap(MapId.Test);
+
+        var obj = MapObject(
+            id: '0',
+            startPosition: Position(0x200, 0x200),
+            spec: Npc(
+                Sprite.PalmanWoman1,
+                WanderAround(Direction.down,
+                    onInteract: Scene.forNpcInteraction([
+                      Dialog(spans: [DialogSpan('Hello')])
+                    ]))));
+
+        map.addObject(obj);
+
+        var mapAsm = program.addMap(map);
+
+        print(mapAsm);
+
+        expect(mapAsm.events.withoutComments().trim(), Asm.empty());
+      });
+
+      test(
+          'when only set context, facing player and dialog, does not run event',
+          () {
+        var map = GameMap(MapId.Test);
+
+        var obj = MapObject(
+            id: '0',
+            startPosition: Position(0x200, 0x200),
+            spec: Npc(
+                Sprite.PalmanWoman1,
+                WanderAround(Direction.down,
+                    onInteract: Scene([
+                      SetContext((ctx) {}),
+                      InteractionObject.facePlayer(),
+                      Dialog(spans: [DialogSpan('Hello')])
+                    ]))));
+
+        map.addObject(obj);
+
+        var mapAsm = program.addMap(map);
+
+        print(mapAsm);
+
+        expect(mapAsm.events.withoutComments().trim(), Asm.empty());
+      });
     });
 
     test('given dialog, event, dialog; event code runs dialog', () {

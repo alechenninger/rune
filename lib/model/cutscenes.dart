@@ -13,7 +13,7 @@ class ShowPanel extends Event {
 
   @override
   String toString() {
-    return 'ShowPanel{$panel}';
+    return 'ShowPanel{panel: $panel, showDialogBox: $showDialogBox}';
   }
 
   @override
@@ -21,10 +21,11 @@ class ShowPanel extends Event {
       identical(this, other) ||
       other is ShowPanel &&
           runtimeType == other.runtimeType &&
-          panel == other.panel;
+          panel == other.panel &&
+          showDialogBox == other.showDialogBox;
 
   @override
-  int get hashCode => panel.hashCode;
+  int get hashCode => panel.hashCode ^ showDialogBox.hashCode;
 }
 
 class HideTopPanels extends Event {
