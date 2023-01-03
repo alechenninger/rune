@@ -15,6 +15,7 @@ import 'data.dart';
 
 export 'address.dart';
 export 'data.dart';
+export 'objects.dart';
 
 /// Data constant
 const DcMnemonic dc = DcMnemonic();

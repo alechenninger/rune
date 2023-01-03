@@ -55,9 +55,16 @@ export 'deprecated.dart';
 final _spriteVramOffsets = {
   MapId.Test: 0x2d0,
   MapId.Aiedo: 0x29A,
-  MapId.Piata: 0x360, // Map_Pata, normally 2D0
+  MapId.Piata: 0x2D0, // Map_Pata, normally 2D0
   MapId.PiataAcademyF1: 0x27F, // Map_PiataAcademy_F1
+  MapId.PiataAcademy: 0x27F,
   MapId.PiataAcademyPrincipalOffice: 0x27F, // Map_AcademyPrincipalOffice
+  MapId.PiataDorm: 0x372,
+  MapId.PiataInn: 0x372,
+  MapId.PiataHouse1: 0x372,
+  MapId.PiataHouse2: 0x372,
+  MapId.PiataAcademyNearBasement:
+      0x27F, // Map_PiataAcademyNearBasement, no sprites actually used
 };
 
 // tracks global state about the program code
@@ -124,7 +131,10 @@ class Program {
   MapAsm addMap(GameMap map) {
     // todo: can we inject these differently so it's more testable?
     // fixme: nonnull assertion
-    var spriteVramOffset = _spriteVramOffsets[map.id]!;
+    var spriteVramOffset = _spriteVramOffsets[map.id];
+    if (spriteVramOffset == null) {
+      throw Exception('no vram offsets defined for ${map.id}');
+    }
     return _maps[map.id] =
         compileMap(map, _ProgramEventRoutines(this), spriteVramOffset);
   }

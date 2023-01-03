@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
 
+import '../asm/asm.dart';
 import 'model.dart';
 
 // generator will need to track a vram tile number offset to start storing art
@@ -90,7 +91,7 @@ class GameMap {
       if (at < _indexedObjects.length) {
         var existing = _indexedObjects[at];
         if (existing != null) {
-          throw ArgumentError(
+          throw ArgumentError.value(obj.id.value, 'obj.id',
               'map already contains object at index $at: ${existing.id}');
         }
         _indexedObjects[at] = obj;
@@ -804,6 +805,17 @@ class InteractiveNpc extends Npc implements Interactive {
 
   InteractiveNpc._(Sprite sprite, InteractiveNpcBehavior behavior)
       : super._(sprite, behavior);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      super == other &&
+          other is InteractiveNpc &&
+          runtimeType == other.runtimeType &&
+          onInteract == other.onInteract;
+
+  @override
+  int get hashCode => super.hashCode ^ onInteract.hashCode;
 }
 
 class Sprite {
@@ -1063,6 +1075,9 @@ abstract class InteractiveNpcBehavior extends NpcBehavior
       other is InteractiveNpcBehavior &&
           runtimeType == other.runtimeType &&
           onInteract == other.onInteract;
+
+  @override
+  int get hashCode => onInteract.hashCode;
 }
 
 class FaceDown extends InteractiveNpcBehavior {
@@ -1198,4 +1213,75 @@ class FixedFaceRight extends InteractiveNpcBehavior {
   String toString() {
     return 'FixedFaceRight{}';
   }
+}
+
+class AsmSpec extends MapObjectSpec {
+  final Label? artLabel;
+  final Word routine;
+  @override
+  final Direction startFacing;
+
+  AsmSpec._({this.artLabel, required this.routine, required this.startFacing});
+
+  factory AsmSpec(
+      {Label? artLabel,
+      required Word routine,
+      required Direction startFacing}) {
+    if (isInteractive(routine)) {
+      return InteractiveAsmSpec(
+          routine: routine, startFacing: startFacing, artLabel: artLabel);
+    }
+    return AsmSpec._(
+        artLabel: artLabel, routine: routine, startFacing: startFacing);
+  }
+
+  @override
+  String toString() {
+    return 'AsmSpec{artLabel: $artLabel, routine: $routine, startFacing: $startFacing}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsmSpec &&
+          runtimeType == other.runtimeType &&
+          artLabel == other.artLabel &&
+          routine == other.routine &&
+          startFacing == other.startFacing;
+
+  @override
+  int get hashCode =>
+      artLabel.hashCode ^ routine.hashCode ^ startFacing.hashCode;
+}
+
+class InteractiveAsmSpec extends AsmSpec with Interactive {
+  InteractiveAsmSpec(
+      {super.artLabel,
+      required super.routine,
+      required super.startFacing,
+      Scene onInteract = const Scene.none()})
+      : super._() {
+    if (!isInteractive(routine)) {
+      throw ArgumentError.value(
+          routine.value, 'routine', 'is not an interactive routine');
+    }
+    this.onInteract = onInteract;
+  }
+
+  @override
+  String toString() {
+    return 'InteractiveAsmSpec{'
+        'artLabel: $artLabel, '
+        'routine: $routine, '
+        'startFacing: $startFacing,'
+        'onInteract: $onInteract';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      super == other && onInteract == (other as InteractiveAsmSpec).onInteract;
+
+  @override
+  int get hashCode => super.hashCode ^ onInteract.hashCode;
 }

@@ -255,11 +255,11 @@ class Slots {
 class Scene {
   final List<Event> events;
 
-  Scene([List<Event> events = const []]) : events = [] {
+  Scene([Iterable<Event> events = const []]) : events = [] {
     this.events.addAll(events);
   }
 
-  Scene.forNpcInteraction([List<Event> events = const []])
+  Scene.forNpcInteraction([Iterable<Event> events = const []])
       : this([InteractionObject.facePlayer(), ...events]);
 
   const Scene.none() : events = const [];
@@ -270,7 +270,7 @@ class Scene {
   // that is, we may actually want to modify the same scene, but are instead
   // producing a new one.
 
-  Scene startingWith(List<Event> events) {
+  Scene startingWith(Iterable<Event> events) {
     return Scene([...events, ...this.events]);
   }
 
@@ -283,6 +283,10 @@ class Scene {
       .whereNot((e) => e is SetContext || _isIfFlagWithEmptyBranches(e))
       .isEmpty;
   bool get isNotEmpty => !isEmpty;
+
+  Scene withoutSetContext() {
+    return Scene(events.whereNot((e) => e is SetContext));
+  }
 
   void addEvent(Event event) {
     events.add(event);
