@@ -72,6 +72,7 @@ final _spriteArtLabels = BiMap<Sprite, Label>()
   ..addAll(Sprite.wellKnown.groupFoldBy(
       (sprite) => sprite, (previous, sprite) => Label('Art_${sprite.name}')));
 
+// todo: can use field objects jmp tbl in objects.dart now
 final _mapObjectSpecRoutines = {
   AlysWaiting: FieldRoutine(Word('68'.hex), Label('FieldObj_NPCAlysPiata'),
       SpecFactory((_) => AlysWaiting())),
@@ -389,15 +390,25 @@ void _compileMapObjectData(
 extension ObjectRoutine on MapObject {
   FieldRoutine get routine {
     var spec = this.spec;
-    var routine = spec is Npc
-        ? _npcBehaviorRoutines[spec.behavior.runtimeType]
-        : _mapObjectSpecRoutines[spec.runtimeType];
-    if (routine == null) {
+
+    if (spec is AsmSpec) {
+      var index = spec.routine;
+      var label = labelOfFieldObjectRoutine(index);
+      if (label == null) {
+        throw Exception('invalid field object routine index: $index');
+      }
+      var factory = SpecFactory((d) =>
+          AsmSpec(artLabel: spec.artLabel, routine: index, startFacing: d));
+      return FieldRoutine(index, label, factory);
+    } else {
+      var routine = spec is Npc
+          ? _npcBehaviorRoutines[spec.behavior.runtimeType]
+          : _mapObjectSpecRoutines[spec.runtimeType];
       if (routine == null) {
         throw Exception('no routine configured for spec $spec');
       }
+      return routine;
     }
-    return routine;
   }
 }
 
