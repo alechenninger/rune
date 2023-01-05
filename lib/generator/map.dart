@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
@@ -433,6 +434,19 @@ extension ObjectAddress on GameMap {
   }
 }
 
+FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
+  var reader = ConstantReader.asm(asm);
+  // skip general var, music, something else
+  reader.skipThrough(times: 1, value: Size.w.maxValueSized);
+  var sprites = _readSprites(reader);
+  return sprites.keys.sorted((a, b) => a.compareTo(b)).firstOrNull;
+}
+
+Stream<Asm> preprocessMap(Stream<Asm> original,
+    {required Asm sprites, required Asm objects}) {
+  return original;
+}
+
 Future<GameMap> asmToMap(
     Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) async {
   var reader = ConstantReader.asm(asm);
@@ -460,7 +474,7 @@ Future<GameMap> asmToMap(
   // on maps there are 2 labels before dialog,
   // except on motavia and dezolis
   // (this is simply hard coded based on map IDs)
-  var mapId = _labelToMapId(mapLabel);
+  var mapId = labelToMapId(mapLabel);
   Label dialogLabel;
   if ([MapId.Motavia, MapId.Dezolis].contains(mapId)) {
     dialogLabel = reader.readLabel();
@@ -593,7 +607,7 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
   }).toList(growable: false);
 }
 
-MapId _labelToMapId(Label lbl) {
+MapId labelToMapId(Label lbl) {
   var m = MapId.values.firstWhereOrNull((id) => Label('Map_${id.name}') == lbl);
   if (m != null) return m;
   m = _fallbackMapIdsByLabel[lbl];

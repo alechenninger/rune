@@ -572,6 +572,38 @@ void main() {
       expect(map.orderedObjects[0].onInteract,
           same(map.orderedObjects[1].onInteract));
     });
+
+    test('parses first sprite vram tile', () async {
+      var asm = (MapAsmFixture()
+            ..sprites[0x2D0] = 'Art_PalmanMan1'
+            ..sprites[0x2d0 + 0x48] = 'Art_PalmanMan2'
+            ..sprites[0x2d0 + 0x48 * 2] = 'Art_PalmanMan2')
+          .toAsm();
+
+      var tile = await firstSpriteVramTileOfMap(asm);
+
+      expect(tile, Word(0x2d0));
+    });
+
+    test('parses first sprite vram tile even if sprites unordered', () async {
+      var asm = (MapAsmFixture()
+            ..sprites[0x2d0 + 0x48] = 'Art_PalmanMan2'
+            ..sprites[0x2D0] = 'Art_PalmanMan1'
+            ..sprites[0x2d0 + 0x48 * 2] = 'Art_PalmanMan2')
+          .toAsm();
+
+      expect(
+          asm,
+          containsAllInOrder([
+            dc.w([Word(0x318)]).first,
+            dc.w([Word(0x2d0)]).first,
+          ]),
+          reason: 'ensure test setup correctly');
+
+      var tile = await firstSpriteVramTileOfMap(asm);
+
+      expect(tile, Word(0x2d0));
+    });
   });
 }
 
