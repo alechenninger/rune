@@ -178,8 +178,17 @@ main() {
           dc.w([Word(0xffff)]),
         ]);
         var reader = ConstantReader.asm(asm);
-        reader.skipThrough(value: Word(0xffff), times: 1);
+        var skipped = reader.skipThrough(value: Word(0xffff), times: 1);
         expect(reader.remaining, isEmpty);
+        expect(skipped, [
+          Byte(0x12),
+          Byte(0x34),
+          Byte(0x56),
+          Byte(0x78),
+          Label('test'),
+          Byte(0xff),
+          Byte(0xff)
+        ]);
       });
 
       test('skip to end', () {
@@ -188,8 +197,16 @@ main() {
           dc.w([Word(0xffff)]),
         ]);
         var reader = ConstantReader.asm(asm);
-        reader.skipThrough(value: Word(0xffff), times: 1);
+        var skipped = reader.skipThrough(value: Word(0xffff), times: 1);
         expect(reader.remaining, isEmpty);
+        expect(skipped, [
+          Byte(0x12),
+          Byte(0x34),
+          Byte(0x56),
+          Byte(0x78),
+          Byte(0xff),
+          Byte(0xff)
+        ]);
       });
 
       test('skip within long', () {
@@ -198,8 +215,14 @@ main() {
           dc.w([Word(0xffff)]),
         ]);
         var reader = ConstantReader.asm(asm);
-        reader.skipThrough(value: Word(0xffff), times: 1);
+        var skipped = reader.skipThrough(value: Word(0xffff), times: 1);
         expect(reader.remaining, dc.w([Word(0xffff)]));
+        expect(skipped, [
+          Byte(0x12),
+          Byte(0x34),
+          Byte(0xff),
+          Byte(0xff),
+        ]);
       });
     });
   });

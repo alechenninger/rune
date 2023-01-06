@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
+import 'package:quiver/iterables.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/numbers.dart';
 import 'package:rune/src/null.dart';
@@ -437,39 +438,83 @@ extension ObjectAddress on GameMap {
 FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
   var reader = ConstantReader.asm(asm);
   // skip general var, music, something else
-  reader.skipThrough(times: 1, value: Size.w.maxValueSized);
+  _skipToSprites(reader);
   var sprites = _readSprites(reader);
   return sprites.keys.sorted((a, b) => a.compareTo(b)).firstOrNull;
 }
 
-Stream<Asm> preprocessMap(Stream<Asm> original,
+List<String> preprocessMapToRaw(MapId mapId, Asm original,
     {required Asm sprites, required Asm objects}) {
-  return original;
+  var reader = ConstantReader.asm(original);
+  var processed = <String>[];
+
+  defineConstants(Iterable<Sized> constants) {
+    processed.add(_defineConstants(constants).toString());
+  }
+
+  defineConstants(_skipToSprites(reader));
+
+  // ignore real sprite data
+  _readSprites(reader);
+
+  // replace with include
+  processed.add('\tinclude "script/maps/${mapId.name}/sprites.asm"');
+
+  defineConstants(_skipAfterSpritesToObjects(reader));
+
+  // ignore real object data
+  _readObjects(reader, {});
+
+  // replace with include
+  processed.add('\tinclude "script/maps/${mapId.name}/objects.asm"');
+
+  defineConstants(_skipAfterObjectsToLabels(reader));
+
+  // on maps there are 2 labels before dialog,
+  // except on motavia and dezolis
+  // (this is simply hard coded based on map IDs)
+  if (![MapId.Motavia, MapId.Dezolis].contains(mapId)) {
+    defineConstants([reader.readLabel(), reader.readLabel()]);
+  }
+  // replace dialog label
+  defineConstants([Label('Map_${mapId.name}_Dialog')]);
+
+  return processed;
+}
+
+Asm _defineConstants(Iterable<Sized> constants) {
+  var asm = Asm.empty();
+  Size? size;
+  var buffer = <Sized>[];
+  for (var expression in constants) {
+    if (size != expression.size) {
+      if (size != null) {
+        asm.add(dc.size(size, buffer));
+        buffer.clear();
+      }
+      size = expression.size;
+    }
+    buffer.add(expression);
+  }
+  if (buffer.isNotEmpty) {
+    asm.add(dc.size(size!, buffer));
+  }
+  return asm;
 }
 
 Future<GameMap> asmToMap(
     Label mapLabel, Asm asm, DialogTreeLookup dialogLookup) async {
   var reader = ConstantReader.asm(asm);
 
-  // skip general var, music, something else
-  reader.skipThrough(times: 1, value: Size.w.maxValueSized);
+  _skipToSprites(reader);
 
   var sprites = _readSprites(reader);
 
-  // skip secondary sprite data
-  // such as those loaded into ram instead of vram
-  reader.skipThrough(value: Size.w.maxValueSized, times: 2);
-
-  // skip map updates
-  reader.skipThrough(value: Size.b.maxValueSized, times: 1);
-
-  // skip transition data 1 & 2
-  reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+  _skipAfterSpritesToObjects(reader);
 
   var asmObjects = _readObjects(reader, sprites);
 
-  // skip treasure and tile animations
-  reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+  _skipAfterObjectsToLabels(reader);
 
   // on maps there are 2 labels before dialog,
   // except on motavia and dezolis
@@ -491,6 +536,30 @@ Future<GameMap> asmToMap(
   mapObjects.forEach(map.addObject);
 
   return map;
+}
+
+Iterable<Sized> _skipAfterObjectsToLabels(ConstantReader reader) {
+  // skip treasure and tile animations
+  return reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+}
+
+Iterable<Sized> _skipAfterSpritesToObjects(ConstantReader reader) {
+  // skip secondary sprite data
+  // such as those loaded into ram instead of vram
+  var sprite = reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+
+  // skip map updates
+  var updates = reader.skipThrough(value: Size.b.maxValueSized, times: 1);
+
+  // skip transition data 1 & 2
+  var transition = reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+
+  return concat([sprite, updates, transition]);
+}
+
+Iterable<Sized> _skipToSprites(ConstantReader reader) {
+  // skip general var, music, something else
+  return reader.skipThrough(times: 1, value: Size.w.maxValueSized);
 }
 
 Map<Word, Label> _readSprites(ConstantReader reader) {

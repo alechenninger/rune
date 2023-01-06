@@ -634,18 +634,23 @@ class ConstantReader {
 
   /// Iterates by bytes, looking for [value], and skipping ahead until it is
   /// seen [times] times.
-  void skipThrough(
+  List<Sized> skipThrough(
       // todo: variable chunk size?
       {/*required Size chunk,*/ required SizedValue value,
       required int times}) {
-    var skipped = 0;
+    var timesSkipped = 0;
+    var skippedBytes = <Sized>[];
     var buffer = QueueList<Byte>();
 
     Byte readByteSkippingLabels() {
       try {
-        return readByte();
+        var byte = readByte();
+        skippedBytes.add(byte);
+        return byte;
       } on ConstantReadException catch (e) {
-        if (e.valuesRead.first is! Value && e.valuesRead.length == 1) {
+        var first = e.valuesRead.first;
+        if (first is! Value && e.valuesRead.length == 1) {
+          skippedBytes.add(first);
           // clear buffer because we're skipping data,
           // so it can't match consecutively now.
           buffer.clear();
@@ -655,20 +660,20 @@ class ConstantReader {
       }
     }
 
-    while (skipped < times) {
+    while (timesSkipped < times) {
       buffer.add(readByteSkippingLabels());
 
       switch (value.size) {
         case Size.b:
           if (value == buffer[0]) {
-            skipped++;
+            timesSkipped++;
           }
           buffer.clear();
           break;
         case Size.w:
           if (buffer.length == 2) {
             if (value == buffer[0].appendLower(buffer[1])) {
-              skipped++;
+              timesSkipped++;
               buffer.clear();
             } else {
               buffer.removeFirst();
@@ -680,7 +685,7 @@ class ConstantReader {
             if (value ==
                 Longword.concatBytes(
                     buffer[0], buffer[1], buffer[2], buffer[3])) {
-              skipped++;
+              timesSkipped++;
               buffer.clear();
             } else {
               buffer.removeFirst();
@@ -689,6 +694,8 @@ class ConstantReader {
           break;
       }
     }
+
+    return skippedBytes;
   }
 
   Byte readByte() {
