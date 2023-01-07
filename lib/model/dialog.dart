@@ -221,14 +221,18 @@ abstract class Speaker {
   ///
   /// Case insensitive.
   static Speaker? byName(String name) {
+    var char = Character.byName(name);
+    if (char != null) {
+      return char;
+    }
     switch (name.toLowerCase()) {
-      case 'alys':
-        return alys;
-      case 'shay':
-        return shay;
       case 'kroft':
       case 'principal kroft':
         return const PrincipalKroft();
+      case 'saya':
+        return saya;
+      case 'holt':
+        return holt;
     }
     return null;
   }

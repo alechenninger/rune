@@ -290,6 +290,18 @@ class IfFlag extends Event {
       flag.hashCode ^
       const ListEquality<Event>().hash(isSet) ^
       const ListEquality<Event>().hash(isUnset);
+
+  IfFlag withoutSetContextInBranches() {
+    return IfFlag(flag,
+        isSet: isSet
+            .whereNot((e) => e is SetContext)
+            .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e)
+            .toList(),
+        isUnset: isUnset
+            .whereNot((e) => e is SetContext)
+            .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e)
+            .toList());
+  }
 }
 
 class SetFlag extends Event {

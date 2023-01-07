@@ -284,8 +284,12 @@ class Scene {
       .isEmpty;
   bool get isNotEmpty => !isEmpty;
 
+  // see TODO on SetContext
+  // have to hack around it
   Scene withoutSetContext() {
-    return Scene(events.whereNot((e) => e is SetContext));
+    return Scene(events
+        .whereNot((e) => e is SetContext)
+        .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e));
   }
 
   void addEvent(Event event) {
@@ -511,6 +515,24 @@ abstract class Character extends FieldObject with Speaker {
         return alys;
       case 'shay':
         return shay;
+      case 'hahn':
+        return hahn;
+      case 'rune':
+        return rune;
+      case 'gryz':
+        return gryz;
+      case 'rika':
+        return rika;
+      case 'demi':
+        return demi;
+      case 'wren':
+        return wren;
+      case 'raja':
+        return raja;
+      case 'kyra':
+        return kyra;
+      case 'seth':
+        return seth;
     }
     return null;
   }
@@ -521,6 +543,17 @@ abstract class Character extends FieldObject with Speaker {
 
 const alys = Alys();
 const shay = Shay();
+const hahn = Hahn();
+const rune = Rune();
+const gryz = Gryz();
+const rika = Rika();
+const demi = Demi();
+const wren = Wren();
+const raja = Raja();
+const kyra = Kyra();
+const seth = Seth();
+const saya = Saya();
+const holt = Holt();
 
 class Alys extends Character {
   const Alys();
