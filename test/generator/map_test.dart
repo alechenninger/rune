@@ -638,6 +638,42 @@ void main() {
 
     expect(data, expectedData);
   });
+
+  test('determines address of objects', () {
+    var obj1 =
+        MapObject(id: '1', startPosition: Position(0, 0), spec: AlysWaiting());
+    var obj2 =
+        MapObject(id: '2', startPosition: Position(0, 0), spec: AlysWaiting());
+    testMap.addObject(obj1);
+    testMap.addObject(obj2);
+
+    expect(testMap.addressOf(obj1), Longword(0xFFFFC300));
+    expect(testMap.addressOf(obj2), Longword(0xFFFFC340));
+  });
+
+  test('determines address of objects added at indexes', () {
+    var obj1 =
+        MapObject(id: '1', startPosition: Position(0, 0), spec: AlysWaiting());
+    var obj2 =
+        MapObject(id: '2', startPosition: Position(0, 0), spec: AlysWaiting());
+    testMap.addObject(obj1, at: 1);
+    testMap.addObject(obj2, at: 0);
+
+    expect(testMap.addressOf(obj2), Longword(0xFFFFC300));
+    expect(testMap.addressOf(obj1), Longword(0xFFFFC340));
+  });
+
+  test('determines address of objects added at sparse indexes', () {
+    var obj1 =
+        MapObject(id: '1', startPosition: Position(0, 0), spec: AlysWaiting());
+    var obj2 =
+        MapObject(id: '2', startPosition: Position(0, 0), spec: AlysWaiting());
+    testMap.addObject(obj1, at: 1);
+    testMap.addObject(obj2, at: 3);
+
+    expect(testMap.addressOf(obj1), Longword(0xFFFFC340));
+    expect(testMap.addressOf(obj2), Longword(0xFFFFC3C0));
+  });
 }
 
 var testMapAsm = (MapAsmFixture()

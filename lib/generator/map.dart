@@ -58,14 +58,9 @@ const _defaultVramTilesPerSprite = 0x48;
 //  itself rather than hard coding here.
 //  Program API would be the right place now that we have that.
 
-// todo: this would only be used when we have events which refer to objects by
-//   their location in memory. we would have to offset that location.
-final _objectIndexOffsets = {MapId.PiataAcademyF1: 1, MapId.Piata: 3};
-
-final _defaultDialogs = {
-  MapId.PiataAcademyF1: DialogTree()..add(DialogAsm.emptyDialog()),
-  MapId.Piata: DialogTree()..addAll(DialogAsm.fromRaw(_piataDialog).split()),
-};
+// todo: now that we automatically boostrap maps, maybe remove this
+final _objectIndexOffsets = <MapId, int>{};
+final _defaultDialogs = <MapId, DialogTree>{};
 DialogTree _defaultDialogTree(MapId map) =>
     _defaultDialogs[map] ?? DialogTree();
 
