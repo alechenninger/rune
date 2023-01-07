@@ -62,6 +62,13 @@ main() {
         expect(asm.toString(),
             r'	move.w	$30(a4), $38(a4)	; move current to dest x');
       });
+
+      test('funky sega line', () {
+        var asm = Asm.fromRaw(
+            r'	move.l	#"SEGA", Security_Addr-Z80_Bus_Request(a1)	; satisfy the TMSS');
+        expect(asm.toString(),
+            r'	move.l	#"SEGA", Security_Addr-Z80_Bus_Request(a1)	; satisfy the TMSS');
+      });
     });
   });
 

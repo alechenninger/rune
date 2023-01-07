@@ -443,41 +443,66 @@ FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
   return sprites.keys.sorted((a, b) => a.compareTo(b)).firstOrNull;
 }
 
-List<String> preprocessMapToRaw(MapId mapId, Asm original,
-    {required Asm sprites, required Asm objects}) {
+List<String> preprocessMapToRaw(Asm original,
+    {required String sprites, required String objects, required Label dialog}) {
   var reader = ConstantReader.asm(original);
   var processed = <String>[];
 
-  defineConstants(Iterable<Sized> constants) {
-    processed.add(_defineConstants(constants).toString());
+  var trimmed = original.trim();
+  var map = trimmed.first.label?.map((l) => Label(l));
+  if (map == null) {
+    throw ArgumentError(
+        'original asm does not start with label: ${trimmed.first}');
   }
 
+  processed.add(label(map).toString());
+
+  defineConstants(Iterable<Sized> constants) {
+    processed
+        .addAll(_defineConstants(constants).lines.map((l) => l.toString()));
+  }
+
+  addComment(String c) {
+    processed.add(comment(c).toString());
+  }
+
+  addComment('General variable / Music');
   defineConstants(_skipToSprites(reader));
 
-  // ignore real sprite data
+  // ignore & replace real sprite data
   _readSprites(reader);
+  addComment('Sprites');
+  processed.add(sprites);
+  defineConstants([Word(0xffff)]);
 
-  // replace with include
-  processed.add('\tinclude "script/maps/${mapId.name}/sprites.asm"');
-
+  addComment('Secondary sprites, map updates, transition data');
   defineConstants(_skipAfterSpritesToObjects(reader));
 
-  // ignore real object data
+  // ignore & replace real object data
   _readObjects(reader, {});
+  addComment('Objects');
+  processed.add(objects);
+  defineConstants([Word(0xffff)]);
 
-  // replace with include
-  processed.add('\tinclude "script/maps/${mapId.name}/objects.asm"');
-
+  addComment('Treasure, tile animations');
   defineConstants(_skipAfterObjectsToLabels(reader));
 
+  addComment('?');
   // on maps there are 2 labels before dialog,
   // except on motavia and dezolis
   // (this is simply hard coded based on map IDs)
-  if (![MapId.Motavia, MapId.Dezolis].contains(mapId)) {
+  if (!const ['Map_Motavia' 'Map_Dezolis'].contains(map.name)) {
     defineConstants([reader.readLabel(), reader.readLabel()]);
+    // skip actual label
+    reader.readLabel();
   }
+
+  addComment('Dialog address');
   // replace dialog label
-  defineConstants([Label('Map_${mapId.name}_Dialog')]);
+  // defineConstants([Label('Map_${mapId.name}_Dialog')]);
+  defineConstants([dialog]);
+
+  processed.addAll(reader.remaining.lines.map((l) => l.toString()));
 
   return processed;
 }

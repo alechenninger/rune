@@ -605,6 +605,39 @@ void main() {
       expect(tile, Word(0x2d0));
     });
   });
+
+  test('preprocesses map does not change existing data', () async {
+    var asm = (MapAsmFixture()
+          ..sprites[0x2d0 + 0x48] = 'Art_PalmanMan2'
+          ..sprites[0x2D0] = 'Art_PalmanMan1'
+          ..sprites[0x2d0 + 0x48 * 2] = 'Art_PalmanMan2'
+          ..addObject(
+              routine: 0x3c,
+              direction: 0,
+              dialog: 0,
+              tileNumber: 0x2d0,
+              x: 0,
+              y: 0))
+        .toAsm()
+        .withoutComments()
+        .withoutEmptyLines();
+
+    var raw = preprocessMapToRaw(asm,
+        sprites: '', objects: '', dialog: Label('Test'));
+    var processed = Asm.fromRaw(raw.join('\n'));
+
+    var expected = (MapAsmFixture()..dialogTreeLabel = 'Test')
+        .toAsm()
+        .withoutComments()
+        .withoutEmptyLines();
+
+    var data = ConstantReader.asm(processed)
+        .skipThrough(value: Word(0xffff), times: 11);
+    var expectedData = ConstantReader.asm(expected)
+        .skipThrough(value: Word(0xffff), times: 11);
+
+    expect(data, expectedData);
+  });
 }
 
 var testMapAsm = (MapAsmFixture()

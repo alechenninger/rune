@@ -47,6 +47,7 @@ const TstMnemonic tst = TstMnemonic();
 final rts = cmd('rts', []);
 
 Asm newLine() => Asm.fromInstruction(_Instruction());
+Asm label(Label lbl) => Asm.fromInstruction(_Instruction(label: lbl.name));
 Asm comment(String comment) => Asm.fromInstructions(LineSplitter.split(comment)
     .map((e) => _Instruction(comment: comment))
     .toList(growable: false));
@@ -171,7 +172,7 @@ class Asm extends IterableBase<Instruction> {
     addLine(line);
   }
 
-  Asm.fromInstructions(List<Instruction> lines) {
+  Asm.fromInstructions(Iterable<Instruction> lines) {
     lines.forEach(addLine);
   }
 
@@ -227,6 +228,21 @@ class Asm extends IterableBase<Instruction> {
     return Asm.fromInstructions(this.lines.sublist(length - lines));
   }
 
+  Asm trim() {
+    return Asm.fromInstructions(lines
+        .skipWhile((instr) => instr.toString().trim().isEmpty)
+        .toList(growable: false)
+        .reversed
+        .skipWhile((instr) => instr.toString().trim().isEmpty)
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false));
+  }
+
+  Asm withoutEmptyLines() {
+    return Asm.fromInstructions(lines.whereNot((line) => line.isEmpty));
+  }
+
   @override
   int get length => lines.length;
 
@@ -251,17 +267,6 @@ class Asm extends IterableBase<Instruction> {
 
   @override
   Iterator<Instruction> get iterator => lines.iterator;
-
-  Asm trim() {
-    return Asm.fromInstructions(lines
-        .skipWhile((instr) => instr.toString().trim().isEmpty)
-        .toList(growable: false)
-        .reversed
-        .skipWhile((instr) => instr.toString().trim().isEmpty)
-        .toList(growable: false)
-        .reversed
-        .toList(growable: false));
-  }
 }
 
 Asm setLabel(String label) {
@@ -408,67 +413,14 @@ class _Instruction extends Instruction {
           }
           break;
         case _Token.operand:
-          if (c == ',' || isBlank(c)) {
-            if (operand == null) throw StateError('bad operand');
-
-            var size = attribute?.map((a) => Size.valueOf(a));
-            var expression =
-                Expression.parseSingleExpression(operand, size: size);
-
-            if (expression is Value) {
-              if (ops.isEmpty && expression is Byte) {
-                ops = Bytes.from([expression]);
-              } else if (ops is Bytes && expression is Byte) {
-                ops += [expression];
-              } else {
-                if (ops is Bytes) {
-                  ops = List.of(ops);
-                }
-                ops.add(expression);
-              }
-            } else {
-              // todo could parse addresses and whatnot but jeeze
-              if (ops is Bytes) {
-                ops = List.of(ops);
-              }
-              // fixme: we assume operand may be Expression in some cases
-              // when string, may be constant or label
-              // how to tell?
-              // we may need to be able to resolve constant values
-              ops.add(expression);
-            }
-
-            operand = null;
-            state = _Token.root;
-          } else if (c == '"' || c == "'") {
-            stringDelimiter = c;
-            state = _Token.stringConstant;
-          } else {
-            operand ??= "";
-            operand += c!;
+          var remaining = chars.sublist(i);
+          Size? size;
+          if (cmd!.startsWith('dc.')) {
+            size = attribute?.map((a) => Size.valueOf(a));
           }
-          break;
-        case _Token.stringConstant:
-          var result = Expression.parse(iterables.concat([
-            [stringDelimiter!],
-            chars.sublist(i)
-          ]));
-          var parsed = result.expressions;
-          if (parsed is! List<Byte>) {
-            throw ArgumentError('expected list of bytes. '
-                'result=$parsed operand=$operand');
-          }
-          if (ops.isEmpty) {
-            ops = parsed;
-          } else if (ops is Bytes) {
-            ops += parsed;
-          } else {
-            ops = List.from(ops);
-            ops.addAll(parsed);
-          }
-          operand = null;
-          stringDelimiter = null;
-          i += result.charactersParsed;
+          var parsed = Expression.parse(remaining, size: size);
+          ops = parsed.expressions;
+          i += parsed.charactersParsed;
           state = _Token.root;
           break;
         case _Token.comment:
@@ -511,7 +463,6 @@ enum _Token {
   label,
   cmd,
   operand,
-  stringConstant,
   comment,
 }
 
@@ -550,7 +501,7 @@ class ConstantIterator implements Iterator<Sized> {
 
     var cmd = next.cmdWithoutAttribute;
 
-    if (cmd == 'if') {
+    if (cmd == 'if' || cmd == 'include') {
       // FIXME: evaluate conditional assembly
       // for now skip
       _loadNextLine();

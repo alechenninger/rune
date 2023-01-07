@@ -34,7 +34,7 @@ abstract class Expression {
       var val = hex ? expression.substring(1).hex : int.parse(expression);
 
       if (size != null) {
-        sized = size.sizedValue(val);
+        sized = size.truncate(val);
       } else if (val <= Size.b.maxValue) {
         sized = Byte(val);
       } else if (val <= Size.w.maxValue) {
@@ -110,11 +110,22 @@ abstract class Expression {
           if (c == ',' || isBlank(c)) {
             if (parsing == null) throw StateError('bad operand');
 
-            expressions.add(parseSingleExpression(parsing, size: size));
+            var expression = parseSingleExpression(parsing, size: size);
+
+            if (expressions.isEmpty && expression is Byte) {
+              expressions = Bytes.from([expression]);
+            } else if (expressions is Bytes && expression is Byte) {
+              expressions += [expression];
+            } else {
+              if (expressions is Bytes) {
+                expressions = List<Expression>.of(expressions);
+              }
+              expressions.add(expression);
+            }
 
             parsing = null;
             state = _Token.root;
-          } else if (c == '"' || c == "'") {
+          } else if (parsing == null && (c == '"' || c == "'")) {
             stringDelimiter = c;
             state = _Token.stringConstant;
           } else {
@@ -556,6 +567,17 @@ class _Sized extends Sized {
 
   @override
   String toString() => expression.toString();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _Sized &&
+          runtimeType == other.runtimeType &&
+          size == other.size &&
+          expression == other.expression;
+
+  @override
+  int get hashCode => size.hashCode ^ expression.hashCode;
 }
 
 // TODO: unsigned. what about signed?
@@ -565,6 +587,11 @@ abstract class SizedValue extends Value implements Sized {
     if (value > size.maxValue) {
       throw AsmError(value, 'too large to fit in ${size.bytes} bytes');
     }
+  }
+
+  static int truncate(int value, Size size) {
+    return (size.nextLarger.sizedValue(value).splitInto(size)[1] as Value)
+        .value;
   }
 
   const SizedValue._(int value) : super.constant(value);
@@ -606,6 +633,7 @@ class Byte extends SizedValue {
   static const two = Byte._(2);
 
   Byte(int value) : super(value);
+  factory Byte.truncate(int value) => Size.b.truncate(value) as Byte;
 
   const Byte._(int value) : super._(value);
 
@@ -661,6 +689,8 @@ class Word extends SizedValue {
   factory Word.concatBytes(Byte b1, Byte b2) {
     return Word((b1.value << 8) + b2.value);
   }
+
+  factory Word.truncate(int value) => Size.w.truncate(value) as Word;
 
   @override
   final size = Size.w;
@@ -791,6 +821,13 @@ enum Size {
 
   bool operator >(Size other) {
     return bytes > other.bytes;
+  }
+
+  Size get nextLarger => this == b ? w : l;
+
+  SizedValue truncate(int value) {
+    var splitInto = nextLarger.sizedValue(value).splitInto(this);
+    return splitInto.last as SizedValue;
   }
 
   SizedValue get maxValueSized => sizedValue(maxValue);
