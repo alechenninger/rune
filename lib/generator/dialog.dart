@@ -16,7 +16,9 @@ import 'cutscenes.dart';
 
 class DialogAsm extends Asm {
   DialogAsm.empty() : super.empty();
-  DialogAsm.fromRaw(String raw) : super.fromRaw(raw);
+  DialogAsm.fromRaw(String raw) : super.empty() {
+    add(Instruction.parse(raw));
+  }
   DialogAsm(List<Asm> asm) : super(asm);
 
   DialogAsm.emptyDialog()

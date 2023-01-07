@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:characters/characters.dart';
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:quiver/iterables.dart' as iterables;
 import 'package:quiver/strings.dart';
 import 'package:rune/src/iterables.dart';
 import 'package:rune/src/null.dart';
@@ -174,8 +175,8 @@ class Asm extends IterableBase<Instruction> {
     lines.forEach(addLine);
   }
 
-  Asm.fromRaw(String raw) {
-    LineSplitter.split(raw).map((e) => _Instruction.parse(e)).forEach(addLine);
+  factory Asm.fromRaw(String raw) {
+    return Instruction.parse(raw);
   }
 
   Asm withoutComments() => Asm.fromInstructions(lines.expand((line) {
@@ -354,12 +355,12 @@ class _Instruction extends Instruction {
   }
 
   factory _Instruction.parse(String line) {
-    var chars = line.characters.iterator.toList();
+    var chars = line.characters.toList();
 
     String? label;
     String? cmd;
     String? attribute;
-    List ops = [];
+    List<Expression> ops = [];
     String? comment;
 
     var state = _Token.root;
@@ -403,11 +404,6 @@ class _Instruction extends Instruction {
             cmd ??= "";
             cmd += c!;
 
-            if (['if', 'endif', 'elseif', 'else'].contains(cmd)) {
-              // ignore this line for now
-              return _Instruction();
-            }
-
             attribute = cmd.split('.').skip(1).firstOrNull;
           }
           break;
@@ -415,42 +411,31 @@ class _Instruction extends Instruction {
           if (c == ',' || isBlank(c)) {
             if (operand == null) throw StateError('bad operand');
 
-            if (_number.hasMatch(operand)) {
-              SizedValue sized;
-              bool hex = operand.startsWith(r'$');
-              var val = hex ? operand.substring(1).hex : int.parse(operand);
+            var size = attribute?.map((a) => Size.valueOf(a));
+            var expression =
+                Expression.parseSingleExpression(operand, size: size);
 
-              var size = attribute?.map((a) => Size.valueOf(a));
-              if (size != null) {
-                sized = size.sizedValue(val);
-              } else if (val <= Size.b.maxValue) {
-                sized = Byte(val);
-              } else if (val <= Size.w.maxValue) {
-                sized = Word(val);
-              } else {
-                sized = Longword(val);
-              }
-
-              if (ops.isEmpty && sized is Byte) {
-                ops = Bytes.from([sized]);
-              } else if (ops is Bytes && sized is Byte) {
-                ops += [sized];
+            if (expression is Value) {
+              if (ops.isEmpty && expression is Byte) {
+                ops = Bytes.from([expression]);
+              } else if (ops is Bytes && expression is Byte) {
+                ops += [expression];
               } else {
                 if (ops is Bytes) {
-                  ops = List.from(ops);
+                  ops = List.of(ops);
                 }
-                ops.add(sized);
+                ops.add(expression);
               }
             } else {
               // todo could parse addresses and whatnot but jeeze
               if (ops is Bytes) {
-                ops = List.from(ops);
+                ops = List.of(ops);
               }
               // fixme: we assume operand may be Expression in some cases
               // when string, may be constant or label
               // how to tell?
               // we may need to be able to resolve constant values
-              ops.add(LabelOrConstant(operand));
+              ops.add(expression);
             }
 
             operand = null;
@@ -464,34 +449,27 @@ class _Instruction extends Instruction {
           }
           break;
         case _Token.stringConstant:
-          if ((!escape && c == stringDelimiter) || c == null) {
-            // todo: this assumes each character represents a byte,
-            // but this depends on the attribute of the dc instruction
-            if (ops.isEmpty) {
-              ops = Bytes.ascii(operand ?? "");
-            } else if (ops is Bytes) {
-              ops += Bytes.ascii(operand ?? "");
-            } else {
-              ops = List.from(ops);
-              ops.addAll(Bytes.ascii(operand ?? ""));
-            }
-            operand = null;
-            escape = false;
-            stringDelimiter = null;
-            state = _Token.root;
-          } else {
-            operand ??= "";
-            if (!escape) {
-              if (c == r'\') {
-                escape = true;
-              } else {
-                operand += c;
-              }
-            } else {
-              operand += '\\$c';
-              escape = false;
-            }
+          var result = Expression.parse(iterables.concat([
+            [stringDelimiter!],
+            chars.sublist(i)
+          ]));
+          var parsed = result.expressions;
+          if (parsed is! List<Byte>) {
+            throw ArgumentError('expected list of bytes. '
+                'result=$parsed operand=$operand');
           }
+          if (ops.isEmpty) {
+            ops = parsed;
+          } else if (ops is Bytes) {
+            ops += parsed;
+          } else {
+            ops = List.from(ops);
+            ops.addAll(parsed);
+          }
+          operand = null;
+          stringDelimiter = null;
+          i += result.charactersParsed;
+          state = _Token.root;
           break;
         case _Token.comment:
           if (comment == null && isBlank(c)) {
@@ -528,17 +506,26 @@ class _Instruction extends Instruction {
   int get hashCode => line.hashCode;
 }
 
-enum _Token { root, label, cmd, operand, stringConstant, comment }
+enum _Token {
+  root,
+  label,
+  cmd,
+  operand,
+  stringConstant,
+  comment,
+}
 
 final _number = RegExp(r'^(\$[0-9a-fA-F]+|\d+)$');
 
 class ConstantIterator implements Iterator<Sized> {
   final Iterator<Instruction> _asm;
+  final Constants _constants;
   late Queue<Sized> _remainingLineConstants;
   bool _done = false;
   Sized? _current;
 
-  ConstantIterator(this._asm) {
+  ConstantIterator(this._asm, {Constants constants = const Constants.wrap({})})
+      : _constants = Constants.of(constants) {
     _loadNextLine();
   }
 
@@ -561,7 +548,16 @@ class ConstantIterator implements Iterator<Sized> {
       return;
     }
 
-    if (next.cmdWithoutAttribute != 'dc') {
+    var cmd = next.cmdWithoutAttribute;
+
+    if (cmd == 'if') {
+      // FIXME: evaluate conditional assembly
+      // for now skip
+      _loadNextLine();
+      return;
+    }
+
+    if (cmd != 'dc') {
       _done = true;
       _remainingLineConstants = Queue();
       return;

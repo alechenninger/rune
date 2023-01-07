@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
-import 'package:quiver/iterables.dart';
+import 'package:quiver/iterables.dart' as iterables;
 import 'package:rune/generator/movement.dart';
 import 'package:rune/numbers.dart';
 import 'package:rune/src/null.dart';
@@ -554,7 +554,7 @@ Iterable<Sized> _skipAfterSpritesToObjects(ConstantReader reader) {
   // skip transition data 1 & 2
   var transition = reader.skipThrough(value: Size.w.maxValueSized, times: 2);
 
-  return concat([sprite, updates, transition]);
+  return iterables.concat([sprite, updates, transition]);
 }
 
 Iterable<Sized> _skipToSprites(ConstantReader reader) {

@@ -12,5 +12,7 @@ class EventAsm extends Asm {
   EventAsm.fromInstructions(List<Instruction> lines)
       : super.fromInstructions(lines);
 
-  EventAsm.fromRaw(String raw) : super.fromRaw(raw);
+  EventAsm.fromRaw(String raw) : super.empty() {
+    add(Instruction.parse(raw));
+  }
 }

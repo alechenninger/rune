@@ -2,7 +2,11 @@ import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:characters/characters.dart';
+import 'package:collection/collection.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/check.dart';
+import 'package:quiver/strings.dart';
 import 'package:rune/numbers.dart';
 import 'package:rune/src/iterables.dart';
 
@@ -22,11 +26,147 @@ abstract class Expression {
 
   const Expression.constant();
 
+  static Expression parseSingleExpression(String expression,
+      {Size? size, Constants? constants}) {
+    if (_number.hasMatch(expression)) {
+      SizedValue sized;
+      bool hex = expression.startsWith(r'$');
+      var val = hex ? expression.substring(1).hex : int.parse(expression);
+
+      if (size != null) {
+        sized = size.sizedValue(val);
+      } else if (val <= Size.b.maxValue) {
+        sized = Byte(val);
+      } else if (val <= Size.w.maxValue) {
+        sized = Word(val);
+      } else {
+        sized = Longword(val);
+      }
+
+      return sized;
+    } else {
+      // todo could parse addresses and whatnot but jeeze
+      // fixme: we assume operand may be Expression in some cases
+      // when string, may be constant or label
+      // how to tell?
+      // we may need to be able to resolve constant values
+      var maybeConstant = Constant.isValidConstantName(expression);
+      var maybeLabel = Label.isValidLabelName(expression);
+
+      if (!maybeLabel && !maybeConstant) {
+        return UnknownExpression(expression);
+      }
+
+      if (maybeLabel && !maybeConstant) {
+        return Label(expression);
+      }
+
+      if (maybeConstant && !maybeLabel) {
+        return Constant(expression);
+      }
+
+      if (constants != null) {
+        return constants.containsConstantNamed(expression)
+            ? Constant(expression)
+            : Label(expression);
+      } else {
+        return LabelOrConstant(expression);
+      }
+    }
+  }
+
+  static ParsedExpressions parse(Iterable<String> expression,
+      {Size? size, Constants? constants}) {
+    var chars = expression.toList();
+
+    var state = _Token.root;
+
+    var escape = false;
+    String? stringDelimiter;
+    String? parsing;
+
+    var expressions = <Expression>[];
+    var i = 0;
+
+    loop:
+    for (; i < chars.length + 1; i++) {
+      var c = i == chars.length ? null : chars[i];
+
+      switch (state) {
+        case _Token.root:
+          if (isNotBlank(c)) {
+            if (c == ';') {
+              i--;
+              break loop;
+            } else if (c == ',') {
+              // skip
+            } else {
+              state = _Token.operand;
+              i--;
+            }
+          }
+          break;
+        case _Token.operand:
+          if (c == ',' || isBlank(c)) {
+            if (parsing == null) throw StateError('bad operand');
+
+            expressions.add(parseSingleExpression(parsing, size: size));
+
+            parsing = null;
+            state = _Token.root;
+          } else if (c == '"' || c == "'") {
+            stringDelimiter = c;
+            state = _Token.stringConstant;
+          } else {
+            parsing ??= "";
+            parsing += c!;
+          }
+          break;
+        case _Token.stringConstant:
+          if ((!escape && c == stringDelimiter) || c == null) {
+            // todo: this assumes each character represents a byte,
+            // but this depends on the attribute of the dc instruction
+            if (expressions.isEmpty) {
+              expressions = Bytes.ascii(parsing ?? "");
+            } else if (expressions is Bytes) {
+              expressions += Bytes.ascii(parsing ?? "");
+            } else {
+              expressions = List.from(expressions);
+              expressions.addAll(Bytes.ascii(parsing ?? ""));
+            }
+            parsing = null;
+            escape = false;
+            stringDelimiter = null;
+            state = _Token.root;
+          } else {
+            parsing ??= "";
+            if (!escape) {
+              if (c == r'\') {
+                escape = true;
+              } else {
+                parsing += c;
+              }
+            } else {
+              parsing += '\\$c';
+              escape = false;
+            }
+          }
+          break;
+      }
+    }
+
+    return ParsedExpressions(expressions, i - 1);
+  }
+
   Immediate get i => Immediate(this);
 
   Absolute get w => Absolute.word(this);
 
   Absolute get l => Absolute.long(this);
+
+  Expression evaluate(Constants constants) {
+    return this;
+  }
 
   Expression operator +(Expression other) {
     return ArithmaticExpression('+', this, other);
@@ -53,6 +193,21 @@ abstract class Expression {
   }
 }
 
+enum _Token {
+  root,
+  operand,
+  stringConstant,
+}
+
+final _number = RegExp(r'^(\$[0-9a-fA-F]+|\d+)$');
+
+class ParsedExpressions {
+  final List<Expression> expressions;
+  final int charactersParsed;
+
+  ParsedExpressions(this.expressions, this.charactersParsed);
+}
+
 class ArithmaticExpression extends Expression {
   final Expression operand1;
   final Expression operand2;
@@ -69,12 +224,140 @@ class ArithmaticExpression extends Expression {
   }
 }
 
+class BooleanOperation extends Expression {
+  final Expression operand1;
+  final Expression operand2;
+  final String operator;
+
+  static final operators = const ['=', '<', '<>', '>'];
+
+  BooleanOperation(this.operator, this.operand1, this.operand2) {
+    if (!operators.contains(operator)) {
+      throw ArgumentError.value(operator, 'operator', 'not a boolean operator');
+    }
+  }
+
+  factory BooleanOperation.parse(String exp) {
+    var state = 0;
+
+    var op1 = '';
+    var op = '';
+    var op2 = '';
+
+    for (var c in exp.characters) {
+      switch (state) {
+        case 0:
+          if (isBlank(c)) {
+            state = 1;
+          } else if (operators.contains(c)) {
+            state = 1;
+            op += c;
+          }
+          break;
+        case 1:
+          if (!operators.contains(c)) {
+            op2 += c;
+            state = 2;
+          } else {
+            op += c;
+          }
+          break;
+        case 2:
+          op2 += c;
+          break;
+      }
+    }
+    return BooleanOperation(op, Expression.parseSingleExpression(op1),
+        Expression.parseSingleExpression(op2));
+  }
+
+  @override
+  Expression evaluate(Constants constants) {
+    switch (operator) {
+      case '=':
+        return Value.boolean(operand1.evaluate(constants).toString() ==
+            operand2.evaluate(constants).toString());
+      case '<>':
+        return Value.boolean(operand1.evaluate(constants).toString() !=
+            operand2.evaluate(constants).toString());
+      case '>':
+        var op1 = operand1.evaluate(constants);
+        var op2 = operand2.evaluate(constants);
+        if (op1 is! Value || op2 is! Value) {
+          throw StateError('operator not supported for $op1 and/or $op2');
+        }
+        return Value.boolean(op1.value > op2.value);
+      case '<':
+        var op1 = operand1.evaluate(constants);
+        var op2 = operand2.evaluate(constants);
+        if (op1 is! Value || op2 is! Value) {
+          throw StateError('operator not supported for $op1 and/or $op2');
+        }
+        return Value.boolean(op1.value > op2.value);
+      default:
+        throw StateError('unsupported operator $operator');
+    }
+  }
+
+  @override
+  bool get isKnownZero => false;
+
+  @override
+  String toString() {
+    return '($operand1$operator$operand2)';
+  }
+}
+
+class Constants {
+  final Map<Constant, Expression> _map;
+
+  const Constants.none() : _map = const {};
+  const Constants.wrap(Map<Constant, Expression> constants) : _map = constants;
+  Constants.of(Constants constants) : _map = Map.of(constants._map);
+  Constants.fromMap(Map<Constant, Expression> constants)
+      : _map = Map.of(constants);
+
+  Map<Constant, Expression> toMap() {
+    return UnmodifiableMapView(_map);
+  }
+
+  // todo: eh
+  bool containsConstantNamed(String constant) =>
+      _map.keys.map((e) => e.constant).toSet().contains(constant);
+}
+
+class UnknownExpression extends Expression {
+  final String expression;
+  @override
+  final isKnownZero = false;
+
+  const UnknownExpression(this.expression) : super.constant();
+
+  @override
+  String toString() {
+    return expression;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UnknownExpression &&
+          runtimeType == other.runtimeType &&
+          expression == other.expression;
+
+  @override
+  int get hashCode => expression.hashCode;
+}
+
 class Value extends Expression implements Comparable<Value> {
   final int value;
 
   const Value(this.value) : super.constant();
 
   const Value.constant(this.value) : super.constant();
+  const Value.boolean(bool bool)
+      : value = bool ? 1 : 0,
+        super.constant();
 
   @override
   bool get isKnownZero => value == 0;
@@ -134,6 +417,11 @@ class Constant extends Expression {
   @override
   final bool isKnownZero = false;
 
+  static final _wordCharactersOnly = RegExp(r'^\w+$');
+
+  static bool isValidConstantName(String name) =>
+      _wordCharactersOnly.hasMatch(name);
+
   const Constant(this.constant) : super.constant();
 
   @override
@@ -153,6 +441,9 @@ class Constant extends Expression {
 class Label extends Sized implements Address {
   static final _validLabelPattern =
       RegExp(r'^[A-Za-z\d_@.+-/]+[A-Za-z\d_/+-]*$');
+
+  static bool isValidLabelName(String expression) =>
+      _validLabelPattern.hasMatch(expression);
 
   final String name;
 
@@ -187,7 +478,14 @@ class LabelOrConstant extends Expression {
   @override
   final bool isKnownZero = false;
 
-  const LabelOrConstant(this.name) : super.constant();
+  const LabelOrConstant.knownValid(this.name) : super.constant();
+
+  LabelOrConstant(this.name) {
+    // todo: we may be able to determine if name is only valid as a label
+    checkArgument(
+        Constant.isValidConstantName(name) && Label.isValidLabelName(name),
+        message: name);
+  }
 
   @override
   String toString() => name;

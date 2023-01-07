@@ -32,6 +32,27 @@ main() {
       test('dc.l with label', () {
         expect(Asm.fromRaw(r' dc.l a_label'), dc.l([Label('a_label')]));
       });
+
+      test('conditional assembly', () {
+        var asm = Asm.fromRaw('''\tif revision=0
+\tdc.b\t"1"\t
+\telseif revision=1
+\tdc.b\t"2"\t
+\telse
+\tdc.b\t"3"\t
+\tendif''');
+        expect(
+            asm,
+            Asm([
+              cmd('if', ['revision=0']),
+              dc.b(Bytes.ascii("1")),
+              cmd('elseif', ['revision=1']),
+              dc.b(Bytes.ascii("2")),
+              cmd('else', []),
+              dc.b(Bytes.ascii("3")),
+              cmd('endif', []),
+            ]));
+      });
     });
 
     group('equivalent back to string', () {
@@ -102,6 +123,19 @@ main() {
           Word(1),
         ]);
       });
+
+      test('evaluates conditional assembly', () {
+        var asm = Asm.fromRaw('''\tif revision=0
+\tdc.b\t"1"\t
+\telseif revision=1
+\tdc.b\t"2"\t
+\telse
+\tdc.b\t"3"\t
+\tendif''');
+        var iterator = ConstantIterator(asm.iterator,
+            constants: Constants.fromMap({Constant('revision'): Value(1)}));
+        expect(iterator.toList(), [Byte(2)]);
+      }, skip: 'not sure we actually need this after all');
     });
 
     group('reader', () {
