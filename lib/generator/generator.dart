@@ -492,14 +492,14 @@ class SceneAsmGenerator implements EventVisitor {
       _flagIsNotSet(flag);
 
       runEventFromInteractionIfNeeded(ifFlag.isUnset,
-          nameSuffix: '${ifFlag.flag.name}Unset');
+          nameSuffix: '${ifFlag.flag.name}_unset');
 
       for (var event in ifFlag.isUnset) {
         event.visit(this);
       }
 
       // Wrap up this branch
-      _finish();
+      _finish(appendNewline: true);
 
       if (_inEvent) {
         // we may be in event now, but we have to go back to dialog generation
@@ -512,7 +512,7 @@ class SceneAsmGenerator implements EventVisitor {
       _flagIsSet(flag, parent: parent);
 
       runEventFromInteractionIfNeeded(ifFlag.isSet,
-          nameSuffix: '${ifFlag.flag.name}Set');
+          nameSuffix: '${ifFlag.flag.name}_set');
 
       for (var event in ifFlag.isSet) {
         event.visit(this);
@@ -527,7 +527,7 @@ class SceneAsmGenerator implements EventVisitor {
       //   but we're using 'empty' condition
       //   to proxy for the original state or 'root' state
       if (_currentCondition == Condition.empty()) {
-        finish();
+        finish(appendNewline: true);
       }
     } else {
       _addToEvent(ifFlag, (i) {
@@ -758,7 +758,7 @@ class SceneAsmGenerator implements EventVisitor {
     // todo: also applfinishy all changes for current mem across graph
     // not sure if still need to do this
     if (!_finished) {
-      _finish();
+      _finish(appendNewline: false);
       _dialogTree.finish();
       _finished = true;
     }
@@ -768,7 +768,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  void _finish() {
+  void _finish({bool appendNewline = false}) {
     if (_inEvent) {
       if (_isProcessingInteraction) {
         if (_eventType == EventType.cutscene) {
@@ -810,6 +810,10 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _terminateDialog();
+
+    if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
+      _eventAsm.addNewline();
+    }
   }
 
   void _checkNotFinished() {

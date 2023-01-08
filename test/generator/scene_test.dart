@@ -452,13 +452,14 @@ ${dialog2.toAsm()}
 
       expect(eventRoutines.cutsceneRoutines, hasLength(1));
       expect(
-          asm.withoutComments().tail(5),
+          asm.withoutComments().tail(6),
           Asm([
             jsr(Label('Event_GetAndRunDialogue5').l),
             moveq(Constant('EventFlag_test').i, d0),
             jsr(Label('EventFlags_Set').l),
             moveq(0.i, d0),
-            rts
+            rts,
+            newLine()
           ]));
     });
 
@@ -1038,9 +1039,9 @@ ${dialog2.toAsm()}
         print(asm);
 
         expect(eventRoutines.eventRoutines,
-            [Label('Event_GrandCross_interactflag1Set')]);
+            [Label('Event_GrandCross_interactflag1_set')]);
         expect(asm.withoutComments().firstOrNull?.toAsm(),
-            setLabel('Event_GrandCross_interactflag1Set'));
+            setLabel('Event_GrandCross_interactflag1_set'));
         expect(
             dialog.toAsm().withoutComments().trim(),
             Asm([
@@ -1071,9 +1072,10 @@ ${dialog2.toAsm()}
         print(asm);
 
         expect(asm.withoutComments().firstOrNull?.toAsm(),
-            setLabel('Event_GrandCross_interactflag1Unset'));
+            setLabel('Event_GrandCross_interactflag1_unset'));
 
-        var returnFromDialog = returnFromDialogEvent().withoutComments();
+        var returnFromDialog = returnFromDialogEvent().withoutComments()
+          ..addNewline();
         expect(asm.withoutComments().tail(returnFromDialog.length),
             returnFromDialog);
 

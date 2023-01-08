@@ -384,9 +384,9 @@ void main() {
           comparisonDialogTree, comparisonEventAsm, testEventRoutines)
         ..runEventFromInteraction()
         ..scene(npc2.onInteract)
-        ..finish();
+        ..finish(appendNewline: true);
 
-      expect(mapAsm.events.trim(), comparisonEventAsm);
+      expect(mapAsm.events, comparisonEventAsm);
       expect(mapAsm.dialog, comparisonDialogTree.toAsm());
     });
 
