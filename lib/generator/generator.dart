@@ -45,28 +45,6 @@ import 'text.dart' as textlib;
 export '../asm/asm.dart' show Asm;
 export 'deprecated.dart';
 
-// These offsets are used to account for assembly specifics, which allows for
-// variances in maps to be coded manually (such as objects).
-// todo: it might be nice to manage these with the assembly or the compiler
-//  itself rather than hard coding here.
-//  Program API would be the right place now that we have that.
-// todo: see generator/map.dart for more of stuff like this
-
-final _spriteVramOffsets = {
-  MapId.Test: 0x2d0,
-  MapId.Aiedo: 0x29A,
-  MapId.Piata: 0x2D0, // Map_Pata, normally 2D0
-  MapId.PiataAcademyF1: 0x27F, // Map_PiataAcademy_F1
-  MapId.PiataAcademy: 0x27F,
-  MapId.PiataAcademyPrincipalOffice: 0x27F, // Map_AcademyPrincipalOffice
-  MapId.PiataDorm: 0x372,
-  MapId.PiataInn: 0x372,
-  MapId.PiataHouse1: 0x372,
-  MapId.PiataHouse2: 0x372,
-  MapId.PiataAcademyNearBasement:
-      0x27F, // Map_PiataAcademyNearBasement, no sprites actually used
-};
-
 // tracks global state about the program code
 // e.g. event pointers
 // could also use to save generation as it is done, relative to the state
@@ -89,9 +67,16 @@ class Program {
   Asm get cutscenesPointers => Asm([_cutscenesPointers]);
   Word _cutsceneIndexOffset;
 
-  Program({Word? eventIndexOffset, Word? cutsceneIndexOffset})
-      : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord,
-        _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord;
+  final Map<MapId, Word> _vramTileOffsets = {};
+
+  Program({
+    Word? eventIndexOffset,
+    Word? cutsceneIndexOffset,
+    Map<MapId, Word>? vramTileOffsets,
+  })  : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord,
+        _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord {
+    _vramTileOffsets.addAll(vramTileOffsets ?? _defaultSpriteVramOffsets);
+  }
 
   /// Returns event index by which [routine] can be referenced.
   ///
@@ -129,12 +114,7 @@ class Program {
   }
 
   MapAsm addMap(GameMap map) {
-    // todo: can we inject these differently so it's more testable?
-    // fixme: nonnull assertion
-    var spriteVramOffset = _spriteVramOffsets[map.id];
-    if (spriteVramOffset == null) {
-      throw Exception('no vram offsets defined for ${map.id}');
-    }
+    var spriteVramOffset = _vramTileOffsets[map.id];
     return _maps[map.id] =
         compileMap(map, _ProgramEventRoutines(this), spriteVramOffset);
   }
@@ -1302,3 +1282,212 @@ class TestDialogTreeLookup extends DialogTreeLookup {
     return _treeByLabel[lbl] ?? (throw StateError('no such dialog tree: $lbl'));
   }
 }
+
+// These offsets are used to account for assembly specifics, which allows for
+// variances in maps to be coded manually (such as objects).
+// todo: it might be nice to manage these with the assembly or the compiler
+//  itself rather than hard coding here.
+//  Program API would be the right place now that we have that.
+// todo: see generator/map.dart for more of stuff like this
+
+// generated via dart bin/macro.dart vram-tile-offsets | gsed -E 's/([^,]+),(.*)/Label('"'"'\1'"'"'): Word(\2),/'
+final Map<MapId, Word> _defaultSpriteVramOffsets = {
+  Label('Map_Dezolis'): Word(0x39b),
+  Label('Map_Piata'): Word(0x2d0),
+  Label('Map_PiataAcademy'): Word(0x27f),
+  Label('Map_PiataAcademy_F1'): Word(0x27f),
+  Label('Map_AcademyPrincipalOffice'): Word(0x27f),
+  Label('Map_AcademyBasement'): Word(0x27f),
+  Label('Map_AcademyBasement_B2'): Word(0x27f),
+  Label('Map_PiataDorm'): Word(0x372),
+  Label('Map_PiataInn'): Word(0x372),
+  Label('Map_PiataHouse1'): Word(0x372),
+  Label('Map_PiataItemShop'): Word(0x372),
+  Label('Map_PiataHouse2'): Word(0x372),
+  Label('Map_Mile'): Word(0x24d),
+  Label('Map_MileDead'): Word(0x24d),
+  Label('Map_MileWeaponShop'): Word(0x372),
+  Label('Map_MileHouse1'): Word(0x372),
+  Label('Map_MileItemShop'): Word(0x372),
+  Label('Map_MileHouse2'): Word(0x372),
+  Label('Map_MileInn'): Word(0x372),
+  Label('Map_Zema'): Word(0x29d),
+  Label('Map_ZemaHouse1'): Word(0x372),
+  Label('Map_ZemaWeaponShop'): Word(0x372),
+  Label('Map_ZemaInn'): Word(0x372),
+  Label('Map_ZemaHouse2'): Word(0x372),
+  Label('Map_ZemaHouse2_B1'): Word(0x372),
+  Label('Map_ZemaItemShop'): Word(0x372),
+  Label('Map_BirthValley_B1'): Word(0x148),
+  Label('Map_Krup'): Word(0x2b8),
+  Label('Map_KrupKindergarten'): Word(0x372),
+  Label('Map_KrupWeaponShop'): Word(0x372),
+  Label('Map_KrupItemShop'): Word(0x372),
+  Label('Map_KrupHouse'): Word(0x372),
+  Label('Map_KrupInn'): Word(0x372),
+  Label('Map_KrupInn_F1'): Word(0x372),
+  Label('Map_Molcum'): Word(0x2a6),
+  Label('Map_Tonoe'): Word(0x2a8),
+  Label('Map_TonoeStorageRoom'): Word(0x409),
+  Label('Map_TonoeGryzHouse'): Word(0x409),
+  Label('Map_TonoeHouse1'): Word(0x409),
+  Label('Map_TonoeHouse2'): Word(0x409),
+  Label('Map_TonoeInn'): Word(0x409),
+  Label('Map_TonoeBasement_B1'): Word(0x152),
+  Label('Map_TonoeBasement_B2'): Word(0x152),
+  Label('Map_TonoeBasement_B3'): Word(0x152),
+  Label('Map_Nalya'): Word(0x2c1),
+  Label('Map_NalyaHouse1'): Word(0x409),
+  Label('Map_NalyaHouse2'): Word(0x409),
+  Label('Map_NalyaItemShop'): Word(0x409),
+  Label('Map_NalyaHouse3'): Word(0x409),
+  Label('Map_NalyaHouse4'): Word(0x409),
+  Label('Map_NalyaHouse5'): Word(0x409),
+  Label('Map_NalyaInn'): Word(0x409),
+  Label('Map_NalyaInn_F1'): Word(0x409),
+  Label('Map_Aiedo'): Word(0x29a),
+  Label('Map_AiedoBakery_B1'): Word(0x372),
+  Label('Map_HuntersGuild'): Word(0x372),
+  Label('Map_StripClubDressingRoom'): Word(0x372),
+  Label('Map_StripClub'): Word(0x372),
+  Label('Map_AiedoWeaponShop'): Word(0x372),
+  Label('Map_AiedoPrison'): Word(0x372),
+  Label('Map_AiedoHouse1'): Word(0x372),
+  Label('Map_ChazHouse'): Word(0x372),
+  Label('Map_AiedoHouse2'): Word(0x372),
+  Label('Map_AiedoHouse3'): Word(0x372),
+  Label('Map_AiedoHouse4'): Word(0x372),
+  Label('Map_AiedoHouse5'): Word(0x372),
+  Label('Map_AiedoSupermarket'): Word(0x372),
+  Label('Map_AiedoPub'): Word(0x372),
+  Label('Map_RockyHouse'): Word(0x372),
+  Label('Map_AiedoHouse6'): Word(0x372),
+  Label('Map_AiedoHouse7'): Word(0x372),
+  Label('Map_Kadary'): Word(0x2cd),
+  Label('Map_KadaryChurch'): Word(0x293),
+  Label('Map_KadaryPub'): Word(0x372),
+  Label('Map_KadaryPub_F1'): Word(0x372),
+  Label('Map_KadaryHouse1'): Word(0x372),
+  Label('Map_KadaryHouse2'): Word(0x372),
+  Label('Map_KadaryHouse3'): Word(0x372),
+  Label('Map_KadaryItemShop'): Word(0x372),
+  Label('Map_KadaryInn'): Word(0x372),
+  Label('Map_KadaryInn_F1'): Word(0x372),
+  Label('Map_Monsen'): Word(0x2c3),
+  Label('Map_MonsenInn'): Word(0x372),
+  Label('Map_MonsenHouse2'): Word(0x372),
+  Label('Map_MonsenHouse3'): Word(0x372),
+  Label('Map_MonsenHouse4'): Word(0x372),
+  Label('Map_MonsenHouse5'): Word(0x372),
+  Label('Map_MonsenItemShop'): Word(0x372),
+  Label('Map_Termi'): Word(0x2ea),
+  Label('Map_TermiItemShop'): Word(0x372),
+  Label('Map_TermiHouse1'): Word(0x372),
+  Label('Map_TermiWeaponShop'): Word(0x372),
+  Label('Map_TermiInn'): Word(0x372),
+  Label('Map_TermiHouse2'): Word(0x372),
+  Label('Map_ZioFort'): Word(0x313),
+  Label('Map_ZioFort_F1'): Word(0x313),
+  Label('Map_ZioFortJuzaRoom'): Word(0x313),
+  Label('Map_ZioFort_F3'): Word(0x313),
+  Label('Map_ZioFort_F4'): Word(0x313),
+  Label('Map_LadeaTower_F5'): Word(0x2e6),
+  Label('Map_IslandCave'): Word(0x192),
+  Label('Map_BioPlant_B4_Part2'): Word(0x222),
+  Label('Map_BioPlant_B4_Part3'): Word(0x222),
+  Label('Map_PlateSystem'): Word(0x22c),
+  Label('Map_ClimCenter_F3'): Word(0x22c),
+  Label('Map_VahalFort'): Word(0x2c1),
+  Label('Map_Uzo'): Word(0x2b8),
+  Label('Map_UzoHouse1'): Word(0x372),
+  Label('Map_UzoHouse2'): Word(0x372),
+  Label('Map_UzoInn'): Word(0x372),
+  Label('Map_UzoHouse3'): Word(0x372),
+  Label('Map_UzoItemShop'): Word(0x372),
+  Label('Map_Torinco'): Word(0x2ea),
+  Label('Map_CulversHouse'): Word(0x372),
+  Label('Map_TorincoHouse1'): Word(0x372),
+  Label('Map_TorincoHouse2'): Word(0x372),
+  Label('Map_TorincoItemShop'): Word(0x372),
+  Label('Map_TorincoInn'): Word(0x372),
+  Label('Map_MonsenCave'): Word(0x148),
+  Label('Map_RappyCave'): Word(0x202),
+  Label('Map_StrengthTower_F4'): Word(0x260),
+  Label('Map_CourageTower_F4'): Word(0x260),
+  Label('Map_AngerTower_F2'): Word(0x260),
+  Label('Map_Tyler'): Word(0x1e0),
+  Label('Map_TylerHouse1'): Word(0x2df),
+  Label('Map_TylerWeaponShop'): Word(0x2df),
+  Label('Map_TylerItemShop'): Word(0x2df),
+  Label('Map_TylerHouse2'): Word(0x2df),
+  Label('Map_TylerInn'): Word(0x2df),
+  Label('Map_Zosa'): Word(0x263),
+  Label('Map_ZosaHouse1'): Word(0x2df),
+  Label('Map_ZosaHouse2'): Word(0x2df),
+  Label('Map_ZosaWeaponShop'): Word(0x2df),
+  Label('Map_ZosaItemShop'): Word(0x2df),
+  Label('Map_ZosaInn'): Word(0x2df),
+  Label('Map_ZosaHouse3'): Word(0x2df),
+  Label('Map_Meese'): Word(0x1c8),
+  Label('Map_MeeseHouse1'): Word(0x2df),
+  Label('Map_MeeseItemShop2'): Word(0x2df),
+  Label('Map_MeeseItemShop1'): Word(0x2df),
+  Label('Map_MeeseWeaponShop'): Word(0x2df),
+  Label('Map_MeeseInn'): Word(0x2df),
+  Label('Map_MeeseClinic'): Word(0x2df),
+  Label('Map_MeeseClinic_F1'): Word(0x2df),
+  Label('Map_Jut'): Word(0x2c2),
+  Label('Map_JutHouse1'): Word(0x2df),
+  Label('Map_JutHouse2'): Word(0x2df),
+  Label('Map_JutHouse3'): Word(0x2df),
+  Label('Map_JutHouse4'): Word(0x2df),
+  Label('Map_JutHouse5'): Word(0x2df),
+  Label('Map_JutWeaponShop'): Word(0x2df),
+  Label('Map_JutItemShop'): Word(0x2df),
+  Label('Map_JutHouse6'): Word(0x2df),
+  Label('Map_JutHouse6_F1'): Word(0x2df),
+  Label('Map_JutHouse7'): Word(0x2df),
+  Label('Map_JutHouse8'): Word(0x2df),
+  Label('Map_JutInn'): Word(0x2df),
+  Label('Map_JutChurch'): Word(0x276),
+  Label('Map_Ryuon'): Word(0x200),
+  Label('Map_RyuonItemShop'): Word(0x2df),
+  Label('Map_RyuonWeaponShop'): Word(0x2df),
+  Label('Map_RyuonHouse1'): Word(0x2df),
+  Label('Map_RyuonHouse2'): Word(0x2df),
+  Label('Map_RyuonHouse3'): Word(0x2df),
+  Label('Map_RyuonPub'): Word(0x2df),
+  Label('Map_RyuonInn'): Word(0x2df),
+  Label('Map_RajaTemple'): Word(0x1f3),
+  Label('Map_Reshel2'): Word(0x222),
+  Label('Map_Reshel3'): Word(0x222),
+  Label('Map_Reshel2House'): Word(0x2df),
+  Label('Map_Reshel2WeaponShop'): Word(0x2df),
+  Label('Map_Reshel3House1'): Word(0x2df),
+  Label('Map_Reshel3ItemShop'): Word(0x2df),
+  Label('Map_Reshel3House2'): Word(0x2df),
+  Label('Map_Reshel3WeaponShop'): Word(0x2df),
+  Label('Map_Reshel3Inn'): Word(0x2df),
+  Label('Map_Reshel3House3'): Word(0x2df),
+  Label('Map_MystVale_Part2'): Word(0x202),
+  Label('Map_MystVale_Part4'): Word(0x202),
+  Label('Map_MystVale_Part5'): Word(0x202),
+  Label('Map_Gumbious'): Word(0x286),
+  Label('Map_Gumbious_F1'): Word(0x286),
+  Label('Map_Gumbious_B1'): Word(0x266),
+  Label('Map_Gumbious_B2_Part2'): Word(0x266),
+  Label('Map_EspMansionEntrance'): Word(0x1f5),
+  Label('Map_EspMansion'): Word(0x1f5),
+  Label('Map_EspMansionWestRoom'): Word(0x1f5),
+  Label('Map_EspMansionNorth'): Word(0x1f5),
+  Label('Map_EspMansionNorthEastRoom'): Word(0x1f5),
+  Label('Map_EspMansionNorthWestRoom'): Word(0x1f5),
+  Label('Map_EspMansionCourtyard'): Word(0x1f5),
+  Label('Map_InnerSanctuary'): Word(0x1f5),
+  Label('Map_InnerSanctuary_B1'): Word(0x1f5),
+  Label('Map_AirCastle_Part3'): Word(0x371),
+  Label('Map_AirCastle_F1_Part10'): Word(0x371),
+  Label('Map_AirCastleXeAThoulRoom'): Word(0x371),
+  Label('Map_Kuran_F3'): Word(0x3b9),
+  Label('Map_GaruberkTower_Part7'): Word(0x252),
+}.map((l, o) => MapEntry(labelToMapId(l), o));

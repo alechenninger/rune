@@ -186,7 +186,7 @@ class FieldRoutine {
 }
 
 MapAsm compileMap(
-    GameMap map, EventRoutines eventRoutines, int spriteVramOffset,
+    GameMap map, EventRoutines eventRoutines, Word? spriteVramOffset,
     {DialogTree? dialogTree}) {
   // TODO: move this out?
   var tree = dialogTree ?? _defaultDialogTree(map.id);
@@ -201,7 +201,7 @@ MapAsm compileMap(
   }
 
   var objectsTileNumbers =
-      _compileMapSpriteData(objects, spritesAsm, spriteVramOffset);
+      _compileMapSpriteData(objects, spritesAsm, spriteVramOffset?.value);
 
   var scenes = Map<Scene, Byte>.identity();
 
@@ -231,7 +231,7 @@ MapAsm compileMap(
 }
 
 Map<MapObjectId, Word> _compileMapSpriteData(
-    List<MapObject> objects, Asm asm, int spriteVramOffset) {
+    List<MapObject> objects, Asm asm, int? spriteVramOffset) {
   // aggregate all sprites and their vram tiles needed
   // aggregate all objects and their sprites
   // then assign vram tile numbers to objects.
@@ -279,6 +279,11 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   var objectTiles = <MapObjectId, Word>{};
 
   for (var entry in mappingTiles.entries) {
+    if (spriteVramOffset == null) {
+      throw Exception('no vram offsets defined but map has sprites. '
+          'objects=${objectTiles.keys}');
+    }
+
     var artLbl = entry.key;
     var mappingTiles = entry.value;
 

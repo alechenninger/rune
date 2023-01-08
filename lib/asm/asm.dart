@@ -5,12 +5,10 @@ import 'dart:math';
 import 'package:characters/characters.dart';
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
-import 'package:quiver/iterables.dart' as iterables;
 import 'package:quiver/strings.dart';
 import 'package:rune/src/iterables.dart';
 import 'package:rune/src/null.dart';
 
-import '../numbers.dart';
 import 'address.dart';
 import 'data.dart';
 
