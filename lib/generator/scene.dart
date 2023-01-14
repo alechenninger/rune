@@ -131,8 +131,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
     eventAsm.add(returnFromDialogEvent());
   }
 
-  return SceneAsm(
-      event: eventAsm, dialog: newDialogs, dialogIdOffset: dialogIdOffset);
+  return SceneAsm(event: eventAsm);
 }
 
 bool _processableInDialogLoop(Scene scene, AsmContext ctx) {
@@ -177,6 +176,7 @@ void _goToDialogFromEvent(
   ctx.runDialog();
 }
 
+@Deprecated('just use EventAsm instead at this point I think')
 class SceneAsm {
   /*
   should we label this?
@@ -191,29 +191,11 @@ class SceneAsm {
   range–larger than a normal rom can be.
    */
   final Asm event;
-  final List<Asm> dialog;
-  final Byte dialogIdOffset;
 
-  // if empty should just be FF?
-  Asm get allDialog {
-    var all = Asm.empty();
-
-    for (var i = 0; i < dialog.length; i++) {
-      all.add(comment('${dialogIdOffset + i.toByte}'));
-      all.add(dialog[i]);
-      all.addNewline();
-    }
-
-    return all;
-  }
-
-  SceneAsm(
-      {required this.event,
-      required this.dialogIdOffset,
-      required this.dialog});
+  SceneAsm({required this.event});
 
   @override
   String toString() {
-    return '; event:\n$event\n; dialog:\n$allDialog';
+    return '; event:\n$event';
   }
 }

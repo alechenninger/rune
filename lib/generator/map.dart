@@ -17,6 +17,7 @@ import 'generator.dart';
 class MapAsm {
   final Asm sprites;
   final Asm objects;
+  @Deprecated('use DialogTrees API instead')
   final Asm dialog;
   final Asm events;
   // todo: i think cutscenes asm is not needed
@@ -60,9 +61,6 @@ const _defaultVramTilesPerSprite = 0x48;
 
 // todo: now that we automatically boostrap maps, maybe remove this
 final _objectIndexOffsets = <MapId, int>{};
-final _defaultDialogs = <MapId, DialogTree>{};
-DialogTree _defaultDialogTree(MapId map) =>
-    _defaultDialogs[map] ?? DialogTree();
 
 // todo: default to convention & allow override
 final _spriteArtLabels = BiMap<Sprite, Label>()
@@ -187,9 +185,8 @@ class FieldRoutine {
 
 MapAsm compileMap(
     GameMap map, EventRoutines eventRoutines, Word? spriteVramOffset,
-    {DialogTree? dialogTree}) {
-  // TODO: move this out?
-  var tree = dialogTree ?? _defaultDialogTree(map.id);
+    {required DialogTrees dialogTrees}) {
+  var trees = dialogTrees;
   var spritesAsm = Asm.empty();
   var objectsAsm = Asm.empty();
   var eventsAsm = EventAsm.empty();
@@ -215,7 +212,7 @@ MapAsm compileMap(
             // todo: scene id arbitrarily refers to first object referenced.
             // maybe scene id should be a part of scene after all
             SceneId('${map.id.name}_${obj.id}'),
-            tree,
+            trees,
             eventsAsm,
             eventRoutines));
     var tileNumber = objectsTileNumbers[obj.id] ?? Word(0);
@@ -225,7 +222,7 @@ MapAsm compileMap(
   return MapAsm(
       sprites: spritesAsm,
       objects: objectsAsm,
-      dialog: tree.toAsm(),
+      dialog: trees.forMap(map.id).toAsm(),
       events: eventsAsm,
       cutscenes: Asm.empty());
 }
@@ -316,14 +313,15 @@ Map<MapObjectId, Word> _compileMapSpriteData(
 }
 
 Byte _compileInteractionScene(GameMap map, Scene scene, SceneId id,
-    DialogTree tree, EventAsm asm, EventRoutines eventRoutines) {
+    DialogTrees trees, EventAsm asm, EventRoutines eventRoutines) {
   var events = scene.events;
 
   // todo: handle max
+  var tree = trees.forMap(map.id);
   var dialogId = tree.nextDialogId!;
 
   SceneAsmGenerator generator =
-      SceneAsmGenerator.forInteraction(map, id, tree, asm, eventRoutines);
+      SceneAsmGenerator.forInteraction(map, id, trees, asm, eventRoutines);
 
   generator.runEventFromInteractionIfNeeded(events);
 
@@ -333,7 +331,9 @@ Byte _compileInteractionScene(GameMap map, Scene scene, SceneId id,
 
   generator.finish(appendNewline: true);
 
-  assert(tree.length > dialogId.value, "no interaction dialog in tree");
+  if (tree.length <= dialogId.value) {
+    throw ArgumentError("no interaction dialog for ${map.id} in scene");
+  }
 
   return dialogId;
 }

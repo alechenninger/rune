@@ -644,8 +644,9 @@ enum MapId {
   TheEdge_Part9;
 
   final Area? area;
+  final MapId? outer;
 
-  const MapId([this.area]);
+  const MapId([this.area, this.outer]);
 }
 
 // todo: 'with UnnamedSpeaker' – aren't some objects named speakers?

@@ -15,12 +15,24 @@ import 'package:test/test.dart';
 import '../fixtures.dart';
 
 void main() {
-  var generator = AsmGenerator();
   late Program program;
+  late GameMap map;
 
   setUp(() {
     program = Program();
+    map = GameMap(MapId.Test);
   });
+
+  EventAsm generateEventAsm(List<Event> events, [EventState? ctx]) {
+    var asm = EventAsm.empty();
+    var gen = SceneAsmGenerator.forEvent(SceneId('test'), DialogTrees(), asm)
+      ..setContext(setContext(ctx));
+    for (var e in events) {
+      e.visit(gen);
+    }
+    gen.finish();
+    return asm;
+  }
 
   group('a cursor separates', () {
     test('between dialogs', () {
@@ -28,24 +40,32 @@ void main() {
       var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hello'));
 
       var scene = Scene([dialog1, dialog2]);
-      var sceneAsm = program.addScene(SceneId('test'), scene);
+      program.addScene(SceneId('test'), scene, startingMap: map);
 
-      expect(sceneAsm.dialog[0].toString(), '''${dialog1.toAsm()}
+      expect(
+          program.dialogTrees
+              .forMap(map.id)
+              .toAsm()
+              .withoutComments()
+              .trim()
+              .toString(),
+          '''${dialog1.toAsm()}
 	dc.b	\$FD
 ${dialog2.toAsm()}
 	dc.b	\$FF''');
     });
 
     test('between dialog and panel', () {
-      var sceneAsm = program.addScene(
+      program.addScene(
           SceneId('test'),
           Scene([
             Dialog(speaker: alys, spans: [DialogSpan('Hi')]),
             Dialog(spans: [DialogSpan('', panel: PrincipalPanel.principal)])
-          ]));
+          ]),
+          startingMap: map);
 
       expect(
-          sceneAsm.dialog[0],
+          program.dialogTrees.forMap(map.id)[0].withoutComments(),
           Asm([
             dc.b([Byte(0xF4), alys.portraitCode]),
             dc.b(Bytes.ascii('Hi')),
@@ -100,14 +120,12 @@ ${dialog2.toAsm()}
     test(
         'when dialog is first, dialog runs event and event immediately runs dialog at next offset',
         () {
-      var ctx = AsmContext.forDialog(state);
-      var eventIndex = ctx.peekNextEventIndex;
-
       var program = Program();
+      var eventIndex = program.peekNextEventIndex;
       var mapAsm = program.addMap(map);
 
       expect(
-          mapAsm.dialog.withoutComments().trim(),
+          program.dialogTrees.forMap(map.id).toAsm().withoutComments().trim(),
           Asm([
             dc.b(Bytes.hex('F6')),
             dc.w([eventIndex]),
@@ -122,9 +140,7 @@ ${dialog2.toAsm()}
           Asm([
             setLabel('Event_GrandCross_Test_testObj'),
             getAndRunDialog3(Byte.one.i),
-            generator
-                .individualMovesToAsm(moves, AsmContext.forEvent(origState))
-                .withoutComments(),
+            generateEventAsm([moves], origState).withoutComments(),
             returnFromDialogEvent()
           ]));
 
@@ -136,12 +152,16 @@ ${dialog2.toAsm()}
     });
 
     group('during interaction', () {
+      late GameMap map;
+
+      setUp(() {
+        map = GameMap(MapId.Test);
+      });
+
       test(
           'when facing player is first but there are other events, faces player from within event',
           () {
-        var map = GameMap(MapId.Test);
-
-        var obj = MapObject(
+        map.addObject(MapObject(
             id: '0',
             startPosition: Position(0x200, 0x200),
             spec: AlysWaiting(),
@@ -150,13 +170,9 @@ ${dialog2.toAsm()}
               SetContext((ctx) => ctx.positions[alys] = state.positions[alys]),
               Dialog(spans: [DialogSpan('Hi')]),
               IndividualMoves()..moves[alys] = (StepPath()..distance = 1.step)
-            ]));
-
-        map.addObject(obj);
+            ])));
 
         var mapAsm = program.addMap(map);
-
-        print(mapAsm);
 
         expect(
             mapAsm.events.withoutComments().trim(),
@@ -164,20 +180,17 @@ ${dialog2.toAsm()}
               setLabel('Event_GrandCross_Test_0'),
               jsr(Label('Interaction_UpdateObj').l),
               getAndRunDialog3(Byte.one.i),
-              generator
-                  .individualMovesToAsm(
-                      IndividualMoves()
-                        ..moves[alys] = (StepPath()..distance = 1.step),
-                      AsmContext.forEvent(origState))
-                  .withoutComments(),
+              generateEventAsm([
+                IndividualMoves()..moves[alys] = (StepPath()..distance = 1.step)
+              ], origState)
+                  .withoutComments()
+                  .trim(),
               returnFromDialogEvent()
             ]));
       });
 
       test('when only facing player and dialog, does not run event', () {
-        var map = GameMap(MapId.Test);
-
-        var obj = MapObject(
+        map.addObject(MapObject(
             id: '0',
             startPosition: Position(0x200, 0x200),
             spec: Npc(
@@ -185,9 +198,7 @@ ${dialog2.toAsm()}
                 WanderAround(Direction.down,
                     onInteract: Scene.forNpcInteraction([
                       Dialog(spans: [DialogSpan('Hello')])
-                    ]))));
-
-        map.addObject(obj);
+                    ])))));
 
         var mapAsm = program.addMap(map);
 
@@ -199,9 +210,7 @@ ${dialog2.toAsm()}
       test(
           'when only set context, facing player and dialog, does not run event',
           () {
-        var map = GameMap(MapId.Test);
-
-        var obj = MapObject(
+        map.addObject(MapObject(
             id: '0',
             startPosition: Position(0x200, 0x200),
             spec: Npc(
@@ -211,9 +220,7 @@ ${dialog2.toAsm()}
                       SetContext((ctx) {}),
                       InteractionObject.facePlayer(),
                       Dialog(spans: [DialogSpan('Hello')])
-                    ]))));
-
-        map.addObject(obj);
+                    ])))));
 
         var mapAsm = program.addMap(map);
 
@@ -221,169 +228,188 @@ ${dialog2.toAsm()}
 
         expect(mapAsm.events.withoutComments().trim(), Asm.empty());
       });
-    });
 
-    test('given dialog, event, dialog; event code runs dialog', () {
-      var ctx = AsmContext.forDialog(state);
-      var eventIndex = ctx.peekNextEventIndex;
+      test('given dialog, event, dialog; event code runs dialog', () {
+        var eventIndex = program.peekNextEventIndex;
 
-      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
-      var moves = IndividualMoves();
-      moves.moves[alys] = StepPath()..distance = 1.step;
-      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hi'));
+        var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
+        var moves = IndividualMoves();
+        moves.moves[alys] = StepPath()..distance = 1.step;
+        var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hi'));
 
-      var scene = Scene([dialog1, moves, dialog2]);
+        var scene = Scene.forNpcInteraction(
+            [setContext(state), dialog1, moves, dialog2]);
 
-      var sceneAsm = generator.sceneToAsm(scene, ctx);
+        map.addObject(testObjectForScene(scene));
 
-      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
-        DialogAsm([
-          dc.b(Bytes.hex('F6')),
-          dc.w([eventIndex]),
-          dc.b(Bytes.hex('FF')),
-        ]),
-        DialogAsm([
-          dialog1.toAsm(),
-          dc.b(Bytes.hex('f7')),
-          dialog2.toAsm(),
-          dc.b(Bytes.hex('ff')),
-        ])
-      ]);
+        var mapAsm = program.addMap(map);
 
-      expect(
-          sceneAsm.event.withoutComments(),
-          Asm([
-            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
-            getAndRunDialog(Byte.one.i),
-            generator
-                .individualMovesToAsm(moves, AsmContext.forEvent(origState))
-                .withoutComments(),
-            popAndRunDialog,
-            newLine(),
-            returnFromDialogEvent()
-          ]));
-    });
+        expect(
+            program.dialogTrees
+                .forMap(map.id)
+                .map((e) => e.withoutComments())
+                .toList(),
+            [
+              DialogAsm([
+                dc.b(Bytes.hex('F6')),
+                dc.w([eventIndex]),
+                dc.b(Bytes.hex('FF')),
+              ]),
+              DialogAsm([
+                dialog1.toAsm(),
+                dc.b(Bytes.hex('f7')),
+                dialog2.toAsm(),
+                dc.b(Bytes.hex('ff')),
+              ])
+            ]);
 
-    test(
-        'given many exchanges between dialog and event; event code runs dialog',
-        () {
-      var ctx = AsmContext.forDialog(state);
-      var eventIndex = ctx.peekNextEventIndex;
+        expect(
+            mapAsm.events.withoutComments().trim(),
+            Asm([
+              setLabel('Event_GrandCross_Test_0'),
+              jsr(Label('Interaction_UpdateObj').l),
+              getAndRunDialog3(Byte.one.i),
+              generateEventAsm([moves], origState).withoutComments(),
+              popAndRunDialog3,
+              returnFromDialogEvent()
+            ]));
+      });
 
-      var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
-      var move1 = IndividualMoves();
-      move1.moves[alys] = StepPath()..distance = 1.step;
-      var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hi'));
-      var move2 = IndividualMoves();
-      move2.moves[shay] = StepPath()..distance = 1.step;
-      var dialog3 =
-          Dialog(speaker: Shay(), spans: DialogSpan.parse('How are you'));
-      var move3 = IndividualMoves();
-      move3.moves[alys] = StepPath()..distance = 1.step;
+      test(
+          'given many exchanges between dialog and event; event code runs dialog',
+          () {
+        var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
+        var move1 = IndividualMoves();
+        move1.moves[alys] = StepPath()..distance = 1.step;
+        var dialog2 = Dialog(speaker: Shay(), spans: DialogSpan.parse('Hi'));
+        var move2 = IndividualMoves();
+        move2.moves[shay] = StepPath()..distance = 1.step;
+        var dialog3 =
+            Dialog(speaker: Shay(), spans: DialogSpan.parse('How are you'));
+        var move3 = IndividualMoves();
+        move3.moves[alys] = StepPath()..distance = 1.step;
 
-      var scene = Scene([dialog1, move1, dialog2, move2, dialog3, move3]);
+        var eventIndex = program.peekNextEventIndex;
+        var scene = Scene.forNpcInteraction([
+          setContext(state),
+          dialog1,
+          move1,
+          dialog2,
+          move2,
+          dialog3,
+          move3
+        ]);
 
-      var sceneAsm = generator.sceneToAsm(scene, ctx);
+        map.addObject(testObjectForScene(scene));
+        var mapAsm = program.addMap(map);
 
-      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
-        DialogAsm([
-          dc.b(Bytes.hex('F6')),
-          dc.w([eventIndex]),
-          dc.b(Bytes.hex('FF')),
-        ]),
-        DialogAsm([
-          dialog1.toAsm(),
-          dc.b(Bytes.hex('f7')),
-          dialog2.toAsm(),
-          dc.b(Bytes.hex('f7')),
-          dialog3.toAsm(),
-          dc.b(Bytes.hex('ff')),
-        ])
-      ]);
+        expect(
+            program.dialogTrees
+                .forMap(map.id)
+                .map((e) => e.withoutComments())
+                .toList(),
+            [
+              DialogAsm([
+                dc.b(Bytes.hex('F6')),
+                dc.w([eventIndex]),
+                dc.b(Bytes.hex('FF')),
+              ]),
+              DialogAsm([
+                dialog1.toAsm(),
+                dc.b(Bytes.hex('f7')),
+                dialog2.toAsm(),
+                dc.b(Bytes.hex('f7')),
+                dialog3.toAsm(),
+                dc.b(Bytes.hex('ff')),
+              ])
+            ]);
 
-      expect(
-          sceneAsm.event.withoutComments(),
-          Asm([
-            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
-            getAndRunDialog(Byte.one.i),
-            generator
-                .individualMovesToAsm(move1, AsmContext.forEvent(origState))
-                .withoutComments(),
-            popAndRunDialog,
-            newLine(),
-            generator
-                .individualMovesToAsm(move2, AsmContext.forEvent(origState))
-                .withoutComments(),
-            popAndRunDialog,
-            newLine(),
-            generator
-                .individualMovesToAsm(move3, AsmContext.forEvent(origState))
-                .withoutComments(),
-            returnFromDialogEvent()
-          ]));
-    });
+        expect(
+            mapAsm.events.withoutComments().trim(),
+            Asm([
+              setLabel('Event_GrandCross_Test_0'),
+              jsr(Label('Interaction_UpdateObj').l),
+              getAndRunDialog3(Byte.one.i),
+              generateEventAsm([move1], origState).withoutComments(),
+              popAndRunDialog3,
+              generateEventAsm([move2], origState..followLead = false)
+                  .withoutComments(),
+              popAndRunDialog3,
+              generateEventAsm(
+                      [move3],
+                      origState
+                        ..followLead = false
+                        ..positions[alys] =
+                            (origState.positions[alys]! + 1.step.up.asPosition))
+                  .withoutComments(),
+              returnFromDialogEvent()
+            ]));
+      });
 
-    test('if starting from dialog with dialog then pause, pause within event',
-        () {
-      var ctx = AsmContext.forDialog(state);
-      var eventIndex = ctx.peekNextEventIndex;
+      test('if starting with dialog then pause, pause within event', () {
+        var dialog = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
+        var pause = Pause(Duration(seconds: 2));
 
-      var dialog = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
-      var pause = Pause(Duration(seconds: 2));
+        var eventIndex = program.peekNextEventIndex;
+        var scene = Scene([dialog, pause]);
+        map.addObject(testObjectForScene(scene));
+        var mapAsm = program.addMap(map);
 
-      var scene = Scene([dialog, pause]);
-      var sceneAsm =
-          generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
+        expect(
+            program.dialogTrees
+                .forMap(map.id)
+                .map((e) => e.withoutComments())
+                .toList(),
+            [
+              DialogAsm([
+                dc.b(Bytes.hex('F6')),
+                dc.w([eventIndex]),
+                dc.b(Bytes.hex('FF')),
+              ]),
+              DialogAsm([
+                dialog.toAsm(),
+                dc.b(Bytes.hex('ff')),
+              ])
+            ]);
 
-      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
-        DialogAsm([
-          dc.b(Bytes.hex('F6')),
-          dc.w([eventIndex]),
-          dc.b(Bytes.hex('FF')),
-        ]),
-        DialogAsm([
-          dialog.toAsm(),
-          dc.b(Bytes.hex('ff')),
-        ])
-      ]);
+        expect(
+            mapAsm.events.withoutComments().trim(),
+            Asm([
+              setLabel('Event_GrandCross_Test_0'),
+              getAndRunDialog3(Byte.one.i),
+              generateEventAsm([pause]).withoutComments(),
+              returnFromDialogEvent()
+            ]));
+      });
 
-      expect(
-          sceneAsm.event.withoutComments(),
-          Asm([
-            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
-            getAndRunDialog(Byte.one.i),
-            generator.pauseToAsm(pause),
-            returnFromDialogEvent()
-          ]));
-    });
+      test("if only pausing, pause within event and don't run dialog", () {
+        var eventIndex = program.peekNextEventIndex;
+        var pause = Pause(Duration(seconds: 2));
+        map.addObject(testObjectForScene(Scene([pause])));
 
-    test(
-        "if starting from dialog and only pausing, pause within event and don't run dialog",
-        () {
-      var ctx = AsmContext.forDialog(state);
-      var eventIndex = ctx.peekNextEventIndex;
+        var mapAsm = program.addMap(map);
 
-      var pause = Pause(Duration(seconds: 2));
+        expect(
+            program.dialogTrees
+                .forMap(map.id)
+                .map((e) => e.withoutComments())
+                .toList(),
+            [
+              DialogAsm([
+                dc.b(Bytes.hex('F6')),
+                dc.w([eventIndex]),
+                dc.b(Bytes.hex('FF')),
+              ]),
+            ]);
 
-      var scene = Scene([pause]);
-      var sceneAsm =
-          generator.sceneToAsm(scene, AsmContext.fresh(gameMode: Mode.dialog));
-
-      expect(sceneAsm.dialog.map((e) => e.withoutComments()).toList(), [
-        DialogAsm([
-          dc.b(Bytes.hex('F6')),
-          dc.w([eventIndex]),
-          dc.b(Bytes.hex('FF')),
-        ]),
-      ]);
-
-      expect(
-          sceneAsm.event.withoutComments(),
-          Asm([
-            setLabel('Event_GrandCross_${eventIndex.value.toRadixString(16)}'),
-            generator.pauseToAsm(pause),
-            returnFromDialogEvent()
-          ]));
+        expect(
+            mapAsm.events.withoutComments().trim(),
+            Asm([
+              setLabel('Event_GrandCross_Test_0'),
+              generateEventAsm([pause]).withoutComments(),
+              returnFromDialogEvent()
+            ]));
+      });
     });
 
     test('if dialog while faded, uses cutscene routine', () {
@@ -393,7 +419,7 @@ ${dialog2.toAsm()}
           spec: Npc(Sprite.PalmanOldMan1, WanderAround(Direction.down)));
       map.addObject(obj);
 
-      var dialog = DialogTree();
+      var dialog = DialogTrees();
       var asm = EventAsm.empty();
       var eventRoutines = TestEventRoutines();
       var events = [
@@ -425,7 +451,7 @@ ${dialog2.toAsm()}
           spec: Npc(Sprite.PalmanOldMan1, WanderAround(Direction.down)));
       map.addObject(obj);
 
-      var dialog = DialogTree();
+      var dialog = DialogTrees();
       var asm = EventAsm.empty();
       var eventRoutines = TestEventRoutines();
       var events = [
@@ -506,7 +532,8 @@ ${dialog2.toAsm()}
       ]);
 
       var program = Program();
-      var sceneAsm = program.addScene(SceneId('testscene'), scene);
+      var sceneAsm =
+          program.addScene(SceneId('testscene'), scene, startingMap: map);
 
       expect(
           sceneAsm.event.withoutComments().trim(),
@@ -534,7 +561,8 @@ ${dialog2.toAsm()}
       ]);
 
       var program = Program();
-      var sceneAsm = program.addScene(SceneId('testscene'), scene);
+      var sceneAsm =
+          program.addScene(SceneId('testscene'), scene, startingMap: map);
 
       expect(
           sceneAsm.event.withoutComments().trim(),
@@ -568,10 +596,10 @@ ${dialog2.toAsm()}
       ]);
 
       var program = Program();
-      var sceneAsm = program.addScene(SceneId('testscene'), scene);
+      program.addScene(SceneId('testscene'), scene, startingMap: map);
 
       expect(
-          sceneAsm.allDialog.withoutComments().trim(),
+          program.dialogTrees.forMap(map.id).toAsm().withoutComments().trim(),
           Asm([
             dc.b([Byte(0xf4), alys.portraitCode]),
             dc.b(Bytes.ascii('Hello')),
@@ -588,7 +616,7 @@ ${dialog2.toAsm()}
 
     Asm pause(int seconds) {
       var asm = EventAsm.empty();
-      SceneAsmGenerator.forEvent(sceneId, DialogTree(), asm)
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), asm)
           .pause(Pause(seconds.seconds));
       return asm;
     }
@@ -599,7 +627,7 @@ ${dialog2.toAsm()}
     test('runs if-set events iff event flag is set', () {
       var eventAsm = EventAsm.empty();
 
-      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
         ..ifFlag(IfFlag(EventFlag('Test'), isSet: [Pause(1.second)]))
         ..finish();
 
@@ -617,7 +645,7 @@ ${dialog2.toAsm()}
     test('runs if-unset events iff event flag is unset', () {
       var eventAsm = EventAsm.empty();
 
-      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
         ..ifFlag(IfFlag(EventFlag('Test'), isUnset: [Pause(1.second)]))
         ..finish();
 
@@ -635,7 +663,7 @@ ${dialog2.toAsm()}
     test('runs if-set events iff set, and if-unset events iff unset', () {
       var eventAsm = EventAsm.empty();
 
-      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
         ..ifFlag(IfFlag(EventFlag('Test'),
             isUnset: [Pause(1.second)], isSet: [Pause(2.seconds)]))
         ..finish();
@@ -657,7 +685,7 @@ ${dialog2.toAsm()}
     test('nested conditionals skip impossible branches', () {
       var eventAsm = EventAsm.empty();
 
-      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
         ..ifFlag(IfFlag(EventFlag('Test'), isUnset: [
           IfFlag(EventFlag('Test'),
               isSet: [Pause(1.second)], isUnset: [Pause(2.second)])
@@ -685,7 +713,7 @@ ${dialog2.toAsm()}
     test('additional checks use different branch routines', () {
       var eventAsm = EventAsm.empty();
 
-      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
         ..ifFlag(IfFlag(EventFlag('Test'),
             isUnset: [Pause(1.second)], isSet: [Pause(2.seconds)]))
         ..ifFlag(IfFlag(EventFlag('Test'),
@@ -718,12 +746,12 @@ ${dialog2.toAsm()}
 
     test('dialog in branch terminates and clears saved dialog state', () {
       var eventAsm = EventAsm.empty();
-      var dialog = DialogTree();
+      var dialog = DialogTrees();
 
       var hello = DialogSpan.parse('Hello!');
       var greetings = DialogSpan.parse('Greetings!');
 
-      SceneAsmGenerator.forEvent(sceneId, dialog, eventAsm)
+      SceneAsmGenerator.forEvent(sceneId, dialog, eventAsm, startingMap: map)
         ..ifFlag(IfFlag(EventFlag('Test'), isSet: [Dialog(spans: hello)]))
         ..dialog(Dialog(spans: greetings))
         ..finish();
@@ -745,7 +773,7 @@ ${dialog2.toAsm()}
           ]).withoutComments());
 
       expect(
-          dialog.toAsm(),
+          dialog.forMap(map.id).toAsm(),
           containsAllInOrder(Asm([
             dc.b(hello[0].toAscii()),
             terminateDialog(),
@@ -758,7 +786,7 @@ ${dialog2.toAsm()}
       var eventAsm = EventAsm.empty();
 
       var generator =
-          SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+          SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
             ..setContext(
                 SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
             ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
@@ -787,7 +815,7 @@ ${dialog2.toAsm()}
     test('events use context from previous branched states', () {
       var eventAsm = EventAsm.empty();
 
-      SceneAsmGenerator.forEvent(sceneId, DialogTree(), eventAsm)
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
         ..setContext(
             SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
         ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
@@ -823,13 +851,13 @@ ${dialog2.toAsm()}
           spec: Npc(Sprite.PalmanOldMan1, WanderAround(Direction.down)));
       map.addObject(obj);
 
-      late DialogTree dialog;
+      late DialogTrees dialog;
       late EventAsm asm;
       late SceneAsmGenerator generator;
       late TestEventRoutines eventRoutines;
 
       setUp(() {
-        dialog = DialogTree();
+        dialog = DialogTrees();
         asm = EventAsm.empty();
         eventRoutines = TestEventRoutines();
       });
@@ -856,7 +884,7 @@ ${dialog2.toAsm()}
 
         expect(asm, isEmpty);
         expect(
-            dialog.toAsm().withoutComments().trim(),
+            dialog.forMap(map.id).toAsm().withoutComments().trim(),
             Asm([
               dc.b([Byte(0xFA)]),
               dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
@@ -885,7 +913,7 @@ ${dialog2.toAsm()}
 
         expect(asm, isEmpty);
         expect(
-            dialog.toAsm().withoutComments().trim(),
+            dialog.forMap(map.id).toAsm().withoutComments().trim(),
             Asm([
               dc.b([Byte(0xFA)]),
               dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
@@ -919,7 +947,7 @@ ${dialog2.toAsm()}
 
         expect(asm, isEmpty);
         expect(
-            dialog.toAsm().withoutComments().trim(),
+            dialog.forMap(map.id).toAsm().withoutComments().trim(),
             Asm([
               dc.b([Byte(0xFA)]),
               dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
@@ -954,7 +982,7 @@ ${dialog2.toAsm()}
 
         expect(asm, isEmpty);
         expect(
-            dialog.toAsm().withoutComments().trim(),
+            dialog.forMap(map.id).toAsm().withoutComments().trim(),
             Asm([
               dc.b([Byte(0xFA)]),
               dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
@@ -998,7 +1026,7 @@ ${dialog2.toAsm()}
 
         expect(asm, isEmpty);
         expect(
-            dialog.toAsm().withoutComments().trim(),
+            dialog.forMap(map.id).toAsm().withoutComments().trim(),
             Asm([
               dc.b([Byte(0xFA)]),
               dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
@@ -1043,7 +1071,7 @@ ${dialog2.toAsm()}
         expect(asm.withoutComments().firstOrNull?.toAsm(),
             setLabel('Event_GrandCross_interactflag1_set'));
         expect(
-            dialog.toAsm().withoutComments().trim(),
+            dialog.forMap(map.id).toAsm().withoutComments().trim(),
             Asm([
               dc.b([Byte(0xFA)]),
               dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
@@ -1080,7 +1108,7 @@ ${dialog2.toAsm()}
             returnFromDialog);
 
         expect(
-            dialog.toAsm().withoutComments().trim(),
+            dialog.forMap(map.id).toAsm().withoutComments().trim(),
             Asm([
               dc.b([Byte(0xFA)]),
               dc.b([Constant('EventFlag_flag1'), Byte(0x01)]),
@@ -1165,6 +1193,21 @@ ${dialog2.toAsm()}
       });
     });
   });
+}
+
+SetContext setContext(EventState? ctx) {
+  return SetContext((c) {
+    c.followLead = ctx?.followLead ?? c.followLead;
+    ctx?.positions.forEach((obj, pos) => c.positions[obj] = pos);
+  });
+}
+
+MapObject testObjectForScene(Scene scene, {String id = '0'}) {
+  return MapObject(
+      id: id,
+      startPosition: Position(0x200, 0x200),
+      spec: Npc(Sprite.PalmanWoman1,
+          WanderAround(Direction.down, onInteract: scene)));
 }
 
 extension EasyDuration on int {

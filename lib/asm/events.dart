@@ -1,5 +1,6 @@
 // ignore_for_file: constant_identifier_names
 
+import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/numbers.dart';
 
@@ -51,10 +52,23 @@ const curr_x_pos = Constant('curr_x_pos');
 const curr_y_pos = Constant('curr_y_pos');
 
 /// bitfield
-/// bit 0 = follow lead character
+/// bit 0 = follow lead character (set = false, clr = true)
 /// bit 1 = update movement order (X first, Y second or viceversa)
 /// bit 2 = lock camera
 const Char_Move_Flags = Constant('Char_Move_Flags');
+const Field_Map_Index = Constant('Field_Map_Index');
+const Field_Map_Index_2 = Constant('Field_Map_Index_2');
+const Map_Start_X_Pos = Constant('Map_Start_X_Pos');
+const Map_Start_Y_Pos = Constant('Map_Start_Y_Pos');
+const Map_Start_Facing_Dir = Constant('Map_Start_Facing_Dir');
+const Map_Start_Char_Align = Constant('Map_Start_Char_Align');
+
+/// alignment of the characters relative to the lead character
+/// 0 = Characters overlap
+/// 4 = Characters below lead character
+/// 8 = Characters above lead character
+/// $C = Characters on the left of lead character
+/// $10 = Characters on the right of lead character
 const Map_Load_Flags = Constant('Map_Load_Flags');
 
 // TODO: maybe parse from ASM in case these values change
@@ -442,6 +456,7 @@ Asm returnFromDialogEvent() {
   return Asm([
     move.w(0.toWord.i, Constant('Game_Mode_Routine').w),
     movea.l(Constant('Map_Chunk_Addr').w, a0),
+    // todo: tail call
     jsr(Label('Map_LoadChunks').l),
     rts,
   ]);
@@ -453,6 +468,14 @@ final popAndRunDialog = Asm([
   //clr.b(Label('Render_Sprites_In_Cutscenes').w),
   cmd('popdlg', []),
   jsr(Label('Event_RunDialogue').l),
+]);
+
+/// Use after F7 (see TextCtrlCode_Terminate2 and 3)
+final popAndRunDialog3 = Asm([
+  // appears around popdlg in one scene for some reason
+  //clr.b(Label('Render_Sprites_In_Cutscenes').w),
+  cmd('popdlg', []),
+  jsr(Label('Event_RunDialogue3').l),
 ]);
 
 /// [slot] is 1-indexed
@@ -565,6 +588,8 @@ Asm addCharacterToParty({
   required Address x,
   required Address y,
 }) {
+  checkArgument(1 <= slot && slot <= 5,
+      message: 'slot must be within 1-5 but was $slot');
   return Asm([
     move.b(charId, 'Current_Party_Slot_$slot'.toConstant.w),
     lea('Character_$slot'.toConstant.w, a4),
@@ -608,5 +633,38 @@ Asm refreshMap({bool refreshObjects = true}) {
     else
       bset(3.i, Map_Load_Flags.w),
     jsr(Label('RefreshMap').l)
+  ]);
+}
+
+Asm fadeOut({bool initVramAndCram = false}) {
+  return initVramAndCram
+      ?
+      // This calls PalFadeOut_ClrSpriteTbl
+      // which is what actually does the fade out,
+      // Then it clears plane A and VRAM completely,
+      // resets camera position,
+      // and resets palette
+      // It is used often in cutscenes but maybe does too much.
+      jsr(Label('InitVRAMAndCRAM').l)
+      : jsr(Label('PalFadeOut_ClrSpriteTbl').l);
+}
+
+Asm fadeIn() => jsr(Label('Pal_FadeIn').l);
+
+Asm changeMap(
+    {required Address to,
+    Address? from,
+    required Address startX,
+    required Address startY,
+    required Address facingDir,
+    required Address partyArrangement}) {
+  return Asm([
+    move.w(to, Field_Map_Index.w),
+    if (from != null) move.w(from, Field_Map_Index_2.w),
+    move.w(startX, Map_Start_X_Pos.w),
+    move.w(startY, Map_Start_Y_Pos.w),
+    move.w(facingDir, Map_Start_Facing_Dir.w),
+    move.w(partyArrangement, Map_Start_Char_Align.w),
+    refreshMap(refreshObjects: true),
   ]);
 }

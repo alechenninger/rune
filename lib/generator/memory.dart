@@ -2,6 +2,7 @@ import 'dart:collection';
 
 import '../asm/asm.dart';
 import '../model/model.dart';
+import 'generator.dart';
 
 abstract class StateChange<T> {
   T apply(Memory memory);
@@ -32,6 +33,7 @@ class AddressOf {
 class SystemState {
   final _inAddress = <DirectAddressRegister, AddressOf>{};
   bool _hasSavedDialogPosition = false;
+  DialogTree? _loadedDialogTree;
 
   void _putInAddress(DirectAddressRegister a, Object? obj) {
     if (obj == null) {
@@ -44,7 +46,8 @@ class SystemState {
   SystemState branch() {
     return SystemState()
       .._inAddress.addAll(_inAddress)
-      .._hasSavedDialogPosition = _hasSavedDialogPosition;
+      .._hasSavedDialogPosition = _hasSavedDialogPosition
+      .._loadedDialogTree = _loadedDialogTree;
   }
 }
 
@@ -78,6 +81,12 @@ class Memory implements EventState {
   /// [obj] should not be wrapped in [AddressOf].
   void putInAddress(DirectAddressRegister a, Object? obj) {
     _apply(PutInAddress(a, obj));
+  }
+
+  DialogTree? get loadedDialogTree => _sysState._loadedDialogTree;
+  set loadedDialogTree(DialogTree? tree) {
+    _apply(SetValue<DialogTree>(tree, (mem) => mem._sysState._loadedDialogTree,
+        (val, mem) => mem._sysState._loadedDialogTree = val));
   }
 
   @override

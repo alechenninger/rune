@@ -59,9 +59,13 @@ class Program {
   final _maps = <MapId, MapAsm>{};
   Map<MapId, MapAsm> get maps => UnmodifiableMapView(_maps);
 
+  final dialogTrees = DialogTrees();
+
   final Asm _eventPointers = Asm.empty();
   Asm get eventPointers => Asm([_eventPointers]);
+
   Word _eventIndexOffset;
+  Word get peekNextEventIndex => _eventIndexOffset;
 
   final Asm _cutscenesPointers = Asm.empty();
   Asm get cutscenesPointers => Asm([_cutscenesPointers]);
@@ -84,7 +88,7 @@ class Program {
   Word _addEventPointer(Label routine) {
     var eventIndex = _eventIndexOffset;
     _eventPointers.add(dc.l([routine], comment: '$eventIndex'));
-    _eventIndexOffset = (eventIndex.value + 1).toWord;
+    _eventIndexOffset = (_eventIndexOffset.value + 1).toWord;
     return eventIndex;
   }
 
@@ -98,10 +102,10 @@ class Program {
     return (cutsceneIndex + Word(0x8000)) as Word;
   }
 
-  SceneAsm addScene(SceneId id, Scene scene) {
-    var dialogTree = DialogTree();
+  SceneAsm addScene(SceneId id, Scene scene, {GameMap? startingMap}) {
     var eventAsm = EventAsm.empty();
-    var generator = SceneAsmGenerator.forEvent(id, dialogTree, eventAsm);
+    var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
+        startingMap: startingMap);
 
     for (var event in scene.events) {
       event.visit(generator);
@@ -109,14 +113,21 @@ class Program {
 
     generator.finish();
 
-    return _scenes[id] = SceneAsm(
-        event: eventAsm, dialogIdOffset: Byte(0), dialog: dialogTree.toList());
+    return _scenes[id] = SceneAsm(event: eventAsm);
   }
 
   MapAsm addMap(GameMap map) {
+    // trees are already written to, and we don't know which ones, and which
+    // branches
+    if (_maps.containsKey(map.id)) {
+      throw ArgumentError.value(
+          map.id.name, 'map', 'map with same id already added');
+    }
+
     var spriteVramOffset = _vramTileOffsets[map.id];
-    return _maps[map.id] =
-        compileMap(map, _ProgramEventRoutines(this), spriteVramOffset);
+    return _maps[map.id] = compileMap(
+        map, _ProgramEventRoutines(this), spriteVramOffset,
+        dialogTrees: dialogTrees);
   }
 }
 
@@ -141,11 +152,11 @@ class SceneAsmGenerator implements EventVisitor {
   final SceneId id;
 
   // Non-volatile state (state of the code being generated)
-  final DialogTree _dialogTree;
+  final DialogTrees _dialogTrees;
   final EventAsm _eventAsm;
   // required if processing interaction (see todo on ctor)
   EventRoutines? _eventRoutines;
-  final Byte _dialogIdOffset;
+  //final Byte _dialogIdOffset;
 
   Mode _gameMode = Mode.event;
   bool get inDialogLoop => _gameMode == Mode.dialog;
@@ -161,6 +172,7 @@ class SceneAsmGenerator implements EventVisitor {
   final FieldObject? _interactingWith;
   bool get _isProcessingInteraction => _interactingWith != null;
 
+  DialogTree? _dialogTree;
   Byte? _currentDialogId;
   DialogAsm? _currentDialog;
   var _lastEventBreak = -1;
@@ -180,9 +192,9 @@ class SceneAsmGenerator implements EventVisitor {
   final _stateGraph = <Condition, Memory>{};
 
   // todo: This might be a subclass really
-  SceneAsmGenerator.forInteraction(GameMap map, this.id, this._dialogTree,
+  SceneAsmGenerator.forInteraction(GameMap map, this.id, this._dialogTrees,
       this._eventAsm, EventRoutines eventRoutines)
-      : _dialogIdOffset = _dialogTree.nextDialogId!,
+      : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = const InteractionObject(),
         _eventRoutines = eventRoutines {
     _gameMode = Mode.dialog;
@@ -190,14 +202,20 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.putInAddress(a3, const InteractionObject());
     _memory.hasSavedDialogPosition = false;
     _memory.currentMap = map;
+    _memory.loadedDialogTree = _dialogTrees.forMap(map.id);
     _stateGraph[Condition.empty()] = _memory;
   }
 
-  SceneAsmGenerator.forEvent(this.id, this._dialogTree, this._eventAsm)
-      : _dialogIdOffset = _dialogTree.nextDialogId!,
+  SceneAsmGenerator.forEvent(this.id, this._dialogTrees, this._eventAsm,
+      {GameMap? startingMap})
+      : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = null,
         // FIXME: also parameterize eventtype so finish() does the right thing
         _eventType = EventType.event {
+    _memory.currentMap = startingMap;
+    if (startingMap != null) {
+      _memory.loadedDialogTree = _dialogTrees.forMap(startingMap.id);
+    }
     _gameMode = Mode.event;
     _stateGraph[Condition.empty()] = _memory;
   }
@@ -359,7 +377,7 @@ class SceneAsmGenerator implements EventVisitor {
   void displayText(DisplayText display) {
     _addToEvent(display, (i) {
       _terminateDialog();
-      var asm = textlib.displayTextToAsm(display, dialogTree: _dialogTree);
+      var asm = textlib.displayTextToAsm(display, _currentDialogTree());
       return asm.event;
     });
   }
@@ -461,7 +479,7 @@ class SceneAsmGenerator implements EventVisitor {
 
       var ifSet = DialogAsm.empty();
       var currentDialogId = _currentDialogIdOrStart();
-      var ifSetId = _dialogTree.add(ifSet);
+      var ifSetId = _currentDialogTree().add(ifSet);
       var ifSetOffset = ifSetId - currentDialogId as Byte;
 
       // memory may change while flag is set, so remember this to branch
@@ -615,20 +633,23 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(fadeOut, (eventIndex) {
       var wasFieldShown = _memory.isFieldShown;
       _memory.isFieldShown = false;
+      // todo: this logic is maybe wrong
+      // sometimes we fade out just to change a map
+      // so this logic is really like, "fade out for cutscene"
+      // that is, fade out for panels
+      // i guess it might work though because
+      // when fading back in, refreshmap preps cram and such
+      // perhaps it is an optimization to
+      // not be based on just whether the field was shown
+      // but based on later events
+      // e.g. if after fading out, we want to show a panel,
+      // the swap it to initvramandcram & fadein
       return wasFieldShown == true
           ? Asm([
-              // This calls PalFadeOut_ClrSpriteTbl
-              // which is what actually does the fade out,
-              // Then it clears plane A and VRAM completely,
-              // resets camera position,
-              // and resets palette
-              // It is used often in cutscenes but maybe does too much.
-              jsr(Label('InitVRAMAndCRAM').l),
-              // I think this just fades in the palette,
-              // using the values set from above.
-              jsr(Label('Pal_FadeIn').l),
+              asmeventslib.fadeOut(initVramAndCram: true),
+              asmeventslib.fadeIn(),
             ])
-          : jsr(Label('PalFadeOut_ClrSpriteTbl').l);
+          : asmeventslib.fadeOut(initVramAndCram: false);
     });
   }
 
@@ -735,11 +756,14 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void finish({bool appendNewline = false}) {
-    // todo: also applfinishy all changes for current mem across graph
+    // todo: also apply all changes for current mem across graph
     // not sure if still need to do this
+    // seems useless because memory won't ever be consulted again after
+    // finishing
+
     if (!_finished) {
       _finish(appendNewline: false);
-      _dialogTree.finish();
+      _dialogTree?.finish();
       _finished = true;
     }
 
@@ -1060,7 +1084,7 @@ class SceneAsmGenerator implements EventVisitor {
       _currentDialog = asm;
       _lastEventInCurrentDialog = lastEventForDialog;
     } else {
-      _currentDialogId = _dialogTree.nextDialogId;
+      _currentDialogId = null; // _dialogTree.nextDialogId;
       _currentDialog = null;
       _lastEventInCurrentDialog = null;
     }
@@ -1086,9 +1110,21 @@ class SceneAsmGenerator implements EventVisitor {
 
     if (_currentDialog == null) {
       _currentDialog = DialogAsm.empty();
-      _currentDialogId = _dialogTree.add(_currentDialog!);
+      _currentDialogId = _currentDialogTree().add(_currentDialog!);
     }
     return _currentDialog!.add(asm);
+  }
+
+  DialogTree _currentDialogTree() {
+    if (_dialogTree == null) {
+      var map = _memory.currentMap;
+      if (map == null) {
+        throw StateError('cannot load dialog tree; '
+            'there is no current map set');
+      }
+      _dialogTree = _dialogTrees.forMap(map.id);
+    }
+    return _dialogTree!;
   }
 
   void _addToEvent(Event event, Asm? Function(int eventIndex) generate) {
@@ -1215,6 +1251,16 @@ class DialogTree extends IterableBase<DialogAsm> {
   String toString() {
     return toAsm(ensureFinished: false).toString();
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DialogTree &&
+          runtimeType == other.runtimeType &&
+          const ListEquality().equals(_dialogs, other._dialogs);
+
+  @override
+  int get hashCode => const ListEquality().hash(_dialogs);
 }
 
 extension FramesPerSecond on Duration {
@@ -1269,6 +1315,34 @@ abstract class DialogTreeLookup {
   Future<DialogTree> byLabel(Label lbl);
 }
 
+// todo: unused, but consider adding to DialogTrees if needed
+final _defaultDialogs = <MapId, DialogTree>{};
+DialogTree _defaultDialogTree(MapId map) =>
+    _defaultDialogs[map] ?? DialogTree();
+
+class DialogTrees {
+  final _trees = <MapId?, DialogTree>{};
+
+  // note, in the original a tree is usually shared for multiple maps
+  // but i don't think it will really be a problem to separate more
+  DialogTree forMap(MapId map) => _trees.putIfAbsent(map, () => DialogTree());
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DialogTrees &&
+          runtimeType == other.runtimeType &&
+          const MapEquality().equals(_trees, other._trees);
+
+  @override
+  int get hashCode => const MapEquality().hash(_trees);
+
+  @override
+  String toString() {
+    return 'DialogTrees{_trees: ${_trees}}';
+  }
+}
+
 class TestDialogTreeLookup extends DialogTreeLookup {
   final _treeByLabel = <Label, DialogTree>{};
 
@@ -1279,7 +1353,8 @@ class TestDialogTreeLookup extends DialogTreeLookup {
   @override
   Future<DialogTree> byLabel(Label lbl) async {
     // wow what a hack :laugh:
-    return _treeByLabel[lbl] ?? (throw StateError('no such dialog tree: $lbl'));
+    return _treeByLabel[lbl] ??
+        (throw ArgumentError('no such dialog tree: $lbl'));
   }
 }
 
@@ -1292,6 +1367,7 @@ class TestDialogTreeLookup extends DialogTreeLookup {
 
 // generated via dart bin/macro.dart vram-tile-offsets | gsed -E 's/([^,]+),(.*)/Label('"'"'\1'"'"'): Word(\2),/'
 final Map<MapId, Word> _defaultSpriteVramOffsets = {
+  Label('Map_Test'): Word(0x2d0),
   Label('Map_Dezolis'): Word(0x39b),
   Label('Map_Piata'): Word(0x2d0),
   Label('Map_PiataAcademy'): Word(0x27f),

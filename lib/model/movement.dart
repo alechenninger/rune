@@ -19,6 +19,11 @@ class Steps implements Comparable<Steps> {
 
   int get toPixels => toInt * unitsPerStep;
 
+  Path get right => Path(this, Direction.right);
+  Path get left => Path(this, Direction.left);
+  Path get up => Path(this, Direction.up);
+  Path get down => Path(this, Direction.down);
+
   Steps min(Steps other) => math.min(toInt, other.toInt).steps;
   Steps max(Steps other) => math.max(toInt, other.toInt).steps;
 

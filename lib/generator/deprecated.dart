@@ -186,14 +186,6 @@ class AsmGenerator {
         scene);
   }
 
-  SceneAsm displayTextToAsm(DisplayText display, AsmContext ctx,
-      {DialogTree? dialogTree}) {
-    return _wrapException(
-        () => text.displayTextToAsm(display, dialogTree: dialogTree),
-        ctx,
-        display);
-  }
-
   DialogAsm dialogToAsm(Dialog dialog) {
     return _wrapException(() => dialog.toAsm(), null, dialog);
   }

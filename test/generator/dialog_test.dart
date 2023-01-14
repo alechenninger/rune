@@ -54,16 +54,21 @@ void main() {
   });
 
   group('sets portrait control codes', () {
+    late DialogTrees dialogTrees;
     late DialogTree dialogTree;
     late EventAsm eventAsm;
+    late GameMap map;
 
     setUp(() {
-      dialogTree = DialogTree();
+      dialogTrees = DialogTrees();
       eventAsm = EventAsm.empty();
+      map = GameMap(MapId.Test);
+      dialogTree = dialogTrees.forMap(MapId.Test);
     });
 
     test('only when not already displayed', () {
-      SceneAsmGenerator.forEvent(SceneId('test'), dialogTree, eventAsm)
+      SceneAsmGenerator.forEvent(SceneId('test'), dialogTrees, eventAsm,
+          startingMap: map)
         ..dialog(Dialog(speaker: alys, spans: DialogSpan.parse('Hello')))
         ..dialog(Dialog(speaker: alys, spans: DialogSpan.parse('Hello')))
         ..finish();
@@ -82,7 +87,8 @@ void main() {
     });
 
     test('for new speakers', () {
-      SceneAsmGenerator.forEvent(SceneId('test'), dialogTree, eventAsm)
+      SceneAsmGenerator.forEvent(SceneId('test'), dialogTrees, eventAsm,
+          startingMap: map)
         ..dialog(Dialog(speaker: alys, spans: DialogSpan.parse('Hello')))
         ..dialog(Dialog(speaker: shay, spans: DialogSpan.parse('Hello')))
         ..finish();
@@ -102,7 +108,8 @@ void main() {
     });
 
     test('for unnamed speakers', () {
-      SceneAsmGenerator.forEvent(SceneId('test'), dialogTree, eventAsm)
+      SceneAsmGenerator.forEvent(SceneId('test'), dialogTrees, eventAsm,
+          startingMap: map)
         ..dialog(Dialog(spans: DialogSpan.parse('Hello')))
         ..dialog(Dialog(spans: DialogSpan.parse('Hello')))
         ..finish();

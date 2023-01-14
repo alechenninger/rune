@@ -19,12 +19,7 @@ const _perCharacter = 0x2;
 const _perPaletteLine = 0x2000;
 const _maxPosition = _topLeft + _perLineOffset * 27; // last you can fit is * 26
 
-SceneAsm displayTextToAsm(DisplayText display, {DialogTree? dialogTree}) {
-  var tree = dialogTree ?? DialogTree();
-  return _displayTextToAsm(display, tree);
-}
-
-SceneAsm _displayTextToAsm(DisplayText display, DialogTree dialogTree) {
+SceneAsm displayTextToAsm(DisplayText display, DialogTree dialogTree) {
   var newDialogs = <DialogAsm>[];
   // todo: handle hitting max trees!
   var currentDialogId = dialogTree.nextDialogId!,
@@ -136,9 +131,7 @@ SceneAsm _displayTextToAsm(DisplayText display, DialogTree dialogTree) {
 
   eventAsm.add(fadeRoutines);
   eventAsm.add(setLabel(done));
-
-  return SceneAsm(
-      event: eventAsm, dialogIdOffset: dialogIdOffset, dialog: newDialogs);
+  return SceneAsm(event: eventAsm);
 }
 
 void _clearSet(_GroupCursor group, _VramTileRanges vramTileRanges,

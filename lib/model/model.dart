@@ -114,6 +114,7 @@ abstract class EventVisitor {
   void hideAllPanels(HideAllPanels hidePanels);
   void fadeOut(FadeOut fadeOut);
   void fadeInField(FadeInField fadeIn);
+  //void changeMap(ChangeMap changeMap);
   void playSound(PlaySound playSound);
 }
 
@@ -198,7 +199,7 @@ class Positions {
     _positions.addAll(p._positions);
   }
 
-  void forEach(Function(FieldObject, Position) func) {
+  void forEach(Function(FieldObject obj, Position pos) func) {
     _positions.forEach(func);
   }
 
@@ -472,6 +473,34 @@ class UnlockCamera extends Event {
   @override
   String toString() {
     return 'UnlockCamera{}';
+  }
+}
+
+class ChangeMap extends Event {
+  final MapId map;
+  final bool showField;
+
+  ChangeMap(this.map, {this.showField = false});
+
+  @override
+  void visit(EventVisitor visitor) {
+    //visitor.changeMap(this);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChangeMap &&
+          runtimeType == other.runtimeType &&
+          map == other.map &&
+          showField == other.showField;
+
+  @override
+  int get hashCode => map.hashCode ^ showField.hashCode;
+
+  @override
+  String toString() {
+    return 'ChangeMap{map: $map, showField: $showField}';
   }
 }
 

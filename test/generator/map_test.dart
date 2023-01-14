@@ -321,7 +321,7 @@ void main() {
           ]),
           onInteractFacePlayer: false));
 
-      var mapAsm = program.addMap(testMap);
+      var mapAsm = Program().addMap(testMap);
 
       expect(
           mapAsm.dialog,
@@ -371,23 +371,23 @@ void main() {
     test('trigger scenes from dialog interactions', () {
       var mapAsm = program.addMap(testMap);
 
-      var comparisonDialogTree = DialogTree();
+      var comparisonDialogTrees = DialogTrees();
       var comparisonEventAsm = EventAsm.empty();
 
       SceneAsmGenerator.forInteraction(testMap, SceneId('Test_npc1'),
-          comparisonDialogTree, comparisonEventAsm, testEventRoutines)
+          comparisonDialogTrees, comparisonEventAsm, testEventRoutines)
         ..runEventFromInteraction()
         ..scene(npc1.onInteract)
         ..finish(appendNewline: true);
 
       SceneAsmGenerator.forInteraction(testMap, SceneId('Test_npc2'),
-          comparisonDialogTree, comparisonEventAsm, testEventRoutines)
+          comparisonDialogTrees, comparisonEventAsm, testEventRoutines)
         ..runEventFromInteraction()
         ..scene(npc2.onInteract)
         ..finish(appendNewline: true);
 
       expect(mapAsm.events, comparisonEventAsm);
-      expect(mapAsm.dialog, comparisonDialogTree.toAsm());
+      expect(program.dialogTrees, comparisonDialogTrees);
     });
 
     test('produce event pointers', () {
