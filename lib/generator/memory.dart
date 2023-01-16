@@ -92,6 +92,7 @@ class Memory implements EventState {
     _apply(PutInAddress(a, obj));
   }
 
+  // todo: maybe not actually needed?
   DialogTree? get loadedDialogTree => _sysState._loadedDialogTree;
   set loadedDialogTree(DialogTree? tree) {
     _apply(SetValue<DialogTree>(tree, (mem) => mem._sysState._loadedDialogTree,

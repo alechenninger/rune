@@ -68,7 +68,7 @@ class Game {
 
   void addMap(GameMap map) => _maps[map.id] = map;
 
-  void addMaps(List<GameMap> maps) => maps.forEach(addMap);
+  void addMaps(Iterable<GameMap> maps) => maps.forEach(addMap);
 }
 
 // todo: use sealed type once supported in dart
@@ -493,9 +493,9 @@ class LoadMap extends Event {
       {required this.map,
       required this.startingPosition,
       required this.facing,
-      this.arrangement = PartyArrangement.overlapping,
-      this.showField = false});
-  //: arrangement = arrangement ?? PartyArrangement.behind(facing);
+      PartyArrangement? arrangement,
+      this.showField = false})
+      : arrangement = arrangement ?? PartyArrangement.overlapping;
 
   @override
   void visit(EventVisitor visitor) {

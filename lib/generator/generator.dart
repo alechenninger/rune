@@ -1209,7 +1209,7 @@ class SceneAsmGenerator implements EventVisitor {
       var map = _memory.currentMap;
       if (map == null) {
         throw StateError('cannot load dialog tree; '
-            'there is no current map set');
+            'current map is unknown');
       }
       _dialogTree = _dialogTrees.forMap(map.id);
     }
