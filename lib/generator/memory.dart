@@ -34,6 +34,14 @@ class SystemState {
   final _inAddress = <DirectAddressRegister, AddressOf>{};
   bool _hasSavedDialogPosition = false;
   DialogTree? _loadedDialogTree;
+  bool? _isMapInVram = true;
+  bool? _isMapInCram = true;
+  bool? _displayEnabled = true;
+
+  void _refreshMap(MapId map, DialogTrees trees) {
+    _loadedDialogTree = trees.forMap(map);
+    //_loadedMapPalette = map;
+  }
 
   void _putInAddress(DirectAddressRegister a, Object? obj) {
     if (obj == null) {
@@ -43,12 +51,13 @@ class SystemState {
     }
   }
 
-  SystemState branch() {
-    return SystemState()
-      .._inAddress.addAll(_inAddress)
-      .._hasSavedDialogPosition = _hasSavedDialogPosition
-      .._loadedDialogTree = _loadedDialogTree;
-  }
+  SystemState branch() => SystemState()
+    .._inAddress.addAll(_inAddress)
+    .._hasSavedDialogPosition = _hasSavedDialogPosition
+    .._loadedDialogTree = _loadedDialogTree
+    .._isMapInCram = _isMapInCram
+    .._isMapInVram = _isMapInVram
+    .._displayEnabled = _displayEnabled;
 }
 
 class Memory implements EventState {
@@ -87,6 +96,24 @@ class Memory implements EventState {
   set loadedDialogTree(DialogTree? tree) {
     _apply(SetValue<DialogTree>(tree, (mem) => mem._sysState._loadedDialogTree,
         (val, mem) => mem._sysState._loadedDialogTree = val));
+  }
+
+  bool? get isMapInCram => _sysState._isMapInCram;
+  set isMapInCram(bool? flag) {
+    _apply(SetValue<bool>(flag, (mem) => mem._sysState._isMapInCram,
+        (val, mem) => mem._sysState._isMapInCram = val));
+  }
+
+  bool? get isMapInVram => _sysState._isMapInVram;
+  set isMapInVram(bool? flag) {
+    _apply(SetValue<bool>(flag, (mem) => mem._sysState._isMapInVram,
+        (val, mem) => mem._sysState._isMapInVram = val));
+  }
+
+  bool? get isDisplayEnabled => _sysState._displayEnabled;
+  set isDisplayEnabled(bool? flag) {
+    _apply(SetValue<bool>(flag, (mem) => mem._sysState._displayEnabled,
+        (val, mem) => mem._sysState._displayEnabled = val));
   }
 
   @override

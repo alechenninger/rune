@@ -114,7 +114,7 @@ abstract class EventVisitor {
   void hideAllPanels(HideAllPanels hidePanels);
   void fadeOut(FadeOut fadeOut);
   void fadeInField(FadeInField fadeIn);
-  //void changeMap(ChangeMap changeMap);
+  void loadMap(LoadMap changeMap);
   void playSound(PlaySound playSound);
 }
 
@@ -476,21 +476,36 @@ class UnlockCamera extends Event {
   }
 }
 
-class ChangeMap extends Event {
-  final MapId map;
+class LoadMap extends Event {
+  // todo: should not be map, should be map id
+  //   map might not actually even be in the same game model
+  final GameMap map;
+  final Position startingPosition;
+  final Direction facing;
+  final PartyArrangement arrangement;
+
+  /// This controls whether the field stays faded (`false`),
+  /// allowing a fade in event,
+  /// or if this event should immediately render the updated field (`true`).
   final bool showField;
 
-  ChangeMap(this.map, {this.showField = false});
+  LoadMap(
+      {required this.map,
+      required this.startingPosition,
+      required this.facing,
+      this.arrangement = PartyArrangement.overlapping,
+      this.showField = false});
+  //: arrangement = arrangement ?? PartyArrangement.behind(facing);
 
   @override
   void visit(EventVisitor visitor) {
-    //visitor.changeMap(this);
+    visitor.loadMap(this);
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ChangeMap &&
+      other is LoadMap &&
           runtimeType == other.runtimeType &&
           map == other.map &&
           showField == other.showField;
@@ -500,7 +515,7 @@ class ChangeMap extends Event {
 
   @override
   String toString() {
-    return 'ChangeMap{map: $map, showField: $showField}';
+    return 'LoadMap{map: $map, showField: $showField}';
   }
 }
 

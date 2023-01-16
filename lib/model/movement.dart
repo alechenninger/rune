@@ -949,3 +949,25 @@ enum StepSpeed {
 
   static StepSpeed normal() => fast;
 }
+
+enum PartyArrangement {
+  overlapping,
+  belowLead,
+  aboveLead,
+  leftOfLead,
+  rightOfLead;
+
+  static PartyArrangement behind(Direction facing) {
+    switch (facing) {
+      case up:
+        return belowLead;
+      case down:
+        return aboveLead;
+      case left:
+        return rightOfLead;
+      case right:
+        return leftOfLead;
+    }
+    throw UnimplementedError('unimplemented facing: $facing');
+  }
+}

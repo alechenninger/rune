@@ -302,6 +302,7 @@ abstract class Instruction {
   String? get comment;
   bool get isEmpty => toString().isEmpty;
   bool get isNotEmpty => toString().isNotEmpty;
+  bool get isCommentOnly => cmd == null && label == null && comment != null;
 
   Instruction withoutComment();
 

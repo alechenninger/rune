@@ -61,7 +61,6 @@ const Field_Map_Index_2 = Constant('Field_Map_Index_2');
 const Map_Start_X_Pos = Constant('Map_Start_X_Pos');
 const Map_Start_Y_Pos = Constant('Map_Start_Y_Pos');
 const Map_Start_Facing_Dir = Constant('Map_Start_Facing_Dir');
-const Map_Start_Char_Align = Constant('Map_Start_Char_Align');
 
 /// alignment of the characters relative to the lead character
 /// 0 = Characters overlap
@@ -69,6 +68,7 @@ const Map_Start_Char_Align = Constant('Map_Start_Char_Align');
 /// 8 = Characters above lead character
 /// $C = Characters on the left of lead character
 /// $10 = Characters on the right of lead character
+const Map_Start_Char_Align = Constant('Map_Start_Char_Align');
 const Map_Load_Flags = Constant('Map_Load_Flags');
 
 // TODO: maybe parse from ASM in case these values change

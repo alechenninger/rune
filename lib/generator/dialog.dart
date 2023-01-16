@@ -28,6 +28,11 @@ class DialogAsm extends Asm {
 
   DialogTree splitToTree() => DialogTree()..addAll(split());
 
+  @override
+  DialogAsm withoutComments() {
+    return DialogAsm([super.withoutComments()]);
+  }
+
   /// If the ASM contains multiple dialogs, split each into their own element.
   ///
   /// A dialog must be terminated for it to be considered.

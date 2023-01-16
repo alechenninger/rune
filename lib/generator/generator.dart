@@ -23,6 +23,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:rune/src/null.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -180,6 +181,7 @@ class SceneAsmGenerator implements EventVisitor {
   var _eventCounter = 1;
   var _finished = false;
   Function([int? dialogRoutine])? _replaceDialogRoutine;
+  //var _lastFadeOut = -1;
 
   // conditional runtime state
   /// For currently generating branch, what is the known state of event flags
@@ -354,7 +356,6 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _addToDialog(asmdialoglib.runEvent(eventIndex));
-    _memory.dialogPortrait = UnnamedSpeaker();
     _eventType = type;
 
     _terminateDialog();
@@ -615,14 +616,20 @@ class SceneAsmGenerator implements EventVisitor {
 
     _addToEvent(fadeIn, (eventIndex) {
       var wasFieldShown = _memory.isFieldShown;
+      var needsRefresh =
+          _memory.isMapInCram != true || _memory.isMapInVram != true;
+
       _memory.isFieldShown = true;
+      _memory.isMapInVram = true;
+      _memory.isMapInCram = true;
+
       return Asm([
         if (wasFieldShown == false && (_memory.panelsShown ?? 0) > 0)
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
-        // Appears to have the same effect as
-        // bset 2 flag in LoadFieldMap
-        // which skips reloading of secondary objects
-        refreshMap(refreshObjects: false),
+        // I guess we assume map was the same as before
+        // so no need to reload secondary objects
+        // LoadMap events take care of that
+        if (needsRefresh) refreshMap(refreshObjects: false),
         jsr(Label('Pal_FadeIn').l)
       ]);
     });
@@ -631,9 +638,16 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void fadeOut(FadeOut fadeOut) {
     _addToEvent(fadeOut, (eventIndex) {
-      var wasFieldShown = _memory.isFieldShown;
       _memory.isFieldShown = false;
-      // todo: this logic is maybe wrong
+      _memory.isMapInCram = false;
+      _memory.isDisplayEnabled = false;
+
+      // map vram untouched.
+      // if we fade back in, though,
+      // we'd need to either clear vram (via initvramandcram)
+      // or set cram via refreshmap
+
+      // notes about old logic:
       // sometimes we fade out just to change a map
       // so this logic is really like, "fade out for cutscene"
       // that is, fade out for panels
@@ -644,13 +658,74 @@ class SceneAsmGenerator implements EventVisitor {
       // but based on later events
       // e.g. if after fading out, we want to show a panel,
       // the swap it to initvramandcram & fadein
-      return wasFieldShown == true
-          ? Asm([
-              asmeventslib.fadeOut(initVramAndCram: true),
-              asmeventslib.fadeIn(),
-            ])
-          : asmeventslib.fadeOut(initVramAndCram: false);
+
+      //_lastFadeOut =
+      _eventAsm.add(asmeventslib.fadeOut(initVramAndCram: false));
+
+      return null;
     });
+  }
+
+  @override
+  void loadMap(LoadMap loadMap) {
+    _checkNotFinished();
+
+    var currentMap = _memory.currentMap;
+    var newMap = loadMap.map;
+
+    var currentId = currentMap?.map((m) => _asmMapIdOf(m.id));
+    var newId = _asmMapIdOf(newMap.id);
+    var x = loadMap.startingPosition.x ~/ 8;
+    var y = loadMap.startingPosition.y ~/ 8;
+    var facing = loadMap.facing.constant;
+    var alignByte = loadMap.arrangement.map((a) {
+      switch (a) {
+        case PartyArrangement.overlapping:
+          return 0;
+        case PartyArrangement.belowLead:
+          return 4;
+        case PartyArrangement.aboveLead:
+          return 8;
+        case PartyArrangement.leftOfLead:
+          return 0xC;
+        case PartyArrangement.rightOfLead:
+          return 0x10;
+      }
+    });
+
+    _addToEvent(loadMap, (eventIndex) {
+      if (loadMap.showField) {
+        if (_memory.isDisplayEnabled == false) {
+          if (_memory.isMapInCram != false) {
+            _eventAsm.add(asmeventslib.fadeOut());
+            _memory.isMapInCram = false;
+          }
+          _eventAsm.add(jsr(Label('Pal_FadeIn').l));
+          _eventAsm.add(jsr(Label('VInt_Prepare').l));
+          _memory.isDisplayEnabled = true;
+        }
+      }
+
+      return asmeventslib.changeMap(
+          to: newId.i,
+          from: currentId?.i,
+          startX: x.i,
+          startY: y.i,
+          facingDir: facing.i,
+          partyArrangement: alignByte.i);
+    });
+
+    _terminateDialog();
+
+    _memory.currentMap = newMap;
+    // todo: wondering if these should automatically be set by virtue of
+    //   setting current map
+
+    _dialogTree = _dialogTrees.forMap(newMap.id);
+    _memory.loadedDialogTree = _dialogTree;
+    _memory.hasSavedDialogPosition = false;
+    _memory.isMapInCram = true;
+    _memory.isMapInVram = true;
   }
 
   @override
@@ -672,6 +747,15 @@ class SceneAsmGenerator implements EventVisitor {
     } else {
       _addToEvent(showPanel, (_) {
         _memory.addPanel();
+
+        if (_memory.isDisplayEnabled == false) {
+          if (_memory.isMapInVram == true) {
+            _initVramAndCram();
+          }
+          _eventAsm.add(jsr(Label('Pal_FadeIn').l));
+          _memory.isDisplayEnabled = true;
+        }
+
         return Asm([
           move.w(index.toWord.i, d0),
           jsr('Panel_Create'.toLabel.l),
@@ -776,40 +860,35 @@ class SceneAsmGenerator implements EventVisitor {
     if (_inEvent) {
       if (_isProcessingInteraction) {
         if (_eventType == EventType.cutscene) {
-          var reload = _memory.isFieldShown == false;
+          var reload = _memory.isFieldShown != true;
           // clears z bit so we don't reload the map from cutscene
           _eventAsm.add(moveq(reload ? 0.i : 1.i, d0));
           _eventAsm.add(rts);
-          if (reload && _replaceDialogRoutine != null) {
-            // dialog 5 will fade out the whole screen
-            // before map reload happens
-            // (destroy window -> fade out -> destroy panels)
-            _replaceDialogRoutine!(5);
-            // todo: but what if there isn't dialog?
-            //  do we need to do palfadout?
+          if (reload) {
+            if (_replaceDialogRoutine != null) {
+              // dialog 5 will fade out the whole screen
+              // before map reload happens
+              // (destroy window -> fade out -> destroy panels)
+              _replaceDialogRoutine!(5);
+            } else {
+              // todo: but what if there isn't dialog?
+              //  do we need to do palfadout?
+              // doesn't usually happen
+              // but might i think depending on conditional logic
+              throw UnimplementedError('need to reload during cutscene '
+                  'but no dialog');
+            }
           }
         } else {
+          if (_memory.isFieldShown != true) {
+            fadeInField(FadeInField());
+          }
           _eventAsm.add(returnFromDialogEvent());
         }
       } else {
-        /*
-        hacky workaround for reloading dialog tree back to map tree
-        for now this is commented out and just handling it in the asm itself,
-        since that is where we load the tree also.
-
-        in order to detect if needed we'd have to know:
-         - current map at all times
-         - dialog tree in ram at all times
-        this is not all that hard but maybe there is an easier way
-
-        for example could we just reuse map dialog trees at this point?
-        the starting scene, though, has no map loaded at that point that i can
-        tell. more importantly perhaps, it would require tracking map updates
-        in events and the ability to switch dialog trees in the generator itself
-        which currently assumes only a single tree per scene. this might
-        however be a problem even with interactions.
-         */
-        //_eventAsm.add(refreshMap(refreshObjects: false));
+        if (_memory.isFieldShown != true) {
+          fadeInField(FadeInField());
+        }
       }
     }
 
@@ -985,10 +1064,18 @@ class SceneAsmGenerator implements EventVisitor {
     // todo if null, have to check somehow?
     // todo: not sure if this is right
     if (_memory.isFieldShown == false) {
-      // fake a cutscene ... hehehe
-      // todo: save in model of ram to prevent unnecessary repetition
-      // todo: but does this break saving?
-      // _eventAsm.add(bset(7.i, Constant('Event_Index').w));
+      if (_memory.isDisplayEnabled == false) {
+        // if cram cleared but vram not,
+        // fading in will cause artifacts
+        // otherwise, fade in may fade in map,
+        // but consider this intentional
+        if (_memory.isMapInVram == true && _memory.isMapInCram == false) {
+          _initVramAndCram();
+        }
+        _eventAsm.add(jsr(Label('Pal_FadeIn').l));
+        _memory.isDisplayEnabled = true;
+      }
+
       _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
     }
 
@@ -1069,6 +1156,8 @@ class SceneAsmGenerator implements EventVisitor {
       throw StateError('ending interaction without event cannot keep panels, '
           'but hidePanels == false');
     }
+
+    _memory.dialogPortrait = UnnamedSpeaker();
 
     _resetCurrentDialog();
   }
@@ -1162,6 +1251,42 @@ class SceneAsmGenerator implements EventVisitor {
 
     _lastEventInCurrentDialog = event;
   }
+
+  void _initVramAndCram() {
+    if (_memory.isDisplayEnabled != false) {
+      // doesn't hurt if we do this while already disabled i guess
+      _eventAsm.add(asmeventslib.fadeOut(initVramAndCram: true));
+      _memory.isDisplayEnabled = false;
+    } else {
+      // var lastFadeOut = _lastFadeOut;
+      // if (lastFadeOut == -1) {
+      var last = _lastLineIfFadeOut(_eventAsm);
+      if (last != null) {
+        _eventAsm.replace(last, asmeventslib.fadeOut(initVramAndCram: true));
+      } else {
+        _eventAsm.add(jsr(Label('InitVRAMAndCRAMAfterFadeOut').l));
+      }
+      // } else {
+      //   _eventAsm.replace(
+      //       lastFadeOut, asmeventslib.fadeOut(initVramAndCram: true));
+      // }
+    }
+    _memory.isMapInCram = false;
+    _memory.isMapInVram = false;
+    _memory.isFieldShown = false;
+  }
+}
+
+int? _lastLineIfFadeOut(Asm asm) {
+  for (var i = asm.lines.length - 1; i >= 0; --i) {
+    var line = asm.lines[i];
+    if (line.isCommentOnly) continue;
+    if (line == asmeventslib.fadeOut(initVramAndCram: false).first) {
+      return i;
+    }
+    break;
+  }
+  return null;
 }
 
 enum Mode { dialog, event }
@@ -1239,6 +1364,11 @@ class DialogTree extends IterableBase<DialogAsm> {
     }
 
     return all;
+  }
+
+  DialogTree withoutComments() {
+    return DialogTree()
+      .._dialogs.addAll(_dialogs.map((e) => e.withoutComments()));
   }
 
   @override
@@ -1327,6 +1457,12 @@ class DialogTrees {
   // but i don't think it will really be a problem to separate more
   DialogTree forMap(MapId map) => _trees.putIfAbsent(map, () => DialogTree());
 
+  DialogTrees withoutComments() {
+    return DialogTrees()
+      .._trees.addAll(
+          _trees.map((key, value) => MapEntry(key, value.withoutComments())));
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1339,7 +1475,7 @@ class DialogTrees {
 
   @override
   String toString() {
-    return 'DialogTrees{_trees: ${_trees}}';
+    return 'DialogTrees{_trees: $_trees}';
   }
 }
 
@@ -1355,6 +1491,25 @@ class TestDialogTreeLookup extends DialogTreeLookup {
     // wow what a hack :laugh:
     return _treeByLabel[lbl] ??
         (throw ArgumentError('no such dialog tree: $lbl'));
+  }
+}
+
+Constant _asmMapIdOf(MapId map) {
+  switch (map) {
+    case MapId.ShayHouse:
+      return Constant('MapID_ChazHouse');
+    case MapId.PiataAcademyF1:
+      return Constant('MapID_PiataAcademy_F1');
+    case MapId.PiataAcademyPrincipalOffice:
+      return Constant('MapID_AcademyPrincipalOffice');
+    case MapId.PiataAcademyBasement:
+      return Constant('MapID_AcademyBasement');
+    case MapId.PiataAcademyBasementB1:
+      return Constant('MapID_AcademyBasement_B1');
+    case MapId.PiataAcademyBasementB2:
+      return Constant('MapID_AcademyBasement_B2');
+    default:
+      return Constant('MapID_${map.name}');
   }
 }
 
