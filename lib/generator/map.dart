@@ -34,6 +34,13 @@ class MapAsm {
     required this.cutscenes,
   });
 
+  MapAsm.empty()
+      : sprites = Asm.empty(),
+        objects = Asm.empty(),
+        dialog = Asm.empty(),
+        events = Asm.empty(),
+        cutscenes = Asm.empty();
+
   @override
   String toString() {
     return [
@@ -41,8 +48,6 @@ class MapAsm {
       sprites,
       '; objects',
       objects,
-      '; dialog',
-      dialog,
       '; events',
       events,
       '; cutscenes',
@@ -491,11 +496,12 @@ List<String> preprocessMapToRaw(Asm original,
   // on maps there are 2 labels before dialog,
   // except on motavia and dezolis
   // (this is simply hard coded based on map IDs)
-  if (!const ['Map_Motavia' 'Map_Dezolis'].contains(map.name)) {
+  if (!const ['Map_Motavia', 'Map_Dezolis'].contains(map.name)) {
     defineConstants([reader.readLabel(), reader.readLabel()]);
-    // skip actual label
-    reader.readLabel();
   }
+
+  // skip actual label
+  reader.readLabel();
 
   addComment('Dialog address');
   // replace dialog label

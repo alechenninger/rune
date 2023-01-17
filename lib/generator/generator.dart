@@ -130,6 +130,13 @@ class Program {
         map, _ProgramEventRoutines(this), spriteVramOffset,
         dialogTrees: dialogTrees);
   }
+
+  /// DialogTrees for maps which are not added to the game.
+  Map<MapId?, DialogTree> extraDialogTrees() {
+    var extras = dialogTrees.toMap();
+    extras.removeWhere((key, _) => _maps.containsKey(key));
+    return extras;
+  }
 }
 
 abstract class EventRoutines {
@@ -1456,6 +1463,8 @@ class DialogTrees {
   // note, in the original a tree is usually shared for multiple maps
   // but i don't think it will really be a problem to separate more
   DialogTree forMap(MapId map) => _trees.putIfAbsent(map, () => DialogTree());
+
+  Map<MapId?, DialogTree> toMap() => Map.of(_trees);
 
   DialogTrees withoutComments() {
     return DialogTrees()
