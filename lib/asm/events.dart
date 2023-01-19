@@ -71,14 +71,7 @@ const Map_Start_Facing_Dir = Constant('Map_Start_Facing_Dir');
 const Map_Start_Char_Align = Constant('Map_Start_Char_Align');
 const Map_Load_Flags = Constant('Map_Load_Flags');
 
-// TODO: maybe parse from ASM in case these values change
-// but unlikely we'll change since referred to without constants in ASM
-// or change to constants in ASM?
-// that would be a pain
-// TODO: will need this for custom event flags, so we know what index
-// to set for them – only about 20 remaining :(, though not always continuous
-// based on memory space available i think we can squeeze out more?
-final eventFlags = BiMap<Constant, Value>()
+final eventFlags = BiMap<Constant, Byte>()
   ..addAll({
     Constant('EventFlag_PiataFirstTime'):
         Byte(7), // Set when Chaz is alone in Piata at the start of the game

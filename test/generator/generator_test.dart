@@ -2,6 +2,7 @@ import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
@@ -260,5 +261,24 @@ main() {
           dc.b([Byte(0xff)]),
         ]));
     expect(program.dialogTrees.withoutComments(), expectedTrees);
+  });
+
+  test('custom event flags produce constants', () {
+    var program = Program();
+    program.addScene(SceneId('test'), Scene([SetFlag(EventFlag('Test000'))]),
+        startingMap: map);
+    program.addMap(map
+      ..addObject(MapObject(
+          startPosition: Position(0x100, 0x100),
+          spec: Npc(
+              Sprite.PalmanWoman1,
+              FaceDown(
+                  onInteract: Scene([
+                IfFlag(EventFlag('Test001'),
+                    isSet: [Pause(Duration(seconds: 1))])
+              ]))))));
+
+    expect(program.extraConstants(), Asm.fromRaw(r'''EventFlag_Test000 = $00 
+EventFlag_Test001 = $01'''));
   });
 }

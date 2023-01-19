@@ -190,7 +190,8 @@ class FieldRoutine {
 
 MapAsm compileMap(
     GameMap map, EventRoutines eventRoutines, Word? spriteVramOffset,
-    {required DialogTrees dialogTrees}) {
+    {required DialogTrees dialogTrees,
+    EventFlags eventFlags = const EventFlagConstants()}) {
   var trees = dialogTrees;
   var spritesAsm = Asm.empty();
   var objectsAsm = Asm.empty();
@@ -219,7 +220,8 @@ MapAsm compileMap(
             SceneId('${map.id.name}_${obj.id}'),
             trees,
             eventsAsm,
-            eventRoutines));
+            eventRoutines,
+            eventFlags));
     var tileNumber = objectsTileNumbers[obj.id] ?? Word(0);
     _compileMapObjectData(objectsAsm, obj, tileNumber, dialogId);
   }
@@ -317,16 +319,23 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   return objectTiles;
 }
 
-Byte _compileInteractionScene(GameMap map, Scene scene, SceneId id,
-    DialogTrees trees, EventAsm asm, EventRoutines eventRoutines) {
+Byte _compileInteractionScene(
+    GameMap map,
+    Scene scene,
+    SceneId id,
+    DialogTrees trees,
+    EventAsm asm,
+    EventRoutines eventRoutines,
+    EventFlags eventFlags) {
   var events = scene.events;
 
   // todo: handle max
   var tree = trees.forMap(map.id);
   var dialogId = tree.nextDialogId!;
 
-  SceneAsmGenerator generator =
-      SceneAsmGenerator.forInteraction(map, id, trees, asm, eventRoutines);
+  SceneAsmGenerator generator = SceneAsmGenerator.forInteraction(
+      map, id, trees, asm, eventRoutines,
+      eventFlags: eventFlags);
 
   generator.runEventFromInteractionIfNeeded(events);
 

@@ -550,6 +550,7 @@ class IfSetState extends DialogState {
 }
 
 // todo: relies on constant globals. fine?
+// See EventFlags interface, might be able to move this here
 EventFlag toEventFlag(Expression byte) {
   var constant = eventFlags.inverse[byte];
   if (constant == null) {

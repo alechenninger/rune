@@ -23,6 +23,8 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:quiver/collection.dart';
+import 'package:rune/src/iterables.dart';
 import 'package:rune/src/null.dart';
 
 import '../asm/asm.dart';
@@ -72,7 +74,15 @@ class Program {
   Asm get cutscenesPointers => Asm([_cutscenesPointers]);
   Word _cutsceneIndexOffset;
 
+  Byte? _eventFlagOffset;
+  final BiMap<Byte, Constant> _customEventFlags = BiMap();
+  Byte? get peekNextEventFlag => _eventFlagOffset;
+  Map<Byte, Constant> customEventFlags() =>
+      _customEventFlags.toIMap().unlockLazy;
+
   final Map<MapId, Word> _vramTileOffsets = {};
+
+  final _freeEventFlags = freeEventFlags();
 
   Program({
     Word? eventIndexOffset,
@@ -81,6 +91,8 @@ class Program {
   })  : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord,
         _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord {
     _vramTileOffsets.addAll(vramTileOffsets ?? _defaultSpriteVramOffsets);
+    _eventFlagOffset =
+        _freeEventFlags.isEmpty ? null : _freeEventFlags.removeFirst();
   }
 
   /// Returns event index by which [routine] can be referenced.
@@ -103,10 +115,24 @@ class Program {
     return (cutsceneIndex + Word(0x8000)) as Word;
   }
 
+  Byte _addEventFlag(Constant flag) {
+    var existing = eventFlags[flag] ?? _customEventFlags.inverse[flag];
+    if (existing != null) return existing;
+
+    var index = _eventFlagOffset;
+    if (index == null) {
+      throw StateError('cannot add event flag; too many event flags');
+    }
+    _customEventFlags[index] = flag;
+    _eventFlagOffset =
+        _freeEventFlags.isEmpty ? null : _freeEventFlags.removeFirst();
+    return index;
+  }
+
   SceneAsm addScene(SceneId id, Scene scene, {GameMap? startingMap}) {
     var eventAsm = EventAsm.empty();
     var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
-        startingMap: startingMap);
+        startingMap: startingMap, eventFlags: _ProgramEventFlags(this));
 
     for (var event in scene.events) {
       event.visit(generator);
@@ -128,7 +154,7 @@ class Program {
     var spriteVramOffset = _vramTileOffsets[map.id];
     return _maps[map.id] = compileMap(
         map, _ProgramEventRoutines(this), spriteVramOffset,
-        dialogTrees: dialogTrees);
+        dialogTrees: dialogTrees, eventFlags: _ProgramEventFlags(this));
   }
 
   /// DialogTrees for maps which are not added to the game.
@@ -137,11 +163,21 @@ class Program {
     extras.removeWhere((key, _) => _maps.containsKey(key));
     return extras;
   }
+
+  Asm extraConstants() {
+    return _customEventFlags.entries
+        .map((e) => Asm.fromRaw('${e.value.constant} = ${e.key}'))
+        .reduceOr((a1, a2) => Asm([a1, a2]), ifEmpty: Asm.empty());
+  }
 }
 
 abstract class EventRoutines {
   Word addEvent(Label name);
   Word addCutscene(Label name);
+}
+
+abstract class EventFlags {
+  Constant toConstant(EventFlag flag);
 }
 
 class _ProgramEventRoutines extends EventRoutines {
@@ -156,6 +192,27 @@ class _ProgramEventRoutines extends EventRoutines {
   Word addCutscene(Label routine) => _program._addCutscenePointer(routine);
 }
 
+class _ProgramEventFlags extends EventFlagConstants {
+  final Program _program;
+
+  _ProgramEventFlags(this._program);
+
+  @override
+  Constant toConstant(EventFlag flag) {
+    var constant = super.toConstant(flag);
+    _program._addEventFlag(constant);
+    return constant;
+  }
+}
+
+class EventFlagConstants implements EventFlags {
+  const EventFlagConstants();
+  @override
+  Constant toConstant(EventFlag flag) {
+    return Constant('EventFlag_${flag.name}');
+  }
+}
+
 class SceneAsmGenerator implements EventVisitor {
   final SceneId id;
 
@@ -164,6 +221,7 @@ class SceneAsmGenerator implements EventVisitor {
   final EventAsm _eventAsm;
   // required if processing interaction (see todo on ctor)
   EventRoutines? _eventRoutines;
+  EventFlags _eventFlags;
   //final Byte _dialogIdOffset;
 
   Mode _gameMode = Mode.event;
@@ -202,10 +260,12 @@ class SceneAsmGenerator implements EventVisitor {
 
   // todo: This might be a subclass really
   SceneAsmGenerator.forInteraction(GameMap map, this.id, this._dialogTrees,
-      this._eventAsm, EventRoutines eventRoutines)
+      this._eventAsm, EventRoutines eventRoutines,
+      {EventFlags eventFlags = const EventFlagConstants()})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = const InteractionObject(),
-        _eventRoutines = eventRoutines {
+        _eventRoutines = eventRoutines,
+        _eventFlags = eventFlags {
     _gameMode = Mode.dialog;
 
     _memory.putInAddress(a3, const InteractionObject());
@@ -216,11 +276,13 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   SceneAsmGenerator.forEvent(this.id, this._dialogTrees, this._eventAsm,
-      {GameMap? startingMap})
+      {GameMap? startingMap,
+      EventFlags eventFlags = const EventFlagConstants()})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = null,
         // FIXME: also parameterize eventtype so finish() does the right thing
-        _eventType = EventType.event {
+        _eventType = EventType.event,
+        _eventFlags = eventFlags {
     _memory.currentMap = startingMap;
     if (startingMap != null) {
       _memory.loadedDialogTree = _dialogTrees.forMap(startingMap.id);
@@ -494,7 +556,7 @@ class SceneAsmGenerator implements EventVisitor {
       // off of for unset branch
       var parent = _memory;
 
-      _addToDialog(eventCheck(flag.toConstant, ifSetOffset));
+      _addToDialog(eventCheck(_eventFlags.toConstant(flag), ifSetOffset));
       _flagIsNotSet(flag);
 
       runEventFromInteractionIfNeeded(ifFlag.isUnset,
@@ -560,13 +622,15 @@ class SceneAsmGenerator implements EventVisitor {
 
         // run isSet events unless there are none
         if (ifFlag.isSet.isEmpty) {
-          _eventAsm.add(branchIfEventFlagSet(flag.toConstant.i, continueScene));
+          _eventAsm.add(branchIfEventFlagSet(
+              _eventFlags.toConstant(flag).i, continueScene));
         } else {
           if (ifFlag.isUnset.isEmpty) {
-            _eventAsm
-                .add(branchIfEvenfFlagNotSet(flag.toConstant.i, continueScene));
+            _eventAsm.add(branchIfEvenfFlagNotSet(
+                _eventFlags.toConstant(flag).i, continueScene));
           } else {
-            _eventAsm.add(branchIfEvenfFlagNotSet(flag.toConstant.i, ifUnset));
+            _eventAsm.add(branchIfEvenfFlagNotSet(
+                _eventFlags.toConstant(flag).i, ifUnset));
           }
 
           _flagIsSet(flag);
@@ -612,7 +676,7 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(
         setFlag,
         (eventIndex) => Asm([
-              moveq(setFlag.flag.toConstant.i, d0),
+              moveq(_eventFlags.toConstant(setFlag.flag).i, d0),
               jsr('EventFlags_Set'.toLabel.l)
             ]));
   }
@@ -1440,14 +1504,6 @@ what is steps per second?
 
  */
 
-extension EventFlagConstant on EventFlag {
-  Constant get toConstant {
-    // todo: not all event flags are named constants
-    // see toEventFlag
-    return Constant('EventFlag_$name');
-  }
-}
-
 abstract class DialogTreeLookup {
   Future<DialogTree> byLabel(Label lbl);
 }
@@ -1731,3 +1787,16 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_Kuran_F3'): Word(0x3b9),
   Label('Map_GaruberkTower_Part7'): Word(0x252),
 }.map((l, o) => MapEntry(labelToMapId(l), o));
+
+Queue<Byte> freeEventFlags() {
+  var q = Queue<Byte>();
+  int next = 0;
+  for (var used in eventFlags.values.sorted((a, b) => a.compareTo(b))) {
+    for (; next < used.value; next++) {
+      q.add(Byte(next));
+    }
+    next = used.value + 1;
+  }
+  q.addAll([for (; next <= 0xff; next++) Byte(next)]);
+  return q;
+}
