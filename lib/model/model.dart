@@ -168,6 +168,7 @@ class EventState {
 
   Direction? getFacing(FieldObject obj) => _facing[obj];
   void setFacing(FieldObject obj, Direction dir) => _facing[obj] = dir;
+
   void clearFacing(FieldObject obj) => _facing.remove(obj);
 
   /// 1-indexed (first slot is 1, there is no slot 0).

@@ -438,9 +438,8 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void dialog(Dialog dialog) {
     _checkNotFinished();
-    _runOrInterruptDialog();
+    _runOrInterruptDialog(dialog);
     _addToDialog(dialog.toAsm(_memory));
-    _lastEventInCurrentDialog = dialog;
   }
 
   @override
@@ -804,7 +803,7 @@ class SceneAsmGenerator implements EventVisitor {
     var index = showPanel.panel.panelIndex;
 
     if (showPanel.showDialogBox) {
-      _runOrInterruptDialog();
+      _runOrInterruptDialog(showPanel);
       _memory.addPanel();
 
       _addToDialog(Asm([
@@ -813,8 +812,6 @@ class SceneAsmGenerator implements EventVisitor {
         dc.b([Byte(0xf2), Byte.zero]),
         dc.w([Word(index)]),
       ]));
-
-      _lastEventInCurrentDialog = showPanel;
     } else {
       _addToEvent(showPanel, (_) {
         _memory.addPanel();
@@ -839,10 +836,12 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void hideAllPanels(HideAllPanels hidePanels) {
     if (inDialogLoop) {
+      _runOrInterruptDialog(hidePanels);
       _addToDialog(dc.b([Byte(0xf2), Byte.two]));
     } else {
       _addToEvent(hidePanels, (_) => jsr(Label('Panel_DestroyAll').l));
     }
+    _memory.panelsShown = 0;
   }
 
   @override
@@ -859,6 +858,8 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     if (inDialogLoop) {
+      _runOrInterruptDialog(hidePanels);
+
       _memory.removePanels(panels);
 
       _addToDialog(Asm([
@@ -894,16 +895,9 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void playSound(PlaySound playSound) {
     if (inDialogLoop) {
-      if (_lastEventInCurrentDialog is Dialog) {
-        // Panel should come after this Dialog;
-        // otherwise gets rendered before player continues
-        _addToDialog(interrupt());
-      }
-
+      _runOrInterruptDialog(playSound);
       _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
       _addToDialog(dc.b([playSound.sound.sfxId]));
-
-      _lastEventInCurrentDialog = playSound;
     } else {
       _addToEvent(playSound,
           (_) => move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l));
@@ -951,8 +945,12 @@ class SceneAsmGenerator implements EventVisitor {
             }
           }
         } else {
+          // TODO: should this synthetic event logic be in the model instead?
           if (_memory.isFieldShown != true) {
             fadeInField(FadeInField());
+          }
+          if ((_memory.panelsShown ?? 0) > 0) {
+            hideAllPanels(HideAllPanels());
           }
           _eventAsm.add(returnFromDialogEvent());
         }
@@ -960,6 +958,12 @@ class SceneAsmGenerator implements EventVisitor {
         if (_memory.isFieldShown != true) {
           fadeInField(FadeInField());
         }
+      }
+    } else {
+      // todo: not sure about this. might want to do this after terminating
+      // dialog only?
+      if ((_memory.panelsShown ?? 0) > 0) {
+        hideAllPanels(HideAllPanels());
       }
     }
 
@@ -1094,7 +1098,7 @@ class SceneAsmGenerator implements EventVisitor {
     sibling?.clearChanges();
   }
 
-  void _runOrInterruptDialog() {
+  void _runOrInterruptDialog([Event? event]) {
     _expectFacePlayerFirstIfInteraction();
 
     if (!inDialogLoop) {
@@ -1104,6 +1108,8 @@ class SceneAsmGenerator implements EventVisitor {
       // This is delayed because this interrupt may be a termination
       _addToDialog(interrupt());
     }
+
+    if (event != null) _lastEventInCurrentDialog = event;
   }
 
   void _expectFacePlayerFirstIfInteraction() {
