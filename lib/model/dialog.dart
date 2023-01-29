@@ -227,6 +227,7 @@ abstract class Speaker {
     }
     switch (name.toLowerCase()) {
       case 'kroft':
+      case 'principalkroft':
       case 'principal kroft':
         return const PrincipalKroft();
       case 'saya':
