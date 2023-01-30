@@ -33,7 +33,9 @@ class GameMap {
   List<MapObject> get orderedObjects => _iterateIndexedObjects().map((indexed) {
         if (indexed == null) {
           // todo: add something invisible which doesn't collide or interact?
-          throw StateError('not enough objects to maintain object indexes');
+          throw StateError(
+              '$id: not enough objects to maintain object indexes. '
+              '${_iterateIndexedObjects().toList(growable: false)}');
         }
         return indexed.object;
       }).toList(growable: false);
@@ -105,6 +107,11 @@ class GameMap {
 
   void addIndexedObject(IndexedMapObject obj) {
     addObject(obj.object, at: obj.index);
+  }
+
+  @override
+  String toString() {
+    return 'GameMap{id: $id, _indexedObjects: $_indexedObjects}';
   }
 }
 
@@ -303,7 +310,7 @@ enum MapId {
 
   Aiedo(Area.Aiedo),
   ShayHouse(Area.Aiedo),
-  //ChazHouse(Area.Aiedo,
+  //ChazHouse(Area.Aiedo),
   AiedoBakery(Area.Aiedo),
   AiedoBakery_B1(Area.Aiedo),
   AiedoWeaponShop(Area.Aiedo),
@@ -657,16 +664,18 @@ class MapObject extends FieldObject implements UnnamedSpeaker {
   final MapObjectSpec spec;
 
   Scene get onInteract {
-    if (spec is Interactive) {
+    if (isInteractive) {
       return (spec as Interactive).onInteract;
     }
     return Scene.none();
   }
 
+  bool get isInteractive => spec is Interactive;
+
   //@Deprecated('check if interactive first')
   set onInteract(Scene scene) {
     var spec = this.spec;
-    if (spec is Interactive) {
+    if (isInteractive) {
       (spec as Interactive).onInteract = scene;
     } else if (scene != const Scene.none()) {
       throw ModelException('object is not interactive; cannot set scene');

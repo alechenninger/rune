@@ -424,6 +424,43 @@ void main() {
             ]));
       });
     });
+
+    test('just facing with multiple characters', () {
+      var moves = IndividualMoves()
+        ..moves[shay] = (StepPath()..direction = right)
+        ..moves[alys] = (StepPath()..direction = left);
+
+      var asm = moves.toAsm(EventState()..followLead = false);
+      expect(
+          asm,
+          Asm([
+            characterByIdToA4(shay.charId),
+            updateObjFacing(right.address),
+            characterByIdToA4(alys.charId),
+            updateObjFacing(left.address),
+          ]));
+    });
+
+    test('facing and movement adjusts facing then movement', () {
+      var moves = IndividualMoves()
+        ..moves[hahn] = (StepPath()
+          ..direction = up
+          ..distance = 1.step)
+        ..moves[alys] = (StepPath()..direction = up);
+
+      var asm = moves.toAsm(EventState()
+        ..positions[hahn] = Position(0x100, 0x0c0)
+        ..followLead = false);
+
+      expect(
+          asm,
+          Asm([
+            characterByIdToA4(alys.charId),
+            updateObjFacing(up.address),
+            characterByIdToA4(hahn.charId),
+            moveCharacter(x: Word(0x100).i, y: Word(0xb0).i)
+          ]));
+    });
   });
 
   group('generates asm for FacePlayer', () {

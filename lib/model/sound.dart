@@ -28,6 +28,8 @@ class PlaySound extends Event {
 
 enum Sound { selection, surprise }
 
+enum Music { mystery }
+
 /*
 SFXID_Rod = id(PtrSFX_Rod)	; $B5
 SFXID_Shot = id(PtrSFX_Shot)	; $B6

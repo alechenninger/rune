@@ -190,6 +190,7 @@ extension IndividualMovesToAsm on IndividualMoves {
 
         movement = movement.less(stepsToTake);
 
+        // todo: but this ignores delay?
         if (movement.distance == 0.steps) {
           if (movement.direction != ctx.getFacing(moveable)) {
             if (i == lastMoveIndex) {
@@ -213,6 +214,11 @@ extension IndividualMovesToAsm on IndividualMoves {
         // Just guessing at 8 frames per step?
         // look at x/y_step_constant and FieldObj_Move routine
         asm.add(vIntPrepareLoop((8 * maxSteps.toInt).toWord));
+      } else {
+        while (updatesOnMove.isNotEmpty) {
+          var update = updatesOnMove.removeFirst();
+          update();
+        }
       }
     }
 
