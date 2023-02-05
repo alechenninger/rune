@@ -688,14 +688,24 @@ class SceneAsmGenerator implements EventVisitor {
       var wasFieldShown = _memory.isFieldShown;
       var needsRefresh =
           _memory.isMapInCram != true || _memory.isMapInVram != true;
+      var panelsShown = _memory.panelsShown;
 
       _memory.isFieldShown = true;
       _memory.isMapInVram = true;
       _memory.isMapInCram = true;
+      _memory.panelsShown = 0;
 
       return Asm([
-        if (wasFieldShown == false && (_memory.panelsShown ?? 0) > 0)
+        if (wasFieldShown == false && (panelsShown ?? 0) > 0) ...[
+          // todo: as an optimization, we could potentially replace dialog routine
+          // with 5, to do the same thing in this condition
+          // however technically we'd only definitely be able to do this if the
+          // last event was dialog, otherwise it may reorder scene events in
+          // perceivable ways
+          // (for example, if there was dialog, pause, then fade)
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          jsr(Label('Panel_DestroyAll').l)
+        ],
         // I guess we assume map was the same as before
         // so no need to reload secondary objects
         // LoadMap events take care of that
@@ -902,6 +912,61 @@ class SceneAsmGenerator implements EventVisitor {
       _addToEvent(playSound,
           (_) => move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l));
     }
+  }
+
+  @override
+  void playMusic(PlayMusic playMusic) {
+    /*
+    ; $F2 = Determines actions during dialogues. The byte after this has the following values:
+		3 = Loads sound; the byte after this is the Sound index
+		4 = Loads sound; the byte after this is the Sound index
+		8 = Pauses music
+		9 = Resumes music
+     */
+    _addToEvent(playMusic,
+        (_) => move.b(playMusic.music.musicId.i, Constant('Sound_Index').l));
+  }
+
+  @override
+  void stopMusic(StopMusic stopMusic) {
+    /*
+    ; $F2 = Determines actions during dialogues. The byte after this has the following values:
+		3 = Loads sound; the byte after this is the Sound index
+		4 = Loads sound; the byte after this is the Sound index
+		8 = Pauses music
+	move.b	#1, $00FF5007
+	jsr	(VInt_Prepare).l
+		9 = Resumes music
+	move.b	#$80, ($FF5007).l
+	jsr	(VInt_Prepare).l
+     */
+    _addToEvent(
+        stopMusic,
+        (_) => Asm([
+              move.b(const Constant('Sound_StopMusic').i,
+                  Constant('Sound_Index').l),
+              clr.b(Constant('Saved_Sound_Index').w)
+            ]));
+  }
+
+  @override
+  void addMoney(AddMoney addMoney) {
+    _checkNotFinished();
+
+    // addi.l	#300, (Current_Money).w
+    // 	addi.l	#100, (Current_Money).w
+
+    if (addMoney.meseta == 0) {
+      return;
+    }
+
+    var diff = addMoney.meseta;
+
+    _addToEvent(
+        addMoney,
+        (_) => diff > 0
+            ? addi.l(diff.i, const Constant('Current_Money').w)
+            : subi.l(diff.i, const Constant('Current_Money').w));
   }
 
   void finish({bool appendNewline = false}) {
@@ -1480,7 +1545,7 @@ extension FramesPerSecond on Duration {
   }
 }
 
-extension Sfxid on Sound {
+extension SfxId on Sound {
   static Constant _defaultConstant(Sound s) {
     var first = s.name.substring(0, 1);
     var rest = s.name.substring(1);
@@ -1489,6 +1554,23 @@ extension Sfxid on Sound {
 
   Expression get sfxId {
     switch (this) {
+      default:
+        return _defaultConstant(this);
+    }
+  }
+}
+
+extension MusicId on Music {
+  static Constant _defaultConstant(Music m) {
+    var first = m.name.substring(0, 1);
+    var rest = m.name.substring(1);
+    return Constant('MusicID_${first.toUpperCase()}$rest');
+  }
+
+  Expression get musicId {
+    switch (this) {
+      case Music.motaviaTown:
+        return Constant('MusicID_MotabiaTown');
       default:
         return _defaultConstant(this);
     }

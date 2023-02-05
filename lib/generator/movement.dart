@@ -76,10 +76,12 @@ extension IndividualMovesToAsm on IndividualMoves {
           remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
       var done = <FieldObject, Movement>{};
 
-      // Sort by slot so we always start with lead character, which may allow the
-      // following movements to simply follow the leader (using the follow lead
-      // movement flag in the generated ASM).
-      movesList.sort((m1, m2) => m1.moveable.compareTo(m2.moveable, ctx));
+      // We could consider sorting movesList by slot
+      // so we always start with lead character,
+      // which may allow the following movements to simply follow the leader
+      // (using the follow lead movement flag in the generated ASM).
+      // But, sorting meant some changes to behavior such as who's facing is
+      // updated first.
 
       // Figure out what's the longest we can move continuously before we have
       // to call the character move procedure again.
@@ -122,16 +124,9 @@ extension IndividualMovesToAsm on IndividualMoves {
         ctx.startingAxis = firstAxis;
       }
 
-      // Check if leader is moving, in case we can optimize as party move
-      if (movesList.first.moveable.slot(ctx) == 1) {
-        // TODO
-        // might want to rethink this / simplify
-      }
-
       // If no movement code is generated because all moves are delayed, we'll
       // have to add an artificial delay later.
       var allDelay = true;
-      var updatesOnMove = Queue<Function>();
       // The ASM for the last character movement should use data registers, the
       // others use memory
       var lastMoveIndex = movesList
@@ -178,31 +173,20 @@ extension IndividualMovesToAsm on IndividualMoves {
 
             if (i == lastMoveIndex) {
               asm.add(moveCharacter(x: x, y: y));
-              while (updatesOnMove.isNotEmpty) {
-                var update = updatesOnMove.removeFirst();
-                update();
-              }
             } else {
               asm.add(setDestination(x: x, y: y));
             }
+          } else if (movement.distance == 0.steps &&
+              movement.direction != ctx.getFacing(moveable)) {
+            updateFacing(moveable, movement.direction);
           }
         }
 
         movement = movement.less(stepsToTake);
 
         // todo: but this ignores delay?
-        if (movement.distance == 0.steps) {
-          if (movement.direction != ctx.getFacing(moveable)) {
-            if (i == lastMoveIndex) {
-              updateFacing(moveable, movement.direction);
-            } else {
-              // Movement has not actually triggered yet;
-              // queue for after it is.
-              updatesOnMove
-                  .add(() => updateFacing(moveable, movement.direction));
-            }
-          }
-
+        if (movement.distance == 0.steps &&
+            movement.direction == ctx.getFacing(moveable)) {
           remainingMoves.remove(moveable);
           done[moveable] = movement;
         } else {
@@ -214,11 +198,6 @@ extension IndividualMovesToAsm on IndividualMoves {
         // Just guessing at 8 frames per step?
         // look at x/y_step_constant and FieldObj_Move routine
         asm.add(vIntPrepareLoop((8 * maxSteps.toInt).toWord));
-      } else {
-        while (updatesOnMove.isNotEmpty) {
-          var update = updatesOnMove.removeFirst();
-          update();
-        }
       }
     }
 

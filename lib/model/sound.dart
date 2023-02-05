@@ -26,9 +26,55 @@ class PlaySound extends Event {
   int get hashCode => sound.hashCode;
 }
 
+class PlayMusic extends Event {
+  final Music music;
+
+  PlayMusic(this.music);
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.playMusic(this);
+  }
+
+  @override
+  String toString() {
+    return 'PlayMusic{music: $music}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PlayMusic &&
+          runtimeType == other.runtimeType &&
+          music == other.music;
+
+  @override
+  int get hashCode => music.hashCode;
+}
+
+class StopMusic extends Event {
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.stopMusic(this);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StopMusic && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => toString().hashCode;
+
+  @override
+  String toString() {
+    return 'StopMusic{}';
+  }
+}
+
 enum Sound { selection, surprise }
 
-enum Music { mystery }
+enum Music { mystery, suspicion, motaviaTown }
 
 /*
 SFXID_Rod = id(PtrSFX_Rod)	; $B5

@@ -461,6 +461,42 @@ void main() {
             moveCharacter(x: Word(0x100).i, y: Word(0xb0).i)
           ]));
     });
+
+    test('movements with delayed facing move then face', () {
+      var moves = IndividualMoves()
+        ..moves[hahn] = (StepPath()
+          ..direction = up
+          ..distance = 1.step)
+        ..moves[shay] = (StepPaths()
+          ..step(StepPath()
+            ..delay = 1.step
+            ..direction = left
+            ..distance = 1.step)
+          ..face(down))
+        ..moves[alys] = (StepPath()
+          ..delay = 2.steps
+          ..direction = up);
+
+      var asm = moves.toAsm(EventState()
+        ..positions[hahn] = Position(0x100, 0x0c0)
+        ..positions[shay] = Position(0x0E0, 0x0c0)
+        ..positions[alys] = Position(0x0F0, 0x0c0)
+        ..followLead = false);
+
+      print(asm);
+
+      expect(
+          asm,
+          Asm([
+            characterByIdToA4(hahn.charId),
+            moveCharacter(x: Word(0x100).i, y: Word(0xb0).i),
+            characterByIdToA4(shay.charId),
+            moveCharacter(x: Word(0x0d0).i, y: Word(0xc0).i),
+            updateObjFacing(down.address),
+            characterByIdToA4(alys.charId),
+            updateObjFacing(up.address),
+          ]));
+    });
   });
 
   group('generates asm for FacePlayer', () {

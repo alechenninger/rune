@@ -234,6 +234,8 @@ abstract class Speaker {
         return saya;
       case 'holt':
         return holt;
+      case 'zio':
+        return const Zio();
     }
     return null;
   }
@@ -271,5 +273,22 @@ class PrincipalKroft implements Speaker {
   @override
   String toString() {
     return 'PrincipalKroft{}';
+  }
+}
+
+class Zio implements Speaker {
+  const Zio();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Zio && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => 0;
+
+  @override
+  String toString() {
+    return 'Zio{}';
   }
 }

@@ -691,7 +691,7 @@ extension Portrait on Speaker {
     null, // dc.l	ArtNem_PanaDialPortrait	; $10
     null, // dc.l	ArtNem_HntGuildReceptionistDialPortrait	; $11
     null, // dc.l	ArtNem_BakerDialPortrait	; $12
-    null, // dc.l	ArtNem_ZioDialPortrait	; $13
+    Zio(), // dc.l	ArtNem_ZioDialPortrait	; $13
     null, // dc.l	ArtNem_JuzaDialPortrait	; $14
     null, // dc.l	ArtNem_GyunaDialPortrait	; $15
     null, // dc.l	ArtNem_EsperDialPortrait	; $16
