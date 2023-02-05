@@ -1,5 +1,6 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/cutscenes.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/conditional.dart';
@@ -280,5 +281,30 @@ main() {
 
     expect(program.extraConstants(), Asm.fromRaw(r'''EventFlag_Test000 = $00 
 EventFlag_Test001 = $01'''));
+  });
+
+  test('same speaker dialog after show panel shows portrait', () {
+    var scene = Scene([
+      Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),
+      ShowPanel(PrincipalPanel.alysGrabsPrincipal, showDialogBox: true),
+      Dialog(speaker: alys, spans: DialogSpan.parse('Bye')),
+    ]);
+
+    var program = Program();
+    program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+    expect(
+        program.dialogTrees.forMap(map.id).toAsm().withoutComments().trim(),
+        Asm([
+          dc.b([Byte(0xf4), alys.portraitCode]),
+          dc.b(Bytes.ascii('Hello')),
+          dc.b([Byte(0xfd)]),
+          dc.b([Byte(0xf4), const UnnamedSpeaker().portraitCode]),
+          dc.b([Byte(0xf2), Byte.zero]),
+          dc.w([PrincipalPanel.alysGrabsPrincipal.panelIndex.toWord]),
+          dc.b([Byte(0xf4), alys.portraitCode]),
+          dc.b(Bytes.ascii('Bye')),
+          dc.b([Byte(0xff)])
+        ]));
   });
 }

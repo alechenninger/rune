@@ -2,9 +2,11 @@ import 'model.dart';
 
 class ShowPanel extends Event {
   final Panel panel;
-  final bool showDialogBox;
+  final Speaker? speaker;
+  bool get showDialogBox => speaker != null;
 
-  const ShowPanel(this.panel, {this.showDialogBox = false});
+  const ShowPanel(this.panel, {bool showDialogBox = false, Speaker? speaker})
+      : speaker = speaker ?? (showDialogBox ? const UnnamedSpeaker() : null);
 
   @override
   void visit(EventVisitor visitor) {
@@ -13,7 +15,7 @@ class ShowPanel extends Event {
 
   @override
   String toString() {
-    return 'ShowPanel{panel: $panel, showDialogBox: $showDialogBox}';
+    return 'ShowPanel{panel: $panel, speaker: $speaker}';
   }
 
   @override
@@ -22,10 +24,10 @@ class ShowPanel extends Event {
       other is ShowPanel &&
           runtimeType == other.runtimeType &&
           panel == other.panel &&
-          showDialogBox == other.showDialogBox;
+          speaker == other.speaker;
 
   @override
-  int get hashCode => panel.hashCode ^ showDialogBox.hashCode;
+  int get hashCode => panel.hashCode ^ speaker.hashCode;
 }
 
 class HideTopPanels extends Event {

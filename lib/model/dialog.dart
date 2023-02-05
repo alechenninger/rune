@@ -217,15 +217,20 @@ class Span {
 }
 
 abstract class Speaker {
+  String get name;
+
   /// Returns the [Speaker] if they have a well known [name].
   ///
   /// Case insensitive.
+  // todo: could use allSpeakers to build this index instead now?
   static Speaker? byName(String name) {
     var char = Character.byName(name);
     if (char != null) {
       return char;
     }
     switch (name.toLowerCase()) {
+      case 'unnamed speaker':
+        return const UnnamedSpeaker();
       case 'kroft':
       case 'principalkroft':
       case 'principal kroft':
@@ -239,6 +244,17 @@ abstract class Speaker {
     }
     return null;
   }
+
+  static final Iterable<Speaker> allSpeakers = [
+    ...Character.allCharacters,
+    const PrincipalKroft(),
+    saya,
+    holt,
+    const Zio()
+  ];
+
+  @override
+  String toString() => name;
 }
 
 // todo: this is really more like "unseen" speaker
@@ -246,21 +262,22 @@ class UnnamedSpeaker implements Speaker {
   const UnnamedSpeaker();
 
   @override
+  final name = 'Unnamed Speaker';
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is UnnamedSpeaker && runtimeType == other.runtimeType;
 
   @override
-  int get hashCode => 0;
-
-  @override
-  String toString() {
-    return 'UnnamedSpeaker{}';
-  }
+  int get hashCode => name.hashCode;
 }
 
 class PrincipalKroft implements Speaker {
   const PrincipalKroft();
+
+  @override
+  final name = 'Principal Kroft';
 
   @override
   bool operator ==(Object other) =>
@@ -268,16 +285,14 @@ class PrincipalKroft implements Speaker {
       other is PrincipalKroft && runtimeType == other.runtimeType;
 
   @override
-  int get hashCode => 0;
-
-  @override
-  String toString() {
-    return 'PrincipalKroft{}';
-  }
+  int get hashCode => name.hashCode;
 }
 
 class Zio implements Speaker {
   const Zio();
+
+  @override
+  final name = 'Zio';
 
   @override
   bool operator ==(Object other) =>
@@ -285,10 +300,5 @@ class Zio implements Speaker {
       other is Zio && runtimeType == other.runtimeType;
 
   @override
-  int get hashCode => 0;
-
-  @override
-  String toString() {
-    return 'Zio{}';
-  }
+  int get hashCode => name.hashCode;
 }

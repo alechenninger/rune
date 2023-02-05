@@ -663,6 +663,9 @@ class MapObject extends FieldObject implements UnnamedSpeaker {
   final Position startPosition;
   final MapObjectSpec spec;
 
+  @override
+  final name = const UnnamedSpeaker().name;
+
   Scene get onInteract {
     if (isInteractive) {
       return (spec as Interactive).onInteract;

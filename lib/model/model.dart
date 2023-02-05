@@ -412,6 +412,20 @@ abstract class Character extends FieldObject with Speaker {
     return null;
   }
 
+  static final allCharacters = [
+    alys,
+    shay,
+    hahn,
+    rune,
+    gryz,
+    rika,
+    demi,
+    wren,
+    raja,
+    kyra,
+    seth
+  ];
+
   @override
   int? slot(EventState c) => c.slotFor(this);
 }
@@ -432,8 +446,9 @@ const holt = Holt();
 
 class Alys extends Character {
   const Alys();
+
   @override
-  String toString() => 'Alys';
+  final name = 'Alys';
 
   @override
   bool operator ==(Object other) =>
@@ -441,13 +456,14 @@ class Alys extends Character {
       other is Alys && runtimeType == other.runtimeType;
 
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Shay extends Character {
   const Shay();
+
   @override
-  String toString() => 'Shay';
+  final name = 'Shay';
 
   @override
   bool operator ==(Object other) =>
@@ -455,137 +471,137 @@ class Shay extends Character {
       other is Shay && runtimeType == other.runtimeType;
 
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Hahn extends Character {
   const Hahn();
   @override
-  String toString() => 'Hahn';
+  final name = 'Hahn';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Hahn && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Rune extends Character {
   const Rune();
   @override
-  String toString() => 'Rune';
+  final name = 'Rune';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Rune && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Gryz extends Character {
   const Gryz();
   @override
-  String toString() => 'Gryz';
+  final name = 'Gryz';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Gryz && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Rika extends Character {
   const Rika();
   @override
-  String toString() => 'Rika';
+  final name = 'Rika';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Rika && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Demi extends Character {
   const Demi();
   @override
-  String toString() => 'Demi';
+  final name = 'Demi';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Demi && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Wren extends Character {
   const Wren();
   @override
-  String toString() => 'Wren';
+  final name = 'Wren';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Wren && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Raja extends Character {
   const Raja();
   @override
-  String toString() => 'Raja';
+  final name = 'Raja';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Raja && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Kyra extends Character {
   const Kyra();
   @override
-  String toString() => 'Kyra';
+  final name = 'Kyra';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Kyra && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Seth extends Character {
   const Seth();
   @override
-  String toString() => 'Seth';
+  final name = 'Seth';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Seth && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Saya extends Character {
   const Saya();
   @override
-  String toString() => 'Saya';
+  final name = 'Saya';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Saya && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }
 
 class Holt extends Character {
   const Holt();
   @override
-  String toString() => 'Holt';
+  final name = 'Holt';
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Holt && runtimeType == other.runtimeType;
   @override
-  int get hashCode => 0;
+  int get hashCode => name.hashCode;
 }

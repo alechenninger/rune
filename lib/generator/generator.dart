@@ -812,16 +812,18 @@ class SceneAsmGenerator implements EventVisitor {
   void showPanel(ShowPanel showPanel) {
     var index = showPanel.panel.panelIndex;
 
-    if (showPanel.showDialogBox) {
+    var speaker = showPanel.speaker;
+    if (speaker != null) {
       _runOrInterruptDialog(showPanel);
       _memory.addPanel();
 
       _addToDialog(Asm([
-        if (_memory.dialogPortrait != const UnnamedSpeaker())
-          portrait(const UnnamedSpeaker().portraitCode),
+        if (_memory.dialogPortrait != speaker) portrait(speaker.portraitCode),
         dc.b([Byte(0xf2), Byte.zero]),
         dc.w([Word(index)]),
       ]));
+
+      _memory.dialogPortrait = speaker;
     } else {
       _addToEvent(showPanel, (_) {
         _memory.addPanel();
