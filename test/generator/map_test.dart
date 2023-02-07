@@ -1,5 +1,6 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
+import 'package:rune/asm/text.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
@@ -442,6 +443,83 @@ void main() {
               dc.b([Byte(0xff)]),
             ]));
       });
+    });
+
+    test('removes panel in dialog if removal preceeds dialog', () {
+      var obj = MapObject(
+          id: 'test',
+          startPosition: Position('1e0'.hex, '2e0'.hex),
+          spec: Npc(
+              Sprite.PalmanMan1,
+              FaceDown(
+                  onInteract: Scene([
+                FadeOut(),
+                ShowPanel(PrincipalPanel.shayAndAlys),
+                Dialog(spans: [DialogSpan('Hi')]),
+                HideTopPanels(1),
+                Dialog(spans: [DialogSpan('Bye')]),
+              ]))));
+      testMap.addObject(obj);
+
+      var asm = program.addMap(testMap);
+
+      expect(
+          program.dialogTrees.forMap(testMap.id)[1].withoutComments(),
+          DialogAsm([
+            dc.b(Bytes.ascii('Hi')),
+            dc.b([Byte(0xfd)]),
+            dc.b([Byte(0xf2), Byte.one]),
+            dc.b(Bytes.ascii('Bye')),
+            dc.b([Byte(0xff)])
+          ]));
+
+      expect(
+          asm.events
+              .withoutComments()
+              .skipWhile((line) => !line.toString().contains('RunDialogue'))
+              .skip(1)
+              .first
+              .toString(),
+          isNot(contains('Panel_Destroy')));
+    });
+
+    test('removes panel in event if removal does not preceed dialog', () {
+      var obj = MapObject(
+          id: 'test',
+          startPosition: Position('1e0'.hex, '2e0'.hex),
+          spec: Npc(
+              Sprite.PalmanMan1,
+              FaceDown(
+                  onInteract: Scene([
+                SetContext((ctx) {
+                  ctx.followLead = false;
+                  ctx.slots[1] = alys;
+                  ctx.positions[alys] = Position(0, 0);
+                }),
+                FadeOut(),
+                ShowPanel(PrincipalPanel.shayAndAlys),
+                Dialog(spans: [DialogSpan('Hi')]),
+                HideTopPanels(1),
+                PartyMove(StepPaths()..face(Direction.down))
+              ]))));
+      testMap.addObject(obj);
+
+      var asm = program.addMap(testMap);
+
+      expect(
+          program.dialogTrees.forMap(testMap.id)[1].withoutComments(),
+          DialogAsm([
+            dc.b(Bytes.ascii('Hi')),
+            dc.b([Byte(0xff)])
+          ]));
+
+      expect(
+          asm.events
+              .withoutComments()
+              .skipWhile((line) => !line.toString().contains('RunDialogue'))
+              .skip(1)
+              .take(2),
+          Asm([jsr('Panel_Destroy'.toLabel.l), dmaPlanesVInt()]));
     });
   });
 

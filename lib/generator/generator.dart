@@ -238,17 +238,25 @@ class SceneAsmGenerator implements EventVisitor {
   final FieldObject? _interactingWith;
   bool get _isProcessingInteraction => _interactingWith != null;
 
+  var _eventCounter = 1;
+  var _finished = false;
+
+  // Current dialog generation state:
+
   DialogTree? _dialogTree;
   Byte? _currentDialogId;
   DialogAsm? _currentDialog;
   var _lastEventBreak = -1;
+  int? _lastInterrupt;
+
+  /// Events processed in current dialog, last event first.
+  final _queuedGeneration = Queue<_QueuedGeneration>();
   Event? _lastEventInCurrentDialog;
-  var _eventCounter = 1;
-  var _finished = false;
+
   Function([int? dialogRoutine])? _replaceDialogRoutine;
-  //var _lastFadeOut = -1;
 
   // conditional runtime state
+
   /// For currently generating branch, what is the known state of event flags
   Condition _currentCondition = Condition.empty();
 
@@ -438,6 +446,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void dialog(Dialog dialog) {
     _checkNotFinished();
+    _generateQueueInCurrentMode();
     _runOrInterruptDialog(dialog);
     _addToDialog(dialog.toAsm(_memory));
   }
@@ -585,6 +594,7 @@ class SceneAsmGenerator implements EventVisitor {
         event.visit(this);
       }
 
+      _generateQueueInCurrentMode();
       _flagUnknown(flag);
 
       // no more events can be added
@@ -814,6 +824,7 @@ class SceneAsmGenerator implements EventVisitor {
 
     var speaker = showPanel.speaker;
     if (speaker != null) {
+      _generateQueueInCurrentMode();
       _runOrInterruptDialog(showPanel);
       _memory.addPanel();
 
@@ -847,13 +858,13 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void hideAllPanels(HideAllPanels hidePanels) {
-    if (inDialogLoop) {
-      _runOrInterruptDialog(hidePanels);
+    _addToEventOrDialog(hidePanels, inDialog: () {
       _addToDialog(dc.b([Byte(0xf2), Byte.two]));
-    } else {
-      _addToEvent(hidePanels, (_) => jsr(Label('Panel_DestroyAll').l));
-    }
-    _memory.panelsShown = 0;
+    }, inEvent: (_) {
+      return jsr(Label('Panel_DestroyAll').l);
+    }, after: () {
+      _memory.panelsShown = 0;
+    });
   }
 
   @override
@@ -869,9 +880,7 @@ class SceneAsmGenerator implements EventVisitor {
       panels = min(panels, panelsShown);
     }
 
-    if (inDialogLoop) {
-      _runOrInterruptDialog(hidePanels);
-
+    _addToEventOrDialog(hidePanels, inDialog: () {
       _memory.removePanels(panels);
 
       _addToDialog(Asm([
@@ -880,40 +889,37 @@ class SceneAsmGenerator implements EventVisitor {
         // it might be if the field is not faded out, but not always
         if (_memory.isFieldShown == true) dc.b([Byte(0xf2), Byte(6)]),
       ]));
-    } else {
-      _addToEvent(hidePanels, (eventIndex) {
-        _memory.removePanels(panels);
+    }, inEvent: (eventIndex) {
+      _memory.removePanels(panels);
 
-        var skip = '.skipHidePanel$eventIndex';
-        return Asm([
-          for (var i = 0; i < panels; i++) ...[
-            if (panelsShown == null)
-              Asm([
-                tst.b(Constant('Panel_Num').w),
-                // if too many panels .s might be broken :X
-                beq.s(Label(skip)),
-              ]),
-            jsr('Panel_Destroy'.toLabel.l),
-            // in Panel_DestroyAll it is done after each,
-            // so assuming this is needed here
-            dmaPlanesVInt(),
-          ],
-          if (panelsShown == null) setLabel(skip),
-        ]);
-      });
-    }
+      var skip = '.skipHidePanel$eventIndex';
+      return Asm([
+        for (var i = 0; i < panels; i++) ...[
+          if (panelsShown == null)
+            Asm([
+              tst.b(Constant('Panel_Num').w),
+              // if too many panels .s might be broken :X
+              beq.s(Label(skip)),
+            ]),
+          jsr('Panel_Destroy'.toLabel.l),
+          // in Panel_DestroyAll it is done after each,
+          // so assuming this is needed here
+          dmaPlanesVInt(),
+        ],
+        if (panelsShown == null) setLabel(skip),
+      ]);
+    });
   }
 
   @override
   void playSound(PlaySound playSound) {
-    if (inDialogLoop) {
-      _runOrInterruptDialog(playSound);
-      _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
-      _addToDialog(dc.b([playSound.sound.sfxId]));
-    } else {
-      _addToEvent(playSound,
-          (_) => move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l));
-    }
+    _addToEventOrDialog(playSound,
+        inDialog: () {
+          _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
+          _addToDialog(dc.b([playSound.sound.sfxId]));
+        },
+        inEvent: (_) =>
+            move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l));
   }
 
   @override
@@ -989,13 +995,14 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void _finish({bool appendNewline = false}) {
+    // If we're in dialog loop,
+    // we don't want to generate
+    // because that would cause an unwanted interrupt
+
     if (_inEvent) {
       if (_isProcessingInteraction) {
         if (_eventType == EventType.cutscene) {
           var reload = _memory.isFieldShown != true;
-          // clears z bit so we don't reload the map from cutscene
-          _eventAsm.add(moveq(reload ? 0.i : 1.i, d0));
-          _eventAsm.add(rts);
           if (reload) {
             if (_replaceDialogRoutine != null) {
               // dialog 5 will fade out the whole screen
@@ -1011,7 +1018,12 @@ class SceneAsmGenerator implements EventVisitor {
                   'but no dialog');
             }
           }
+          _terminateDialog();
+          // clears z bit so we don't reload the map from cutscene
+          _eventAsm.add(moveq(reload ? 0.i : 1.i, d0));
+          _eventAsm.add(rts);
         } else {
+          _terminateDialog();
           // TODO: should this synthetic event logic be in the model instead?
           if (_memory.isFieldShown != true) {
             fadeInField(FadeInField());
@@ -1022,6 +1034,7 @@ class SceneAsmGenerator implements EventVisitor {
           _eventAsm.add(returnFromDialogEvent());
         }
       } else {
+        _terminateDialog();
         if (_memory.isFieldShown != true) {
           fadeInField(FadeInField());
         }
@@ -1030,11 +1043,11 @@ class SceneAsmGenerator implements EventVisitor {
       // todo: not sure about this. might want to do this after terminating
       // dialog only?
       if ((_memory.panelsShown ?? 0) > 0) {
+        // unfortunately this will produce unwanted interrupt
         hideAllPanels(HideAllPanels());
       }
+      _terminateDialog();
     }
-
-    _terminateDialog();
 
     if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
       _eventAsm.addNewline();
@@ -1173,7 +1186,7 @@ class SceneAsmGenerator implements EventVisitor {
     } else if (_lastEventInCurrentDialog is Dialog) {
       // Add cursor for previous dialog
       // This is delayed because this interrupt may be a termination
-      _addToDialog(interrupt());
+      _lastInterrupt = _addToDialog(interrupt());
     }
 
     if (event != null) _lastEventInCurrentDialog = event;
@@ -1278,10 +1291,13 @@ class SceneAsmGenerator implements EventVisitor {
   /// regardless of whether current generating within dialog loop or not.
   void _terminateDialog({bool? hidePanels}) {
     if (inDialogLoop) {
-      _addToDialog(terminateDialog());
       if (_inEvent) {
         _gameMode = Mode.event;
+      } else {
+        // we can't run in event, so do in dialog
+        _generateQueueInCurrentMode();
       }
+      _addToDialog(terminateDialog());
     } else if (_lastEventBreak >= 0) {
       // i think this is only ever the last line so could simplify
       _currentDialog!.replace(_lastEventBreak, terminateDialog());
@@ -1304,6 +1320,11 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.dialogPortrait = UnnamedSpeaker();
 
     _resetCurrentDialog();
+
+    if (_inEvent) {
+      // Now that we're not in dialog loop, generate
+      _generateQueueInCurrentMode();
+    }
   }
 
   /// If [id] is provided, [asm] must be provided. Otherwise, sets to next id
@@ -1320,6 +1341,7 @@ class SceneAsmGenerator implements EventVisitor {
       _currentDialogId = null; // _dialogTree.nextDialogId;
       _currentDialog = null;
       _lastEventInCurrentDialog = null;
+      _lastInterrupt = null;
     }
 
     // i think terminate might still save dialog position but i don't usually
@@ -1368,17 +1390,15 @@ class SceneAsmGenerator implements EventVisitor {
     if (!_inEvent) {
       throw StateError("can't add event when not in event loop");
     } else if (inDialogLoop) {
-      // 🐞 note that if we need to do this after a dialog loop event
-      // which does not show a dialog box (e.g. panel)
-      // then this will result in an extra dialog box appearing and
-      // extra button press required before breaking to the event
-      // see: https://trello.com/c/LhjcgZkZ
-
       _addToDialog(comment('scene event $eventIndex'));
       _lastEventBreak = _addToDialog(eventBreak());
       _memory.hasSavedDialogPosition = true;
       _memory.dialogPortrait = UnnamedSpeaker();
       _gameMode = Mode.event;
+
+      // If any events which could've gone either way,
+      // generate in event mode now
+      _generateQueueInCurrentMode();
     }
 
     var length = _eventAsm.length;
@@ -1396,24 +1416,57 @@ class SceneAsmGenerator implements EventVisitor {
     _lastEventInCurrentDialog = event;
   }
 
+  /// Adds to event if can, otherwise queues up for later.
+  /// We don't want to add to dialog
+  /// unless there is an eventual intended interrupt,
+  /// like a Dialog or ShowPanel (with speaker) event.
+  void _addToEventOrDialog(Event event,
+      {required void Function() inDialog,
+      required Asm? Function(int eventIndex) inEvent,
+      void Function()? after}) {
+    _checkNotFinished();
+
+    generateEvent() {
+      _addToEvent(event, inEvent);
+      after?.call();
+    }
+
+    if (!inDialogLoop) {
+      // just always run in event in this case
+      generateEvent();
+    } else {
+      // may go either way
+      _queuedGeneration.addFirst(_QueuedGeneration(() {
+        _runOrInterruptDialog(event);
+        inDialog();
+        after?.call();
+      }, generateEvent));
+    }
+  }
+
+  void _generateQueueInCurrentMode() {
+    while (_queuedGeneration.isNotEmpty) {
+      var queued = _queuedGeneration.removeFirst();
+      if (inDialogLoop) {
+        queued.generateDialog();
+      } else {
+        queued.generateEvent();
+      }
+    }
+  }
+
   void _initVramAndCram() {
     if (_memory.isDisplayEnabled != false) {
       // doesn't hurt if we do this while already disabled i guess
       _eventAsm.add(asmeventslib.fadeOut(initVramAndCram: true));
       _memory.isDisplayEnabled = false;
     } else {
-      // var lastFadeOut = _lastFadeOut;
-      // if (lastFadeOut == -1) {
       var last = _lastLineIfFadeOut(_eventAsm);
       if (last != null) {
         _eventAsm.replace(last, asmeventslib.fadeOut(initVramAndCram: true));
       } else {
         _eventAsm.add(jsr(Label('InitVRAMAndCRAMAfterFadeOut').l));
       }
-      // } else {
-      //   _eventAsm.replace(
-      //       lastFadeOut, asmeventslib.fadeOut(initVramAndCram: true));
-      // }
     }
     _memory.isMapInCram = false;
     _memory.isMapInVram = false;
@@ -1431,6 +1484,13 @@ int? _lastLineIfFadeOut(Asm asm) {
     break;
   }
   return null;
+}
+
+class _QueuedGeneration {
+  final void Function() generateDialog;
+  final void Function() generateEvent;
+
+  _QueuedGeneration(this.generateDialog, this.generateEvent);
 }
 
 enum Mode { dialog, event }

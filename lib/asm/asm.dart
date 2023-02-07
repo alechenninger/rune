@@ -212,8 +212,13 @@ class Asm extends IterableBase<Instruction> {
     lines.add(_Instruction());
   }
 
-  Asm range(int start) {
-    return Asm.fromInstructions(lines.sublist(start));
+  /// Removes the line at [line] and all subsequent lines.
+  void truncate(int line) {
+    lines.removeRange(line, lines.length);
+  }
+
+  Asm range(int start, [int? end]) {
+    return Asm.fromInstructions(lines.sublist(start, end));
   }
 
   Asm head(int lines) {
