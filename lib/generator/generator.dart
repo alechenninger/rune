@@ -749,8 +749,12 @@ class SceneAsmGenerator implements EventVisitor {
       // e.g. if after fading out, we want to show a panel,
       // the swap it to initvramandcram & fadein
 
-      //_lastFadeOut =
       _eventAsm.add(asmeventslib.fadeOut(initVramAndCram: false));
+
+      if ((_memory.panelsShown ?? 0) > 0) {
+        _eventAsm.add(jsr(Label('Panel_DestroyAll').l));
+        _memory.panelsShown = 0;
+      }
 
       return null;
     });
@@ -931,8 +935,12 @@ class SceneAsmGenerator implements EventVisitor {
 		8 = Pauses music
 		9 = Resumes music
      */
-    _addToEvent(playMusic,
-        (_) => move.b(playMusic.music.musicId.i, Constant('Sound_Index').l));
+    _addToEvent(
+        playMusic,
+        (_) => Asm([
+              move.b(playMusic.music.musicId.i, Constant('Sound_Index').l),
+              move.b(playMusic.music.musicId.i, Constant('Saved_Sound_Index').w)
+            ]));
   }
 
   @override

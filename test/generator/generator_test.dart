@@ -212,6 +212,25 @@ main() {
         ]));
   });
 
+  test('fade out destroys panels', () {
+    var scene = Scene([
+      ShowPanel(PrincipalPanel.shayAndAlys),
+      FadeOut(),
+      ShowPanel(PrincipalPanel.alysGrabsPrincipal)
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().trim(),
+        containsAllInOrder(Asm([
+          jsr('Panel_Create'.toLabel.l),
+          jsr('Panel_DestroyAll'.toLabel.l),
+          jsr('Panel_Create'.toLabel.l),
+        ])));
+  });
+
   test('changes dialog tree after changing map', () {
     var dialog1 = Dialog(speaker: alys, spans: [DialogSpan('map 1')]);
     var dialog2 = Dialog(speaker: alys, spans: [DialogSpan('map 2')]);
@@ -305,6 +324,22 @@ EventFlag_Test001 = $01'''));
           dc.b([Byte(0xf4), alys.portraitCode]),
           dc.b(Bytes.ascii('Bye')),
           dc.b([Byte(0xff)])
+        ]));
+  });
+
+  test('play music sets sound index and saved sound index', () {
+    var scene = Scene([
+      PlayMusic(Music.motaviaTown),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments(),
+        Asm([
+          move.b(Music.motaviaTown.musicId.i, Constant('Sound_Index').l),
+          move.b(Music.motaviaTown.musicId.i, Constant('Saved_Sound_Index').w)
         ]));
   });
 }
