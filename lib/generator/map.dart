@@ -96,11 +96,11 @@ final _npcBehaviorRoutines = {
       Label('loc_49502'),
       SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNonInteractive()),
           spriteMappingTiles: 8)),
-  FixedFaceDownLegsHidden: FieldRoutine(
+  FaceDownOrUpLegsHidden: FieldRoutine(
       Word(0x108),
       Label('FieldObj_NPCType32'),
-      SpecFactory.npc((s, _) => Npc(s, FixedFaceDownLegsHidden()),
-          spriteMappingTiles: 8)),
+      SpecFactory.npc((s, _) => Npc(s, FaceDownOrUpLegsHidden()),
+          spriteMappingTiles: 0x38)),
   FixedFaceRight: FieldRoutine(
       Word(0x14C),
       Label('loc_49502'),

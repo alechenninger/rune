@@ -158,7 +158,7 @@ void main() {
   test('objects requiring fewer tiles use fewer tiles', () {
     testMap.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),
-        spec: Npc(Sprite.PalmanMan1, FixedFaceDownLegsHidden()),
+        spec: Npc(Sprite.PalmanMan1, FaceDownOrUpLegsHidden()),
         onInteract: Scene([
           Dialog(spans: [DialogSpan('Hello world!')])
         ])));

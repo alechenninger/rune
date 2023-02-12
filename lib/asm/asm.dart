@@ -373,9 +373,6 @@ class _Instruction extends Instruction {
     String? comment;
 
     var state = _Token.root;
-    var escape = false;
-    String? stringDelimiter;
-    String? operand;
 
     for (var i = 0; i < chars.length + 1; i++) {
       var c = i == chars.length ? null : chars[i];

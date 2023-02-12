@@ -80,6 +80,10 @@ final storyEvents = [
   EventFlag('GryzJoined'),
   EventFlag('TonoeDoorOpen'),
   EventFlag('AlshlineFound'),
+  // This one is weird. Linked to IgglanovaZema.
+  // Effectively it is *set* until IgglanovaZema is set.
+  // We could just key off of IgglanovaZema instead?
+  // See MapDataMan_ZemaPetrifiedFlag
   EventFlag('ZemaPetrified'),
   EventFlag('IgglanovaZema'),
   EventFlag('AfterIgglanovaZema'),

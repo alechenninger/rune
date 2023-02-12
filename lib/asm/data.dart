@@ -451,7 +451,7 @@ class Constant extends Expression {
 
 class Label extends Sized implements Address {
   static final _validLabelPattern =
-      RegExp(r'^[A-Za-z\d_@.+-/]+[A-Za-z\d_/+-]*$');
+      RegExp(r'^([A-Za-z\d_@.$]+[A-Za-z\d_]*|[+-/]+)$');
 
   static bool isValidLabelName(String expression) =>
       _validLabelPattern.hasMatch(expression);
@@ -835,8 +835,8 @@ enum Size {
   Sized sizedExpression(Expression expression) {
     if (expression is Sized) {
       if (expression.size != this) {
-        throw ArgumentError.value(
-            expression, 'expression', 'incompatible size ${expression.size}');
+        throw ArgumentError.value(expression.toString(), 'expression',
+            'incompatible size ${expression.size}');
       }
       return expression;
     }

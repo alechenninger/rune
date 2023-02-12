@@ -1180,18 +1180,19 @@ class FaceDownLegsHiddenNonInteractive extends NpcBehavior {
   }
 }
 
-/// Does not move when spoken to.
-class FixedFaceDownLegsHidden extends InteractiveNpcBehavior {
+/// Only moves up or down. Does not collide. Relies on desk collision I think.
+/// So this should probably really be directly classified as behind desk?
+class FaceDownOrUpLegsHidden extends InteractiveNpcBehavior {
   @override
   final startFacing = Direction.down;
 
-  FixedFaceDownLegsHidden({super.onInteract});
+  FaceDownOrUpLegsHidden({super.onInteract});
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       super == other &&
-          other is FixedFaceDownLegsHidden &&
+          other is FaceDownOrUpLegsHidden &&
           runtimeType == other.runtimeType &&
           startFacing == other.startFacing;
 
@@ -1200,7 +1201,7 @@ class FixedFaceDownLegsHidden extends InteractiveNpcBehavior {
 
   @override
   String toString() {
-    return 'FixedFaceDownLegsHidden{}';
+    return 'FaceDownOrUpLegsHidden{}';
   }
 }
 
