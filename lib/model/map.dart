@@ -727,13 +727,12 @@ class MapObject extends FieldObject implements UnnamedSpeaker {
   int get hashCode => id.hashCode ^ startPosition.hashCode ^ spec.hashCode;
 }
 
-/// Constructs an object which doesn't do anything.
+/// Constructs an object which doesn't do anything, but does collide.
 MapObject placeholderMapObject(int index) {
   return MapObject(
       id: 'placeholder_$index',
       startPosition: Position(0, 0),
-      // FieldObj_None
-      spec: AsmSpec(routine: Word(0), startFacing: Direction.down));
+      spec: InvisibleBlock());
 }
 
 final _random = Random();
