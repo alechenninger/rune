@@ -184,9 +184,9 @@ void main() {
         Asm([
           dc.w(['2d0'.hex.toWord]),
           dc.l([Constant('Art_PalmanMan1')]),
-          dc.w(['2d8'.hex.toWord]),
+          dc.w(['308'.hex.toWord]),
           dc.l([Constant('Art_PalmanWoman1')]),
-          dc.w(['320'.hex.toWord]),
+          dc.w(['350'.hex.toWord]),
           dc.l([Constant('Art_PalmanMan2')]),
         ]));
   });

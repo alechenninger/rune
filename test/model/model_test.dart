@@ -425,5 +425,18 @@ void main() {
       expect(view.indexedObjects,
           [IndexedMapObject(0, other), IndexedMapObject(2, other2)]);
     });
+
+    test('placeholders are unused to maintain indexes of sparse objects', () {
+      var map = GameMap(MapId.Test);
+      var alys = MapObject(
+          id: 'alys', startPosition: Position(0, 0), spec: AlysWaiting());
+      var other = MapObject(
+          id: 'other', startPosition: Position(0x10, 0), spec: AlysWaiting());
+      map.addObject(other, at: 0);
+      map.addObject(alys, at: 2);
+      expect(map.orderedObjects, [other, placeholderMapObject(1), alys]);
+      expect(map.indexedObjects, hasLength(2));
+      expect(map.objects, hasLength(2));
+    });
   });
 }

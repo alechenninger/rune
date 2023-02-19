@@ -30,12 +30,10 @@ class GameMap {
   Iterable<MapObject> get objects =>
       UnmodifiableListView(_objects.values.map((o) => o.object));
 
-  List<MapObject> get orderedObjects => _iterateIndexedObjects().map((indexed) {
+  List<MapObject> get orderedObjects =>
+      _iterateIndexedObjects().mapIndexed((i, indexed) {
         if (indexed == null) {
-          // todo: add something invisible which doesn't collide or interact?
-          throw StateError(
-              '$id: not enough objects to maintain object indexes. '
-              '${_iterateIndexedObjects().toList(growable: false)}');
+          return placeholderMapObject(i);
         }
         return indexed.object;
       }).toList(growable: false);
@@ -727,6 +725,15 @@ class MapObject extends FieldObject implements UnnamedSpeaker {
 
   @override
   int get hashCode => id.hashCode ^ startPosition.hashCode ^ spec.hashCode;
+}
+
+/// Constructs an object which doesn't do anything.
+MapObject placeholderMapObject(int index) {
+  return MapObject(
+      id: 'placeholder_$index',
+      startPosition: Position(0, 0),
+      // FieldObj_None
+      spec: AsmSpec(routine: Word(0), startFacing: Direction.down));
 }
 
 final _random = Random();
