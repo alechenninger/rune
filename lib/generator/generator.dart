@@ -1641,6 +1641,8 @@ extension MusicId on Music {
     switch (this) {
       case Music.motaviaTown:
         return Constant('MusicID_MotabiaTown');
+      case Music.motaviaVillage:
+        return Constant('MusicID_MotabiaVillage');
       default:
         return _defaultConstant(this);
     }

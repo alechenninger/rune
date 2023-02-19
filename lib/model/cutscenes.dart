@@ -124,9 +124,11 @@ class FadeInField extends Event {
 
 class Panel {}
 
+// See _panelData for generation
 final allPanels = <Panel>[
   ...PrincipalPanel.values,
   ...MeetingHahnPanel.values,
+  ...BirthValleyPanel.values,
 ];
 
 enum PrincipalPanel implements Panel {
@@ -143,6 +145,15 @@ enum PrincipalPanel implements Panel {
 enum MeetingHahnPanel implements Panel {
   hahn,
   hahnSweatsBeforeAlys,
+}
+
+enum BirthValleyPanel implements Panel {
+  holtPetrifiedBeforeHahn,
+  holtPetrifiedPortrait,
+  hahnDarkEyes,
+  alysEyesAndShay,
+  alysFingerUp,
+  hahnEmotional,
 }
 
 class PanelByIndex implements Panel {

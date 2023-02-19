@@ -74,7 +74,62 @@ class StopMusic extends Event {
 
 enum Sound { selection, surprise }
 
-enum Music { mystery, suspicion, motaviaTown }
+// generated using
+// cat musicids | gsed -E 's/MusicID_(\S+).*/\1,/' | gsed -E 's/\w/\L&/'
+enum Music {
+  tonoeDePon,
+  inn,
+  motaviaVillage,
+  motaviaTown,
+  organicBeat,
+  dezorisTown1,
+  nowOnSale,
+  behindTheCircuit,
+  machineCenter,
+  inTheCave,
+  winners,
+  fieldMotabia,
+  landMaster,
+  requiemForLutz,
+  meetThemHeadOn,
+  ryucrossField,
+  dungeonArrange1,
+  fal,
+  templeNgangbius,
+  thray,
+  defeatAtABlow,
+  cyberneticCarnival,
+  terribleSight,
+  edgeOfDarkness,
+  dezorisField1,
+  tower,
+  takeOffLandeel,
+  dezorisTown2,
+  dezorisField2,
+  aHappySettlement,
+  suspicion,
+  theKingOfTerrors,
+  theAgeOfFables,
+  abyss,
+  enemyAppearance,
+  herLastBreath,
+  pain,
+  jijyNoRag,
+  dungeonArrange2Cont,
+  theBlackBlood,
+  redAlert,
+  laughter,
+  mystery,
+  endOfTheMillennium,
+  explosion,
+  staffRoll,
+  thePromisingFuture1,
+  paoPao,
+  dungeonArrange2,
+  thePromisingFuture2,
+  dezorisDeDon,
+  ooze,
+}
 
 /*
 SFXID_Rod = id(PtrSFX_Rod)	; $B5

@@ -11,6 +11,12 @@ final _panelData = <Panel>[
   PrincipalPanel.zio,
   PrincipalPanel.manTurnedToStone,
   PrincipalPanel.alysWhispersToHahn,
+  BirthValleyPanel.holtPetrifiedBeforeHahn,
+  BirthValleyPanel.holtPetrifiedPortrait,
+  BirthValleyPanel.hahnDarkEyes,
+  BirthValleyPanel.alysEyesAndShay,
+  BirthValleyPanel.alysFingerUp,
+  BirthValleyPanel.hahnEmotional,
 ];
 
 extension PanelIndex on Panel {
