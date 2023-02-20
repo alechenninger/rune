@@ -129,6 +129,7 @@ final allPanels = <Panel>[
   ...PrincipalPanel.values,
   ...MeetingHahnPanel.values,
   ...BirthValleyPanel.values,
+  ...MolcumPanel.values,
 ];
 
 enum PrincipalPanel implements Panel {
@@ -154,6 +155,14 @@ enum BirthValleyPanel implements Panel {
   alysEyesAndShay,
   alysFingerUp,
   hahnEmotional,
+}
+
+enum MolcumPanel implements Panel {
+  rune,
+  runeCloseUp,
+  shayAndRune,
+  alysSurprised,
+  alysSlightlyEmbarrassed,
 }
 
 class PanelByIndex implements Panel {

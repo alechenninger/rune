@@ -17,6 +17,11 @@ final _panelData = <Panel>[
   BirthValleyPanel.alysEyesAndShay,
   BirthValleyPanel.alysFingerUp,
   BirthValleyPanel.hahnEmotional,
+  MolcumPanel.rune,
+  MolcumPanel.runeCloseUp,
+  MolcumPanel.shayAndRune,
+  MolcumPanel.alysSurprised,
+  MolcumPanel.alysSlightlyEmbarrassed,
 ];
 
 extension PanelIndex on Panel {

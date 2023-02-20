@@ -82,6 +82,8 @@ final _mapObjectSpecRoutines = {
       Word(0x13C), Label('loc_49128'), SpecFactory((_) => AiedoShopperMom())),
   Elevator: FieldRoutine(
       Word(0x120), Label('FieldObj_Elevator'), SpecFactory((d) => Elevator(d))),
+  InvisibleBlock: FieldRoutine(Word(0x74), Label('FieldObj_InvisibleBlock'),
+      SpecFactory((_) => InvisibleBlock())),
 };
 
 final _npcBehaviorRoutines = {

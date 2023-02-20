@@ -480,6 +480,14 @@ class SceneAsmGenerator implements EventVisitor {
         _memory.putInAddress(a3, face.object);
       }
 
+      /*
+      sometimes this is done in events:
+  lea	($FFFFC400).w, a4
+	lea	(Character_1).w, a3
+	move.w	$6(a3), d0
+	bchg	#2, d0
+	jsr	(Event_UpdateObjFacing).l
+       */
       asm.add(jsr(Label('Interaction_UpdateObj').l));
 
       return asm;
@@ -935,12 +943,18 @@ class SceneAsmGenerator implements EventVisitor {
 		8 = Pauses music
 		9 = Resumes music
      */
-    _addToEvent(
-        playMusic,
-        (_) => Asm([
-              move.b(playMusic.music.musicId.i, Constant('Sound_Index').l),
-              move.b(playMusic.music.musicId.i, Constant('Saved_Sound_Index').w)
-            ]));
+    var musicId = playMusic.music.musicId;
+
+    _addToEventOrDialog(playMusic, inDialog: () {
+      _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
+      _addToDialog(dc.b([musicId]));
+      // TODO: note in this case, saved sound index is not set
+    }, inEvent: (_) {
+      return Asm([
+        move.b(musicId.i, Constant('Sound_Index').l),
+        move.b(musicId.i, Constant('Saved_Sound_Index').w)
+      ]);
+    });
   }
 
   @override
@@ -1035,8 +1049,7 @@ class SceneAsmGenerator implements EventVisitor {
           // TODO: should this synthetic event logic be in the model instead?
           if (_memory.isFieldShown != true) {
             fadeInField(FadeInField());
-          }
-          if ((_memory.panelsShown ?? 0) > 0) {
+          } else if ((_memory.panelsShown ?? 0) > 0) {
             hideAllPanels(HideAllPanels());
           }
           _eventAsm.add(returnFromDialogEvent());
