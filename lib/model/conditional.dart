@@ -51,7 +51,7 @@ final storyEvents = [
   EventFlag('PrincipalConfession'),
   EventFlag('HoltPetrified'),
   EventFlag('RuneJoined'),
-  EventFlag('Saya'),
+  //EventFlag('Saya'), // May occur in different order
   EventFlag('TonoePathOpen'),
   //EventFlag('TheRanchOwner'),
   //EventFlag('MileRanchOwner'),
