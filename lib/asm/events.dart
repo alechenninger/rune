@@ -450,9 +450,7 @@ Asm returnFromDialogEvent() {
   return Asm([
     move.w(0.toWord.i, Constant('Game_Mode_Routine').w),
     movea.l(Constant('Map_Chunk_Addr').w, a0),
-    // todo: tail call
-    jsr(Label('Map_LoadChunks').l),
-    rts,
+    jmp(Label('Map_LoadChunks').l),
   ]);
 }
 
