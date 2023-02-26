@@ -258,7 +258,7 @@ abstract class Speaker {
 }
 
 // todo: this is really more like "unseen" speaker
-class UnnamedSpeaker implements Speaker {
+class UnnamedSpeaker with Speaker {
   const UnnamedSpeaker();
 
   @override
@@ -273,7 +273,7 @@ class UnnamedSpeaker implements Speaker {
   int get hashCode => name.hashCode;
 }
 
-class PrincipalKroft implements Speaker {
+class PrincipalKroft with Speaker {
   const PrincipalKroft();
 
   @override
@@ -288,7 +288,7 @@ class PrincipalKroft implements Speaker {
   int get hashCode => name.hashCode;
 }
 
-class Zio implements Speaker {
+class Zio with Speaker {
   const Zio();
 
   @override

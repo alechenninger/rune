@@ -165,6 +165,10 @@ class EventFlags {
 
   final _freeEventFlags = freeEventFlags();
 
+  EventFlags() {
+    _setNextFreeEventFlag();
+  }
+
   Word toId(EventFlag flag) {
     var c = Constant('EventFlag_${flag.name}');
     return _addEventFlag(c);
@@ -191,9 +195,13 @@ class EventFlags {
       throw StateError('cannot add event flag; too many event flags');
     }
     _customEventFlags[index] = flag;
+    _setNextFreeEventFlag();
+    return index;
+  }
+
+  void _setNextFreeEventFlag() {
     _eventFlagOffset =
         _freeEventFlags.isEmpty ? null : _freeEventFlags.removeFirst();
-    return index;
   }
 }
 
