@@ -263,7 +263,7 @@ class Scene {
   final List<Event> events;
 
   Scene([Iterable<Event> events = const []]) : events = [] {
-    this.events.addAll(events);
+    addEvents(events);
   }
 
   Scene.forNpcInteraction([Iterable<Event> events = const []])
@@ -300,11 +300,27 @@ class Scene {
   }
 
   void addEvent(Event event) {
-    events.add(event);
+    _addEvent(events, event);
   }
 
   void addEvents(Iterable<Event> events) {
-    this.events.addAll(events);
+    events.forEach(addEvent);
+  }
+
+  void _addEvent(List<Event> events, Event event) {
+    var last = events.lastOrNull;
+    // todo: should IfFlag branches just be Scenes? would simplify this class
+    if (last is IfFlag && event is IfFlag && last.flag == event.flag) {
+      // normalize conditionals
+      for (var e in event.isSet) {
+        _addEvent(last.isSet, e);
+      }
+      for (var e in event.isUnset) {
+        _addEvent(last.isUnset, e);
+      }
+    } else {
+      events.add(event);
+    }
   }
 
   @override

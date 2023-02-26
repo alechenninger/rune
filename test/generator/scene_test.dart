@@ -481,7 +481,7 @@ ${dialog2.toAsm()}
           asm.withoutComments().tail(6),
           Asm([
             jsr(Label('Event_GetAndRunDialogue5').l),
-            moveq(Constant('EventFlag_test').i, d0),
+            move.b(Constant('EventFlag_test').i, d0),
             jsr(Label('EventFlags_Set').l),
             moveq(0.i, d0),
             rts,
