@@ -700,10 +700,10 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEventOrDialog(setFlag, inDialog: () {
       var flag = _eventFlags.toConstantValue(setFlag.flag);
       if (flag.value > Byte.max) {
-        _addToDialog(dc.b([Byte(0xf2), Byte(0xfd)]));
+        _addToDialog(dc.b([Byte(0xf2), Byte(0xd)]));
         _addToDialog(dc.w([flag.constant]));
       } else {
-        _addToDialog(dc.b([Byte(0xf2), Byte(0xfb)]));
+        _addToDialog(dc.b([Byte(0xf2), Byte(0xb)]));
         _addToDialog(dc.b([flag.constant]));
       }
     }, inEvent: (_) {
