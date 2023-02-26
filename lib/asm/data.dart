@@ -332,6 +332,10 @@ class Constants {
     return UnmodifiableMapView(_map);
   }
 
+  void add(Constant flag, Expression value) => _map[flag] = value;
+
+  Expression? resolve(Constant constant) => _map[constant];
+
   // todo: eh
   bool containsConstantNamed(String constant) =>
       _map.keys.map((e) => e.constant).toSet().contains(constant);
@@ -408,6 +412,14 @@ class Value extends Expression implements Comparable<Value> {
     return value >= other.value;
   }
 
+  bool operator <(Value other) {
+    return value < other.value;
+  }
+
+  bool operator <=(Value other) {
+    return value <= other.value;
+  }
+
   @override
   String toString() => value.toString();
 
@@ -447,6 +459,29 @@ class Constant extends Expression {
 
   @override
   int get hashCode => constant.hashCode;
+}
+
+class KnownConstantValue {
+  final Constant constant;
+  final Value value;
+
+  KnownConstantValue(this.constant, this.value);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is KnownConstantValue &&
+          runtimeType == other.runtimeType &&
+          constant == other.constant &&
+          value == other.value;
+
+  @override
+  int get hashCode => constant.hashCode ^ value.hashCode;
+
+  @override
+  String toString() {
+    return 'KnownConstantValue{$constant=$value}';
+  }
 }
 
 class Label extends Sized implements Address {
@@ -631,6 +666,7 @@ class Byte extends SizedValue {
   static const zero = Byte._(0);
   static const one = Byte._(1);
   static const two = Byte._(2);
+  static const max = Byte._(0xFF);
 
   Byte(int value) : super(value);
   factory Byte.truncate(int value) => Size.b.truncate(value) as Byte;

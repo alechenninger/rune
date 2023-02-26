@@ -192,8 +192,9 @@ class FieldRoutine {
 
 MapAsm compileMap(
     GameMap map, EventRoutines eventRoutines, Word? spriteVramOffset,
-    {required DialogTrees dialogTrees,
-    EventFlags eventFlags = const EventFlagConstants()}) {
+    {required DialogTrees dialogTrees, EventFlags? eventFlags}) {
+  eventFlags = eventFlags ?? EventFlags();
+
   var trees = dialogTrees;
   var spritesAsm = Asm.empty();
   var objectsAsm = Asm.empty();
@@ -223,7 +224,7 @@ MapAsm compileMap(
             trees,
             eventsAsm,
             eventRoutines,
-            eventFlags));
+            eventFlags!));
     var tileNumber = objectsTileNumbers[obj.id] ?? Word(0);
     _compileMapObjectData(objectsAsm, obj, tileNumber, dialogId);
   }

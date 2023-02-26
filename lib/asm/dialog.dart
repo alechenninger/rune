@@ -25,6 +25,7 @@ loc_6A39E:
    */
   static final delay = Bytes.hex('F9');
   static final eventCheck = Bytes.hex('FA');
+  static final extendedEventCheck = Bytes.hex('FB');
   static final newLine = Bytes.hex('FC');
   static final interrupt = Bytes.hex('FD');
   static final terminate = Bytes.hex('FF');
@@ -55,6 +56,18 @@ Asm runEvent(Word index) {
 
 Asm portrait(Byte portrait) {
   return dc.b([..._ControlCodes.portrait, portrait]);
+}
+
+Asm extendableEventCheck(KnownConstantValue flag, Byte dialogOffset) {
+  if (flag.value > Byte.max) {
+    return Asm([
+      dc.b(_ControlCodes.extendedEventCheck),
+      dc.w([flag.constant]),
+      dc.b([dialogOffset])
+    ]);
+  } else {
+    return eventCheck(flag.constant, dialogOffset);
+  }
 }
 
 Asm eventCheck(Expression flag, Byte dialogOffset) {

@@ -74,15 +74,9 @@ class Program {
   Asm get cutscenesPointers => Asm([_cutscenesPointers]);
   Word _cutsceneIndexOffset;
 
-  Byte? _eventFlagOffset;
-  final BiMap<Byte, Constant> _customEventFlags = BiMap();
-  Byte? get peekNextEventFlag => _eventFlagOffset;
-  Map<Byte, Constant> customEventFlags() =>
-      _customEventFlags.toIMap().unlockLazy;
-
   final Map<MapId, Word> _vramTileOffsets = {};
 
-  final _freeEventFlags = freeEventFlags();
+  final _eventFlags = EventFlags();
 
   Program({
     Word? eventIndexOffset,
@@ -91,8 +85,6 @@ class Program {
   })  : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord,
         _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord {
     _vramTileOffsets.addAll(vramTileOffsets ?? _defaultSpriteVramOffsets);
-    _eventFlagOffset =
-        _freeEventFlags.isEmpty ? null : _freeEventFlags.removeFirst();
   }
 
   /// Returns event index by which [routine] can be referenced.
@@ -115,24 +107,10 @@ class Program {
     return (cutsceneIndex + Word(0x8000)) as Word;
   }
 
-  Byte _addEventFlag(Constant flag) {
-    var existing = eventFlags[flag] ?? _customEventFlags.inverse[flag];
-    if (existing != null) return existing;
-
-    var index = _eventFlagOffset;
-    if (index == null) {
-      throw StateError('cannot add event flag; too many event flags');
-    }
-    _customEventFlags[index] = flag;
-    _eventFlagOffset =
-        _freeEventFlags.isEmpty ? null : _freeEventFlags.removeFirst();
-    return index;
-  }
-
   SceneAsm addScene(SceneId id, Scene scene, {GameMap? startingMap}) {
     var eventAsm = EventAsm.empty();
     var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
-        startingMap: startingMap, eventFlags: _ProgramEventFlags(this));
+        startingMap: startingMap, eventFlags: _eventFlags);
 
     for (var event in scene.events) {
       event.visit(generator);
@@ -154,7 +132,7 @@ class Program {
     var spriteVramOffset = _vramTileOffsets[map.id];
     return _maps[map.id] = compileMap(
         map, _ProgramEventRoutines(this), spriteVramOffset,
-        dialogTrees: dialogTrees, eventFlags: _ProgramEventFlags(this));
+        dialogTrees: dialogTrees, eventFlags: _eventFlags);
   }
 
   /// DialogTrees for maps which are not added to the game.
@@ -165,7 +143,9 @@ class Program {
   }
 
   Asm extraConstants() {
-    return _customEventFlags.entries
+    return _eventFlags
+        .customEventFlags()
+        .entries
         .map((e) => Asm.fromRaw('${e.value.constant} = ${e.key}'))
         .reduceOr((a1, a2) => Asm([a1, a2]), ifEmpty: Asm.empty());
   }
@@ -176,8 +156,45 @@ abstract class EventRoutines {
   Word addCutscene(Label name);
 }
 
-abstract class EventFlags {
-  Constant toConstant(EventFlag flag);
+class EventFlags {
+  Word? _eventFlagOffset;
+  final BiMap<Word, Constant> _customEventFlags = BiMap();
+  Word? get peekNextEventFlag => _eventFlagOffset;
+  Map<Word, Constant> customEventFlags() =>
+      _customEventFlags.toIMap().unlockLazy;
+
+  final _freeEventFlags = freeEventFlags();
+
+  Word toId(EventFlag flag) {
+    var c = Constant('EventFlag_${flag.name}');
+    return _addEventFlag(c);
+  }
+
+  KnownConstantValue toConstantValue(EventFlag flag) {
+    var c = Constant('EventFlag_${flag.name}');
+    return KnownConstantValue(c, _addEventFlag(c));
+  }
+
+  Constant toConstant(EventFlag flag) {
+    var c = Constant('EventFlag_${flag.name}');
+    _addEventFlag(c);
+    return c;
+  }
+
+  Word _addEventFlag(Constant flag) {
+    var existing =
+        eventFlags[flag]?.value.toWord ?? _customEventFlags.inverse[flag];
+    if (existing != null) return existing;
+
+    var index = _eventFlagOffset;
+    if (index == null) {
+      throw StateError('cannot add event flag; too many event flags');
+    }
+    _customEventFlags[index] = flag;
+    _eventFlagOffset =
+        _freeEventFlags.isEmpty ? null : _freeEventFlags.removeFirst();
+    return index;
+  }
 }
 
 class _ProgramEventRoutines extends EventRoutines {
@@ -190,27 +207,6 @@ class _ProgramEventRoutines extends EventRoutines {
 
   @override
   Word addCutscene(Label routine) => _program._addCutscenePointer(routine);
-}
-
-class _ProgramEventFlags extends EventFlagConstants {
-  final Program _program;
-
-  _ProgramEventFlags(this._program);
-
-  @override
-  Constant toConstant(EventFlag flag) {
-    var constant = super.toConstant(flag);
-    _program._addEventFlag(constant);
-    return constant;
-  }
-}
-
-class EventFlagConstants implements EventFlags {
-  const EventFlagConstants();
-  @override
-  Constant toConstant(EventFlag flag) {
-    return Constant('EventFlag_${flag.name}');
-  }
 }
 
 class SceneAsmGenerator implements EventVisitor {
@@ -269,11 +265,11 @@ class SceneAsmGenerator implements EventVisitor {
   // todo: This might be a subclass really
   SceneAsmGenerator.forInteraction(GameMap map, this.id, this._dialogTrees,
       this._eventAsm, EventRoutines eventRoutines,
-      {EventFlags eventFlags = const EventFlagConstants()})
+      {EventFlags? eventFlags})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = const InteractionObject(),
         _eventRoutines = eventRoutines,
-        _eventFlags = eventFlags {
+        _eventFlags = eventFlags ?? EventFlags() {
     _gameMode = Mode.dialog;
 
     _memory.putInAddress(a3, const InteractionObject());
@@ -284,13 +280,12 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   SceneAsmGenerator.forEvent(this.id, this._dialogTrees, this._eventAsm,
-      {GameMap? startingMap,
-      EventFlags eventFlags = const EventFlagConstants()})
+      {GameMap? startingMap, EventFlags? eventFlags})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = null,
         // FIXME: also parameterize eventtype so finish() does the right thing
         _eventType = EventType.event,
-        _eventFlags = eventFlags {
+        _eventFlags = eventFlags ?? EventFlags() {
     _memory.currentMap = startingMap;
     if (startingMap != null) {
       _memory.loadedDialogTree = _dialogTrees.forMap(startingMap.id);
@@ -572,7 +567,8 @@ class SceneAsmGenerator implements EventVisitor {
       // off of for unset branch
       var parent = _memory;
 
-      _addToDialog(eventCheck(_eventFlags.toConstant(flag), ifSetOffset));
+      _addToDialog(
+          extendableEventCheck(_eventFlags.toConstantValue(flag), ifSetOffset));
       _flagIsNotSet(flag);
 
       runEventFromInteractionIfNeeded(ifFlag.isUnset,
@@ -639,15 +635,15 @@ class SceneAsmGenerator implements EventVisitor {
 
         // run isSet events unless there are none
         if (ifFlag.isSet.isEmpty) {
-          _eventAsm.add(branchIfEventFlagSet(
-              _eventFlags.toConstant(flag).i, continueScene));
+          _eventAsm.add(branchIfExtendableFlagSet(
+              _eventFlags.toConstantValue(flag), continueScene));
         } else {
           if (ifFlag.isUnset.isEmpty) {
-            _eventAsm.add(branchIfEvenfFlagNotSet(
-                _eventFlags.toConstant(flag).i, continueScene));
+            _eventAsm.add(branchIfExtendableFlagNotSet(
+                _eventFlags.toConstantValue(flag), continueScene));
           } else {
-            _eventAsm.add(branchIfEvenfFlagNotSet(
-                _eventFlags.toConstant(flag).i, ifUnset));
+            _eventAsm.add(branchIfExtendableFlagNotSet(
+                _eventFlags.toConstantValue(flag), ifUnset));
           }
 
           _flagIsSet(flag);
@@ -690,12 +686,18 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void setFlag(SetFlag setFlag) {
     // TODO: can implement in dialog with F2 and B i guess
-    _addToEvent(
-        setFlag,
-        (eventIndex) => Asm([
-              moveq(_eventFlags.toConstant(setFlag.flag).i, d0),
-              jsr('EventFlags_Set'.toLabel.l)
-            ]));
+    _addToEvent(setFlag, (eventIndex) {
+      var flag = _eventFlags.toConstantValue(setFlag.flag);
+      if (flag.value > Byte.max) {
+        return Asm([
+          move.w(flag.constant.i, d0),
+          jsr('ExtendedEventFlags_Set'.toLabel.l)
+        ]);
+      } else {
+        return Asm(
+            [move.b(flag.constant.i, d0), jsr('EventFlags_Set'.toLabel.l)]);
+      }
+    });
   }
 
   @override
@@ -1298,8 +1300,12 @@ class SceneAsmGenerator implements EventVisitor {
       _replaceDialogRoutine = ([i]) =>
           _eventAsm.replace(line, jsr(Label('Event_RunDialogue${i ?? ""}').l));
     } else {
-      var dialogId = _currentDialogIdOrStart().i;
-      _eventAsm.add(moveq(dialogId, d0));
+      var id = _currentDialogIdOrStart();
+      if (id < Byte(128)) {
+        _eventAsm.add(moveq(id.i, d0));
+      } else {
+        _eventAsm.add(move.b(id.i, d0));
+      }
       var line = _eventAsm.add(jsr(Label('Event_GetAndRunDialogue3').l));
       _replaceDialogRoutine = ([i]) => _eventAsm.replace(
           line, jsr(Label('Event_GetAndRunDialogue${i ?? ""}').l));
@@ -1961,15 +1967,16 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_GaruberkTower_Part7'): Word(0x252),
 }.map((l, o) => MapEntry(labelToMapId(l), o));
 
-Queue<Byte> freeEventFlags() {
-  var q = Queue<Byte>();
+Queue<Word> freeEventFlags() {
+  var q = Queue<Word>();
   int next = 0;
   for (var used in eventFlags.values.sorted((a, b) => a.compareTo(b))) {
     for (; next < used.value; next++) {
-      q.add(Byte(next));
+      q.add(Word(next));
     }
     next = used.value + 1;
   }
-  q.addAll([for (; next <= 0xff; next++) Byte(next)]);
+  // 1ff with extension
+  q.addAll([for (; next <= 0x1ff; next++) Word(next)]);
   return q;
 }

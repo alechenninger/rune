@@ -432,6 +432,7 @@ Asm getAndRunDialog(Address dialogId) {
   ]);
 }
 
+@Deprecated('uses moveq - broken where dialogId > 127 (0x7f)')
 Asm getAndRunDialog3(Address dialogId) {
   return Asm([
     moveq(dialogId, d0),
@@ -603,17 +604,43 @@ Asm clearUninterrupted({required Address clear, required Address range}) {
   return Asm([lea(clear, a0), move.w(range, d7), trap(0.toByte.i)]);
 }
 
+Asm branchIfExtendableFlagSet(KnownConstantValue flag, Address to,
+    {bool short = false}) {
+  if (flag.value > Byte.max) {
+    return Asm([
+      move.w(flag.constant.i, d0),
+      jsr(Label('ExtendedEventFlags_Test').l),
+      if (short) bne.s(to) else bne.w(to)
+    ]);
+  } else {
+    return branchIfEventFlagSet(flag.constant.i, to, short: short);
+  }
+}
+
 Asm branchIfEventFlagSet(Address flag, Address to, {bool short = false}) {
   return Asm([
-    moveq(flag, d0),
+    move.b(flag, d0),
     jsr(Label('EventFlags_Test').l),
     if (short) bne.s(to) else bne.w(to)
   ]);
 }
 
-Asm branchIfEvenfFlagNotSet(Address flag, Address to, {bool short = false}) {
+Asm branchIfExtendableFlagNotSet(KnownConstantValue flag, Address to,
+    {bool short = false}) {
+  if (flag.value > Byte.max) {
+    return Asm([
+      move.w(flag.constant.i, d0),
+      jsr(Label('ExtendedEventFlags_Test').l),
+      if (short) beq.s(to) else beq.w(to)
+    ]);
+  } else {
+    return branchIfEventFlagNotSet(flag.value.i, to, short: short);
+  }
+}
+
+Asm branchIfEventFlagNotSet(Address flag, Address to, {bool short = false}) {
   return Asm([
-    moveq(flag, d0),
+    move.b(flag, d0),
     jsr(Label('EventFlags_Test').l),
     if (short) beq.s(to) else beq.w(to)
   ]);
