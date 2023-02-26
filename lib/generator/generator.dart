@@ -359,7 +359,11 @@ class SceneAsmGenerator implements EventVisitor {
       (event, i) =>
           (event is Dialog && !event.hidePanelsOnClose) ||
           event is PlaySound ||
-          event is ShowPanel,
+          event is PlayMusic ||
+          event is ShowPanel ||
+          event is SetFlag ||
+          event is HideTopPanels ||
+          event is HideAllPanels,
       (event, i) =>
           event is Dialog && event.hidePanelsOnClose && i == events.length - 1,
     ];
@@ -693,8 +697,16 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void setFlag(SetFlag setFlag) {
-    // TODO: can implement in dialog with F2 and B i guess
-    _addToEvent(setFlag, (eventIndex) {
+    _addToEventOrDialog(setFlag, inDialog: () {
+      var flag = _eventFlags.toConstantValue(setFlag.flag);
+      if (flag.value > Byte.max) {
+        _addToDialog(dc.b([Byte(0xf2), Byte(0xfd)]));
+        _addToDialog(dc.w([flag.constant]));
+      } else {
+        _addToDialog(dc.b([Byte(0xf2), Byte(0xfb)]));
+        _addToDialog(dc.b([flag.constant]));
+      }
+    }, inEvent: (_) {
       var flag = _eventFlags.toConstantValue(setFlag.flag);
       if (flag.value > Byte.max) {
         return Asm([
@@ -702,8 +714,13 @@ class SceneAsmGenerator implements EventVisitor {
           jsr('ExtendedEventFlags_Set'.toLabel.l)
         ]);
       } else {
-        return Asm(
-            [move.b(flag.constant.i, d0), jsr('EventFlags_Set'.toLabel.l)]);
+        return Asm([
+          if (flag.value <= Byte(127))
+            moveq(flag.constant.i, d0)
+          else
+            move.b(flag.constant.i, d0),
+          jsr('EventFlags_Set'.toLabel.l)
+        ]);
       }
     });
   }

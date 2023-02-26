@@ -611,16 +611,15 @@ Asm branchIfExtendableFlagSet(KnownConstantValue flag, Address to,
       if (short) bne.s(to) else bne.w(to)
     ]);
   } else {
-    return branchIfEventFlagSet(flag.constant.i, to, short: short);
+    return Asm([
+      if (flag.value <= Byte(127))
+        moveq(flag.constant.i, d0)
+      else
+        move.b(flag.constant.i, d0),
+      jsr(Label('EventFlags_Test').l),
+      if (short) bne.s(to) else bne.w(to)
+    ]);
   }
-}
-
-Asm branchIfEventFlagSet(Address flag, Address to, {bool short = false}) {
-  return Asm([
-    move.b(flag, d0),
-    jsr(Label('EventFlags_Test').l),
-    if (short) bne.s(to) else bne.w(to)
-  ]);
 }
 
 Asm branchIfExtendableFlagNotSet(KnownConstantValue flag, Address to,
@@ -632,16 +631,15 @@ Asm branchIfExtendableFlagNotSet(KnownConstantValue flag, Address to,
       if (short) beq.s(to) else beq.w(to)
     ]);
   } else {
-    return branchIfEventFlagNotSet(flag.value.i, to, short: short);
+    return Asm([
+      if (flag.value <= Byte(127))
+        moveq(flag.constant.i, d0)
+      else
+        move.b(flag.constant.i, d0),
+      jsr(Label('EventFlags_Test').l),
+      if (short) beq.s(to) else beq.w(to)
+    ]);
   }
-}
-
-Asm branchIfEventFlagNotSet(Address flag, Address to, {bool short = false}) {
-  return Asm([
-    move.b(flag, d0),
-    jsr(Label('EventFlags_Test').l),
-    if (short) beq.s(to) else beq.w(to)
-  ]);
 }
 
 Asm refreshMap({bool refreshObjects = true}) {
