@@ -119,8 +119,6 @@ void main() {
       expect(
           dialog.withoutComments().trim(),
           DialogAsm([
-            // todo: technically this could be ommitted?
-            dc.b([Byte(0xf4), Byte(0)]),
             dc.b(Bytes.ascii('Hello')),
             dc.b([Byte(0xfd)]),
             dc.b(Bytes.ascii('Hello')),

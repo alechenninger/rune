@@ -353,17 +353,20 @@ class SceneAsmGenerator implements EventVisitor {
 
     if (events.length == 1 && events[0] is IfFlag) return null;
 
+    bool _hasDialogAfter(int i) =>
+        events.sublist(i + 1).any((e) => e is Dialog);
+
     var dialogCheck = 0;
     var dialogChecks = <bool Function(Event, int)>[
       (event, i) => event is FacePlayer && event.object == _interactingWith,
       (event, i) =>
           (event is Dialog && !event.hidePanelsOnClose) ||
-          event is PlaySound ||
-          event is PlayMusic ||
-          event is ShowPanel ||
+          (event is PlaySound && _hasDialogAfter(i)) ||
+          (event is PlayMusic && _hasDialogAfter(i)) ||
+          (event is ShowPanel && event.showDialogBox && _hasDialogAfter(i)) ||
           event is SetFlag ||
-          event is HideTopPanels ||
-          event is HideAllPanels,
+          (event is HideTopPanels && _hasDialogAfter(i)) ||
+          (event is HideAllPanels && _hasDialogAfter(i)),
       (event, i) =>
           event is Dialog && event.hidePanelsOnClose && i == events.length - 1,
     ];
@@ -697,32 +700,36 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void setFlag(SetFlag setFlag) {
-    _addToEventOrDialog(setFlag, inDialog: () {
-      var flag = _eventFlags.toConstantValue(setFlag.flag);
-      if (flag.value > Byte.max) {
-        _addToDialog(dc.b([Byte(0xf2), Byte(0xd)]));
-        _addToDialog(dc.w([flag.constant]));
-      } else {
-        _addToDialog(dc.b([Byte(0xf2), Byte(0xb)]));
-        _addToDialog(dc.b([flag.constant]));
-      }
-    }, inEvent: (_) {
-      var flag = _eventFlags.toConstantValue(setFlag.flag);
-      if (flag.value > Byte.max) {
-        return Asm([
-          move.w(flag.constant.i, d0),
-          jsr('ExtendedEventFlags_Set'.toLabel.l)
-        ]);
-      } else {
-        return Asm([
-          if (flag.value <= Byte(127))
-            moveq(flag.constant.i, d0)
-          else
-            move.b(flag.constant.i, d0),
-          jsr('EventFlags_Set'.toLabel.l)
-        ]);
-      }
-    });
+    _addToEventOrDialog(setFlag,
+        inDialog: () {
+          var flag = _eventFlags.toConstantValue(setFlag.flag);
+          if (flag.value > Byte.max) {
+            _addToDialog(dc.b([Byte(0xf2), Byte(0xd)]));
+            _addToDialog(dc.w([flag.constant]));
+          } else {
+            _addToDialog(dc.b([Byte(0xf2), Byte(0xb)]));
+            _addToDialog(dc.b([flag.constant]));
+          }
+        },
+        // SetFlag isn't perceptible, so okay if run with last dialog
+        runWithLastDialog: true,
+        inEvent: (_) {
+          var flag = _eventFlags.toConstantValue(setFlag.flag);
+          if (flag.value > Byte.max) {
+            return Asm([
+              move.w(flag.constant.i, d0),
+              jsr('ExtendedEventFlags_Set'.toLabel.l)
+            ]);
+          } else {
+            return Asm([
+              if (flag.value <= Byte(127))
+                moveq(flag.constant.i, d0)
+              else
+                move.b(flag.constant.i, d0),
+              jsr('EventFlags_Set'.toLabel.l)
+            ]);
+          }
+        });
   }
 
   @override
@@ -863,6 +870,9 @@ class SceneAsmGenerator implements EventVisitor {
 
     var speaker = showPanel.speaker;
     if (speaker != null) {
+      // This is not using add to dialog or event,
+      // because it HAS to run in dialog in this case.
+      // It is like a Dialog event in that way.
       _generateQueueInCurrentMode();
       _runOrInterruptDialog(showPanel);
       _memory.addPanel();
@@ -1226,18 +1236,18 @@ class SceneAsmGenerator implements EventVisitor {
     sibling?.clearChanges();
   }
 
-  void _runOrInterruptDialog([Event? event]) {
+  void _runOrInterruptDialog(Event event, {bool runWithLastDialog = false}) {
     _expectFacePlayerFirstIfInteraction();
 
     if (!inDialogLoop) {
       _runDialog();
-    } else if (_lastEventInCurrentDialog is Dialog) {
+    } else if (_lastEventInCurrentDialog is Dialog && !runWithLastDialog) {
       // Add cursor for previous dialog
       // This is delayed because this interrupt may be a termination
       _lastInterrupt = _addToDialog(interrupt());
     }
 
-    if (event != null) _lastEventInCurrentDialog = event;
+    _lastEventInCurrentDialog = event;
   }
 
   void _expectFacePlayerFirstIfInteraction() {
@@ -1475,7 +1485,8 @@ class SceneAsmGenerator implements EventVisitor {
   void _addToEventOrDialog(Event event,
       {required void Function() inDialog,
       required Asm? Function(int eventIndex) inEvent,
-      void Function()? after}) {
+      void Function()? after,
+      bool runWithLastDialog = false}) {
     _checkNotFinished();
 
     generateEvent() {
@@ -1489,7 +1500,7 @@ class SceneAsmGenerator implements EventVisitor {
     } else {
       // may go either way
       _queuedGeneration.addFirst(_QueuedGeneration(() {
-        _runOrInterruptDialog(event);
+        _runOrInterruptDialog(event, runWithLastDialog: runWithLastDialog);
         inDialog();
         after?.call();
       }, generateEvent));

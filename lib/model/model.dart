@@ -141,7 +141,7 @@ class EventState {
 
   bool? isFieldShown = true;
 
-  Speaker? dialogPortrait;
+  Speaker? dialogPortrait = UnnamedSpeaker();
 
   GameMap? currentMap;
 

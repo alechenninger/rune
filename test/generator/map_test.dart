@@ -288,11 +288,11 @@ void main() {
           mapAsm.dialog,
           Asm([
             comment(r'$00'),
-            Dialog(spans: [DialogSpan('Hello!')]).toAsm(),
+            Dialog(spans: [DialogSpan('Hello!')]).toAsm(EventState()),
             terminateDialog(),
             newLine(),
             comment(r'$01'),
-            Dialog(spans: [DialogSpan('Goodbye!')]).toAsm(),
+            Dialog(spans: [DialogSpan('Goodbye!')]).toAsm(EventState()),
             terminateDialog(),
             newLine()
           ]));
@@ -329,7 +329,7 @@ void main() {
           Asm([
             comment(r'$00'),
             dc.b(Bytes.of(0xF3)),
-            Dialog(spans: [DialogSpan('Hello!')]).toAsm(),
+            Dialog(spans: [DialogSpan('Hello!')]).toAsm(EventState()),
             terminateDialog(),
             newLine(),
           ]));
@@ -424,12 +424,13 @@ void main() {
 
   group('npc interaction events', () {
     group('in dialog', () {
-      test('plays sound', () {
+      test('plays sound if there is a dialog after', () {
         var obj = MapObject(
             startPosition: Position('1e0'.hex, '2e0'.hex),
             spec: Npc(Sprite.PalmanMan1, FaceDown()),
             onInteract: Scene([
               PlaySound(Sound.surprise),
+              Dialog(spans: [DialogSpan('Hiyo!')])
             ]));
         testMap.addObject(obj);
 
@@ -440,8 +441,55 @@ void main() {
             Asm([
               dc.b([Byte(0xf2), Byte(3)]),
               dc.b([Constant('SFXID_Surprise')]),
+              dc.b(Bytes.ascii('Hiyo!')),
               dc.b([Byte(0xff)]),
             ]));
+      });
+
+      test('sets flag with last dialog if set flag is after dialog', () {
+        var obj = MapObject(
+            startPosition: Position('1e0'.hex, '2e0'.hex),
+            spec: Npc(Sprite.PalmanMan1, FaceDown()),
+            onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hiyo!')]),
+              SetFlag(EventFlag('test')),
+            ]));
+        testMap.addObject(obj);
+
+        var asm = program.addMap(testMap);
+
+        expect(
+            asm.dialog.withoutComments().trim(),
+            Asm([
+              dc.b(Bytes.ascii('Hiyo!')),
+              dc.b([Byte(0xf2), Byte(0xb)]),
+              dc.b([Constant('EventFlag_test')]),
+              dc.b([Byte(0xff)]),
+            ]));
+      });
+    });
+
+    group('in event', () {
+      test('plays sound if there is no dialog after', () {
+        var obj = MapObject(
+            startPosition: Position('1e0'.hex, '2e0'.hex),
+            spec: Npc(Sprite.PalmanMan1, FaceDown()),
+            onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hiyo!')]),
+              PlaySound(Sound.surprise),
+            ]));
+        testMap.addObject(obj);
+
+        var asm = program.addMap(testMap);
+
+        expect(
+            asm.events
+                .withoutComments()
+                .trim()
+                .skipWhile((i) => !'$i'.contains('RunDialog'))
+                .skip(1)
+                .take(1),
+            Asm([move.b(Sound.surprise.sfxId.i, Constant('Sound_Index').l)]));
       });
     });
 
