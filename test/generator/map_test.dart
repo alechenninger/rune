@@ -446,7 +446,9 @@ void main() {
             ]));
       });
 
-      test('sets flag with last dialog if set flag is after dialog', () {
+      test('sets flag first if set flag is after dialog', () {
+        // this is actually a property of the Scene model
+
         var obj = MapObject(
             startPosition: Position('1e0'.hex, '2e0'.hex),
             spec: Npc(Sprite.PalmanMan1, FaceDown()),
@@ -461,9 +463,9 @@ void main() {
         expect(
             asm.dialog.withoutComments().trim(),
             Asm([
-              dc.b(Bytes.ascii('Hiyo!')),
               dc.b([Byte(0xf2), Byte(0xb)]),
               dc.b([Constant('EventFlag_test')]),
+              dc.b(Bytes.ascii('Hiyo!')),
               dc.b([Byte(0xff)]),
             ]));
       });

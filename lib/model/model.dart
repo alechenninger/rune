@@ -312,11 +312,37 @@ class Scene {
     // todo: should IfFlag branches just be Scenes? would simplify this class
     if (last is IfFlag && event is IfFlag && last.flag == event.flag) {
       // normalize conditionals
+      events.removeLast();
+      var isSet = [...last.isSet];
+      var isUnset = [...last.isUnset];
       for (var e in event.isSet) {
-        _addEvent(last.isSet, e);
+        _addEvent(isSet, e);
       }
       for (var e in event.isUnset) {
-        _addEvent(last.isUnset, e);
+        _addEvent(isUnset, e);
+      }
+      events.add(IfFlag(last.flag, isSet: isSet, isUnset: isUnset));
+    } else if (events.isNotEmpty && event == InteractionObject.facePlayer()) {
+      // special case, must retain this first when normalizing
+      // todo: consider changing how some events work
+      // face player, set flag, set context - these are not perceptible
+      // set context is still a little different,
+      // since order changes semantics
+      // however face player must always be first
+      // and set flag doesn't matter where it is in a branch
+      // so those are more properties of branches, than events per se
+      // or we can consider handling in generator
+      // for now we are sort of treating it as a property of the scene by
+      // virtue of this reording logic
+      events.insert(0, event);
+    } else if (event is SetFlag) {
+      // This reordering results in an optimization.
+      // Setting the flag shouldn't matter where it is.
+      // But if we do it last, we have to generate in event code.
+      if (events.firstOrNull == InteractionObject.facePlayer()) {
+        events.insert(1, event);
+      } else {
+        events.insert(0, event);
       }
     } else {
       events.add(event);
