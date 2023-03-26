@@ -502,7 +502,7 @@ class ConstantIterator implements Iterator<Sized> {
 
     var cmd = next.cmdWithoutAttribute;
 
-    if (cmd == 'if' || cmd == 'include') {
+    if (cmd == 'if' || cmd == 'include' || cmd == 'endif') {
       // FIXME: evaluate conditional assembly
       // for now skip
       _loadNextLine();
@@ -652,6 +652,17 @@ class ConstantReader {
     if (c.canSplit) {
       c.splitInto(Size.b).reversed.forEach(_queue.addFirst);
       return readByte();
+    }
+    throw ConstantReadException(Size.b, [c]);
+  }
+
+  // todo: test!
+  Sized readByteExpression() {
+    var c = _next();
+    if (c.size == Size.b) return c;
+    if (c.canSplit) {
+      c.splitInto(Size.b).reversed.forEach(_queue.addFirst);
+      return readByteExpression();
     }
     throw ConstantReadException(Size.b, [c]);
   }

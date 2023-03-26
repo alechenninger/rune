@@ -732,6 +732,40 @@ void main() {
 
       expect(tile, Word(0x2d0));
     });
+
+    test('parses interaction areas', () async {
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogTree()
+          ..add(DialogAsm([
+            dc.b(Bytes.ascii('Hi there!')),
+            dc.b([Byte(0xff)])
+          ]))
+      });
+
+      var asm = (MapAsmFixture()
+            ..addArea(
+                x: 0x3c, // 1e0
+                y: 0x3a, // 1d0
+                range: 1,
+                flagCheckType: 0,
+                flag: 0,
+                routine: 0,
+                parameter: 5))
+          .toAsm();
+
+      var map = await asmToMap(Label('Map_Test'), asm, dialog);
+
+      expect(map.areas, [
+        MapArea(
+            at: Position(0x1e0, 0x1d0),
+            range: AreaRange.x40y40,
+            spec: AsmArea(
+                eventType: Byte.zero,
+                eventFlag: Byte.zero,
+                interactionRoutine: Byte.zero,
+                interactionParameter: Byte(5)))
+      ]);
+    });
   });
 
   test('preprocesses map does not change existing data', () async {
@@ -847,6 +881,19 @@ class MapAsmFixture {
     return _objects.length - 1;
   }
 
+  final _areas = <List<int>>[];
+  int addArea(
+      {required int x,
+      required int y,
+      required int range,
+      required int flagCheckType,
+      required int flag,
+      required int routine,
+      required int parameter}) {
+    _areas.add([x, y, range, flagCheckType, flag, routine, parameter]);
+    return _areas.length - 1;
+  }
+
   Asm toAsm() => Asm.fromRaw('''Map_$mapName:
 	dc.b	\$08
 	dc.b	MusicID_TonoeDePon
@@ -883,6 +930,7 @@ class MapAsmFixture {
 	dc.l	$dialogTreeLabel
 
 ; Interaction areas
+	${_areasAsm()}
 	dc.w	\$FFFF
 
 ; Events
@@ -920,6 +968,24 @@ class MapAsmFixture {
       asm.add(dc.b(Bytes.list([direction, dialog])));
       asm.add(dc.w([Word(tileNumber)]));
       asm.add(dc.w(Words.list([x, y])));
+      asm.addNewline();
+    }
+    return asm.toString();
+  }
+
+  String _areasAsm() {
+    var asm = Asm.empty();
+    for (var area in _areas) {
+      var x = area[0];
+      var y = area[1];
+      var range = area[2];
+      var flagCheckType = area[3];
+      var flag = area[4];
+      var routine = area[5];
+      var parameter = area[6];
+      asm.add(dc.w([Word(x), Word(y)]));
+      asm.add(dc.w([Word(range)]));
+      asm.add(dc.b(Bytes.list([flagCheckType, flag, routine, parameter])));
       asm.addNewline();
     }
     return asm.toString();

@@ -6,21 +6,20 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
+import 'package:rune/model/conditional.dart';
 
 import '../asm/asm.dart';
 import 'model.dart';
 
-// generator will need to track a vram tile number offset to start storing art
-// pointers
-// note that many events refer to map objects address in memory, which means
-// ordering must be maintained for existing objects unless we find and edit
-// those addresses.
 class GameMap {
   final MapId id;
 
   // limited to 64 objects in ram currently
   final _objects = <MapObjectId, _MapObjectAt>{};
   final _indexedObjects = <MapObject?>[];
+
+  // doesn't appear to be a limit other than ROM size
+  final _areas = <MapArea>[];
 
   GameMap(this.id);
 
@@ -41,8 +40,8 @@ class GameMap {
   Iterable<IndexedMapObject> get indexedObjects =>
       _iterateIndexedObjects().whereNotNull();
 
-  bool get isNotEmpty => _objects.isNotEmpty;
-  bool get isEmpty => _objects.isEmpty;
+  bool get isNotEmpty => _objects.isNotEmpty || _areas.isNotEmpty;
+  bool get isEmpty => _objects.isEmpty && _areas.isEmpty;
 
   //final onMove = <Event>[];
 
@@ -107,6 +106,14 @@ class GameMap {
     addObject(obj.object, at: obj.index);
   }
 
+  Iterable<MapArea> get areas => UnmodifiableListView(_areas);
+
+  void addArea(MapArea area) {
+    _areas.add(area);
+  }
+
+  // update area? addAreaAt?
+
   @override
   String toString() {
     return 'GameMap{id: $id, _indexedObjects: $_indexedObjects}';
@@ -143,7 +150,7 @@ class IndexedMapObject {
   }
 }
 
-enum Area {
+enum Zone {
   Test('Test Area'),
   Piata,
   Mile,
@@ -190,273 +197,273 @@ enum Area {
   final String? _readableName;
   String get readableName => _readableName ?? name;
 
-  const Area([String? readableName]) : _readableName = readableName;
+  const Zone([String? readableName]) : _readableName = readableName;
 }
 
 enum MapId {
-  Test(Area.Test),
-  Test_Part2(Area.Test),
+  Test(Zone.Test),
+  Test_Part2(Zone.Test),
 
   Dezolis,
   Motavia,
   Rykros,
 
-  PiataAcademy(Area.Piata),
-  PiataAcademyF1(Area.Piata),
+  PiataAcademy(Zone.Piata),
+  PiataAcademyF1(Zone.Piata),
   //PiataAcademy_F1(Area.Piata),
-  PiataAcademyPrincipalOffice(Area.Piata),
+  PiataAcademyPrincipalOffice(Zone.Piata),
   //AcademyPrincipalOffice(Area.Piata),
-  PiataAcademyNearBasement(Area.Piata),
-  PiataAcademyBasement(Area.Piata),
+  PiataAcademyNearBasement(Zone.Piata),
+  PiataAcademyBasement(Zone.Piata),
   //AcademyBasement(Area.Piata),
-  PiataAcademyBasementB1(Area.Piata),
+  PiataAcademyBasementB1(Zone.Piata),
   //AcademyBasement_B1(Area.Piata),
-  PiataAcademyBasementB2(Area.Piata),
+  PiataAcademyBasementB2(Zone.Piata),
   //AcademyBasement_B2(Area.Piata),
-  Piata(Area.Piata),
-  PiataDorm(Area.Piata),
-  PiataInn(Area.Piata),
-  PiataHouse1(Area.Piata),
-  PiataHouse2(Area.Piata),
-  PiataItemShop(Area.Piata),
+  Piata(Zone.Piata),
+  PiataDorm(Zone.Piata),
+  PiataInn(Zone.Piata),
+  PiataHouse1(Zone.Piata),
+  PiataHouse2(Zone.Piata),
+  PiataItemShop(Zone.Piata),
 
-  Mile(Area.Mile),
-  MileWeaponShop(Area.Mile),
-  MileHouse1(Area.Mile),
-  MileItemShop(Area.Mile),
-  MileHouse2(Area.Mile),
-  MileInn(Area.Mile),
+  Mile(Zone.Mile),
+  MileWeaponShop(Zone.Mile),
+  MileHouse1(Zone.Mile),
+  MileItemShop(Zone.Mile),
+  MileHouse2(Zone.Mile),
+  MileInn(Zone.Mile),
 
-  Zema(Area.Zema),
-  ZemaHouse1(Area.Zema),
-  ZemaWeaponShop(Area.Zema),
-  ZemaInn(Area.Zema),
-  ZemaHouse2(Area.Zema),
-  ZemaHouse2_B1(Area.Zema),
-  ZemaItemShop(Area.Zema),
+  Zema(Zone.Zema),
+  ZemaHouse1(Zone.Zema),
+  ZemaWeaponShop(Zone.Zema),
+  ZemaInn(Zone.Zema),
+  ZemaHouse2(Zone.Zema),
+  ZemaHouse2_B1(Zone.Zema),
+  ZemaItemShop(Zone.Zema),
 
-  BirthValley(Area.BirthValley),
-  BirthValley_B1(Area.BirthValley),
+  BirthValley(Zone.BirthValley),
+  BirthValley_B1(Zone.BirthValley),
 
   Molcum,
 
-  Krup(Area.Krup),
-  KrupKindergarten(Area.Krup),
-  KrupWeaponShop(Area.Krup),
-  KrupItemShop(Area.Krup),
-  KrupHouse(Area.Krup),
-  KrupInn(Area.Krup),
-  KrupInn_F1(Area.Krup),
+  Krup(Zone.Krup),
+  KrupKindergarten(Zone.Krup),
+  KrupWeaponShop(Zone.Krup),
+  KrupItemShop(Zone.Krup),
+  KrupHouse(Zone.Krup),
+  KrupInn(Zone.Krup),
+  KrupInn_F1(Zone.Krup),
 
-  ValleyMazeOutside(Area.ValleyMaze),
-  ValleyMaze(Area.ValleyMaze),
-  ValleyMaze_Part2(Area.ValleyMaze),
-  ValleyMaze_Part3(Area.ValleyMaze),
-  ValleyMaze_Part4(Area.ValleyMaze),
-  ValleyMaze_Part5(Area.ValleyMaze),
-  ValleyMaze_Part6(Area.ValleyMaze),
-  ValleyMaze_Part7(Area.ValleyMaze),
-  ValleyMazeUnused(Area.ValleyMaze),
-  ValleyMazeOutside2(Area.ValleyMaze),
+  ValleyMazeOutside(Zone.ValleyMaze),
+  ValleyMaze(Zone.ValleyMaze),
+  ValleyMaze_Part2(Zone.ValleyMaze),
+  ValleyMaze_Part3(Zone.ValleyMaze),
+  ValleyMaze_Part4(Zone.ValleyMaze),
+  ValleyMaze_Part5(Zone.ValleyMaze),
+  ValleyMaze_Part6(Zone.ValleyMaze),
+  ValleyMaze_Part7(Zone.ValleyMaze),
+  ValleyMazeUnused(Zone.ValleyMaze),
+  ValleyMazeOutside2(Zone.ValleyMaze),
 
-  Tonoe(Area.Tonoe),
-  TonoeStorageRoom(Area.Tonoe),
-  TonoeGryzHouse(Area.Tonoe),
-  TonoeHouse1(Area.Tonoe),
-  TonoeHouse2(Area.Tonoe),
-  TonoeInn(Area.Tonoe),
-  TonoeBasement(Area.Tonoe),
-  TonoeBasement_B1(Area.Tonoe),
-  TonoeBasement_B2(Area.Tonoe),
-  TonoeBasement_B3(Area.Tonoe),
+  Tonoe(Zone.Tonoe),
+  TonoeStorageRoom(Zone.Tonoe),
+  TonoeGryzHouse(Zone.Tonoe),
+  TonoeHouse1(Zone.Tonoe),
+  TonoeHouse2(Zone.Tonoe),
+  TonoeInn(Zone.Tonoe),
+  TonoeBasement(Zone.Tonoe),
+  TonoeBasement_B1(Zone.Tonoe),
+  TonoeBasement_B2(Zone.Tonoe),
+  TonoeBasement_B3(Zone.Tonoe),
 
   // Return to Zema...
 
-  BioPlant(Area.BioPlant),
-  BioPlant_Part2(Area.BioPlant),
-  BioPlant_Part3(Area.BioPlant),
-  BioPlant_B1(Area.BioPlant),
-  BioPlant_B2(Area.BioPlant),
-  BioPlant_B2_Part2(Area.BioPlant),
-  BioPlant_B3(Area.BioPlant),
-  BioPlant_B3_Part2(Area.BioPlant),
-  BioPlant_B4(Area.BioPlant),
-  BioPlant_B4_Part2(Area.BioPlant),
-  BioPlant_B4_Part3(Area.BioPlant),
+  BioPlant(Zone.BioPlant),
+  BioPlant_Part2(Zone.BioPlant),
+  BioPlant_Part3(Zone.BioPlant),
+  BioPlant_B1(Zone.BioPlant),
+  BioPlant_B2(Zone.BioPlant),
+  BioPlant_B2_Part2(Zone.BioPlant),
+  BioPlant_B3(Zone.BioPlant),
+  BioPlant_B3_Part2(Zone.BioPlant),
+  BioPlant_B4(Zone.BioPlant),
+  BioPlant_B4_Part2(Zone.BioPlant),
+  BioPlant_B4_Part3(Zone.BioPlant),
 
   // Return to Piata...
 
-  Nalya(Area.Nalya),
-  NalyaHouse1(Area.Nalya),
-  NalyaHouse2(Area.Nalya),
-  NalyaItemShop(Area.Nalya),
-  NalyaHouse3(Area.Nalya),
-  NalyaHouse4(Area.Nalya),
-  NalyaHouse5(Area.Nalya),
-  NalyaInn(Area.Nalya),
-  NalyaInn_F1(Area.Nalya),
+  Nalya(Zone.Nalya),
+  NalyaHouse1(Zone.Nalya),
+  NalyaHouse2(Zone.Nalya),
+  NalyaItemShop(Zone.Nalya),
+  NalyaHouse3(Zone.Nalya),
+  NalyaHouse4(Zone.Nalya),
+  NalyaHouse5(Zone.Nalya),
+  NalyaInn(Zone.Nalya),
+  NalyaInn_F1(Zone.Nalya),
 
-  Wreckage(Area.Wreckage),
-  Wreckage_Part2(Area.Wreckage),
-  Wreckage_Part3(Area.Wreckage),
-  Wreckage_F1(Area.Wreckage),
-  Wreckage_F1_Part2(Area.Wreckage),
-  Wreckage_F2(Area.Wreckage),
-  Wreckage_F2_Part2(Area.Wreckage),
-  Wreckage_F2_Part3(Area.Wreckage),
-  Wreckage_F2_Part4(Area.Wreckage),
+  Wreckage(Zone.Wreckage),
+  Wreckage_Part2(Zone.Wreckage),
+  Wreckage_Part3(Zone.Wreckage),
+  Wreckage_F1(Zone.Wreckage),
+  Wreckage_F1_Part2(Zone.Wreckage),
+  Wreckage_F2(Zone.Wreckage),
+  Wreckage_F2_Part2(Zone.Wreckage),
+  Wreckage_F2_Part3(Zone.Wreckage),
+  Wreckage_F2_Part4(Zone.Wreckage),
 
-  Aiedo(Area.Aiedo),
-  ShayHouse(Area.Aiedo),
+  Aiedo(Zone.Aiedo),
+  ShayHouse(Zone.Aiedo),
   //ChazHouse(Area.Aiedo),
-  AiedoBakery(Area.Aiedo),
-  AiedoBakery_B1(Area.Aiedo),
-  AiedoWeaponShop(Area.Aiedo),
-  AiedoPrison(Area.Aiedo),
-  AiedoHouse1(Area.Aiedo),
-  AiedoHouse2(Area.Aiedo),
-  AiedoHouse3(Area.Aiedo),
-  AiedoHouse4(Area.Aiedo),
-  AiedoHouse5(Area.Aiedo),
-  AiedoHouse6(Area.Aiedo),
-  AiedoHouse7(Area.Aiedo),
-  RockyHouse(Area.Aiedo),
-  AiedoSupermarket(Area.Aiedo),
-  AiedoPub(Area.Aiedo),
-  HuntersGuild(Area.Aiedo),
-  HuntersGuildStorage(Area.Aiedo),
-  StripClub(Area.Aiedo),
-  StripClubDressingRoom(Area.Aiedo),
+  AiedoBakery(Zone.Aiedo),
+  AiedoBakery_B1(Zone.Aiedo),
+  AiedoWeaponShop(Zone.Aiedo),
+  AiedoPrison(Zone.Aiedo),
+  AiedoHouse1(Zone.Aiedo),
+  AiedoHouse2(Zone.Aiedo),
+  AiedoHouse3(Zone.Aiedo),
+  AiedoHouse4(Zone.Aiedo),
+  AiedoHouse5(Zone.Aiedo),
+  AiedoHouse6(Zone.Aiedo),
+  AiedoHouse7(Zone.Aiedo),
+  RockyHouse(Zone.Aiedo),
+  AiedoSupermarket(Zone.Aiedo),
+  AiedoPub(Zone.Aiedo),
+  HuntersGuild(Zone.Aiedo),
+  HuntersGuildStorage(Zone.Aiedo),
+  StripClub(Zone.Aiedo),
+  StripClubDressingRoom(Zone.Aiedo),
 
   PassagewayNearAiedo,
   Passageway,
   PassagewayNearKadary,
 
-  Kadary(Area.Kadary),
-  KadaryChurch(Area.Kadary),
-  KadaryPub(Area.Kadary),
-  KadaryPub_F1(Area.Kadary),
-  KadaryStorageRoom(Area.Kadary),
-  KadaryHouse1(Area.Kadary),
-  KadaryHouse2(Area.Kadary),
-  KadaryHouse3(Area.Kadary),
-  KadaryItemShop(Area.Kadary),
-  KadaryInn(Area.Kadary),
-  KadaryInn_F1(Area.Kadary),
+  Kadary(Zone.Kadary),
+  KadaryChurch(Zone.Kadary),
+  KadaryPub(Zone.Kadary),
+  KadaryPub_F1(Zone.Kadary),
+  KadaryStorageRoom(Zone.Kadary),
+  KadaryHouse1(Zone.Kadary),
+  KadaryHouse2(Zone.Kadary),
+  KadaryHouse3(Zone.Kadary),
+  KadaryItemShop(Zone.Kadary),
+  KadaryInn(Zone.Kadary),
+  KadaryInn_F1(Zone.Kadary),
 
-  ZioFort(Area.ZioFort),
-  ZioFort_Part2(Area.ZioFort),
-  ZioFort_F1(Area.ZioFort),
-  ZioFort_F2East(Area.ZioFort),
-  ZioFort_F2West(Area.ZioFort),
-  ZioFortEastTunnel(Area.ZioFort),
-  ZioFortWestTunnel(Area.ZioFort),
-  ZioFortJuzaRoom(Area.ZioFort),
-  ZioFort_F3(Area.ZioFort),
-  ZioFort_F4(Area.ZioFort),
+  ZioFort(Zone.ZioFort),
+  ZioFort_Part2(Zone.ZioFort),
+  ZioFort_F1(Zone.ZioFort),
+  ZioFort_F2East(Zone.ZioFort),
+  ZioFort_F2West(Zone.ZioFort),
+  ZioFortEastTunnel(Zone.ZioFort),
+  ZioFortWestTunnel(Zone.ZioFort),
+  ZioFortJuzaRoom(Zone.ZioFort),
+  ZioFort_F3(Zone.ZioFort),
+  ZioFort_F4(Zone.ZioFort),
 
   // Return to Krup
   MachineCenter,
   MachineCenter_B1,
   MachineCenter_B1_Part2,
 
-  MonsenCave(Area.Monsen),
-  Monsen(Area.Monsen),
-  MonsenInn(Area.Monsen),
-  MonsenHouse1(Area.Monsen),
-  MonsenHouse2(Area.Monsen),
-  MonsenHouse3(Area.Monsen),
-  MonsenHouse4(Area.Monsen),
-  MonsenHouse5(Area.Monsen),
-  MonsenItemShop(Area.Monsen),
+  MonsenCave(Zone.Monsen),
+  Monsen(Zone.Monsen),
+  MonsenInn(Zone.Monsen),
+  MonsenHouse1(Zone.Monsen),
+  MonsenHouse2(Zone.Monsen),
+  MonsenHouse3(Zone.Monsen),
+  MonsenHouse4(Zone.Monsen),
+  MonsenHouse5(Zone.Monsen),
+  MonsenItemShop(Zone.Monsen),
 
-  PlateSystem(Area.PlateSystem),
-  PlateSystem_F1(Area.PlateSystem),
-  PlateSystem_F2(Area.PlateSystem),
-  PlateSystem_F3(Area.PlateSystem),
-  PlateSystem_F4(Area.PlateSystem),
+  PlateSystem(Zone.PlateSystem),
+  PlateSystem_F1(Zone.PlateSystem),
+  PlateSystem_F2(Zone.PlateSystem),
+  PlateSystem_F3(Zone.PlateSystem),
+  PlateSystem_F4(Zone.PlateSystem),
 
-  Termi(Area.Termi),
-  TermiHouse1(Area.Termi),
-  TermiHouse2(Area.Termi),
-  TermiItemShop(Area.Termi),
-  TermiWeaponShop(Area.Termi),
-  TermiInn(Area.Termi),
+  Termi(Zone.Termi),
+  TermiHouse1(Zone.Termi),
+  TermiHouse2(Zone.Termi),
+  TermiItemShop(Zone.Termi),
+  TermiWeaponShop(Zone.Termi),
+  TermiInn(Zone.Termi),
 
-  LadeaTower(Area.LadeaTower),
-  LadeaTower_F1(Area.LadeaTower),
-  LadeaTower_F2(Area.LadeaTower),
-  LadeaTower_F3(Area.LadeaTower),
-  LadeaTower_F4(Area.LadeaTower),
-  LadeaTower_F5(Area.LadeaTower),
+  LadeaTower(Zone.LadeaTower),
+  LadeaTower_F1(Zone.LadeaTower),
+  LadeaTower_F2(Zone.LadeaTower),
+  LadeaTower_F3(Zone.LadeaTower),
+  LadeaTower_F4(Zone.LadeaTower),
+  LadeaTower_F5(Zone.LadeaTower),
 
-  Nurvus(Area.Nurvus),
-  Nurvus_Part2(Area.Nurvus),
-  Nurvus_Part3(Area.Nurvus),
-  Nurvus_B1(Area.Nurvus),
-  Nurvus_B1Tunnel(Area.Nurvus),
-  Nurvus_B2(Area.Nurvus),
-  Nurvus_B3(Area.Nurvus),
-  Nurvus_B3Tunnel(Area.Nurvus),
-  Nurvus_B4(Area.Nurvus),
-  Nurvus_B4_Part2(Area.Nurvus),
-  Nurvus_B5(Area.Nurvus),
+  Nurvus(Zone.Nurvus),
+  Nurvus_Part2(Zone.Nurvus),
+  Nurvus_Part3(Zone.Nurvus),
+  Nurvus_B1(Zone.Nurvus),
+  Nurvus_B1Tunnel(Zone.Nurvus),
+  Nurvus_B2(Zone.Nurvus),
+  Nurvus_B3(Zone.Nurvus),
+  Nurvus_B3Tunnel(Zone.Nurvus),
+  Nurvus_B4(Zone.Nurvus),
+  Nurvus_B4_Part2(Zone.Nurvus),
+  Nurvus_B5(Zone.Nurvus),
 
   MotaSpaceport,
 
-  ZelanSpace(Area.Zelan),
-  Zelan(Area.Zelan),
-  Zelan_F1(Area.Zelan),
+  ZelanSpace(Zone.Zelan),
+  Zelan(Zone.Zelan),
+  Zelan_F1(Zone.Zelan),
 
   RajaTemple,
 
-  Ryuon(Area.Ryuon),
-  RyuonItemShop(Area.Ryuon),
-  RyuonWeaponShop(Area.Ryuon),
-  RyuonHouse1(Area.Ryuon),
-  RyuonHouse2(Area.Ryuon),
-  RyuonHouse3(Area.Ryuon),
-  RyuonPub(Area.Ryuon),
-  RyuonInn(Area.Ryuon),
+  Ryuon(Zone.Ryuon),
+  RyuonItemShop(Zone.Ryuon),
+  RyuonWeaponShop(Zone.Ryuon),
+  RyuonHouse1(Zone.Ryuon),
+  RyuonHouse2(Zone.Ryuon),
+  RyuonHouse3(Zone.Ryuon),
+  RyuonPub(Zone.Ryuon),
+  RyuonInn(Zone.Ryuon),
 
   // Tyler
-  Tyler(Area.Tyler),
-  TylerHouse1(Area.Tyler),
-  TylerWeaponShop(Area.Tyler),
-  TylerItemShop(Area.Tyler),
-  TylerHouse2(Area.Tyler),
-  TylerInn(Area.Tyler),
-  Hangar(Area.Tyler),
+  Tyler(Zone.Tyler),
+  TylerHouse1(Zone.Tyler),
+  TylerWeaponShop(Zone.Tyler),
+  TylerItemShop(Zone.Tyler),
+  TylerHouse2(Zone.Tyler),
+  TylerInn(Zone.Tyler),
+  Hangar(Zone.Tyler),
 
   // Kuran
-  KuranSpace(Area.Kuran),
-  Kuran(Area.Kuran),
-  Kuran_F1(Area.Kuran),
-  Kuran_F1_Part2(Area.Kuran),
-  Kuran_F1_Part3(Area.Kuran),
-  Kuran_F1_Part4(Area.Kuran),
-  Kuran_F1_Part5(Area.Kuran),
-  Kuran_F2(Area.Kuran),
-  Kuran_F2_Part2(Area.Kuran),
-  Kuran_F3(Area.Kuran),
+  KuranSpace(Zone.Kuran),
+  Kuran(Zone.Kuran),
+  Kuran_F1(Zone.Kuran),
+  Kuran_F1_Part2(Zone.Kuran),
+  Kuran_F1_Part3(Zone.Kuran),
+  Kuran_F1_Part4(Zone.Kuran),
+  Kuran_F1_Part5(Zone.Kuran),
+  Kuran_F2(Zone.Kuran),
+  Kuran_F2_Part2(Zone.Kuran),
+  Kuran_F3(Zone.Kuran),
 
   // Return to Zelan
 
   // Zosa
-  Zosa(Area.Zosa),
-  ZosaHouse1(Area.Zosa),
-  ZosaHouse2(Area.Zosa),
-  ZosaWeaponShop(Area.Zosa),
-  ZosaItemShop(Area.Zosa),
-  ZosaInn(Area.Zosa),
-  ZosaHouse3(Area.Zosa),
+  Zosa(Zone.Zosa),
+  ZosaHouse1(Zone.Zosa),
+  ZosaHouse2(Zone.Zosa),
+  ZosaWeaponShop(Zone.Zosa),
+  ZosaItemShop(Zone.Zosa),
+  ZosaInn(Zone.Zosa),
+  ZosaHouse3(Zone.Zosa),
 
   // Myst Value
-  MystVale(Area.MystVale),
-  MystVale_Part2(Area.MystVale),
-  MystVale_Part3(Area.MystVale),
-  MystVale_Part4(Area.MystVale),
-  MystVale_Part5(Area.MystVale),
+  MystVale(Zone.MystVale),
+  MystVale_Part2(Zone.MystVale),
+  MystVale_Part3(Zone.MystVale),
+  MystVale_Part4(Zone.MystVale),
+  MystVale_Part5(Zone.MystVale),
 
   // Climate Center
   ClimCenter,
@@ -465,33 +472,33 @@ enum MapId {
   ClimCenter_F3,
 
   // Reshel
-  Reshel1(Area.Reshel),
-  Reshel2(Area.Reshel),
-  Reshel3(Area.Reshel),
-  Reshel2House(Area.Reshel),
-  Reshel2WeaponShop(Area.Reshel),
-  Reshel3House1(Area.Reshel),
-  Reshel3ItemShop(Area.Reshel),
-  Reshel3House2(Area.Reshel),
-  Reshel3WeaponShop(Area.Reshel),
-  Reshel3Inn(Area.Reshel),
-  Reshel3House3(Area.Reshel),
+  Reshel1(Zone.Reshel),
+  Reshel2(Zone.Reshel),
+  Reshel3(Zone.Reshel),
+  Reshel2House(Zone.Reshel),
+  Reshel2WeaponShop(Zone.Reshel),
+  Reshel3House1(Zone.Reshel),
+  Reshel3ItemShop(Zone.Reshel),
+  Reshel3House2(Zone.Reshel),
+  Reshel3WeaponShop(Zone.Reshel),
+  Reshel3Inn(Zone.Reshel),
+  Reshel3House3(Zone.Reshel),
 
   // Jut
-  Jut(Area.Jut),
-  JutHouse1(Area.Jut),
-  JutHouse2(Area.Jut),
-  JutHouse3(Area.Jut),
-  JutHouse4(Area.Jut),
-  JutHouse5(Area.Jut),
-  JutWeaponShop(Area.Jut),
-  JutItemShop(Area.Jut),
-  JutHouse6(Area.Jut),
-  JutHouse6_F1(Area.Jut),
-  JutHouse7(Area.Jut),
-  JutHouse8(Area.Jut),
-  JutInn(Area.Jut),
-  JutChurch(Area.Jut),
+  Jut(Zone.Jut),
+  JutHouse1(Zone.Jut),
+  JutHouse2(Zone.Jut),
+  JutHouse3(Zone.Jut),
+  JutHouse4(Zone.Jut),
+  JutHouse5(Zone.Jut),
+  JutWeaponShop(Zone.Jut),
+  JutItemShop(Zone.Jut),
+  JutHouse6(Zone.Jut),
+  JutHouse6_F1(Zone.Jut),
+  JutHouse7(Zone.Jut),
+  JutHouse8(Zone.Jut),
+  JutInn(Zone.Jut),
+  JutChurch(Zone.Jut),
 
   // Weapon plant
   WeaponPlant,
@@ -500,143 +507,143 @@ enum MapId {
   WeaponPlant_F3,
 
   // Meese
-  Meese(Area.Meese),
-  MeeseHouse1(Area.Meese),
-  MeeseItemShop2(Area.Meese),
-  MeeseItemShop1(Area.Meese),
-  MeeseWeaponShop(Area.Meese),
-  MeeseInn(Area.Meese),
-  MeeseClinic(Area.Meese),
-  MeeseClinic_F1(Area.Meese),
+  Meese(Zone.Meese),
+  MeeseHouse1(Zone.Meese),
+  MeeseItemShop2(Zone.Meese),
+  MeeseItemShop1(Zone.Meese),
+  MeeseWeaponShop(Zone.Meese),
+  MeeseInn(Zone.Meese),
+  MeeseClinic(Zone.Meese),
+  MeeseClinic_F1(Zone.Meese),
 
   // Carnivorous forest
 
   // Esper mansion
-  EspMansionEntrance(Area.EsperMansion),
-  EspMansion(Area.EsperMansion),
-  EspMansionWestRoom(Area.EsperMansion),
-  EspMansionEastRoom(Area.EsperMansion),
-  EspMansionNorth(Area.EsperMansion),
-  EspMansionNorthEastRoom(Area.EsperMansion),
-  EspMansionNorthWestRoom(Area.EsperMansion),
-  EspMansionCourtyard(Area.EsperMansion),
-  InnerSanctuary(Area.EsperMansion),
-  InnerSanctuary_B1(Area.EsperMansion),
+  EspMansionEntrance(Zone.EsperMansion),
+  EspMansion(Zone.EsperMansion),
+  EspMansionWestRoom(Zone.EsperMansion),
+  EspMansionEastRoom(Zone.EsperMansion),
+  EspMansionNorth(Zone.EsperMansion),
+  EspMansionNorthEastRoom(Zone.EsperMansion),
+  EspMansionNorthWestRoom(Zone.EsperMansion),
+  EspMansionCourtyard(Zone.EsperMansion),
+  InnerSanctuary(Zone.EsperMansion),
+  InnerSanctuary_B1(Zone.EsperMansion),
 
   // Gumbious temple
-  GumbiousEntrance(Area.GumbiousTemple),
-  Gumbious(Area.GumbiousTemple),
-  Gumbious_F1(Area.GumbiousTemple),
-  Gumbious_B1(Area.GumbiousTemple),
-  Gumbious_B2(Area.GumbiousTemple),
-  Gumbious_B2_Part2(Area.GumbiousTemple),
+  GumbiousEntrance(Zone.GumbiousTemple),
+  Gumbious(Zone.GumbiousTemple),
+  Gumbious_F1(Zone.GumbiousTemple),
+  Gumbious_B1(Zone.GumbiousTemple),
+  Gumbious_B2(Zone.GumbiousTemple),
+  Gumbious_B2_Part2(Zone.GumbiousTemple),
 
   // Tyler spaceport
   DezoSpaceport,
 
   // Air castle
-  AirCastleSpace(Area.AirCastle),
-  AirCastle(Area.AirCastle),
-  AirCastle_Part2(Area.AirCastle),
-  AirCastle_Part3(Area.AirCastle),
-  AirCastle_Part4(Area.AirCastle),
-  AirCastle_Part5(Area.AirCastle),
-  AirCastle_Part6(Area.AirCastle),
-  AirCastle_Part7(Area.AirCastle),
-  AirCastle_Part8(Area.AirCastle),
-  AirCastle_F1(Area.AirCastle),
-  AirCastle_F1_Part2(Area.AirCastle),
-  AirCastle_F1_Part3(Area.AirCastle),
-  AirCastle_F1_Part4(Area.AirCastle),
-  AirCastle_F1_Part9(Area.AirCastle),
-  AirCastle_F1_Part5(Area.AirCastle),
-  AirCastle_F1_Part10(Area.AirCastle),
-  AirCastle_F1_Part11(Area.AirCastle),
-  AirCastle_F1_Part12(Area.AirCastle),
-  AirCastle_F1_Part13(Area.AirCastle),
-  AirCastle_F2(Area.AirCastle),
-  AirCastleXeAThoulRoom(Area.AirCastle),
-  AirCastleInner(Area.AirCastle),
-  AirCastleInner_B1(Area.AirCastle),
-  AirCastleInner_B1_Part2(Area.AirCastle),
-  AirCastleInner_B1_Part3(Area.AirCastle),
-  AirCastleInner_B2(Area.AirCastle),
-  AirCastleInner_B3(Area.AirCastle),
-  AirCastleInner_B4(Area.AirCastle),
-  AirCastleInner_B5(Area.AirCastle),
+  AirCastleSpace(Zone.AirCastle),
+  AirCastle(Zone.AirCastle),
+  AirCastle_Part2(Zone.AirCastle),
+  AirCastle_Part3(Zone.AirCastle),
+  AirCastle_Part4(Zone.AirCastle),
+  AirCastle_Part5(Zone.AirCastle),
+  AirCastle_Part6(Zone.AirCastle),
+  AirCastle_Part7(Zone.AirCastle),
+  AirCastle_Part8(Zone.AirCastle),
+  AirCastle_F1(Zone.AirCastle),
+  AirCastle_F1_Part2(Zone.AirCastle),
+  AirCastle_F1_Part3(Zone.AirCastle),
+  AirCastle_F1_Part4(Zone.AirCastle),
+  AirCastle_F1_Part9(Zone.AirCastle),
+  AirCastle_F1_Part5(Zone.AirCastle),
+  AirCastle_F1_Part10(Zone.AirCastle),
+  AirCastle_F1_Part11(Zone.AirCastle),
+  AirCastle_F1_Part12(Zone.AirCastle),
+  AirCastle_F1_Part13(Zone.AirCastle),
+  AirCastle_F2(Zone.AirCastle),
+  AirCastleXeAThoulRoom(Zone.AirCastle),
+  AirCastleInner(Zone.AirCastle),
+  AirCastleInner_B1(Zone.AirCastle),
+  AirCastleInner_B1_Part2(Zone.AirCastle),
+  AirCastleInner_B1_Part3(Zone.AirCastle),
+  AirCastleInner_B2(Zone.AirCastle),
+  AirCastleInner_B3(Zone.AirCastle),
+  AirCastleInner_B4(Zone.AirCastle),
+  AirCastleInner_B5(Zone.AirCastle),
 
   // Guaron tower
-  GaruberkTower(Area.GuaronTower),
-  GaruberkTower_Part2(Area.GuaronTower),
-  GaruberkTower_Part3(Area.GuaronTower),
-  GaruberkTower_Part4(Area.GuaronTower),
-  GaruberkTower_Part5(Area.GuaronTower),
-  GaruberkTower_Part6(Area.GuaronTower),
-  GaruberkTower_Part7(Area.GuaronTower),
+  GaruberkTower(Zone.GuaronTower),
+  GaruberkTower_Part2(Zone.GuaronTower),
+  GaruberkTower_Part3(Zone.GuaronTower),
+  GaruberkTower_Part4(Zone.GuaronTower),
+  GaruberkTower_Part5(Zone.GuaronTower),
+  GaruberkTower_Part6(Zone.GuaronTower),
+  GaruberkTower_Part7(Zone.GuaronTower),
 
   // Torinco
-  Torinco(Area.Torinco),
-  CulversHouse(Area.Torinco),
-  TorincoHouse1(Area.Torinco),
-  TorincoHouse2(Area.Torinco),
-  TorincoItemShop(Area.Torinco),
-  TorincoInn(Area.Torinco),
+  Torinco(Zone.Torinco),
+  CulversHouse(Zone.Torinco),
+  TorincoHouse1(Zone.Torinco),
+  TorincoHouse2(Zone.Torinco),
+  TorincoItemShop(Zone.Torinco),
+  TorincoInn(Zone.Torinco),
 
   // Uzo
-  Uzo(Area.Uzo),
-  UzoHouse1(Area.Uzo),
-  UzoHouse2(Area.Uzo),
-  UzoInn(Area.Uzo),
-  UzoHouse3(Area.Uzo),
-  UzoItemShop(Area.Uzo),
+  Uzo(Zone.Uzo),
+  UzoHouse1(Zone.Uzo),
+  UzoHouse2(Zone.Uzo),
+  UzoInn(Zone.Uzo),
+  UzoHouse3(Zone.Uzo),
+  UzoItemShop(Zone.Uzo),
 
   // Vahal Fort
-  VahalFort(Area.VahalFort),
-  VahalFort_F1(Area.VahalFort),
-  VahalFort_F2(Area.VahalFort),
-  VahalFort_F3(Area.VahalFort),
+  VahalFort(Zone.VahalFort),
+  VahalFort_F1(Zone.VahalFort),
+  VahalFort_F2(Zone.VahalFort),
+  VahalFort_F3(Zone.VahalFort),
 
   RappyCave,
 
   // Soldier's Shrine
-  SoldiersTempleOutside(Area.SoldiersShrine),
-  SoldiersTemple(Area.SoldiersShrine),
-  IslandCave(Area.SoldiersShrine),
-  IslandCave_F1(Area.SoldiersShrine),
-  IslandCave_F1_Part2(Area.SoldiersShrine),
-  IslandCave_Part2(Area.SoldiersShrine),
-  IslandCave_B1(Area.SoldiersShrine),
-  IslandCave_F2(Area.SoldiersShrine),
-  IslandCave_F3(Area.SoldiersShrine),
+  SoldiersTempleOutside(Zone.SoldiersShrine),
+  SoldiersTemple(Zone.SoldiersShrine),
+  IslandCave(Zone.SoldiersShrine),
+  IslandCave_F1(Zone.SoldiersShrine),
+  IslandCave_F1_Part2(Zone.SoldiersShrine),
+  IslandCave_Part2(Zone.SoldiersShrine),
+  IslandCave_B1(Zone.SoldiersShrine),
+  IslandCave_F2(Zone.SoldiersShrine),
+  IslandCave_F3(Zone.SoldiersShrine),
 
   // Courage
-  CourageTower(Area.TowerOfCourage),
-  CourageTower_F1(Area.TowerOfCourage),
-  CourageTower_F2(Area.TowerOfCourage),
-  CourageTower_F3(Area.TowerOfCourage),
-  CourageTower_F4(Area.TowerOfCourage),
+  CourageTower(Zone.TowerOfCourage),
+  CourageTower_F1(Zone.TowerOfCourage),
+  CourageTower_F2(Zone.TowerOfCourage),
+  CourageTower_F3(Zone.TowerOfCourage),
+  CourageTower_F4(Zone.TowerOfCourage),
 
   // Grace
-  StrengthTower(Area.TowerOfStrength),
-  StrengthTower_F1(Area.TowerOfStrength),
-  StrengthTower_F2(Area.TowerOfStrength),
-  StrengthTower_F3(Area.TowerOfStrength),
-  StrengthTower_F4(Area.TowerOfStrength),
+  StrengthTower(Zone.TowerOfStrength),
+  StrengthTower_F1(Zone.TowerOfStrength),
+  StrengthTower_F2(Zone.TowerOfStrength),
+  StrengthTower_F3(Zone.TowerOfStrength),
+  StrengthTower_F4(Zone.TowerOfStrength),
 
   // Wrath
-  AngerTower(Area.TowerOfAnger),
-  AngerTower_F1(Area.TowerOfAnger),
-  AngerTower_F2(Area.TowerOfAnger),
+  AngerTower(Zone.TowerOfAnger),
+  AngerTower_F1(Zone.TowerOfAnger),
+  AngerTower_F2(Zone.TowerOfAnger),
 
   // Sacellum
-  SilenceTm(Area.SacellumOfQuietude),
-  LeRoofRoom(Area.SacellumOfQuietude),
+  SilenceTm(Zone.SacellumOfQuietude),
+  LeRoofRoom(Zone.SacellumOfQuietude),
 
   // Elysdeon
-  ElsydeonCave(Area.ElsydeonCave),
-  ElsydeonCave_B1(Area.ElsydeonCave),
+  ElsydeonCave(Zone.ElsydeonCave),
+  ElsydeonCave_B1(Zone.ElsydeonCave),
 
-  MileDead(Area.Mile),
+  MileDead(Zone.Mile),
 
   TheEdge,
   TheEdge_Part2,
@@ -648,10 +655,126 @@ enum MapId {
   TheEdge_Part8,
   TheEdge_Part9;
 
-  final Area? area;
-  final MapId? outer;
+  final Zone? zone;
 
-  const MapId([this.area, this.outer]);
+  const MapId([this.zone]);
+}
+
+class MapArea {
+  final Position position;
+  final AreaSpec spec;
+  final AreaRange range;
+
+  MapArea({required Position at, required this.range, required this.spec})
+      : position = at;
+
+  @override
+  String toString() {
+    return 'InteractionArea{position: $position, '
+        'range: $range, '
+        'spec: $spec}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MapArea &&
+          runtimeType == other.runtimeType &&
+          position == other.position &&
+          spec == other.spec &&
+          range == other.range;
+
+  @override
+  int get hashCode => position.hashCode ^ spec.hashCode ^ range.hashCode;
+}
+
+enum AreaRange {
+  x10y20, // 0xC
+  x10y60, // 0xA
+  x20y10, // 9
+  x20y20, // 2
+  x40y10, // 0xE
+  x40y20, // 0xB
+  x60y10, // 0xD
+  x40y40, // 1
+  xyExact, // 3
+  xLower, // 4
+  xHigher, // 5
+  yLower, // 6
+  yHigher, // 7
+  xyLowerAndYLessOrEqualTo_Y_0x2A0, // 8
+}
+
+abstract class AreaSpec {}
+
+class InteractiveArea extends AreaSpec with Interactive {
+  // TODO: other flag types are modelable in ASM
+  // but we don't support other flag types in the model.
+  // do we care?
+  /// Interactions may be conditional on whether [doNotInteractIf] is set.
+  ///
+  /// If set, the interaction won't take place.
+  final EventFlag? doNotInteractIf;
+
+  InteractiveArea(
+      {this.doNotInteractIf, Scene onInteract = const Scene.none()}) {
+    this.onInteract = onInteract;
+  }
+
+  @override
+  String toString() {
+    return 'InteractiveArea{doNotInteractIf: $doNotInteractIf, '
+        'onInteract: $onInteract}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InteractiveArea &&
+          runtimeType == other.runtimeType &&
+          doNotInteractIf == other.doNotInteractIf &&
+          onInteract == other.onInteract;
+
+  @override
+  int get hashCode => doNotInteractIf.hashCode ^ onInteract.hashCode;
+}
+
+class AsmArea extends AreaSpec {
+  final Byte eventType;
+  final Byte eventFlag;
+  final Byte interactionRoutine;
+  final Sized interactionParameter;
+
+  AsmArea(
+      {required this.eventType,
+      required this.eventFlag,
+      required this.interactionRoutine,
+      required this.interactionParameter});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsmArea &&
+          runtimeType == other.runtimeType &&
+          eventType == other.eventType &&
+          eventFlag == other.eventFlag &&
+          interactionRoutine == other.interactionRoutine &&
+          interactionParameter == other.interactionParameter;
+
+  @override
+  int get hashCode =>
+      eventType.hashCode ^
+      eventFlag.hashCode ^
+      interactionRoutine.hashCode ^
+      interactionParameter.hashCode;
+
+  @override
+  String toString() {
+    return 'AsmArea{eventType: $eventType, '
+        'eventFlag: $eventFlag, '
+        'interactionRoutine: $interactionRoutine, '
+        'interactionParameter: $interactionParameter}';
+  }
 }
 
 // todo: 'with UnnamedSpeaker' – aren't some objects named speakers?

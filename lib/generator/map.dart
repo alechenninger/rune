@@ -572,11 +572,24 @@ Future<GameMap> asmToMap(
     dialogLabel = reader.readLabel();
   }
 
+  // TODO: Parse interaction areas
+  // Why?
+  // We need to update these.
+  // So we need original as reference.
+  // And the ability to round-trip parse->compile.
+
+  // How to model this stuff to keep round trip for stuff we don't
+  // care so much to modify? (at least as of now)
+  // - chest / temp flags
+  // - chests / shops
+  var areas = _readAreas(reader);
+
   var dialogTree = await dialogLookup.byLabel(dialogLabel);
   var mapObjects = _buildObjects(mapId, sprites, asmObjects, dialogTree);
 
   var map = GameMap(mapId);
   mapObjects.forEach(map.addObject);
+  areas.forEach(map.addArea);
 
   return map;
 }
@@ -717,6 +730,78 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
 
     return object;
   }).toList(growable: false);
+}
+
+List<MapArea> _readAreas(ConstantReader reader) {
+  var areas = <MapArea>[];
+
+  while (true) {
+    var xOrTerminate = reader.readWord();
+    if (xOrTerminate == Word(0xffff)) {
+      return areas;
+    }
+
+    var x = xOrTerminate;
+    var y = reader.readWord();
+    var range = _parseRangeType(reader.readWord());
+    var flagType = reader.readByte();
+    var flag = reader.readByte();
+    var routine = reader.readByte();
+    var param = reader.readByteExpression();
+
+    var position = Position(x.value << 3, y.value << 3);
+
+    if (routine == Byte.zero && flagType != Byte.zero) {
+      // routine is dialog, but flag type is not event flag
+      // means we need to model other flag type
+      throw UnsupportedError(
+          'unexpected flag type with interactive area: ${flagType.value}');
+    }
+
+    areas.add(MapArea(
+        at: position,
+        range: range,
+        spec: AsmArea(
+            eventType: flagType,
+            eventFlag: flag,
+            interactionRoutine: routine,
+            interactionParameter: param)));
+  }
+}
+
+AreaRange _parseRangeType(Word range) {
+  switch (range.value) {
+    case 1:
+      return AreaRange.x40y40;
+    case 2:
+      return AreaRange.x20y20;
+    case 3:
+      return AreaRange.xyExact;
+    case 4:
+      return AreaRange.xLower;
+    case 5:
+      return AreaRange.xHigher;
+    case 6:
+      return AreaRange.yLower;
+    case 7:
+      return AreaRange.yHigher;
+    case 8:
+      return AreaRange.xyLowerAndYLessOrEqualTo_Y_0x2A0;
+    case 9:
+      return AreaRange.x20y10;
+    case 0xA:
+      return AreaRange.x10y60;
+    case 0xB:
+      return AreaRange.x40y20;
+    case 0xC:
+      return AreaRange.x10y20;
+    case 0xD:
+      return AreaRange.x60y10;
+    case 0xE:
+      return AreaRange.x40y10;
+    default:
+      throw UnsupportedError('unsupported range type ${range.hex}');
+  }
 }
 
 MapId labelToMapId(Label lbl) {
