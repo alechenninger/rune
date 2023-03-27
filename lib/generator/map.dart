@@ -572,6 +572,8 @@ Future<GameMap> asmToMap(
     dialogLabel = reader.readLabel();
   }
 
+  var lookup = dialogLookup.byLabel(dialogLabel);
+
   // TODO: Parse interaction areas
   // Why?
   // We need to update these.
@@ -582,9 +584,10 @@ Future<GameMap> asmToMap(
   // care so much to modify? (at least as of now)
   // - chest / temp flags
   // - chests / shops
-  var areas = _readAreas(reader);
+  var areas = await _readAreas(reader, dialogLookup,
+      isWorldMotavia: mapId.world == World.Motavia);
 
-  var dialogTree = await dialogLookup.byLabel(dialogLabel);
+  var dialogTree = await lookup;
   var mapObjects = _buildObjects(mapId, sprites, asmObjects, dialogTree);
 
   var map = GameMap(mapId);
@@ -732,7 +735,9 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
   }).toList(growable: false);
 }
 
-List<MapArea> _readAreas(ConstantReader reader) {
+Future<List<MapArea>> _readAreas(
+    ConstantReader reader, DialogTreeLookup dialogLookup,
+    {required bool isWorldMotavia}) async {
   var areas = <MapArea>[];
 
   while (true) {
@@ -751,21 +756,53 @@ List<MapArea> _readAreas(ConstantReader reader) {
 
     var position = Position(x.value << 3, y.value << 3);
 
-    if (routine == Byte.zero && flagType != Byte.zero) {
-      // routine is dialog, but flag type is not event flag
-      // means we need to model other flag type
-      throw UnsupportedError(
-          'unexpected flag type with interactive area: ${flagType.value}');
-    }
+    if (routine == Byte.zero) {
+      if (flagType != Byte.zero) {
+        // routine is dialog, but flag type is not event flag
+        // means we need to model other flag type
+        throw UnsupportedError(
+            'unexpected flag type with interactive area: ${flagType.value}');
+      }
 
-    areas.add(MapArea(
-        at: position,
-        range: range,
-        spec: AsmArea(
-            eventType: flagType,
-            eventFlag: flag,
-            interactionRoutine: routine,
-            interactionParameter: param)));
+      if (param is! Byte) {
+        throw UnsupportedError('cannot evaluate constant expression for '
+            'dialog ID. param=$param');
+      }
+
+      // First, determine which dialog tree to use
+      // This is based off of the "world index."
+      // For Motavia, simply use the first tree ("DialogueTree28")
+      // If dialog ID >= 0x7F, use DialogTree29
+      // Else, use DialogTree30.
+      DialogTree dialog;
+      if (isWorldMotavia) {
+        dialog = await dialogLookup.byLabel(Label('DialogueTree28'));
+      } else if (flag.value >= 0x7F) {
+        dialog = await dialogLookup.byLabel(Label('DialogueTree29'));
+      } else {
+        dialog = await dialogLookup.byLabel(Label('DialogueTree30'));
+      }
+
+      // TODO: not sure if this is considered interaction or not
+      // I believe this is meant for object interactions, so setting to false
+      var scene = toScene(param.value, dialog, isInteraction: false);
+
+      areas.add(MapArea(
+          at: position,
+          range: range,
+          spec: InteractiveArea(
+              doNotInteractIf: flag != Byte.zero ? toEventFlag(flag) : null,
+              onInteract: scene)));
+    } else {
+      areas.add(MapArea(
+          at: position,
+          range: range,
+          spec: AsmArea(
+              eventType: flagType,
+              eventFlag: flag,
+              interactionRoutine: routine,
+              interactionParameter: param)));
+    }
   }
 }
 

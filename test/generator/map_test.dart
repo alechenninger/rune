@@ -739,7 +739,29 @@ void main() {
           ..add(DialogAsm([
             dc.b(Bytes.ascii('Hi there!')),
             dc.b([Byte(0xff)])
-          ]))
+          ])),
+        Label('DialogueTree28'): DialogTree()
+          ..addAll([
+            DialogAsm([
+              dc.b([Byte(0xff)])
+            ]),
+            DialogAsm([
+              dc.b([Byte(0xff)])
+            ]),
+            DialogAsm([
+              dc.b([Byte(0xff)])
+            ]),
+            DialogAsm([
+              dc.b([Byte(0xff)])
+            ]),
+            DialogAsm([
+              dc.b([Byte(0xff)])
+            ]),
+            DialogAsm([
+              dc.b(Bytes.ascii("It's an area")),
+              dc.b([Byte(0xff)])
+            ]),
+          ])
       });
 
       var asm = (MapAsmFixture()
@@ -759,11 +781,9 @@ void main() {
         MapArea(
             at: Position(0x1e0, 0x1d0),
             range: AreaRange.x40y40,
-            spec: AsmArea(
-                eventType: Byte.zero,
-                eventFlag: Byte.zero,
-                interactionRoutine: Byte.zero,
-                interactionParameter: Byte(5)))
+            spec: InteractiveArea(
+                onInteract:
+                    Scene([Dialog(spans: DialogSpan.parse("It's an area"))])))
       ]);
     });
   });

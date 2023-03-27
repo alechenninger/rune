@@ -569,6 +569,16 @@ abstract class Sized extends Expression {
   // Sized append
 
   static Sized expression(Size size, Expression expression) {
+    if (expression is Sized) {
+      if (expression.size != size) {
+        throw ArgumentError.value(
+            expression,
+            'expression',
+            'expression is already sized with a different size. '
+                '${size.name} != ${expression.size.name}');
+      }
+      return expression;
+    }
     return _Sized(size, expression);
   }
 }
@@ -579,10 +589,10 @@ class _Sized extends Sized {
   final Expression expression;
 
   @override
-  bool get canSplit => expression is Sized && (expression as Sized).canSplit;
+  bool get canSplit => false;
 
   @override
-  bool get canAppend => expression is Sized && (expression as Sized).canAppend;
+  bool get canAppend => false;
 
   /// [size] must be ≤ [this.size].
   @override

@@ -151,62 +151,78 @@ class IndexedMapObject {
 }
 
 enum Zone {
-  Test('Test Area'),
-  Piata,
-  Mile,
-  Zema,
-  Krup,
-  BirthValley('Birth Valley'),
-  Tonoe,
-  ValleyMaze('Valley Maze'),
-  BioPlant,
-  Nalya,
-  Wreckage,
-  Aiedo,
-  Kadary,
-  ZioFort("Zio's Fort"),
-  Monsen,
-  PlateSystem,
-  Termi,
-  LadeaTower('Ladea Tower'),
-  Nurvus,
-  Zelan,
-  Ryuon,
-  Tyler,
-  Kuran,
-  Zosa,
-  MystVale('Myst Vale'),
-  Reshel,
-  Jut,
-  Meese,
-  EsperMansion('Esper Mansion'),
-  GumbiousTemple('Gumbious Temple'),
-  AirCastle('Air Castle'),
-  GuaronTower('Guaron Tower'),
-  Torinco,
-  Uzo,
-  VahalFort('Vahal Fort'),
-  SoldiersShrine("Soldier's Shrine"),
-  TowerOfCourage('Tower of Courage'),
-  TowerOfStrength('Tower of Strength'),
-  TowerOfAnger('Tower of Anger'),
-  SacellumOfQuietude('Sacellum of Quietude'),
-  ElsydeonCave('Elsydeon Cave'),
-  ;
+  Test(World.Motavia, 'Test Area'),
+  Motavia(World.Motavia),
+  Piata(World.Motavia),
+  Mile(World.Motavia),
+  Zema(World.Motavia),
+  Krup(World.Motavia),
+  BirthValley(World.Motavia, 'Birth Valley'),
+  Molcum(World.Motavia),
+  Tonoe(World.Motavia),
+  ValleyMaze(World.Motavia, 'Valley Maze'),
+  BioPlant(World.Motavia),
+  Nalya(World.Motavia),
+  Wreckage(World.Motavia),
+  Aiedo(World.Motavia),
+  Passageway(World.Motavia),
+  Kadary(World.Motavia),
+  ZioFort(World.Motavia, "Zio's Fort"),
+  MachineCenter(World.Motavia, 'Machine Center'),
+  Monsen(World.Motavia),
+  PlateSystem(World.Motavia),
+  Termi(World.Motavia),
+  LadeaTower(World.Motavia, 'Ladea Tower'),
+  Nurvus(World.Motavia),
+  MotaviaSpaceport(World.Motavia, 'Motavia Spaceport'),
+  Zelan(World.Zelan),
+  RajaTemple(World.Dezolis, 'Raja Temple'),
+  Dezolis(World.Dezolis),
+  Ryuon(World.Dezolis),
+  Tyler(World.Dezolis),
+  Kuran(World.Kuran),
+  Zosa(World.Dezolis),
+  MystVale(World.Dezolis, 'Myst Vale'),
+  ClimateCenter(World.Dezolis, 'Climate Center'),
+  Reshel(World.Dezolis),
+  Jut(World.Dezolis),
+  WeaponPlant(World.Dezolis, 'Weapon Plant'),
+  Meese(World.Dezolis),
+  EsperMansion(World.Dezolis, 'Esper Mansion'),
+  GumbiousTemple(World.Dezolis, 'Gumbious Temple'),
+  TylerSpaceport(World.Dezolis, 'Tyler Spaceport'),
+  AirCastle(World.AirCastle, 'Air Castle'),
+  GuaronTower(World.Dezolis, 'Guaron Tower'),
+  Torinco(World.Motavia),
+  Uzo(World.Motavia),
+  VahalFort(World.Motavia, 'Vahal Fort'),
+  RappyCave(World.Motavia, 'Rappy Cave'),
+  SoldiersShrine(World.Motavia, "Soldier's Shrine"),
+  Rykros(World.Rykros),
+  TowerOfCourage(World.Rykros, 'Tower of Courage'),
+  TowerOfStrength(World.Rykros, 'Tower of Strength'),
+  TowerOfAnger(World.Rykros, 'Tower of Anger'),
+  SacellumOfQuietude(World.Rykros, 'Sacellum of Quietude'),
+  ElsydeonCave(World.Dezolis, 'Elsydeon Cave'),
+  TheEdge(World.Dezolis, 'The Edge');
+
+  final World world;
 
   final String? _readableName;
   String get readableName => _readableName ?? name;
 
-  const Zone([String? readableName]) : _readableName = readableName;
+  const Zone(this.world, [String? readableName]) : _readableName = readableName;
 }
+
+enum World { Motavia, Dezolis, Rykros, Zelan, Kuran, AirCastle }
 
 enum MapId {
   Test(Zone.Test),
   Test_Part2(Zone.Test),
 
-  Dezolis,
-  Motavia,
-  Rykros,
+  Motavia(Zone.Motavia),
+  Dezolis(Zone.Dezolis),
+  Rykros(Zone.Rykros),
 
   PiataAcademy(Zone.Piata),
   PiataAcademyF1(Zone.Piata),
@@ -245,7 +261,7 @@ enum MapId {
   BirthValley(Zone.BirthValley),
   BirthValley_B1(Zone.BirthValley),
 
-  Molcum,
+  Molcum(Zone.Molcum),
 
   Krup(Zone.Krup),
   KrupKindergarten(Zone.Krup),
@@ -335,9 +351,9 @@ enum MapId {
   StripClub(Zone.Aiedo),
   StripClubDressingRoom(Zone.Aiedo),
 
-  PassagewayNearAiedo,
-  Passageway,
-  PassagewayNearKadary,
+  PassagewayNearAiedo(Zone.Passageway),
+  Passageway(Zone.Passageway),
+  PassagewayNearKadary(Zone.Passageway),
 
   Kadary(Zone.Kadary),
   KadaryChurch(Zone.Kadary),
@@ -363,9 +379,9 @@ enum MapId {
   ZioFort_F4(Zone.ZioFort),
 
   // Return to Krup
-  MachineCenter,
-  MachineCenter_B1,
-  MachineCenter_B1_Part2,
+  MachineCenter(Zone.MachineCenter),
+  MachineCenter_B1(Zone.MachineCenter),
+  MachineCenter_B1_Part2(Zone.MachineCenter),
 
   MonsenCave(Zone.Monsen),
   Monsen(Zone.Monsen),
@@ -409,13 +425,13 @@ enum MapId {
   Nurvus_B4_Part2(Zone.Nurvus),
   Nurvus_B5(Zone.Nurvus),
 
-  MotaSpaceport,
+  MotaSpaceport(Zone.MotaviaSpaceport),
 
   ZelanSpace(Zone.Zelan),
   Zelan(Zone.Zelan),
   Zelan_F1(Zone.Zelan),
 
-  RajaTemple,
+  RajaTemple(Zone.RajaTemple),
 
   Ryuon(Zone.Ryuon),
   RyuonItemShop(Zone.Ryuon),
@@ -466,10 +482,10 @@ enum MapId {
   MystVale_Part5(Zone.MystVale),
 
   // Climate Center
-  ClimCenter,
-  ClimCenter_F1,
-  ClimCenter_F2,
-  ClimCenter_F3,
+  ClimCenter(Zone.ClimateCenter),
+  ClimCenter_F1(Zone.ClimateCenter),
+  ClimCenter_F2(Zone.ClimateCenter),
+  ClimCenter_F3(Zone.ClimateCenter),
 
   // Reshel
   Reshel1(Zone.Reshel),
@@ -501,10 +517,10 @@ enum MapId {
   JutChurch(Zone.Jut),
 
   // Weapon plant
-  WeaponPlant,
-  WeaponPlant_F1,
-  WeaponPlant_F2,
-  WeaponPlant_F3,
+  WeaponPlant(Zone.WeaponPlant),
+  WeaponPlant_F1(Zone.WeaponPlant),
+  WeaponPlant_F2(Zone.WeaponPlant),
+  WeaponPlant_F3(Zone.WeaponPlant),
 
   // Meese
   Meese(Zone.Meese),
@@ -539,7 +555,7 @@ enum MapId {
   Gumbious_B2_Part2(Zone.GumbiousTemple),
 
   // Tyler spaceport
-  DezoSpaceport,
+  DezoSpaceport(Zone.TylerSpaceport),
 
   // Air castle
   AirCastleSpace(Zone.AirCastle),
@@ -603,7 +619,7 @@ enum MapId {
   VahalFort_F2(Zone.VahalFort),
   VahalFort_F3(Zone.VahalFort),
 
-  RappyCave,
+  RappyCave(Zone.RappyCave),
 
   // Soldier's Shrine
   SoldiersTempleOutside(Zone.SoldiersShrine),
@@ -645,19 +661,20 @@ enum MapId {
 
   MileDead(Zone.Mile),
 
-  TheEdge,
-  TheEdge_Part2,
-  TheEdge_Part3,
-  TheEdge_Part4,
-  TheEdge_Part5,
-  TheEdge_Part6,
-  TheEdge_Part7,
-  TheEdge_Part8,
-  TheEdge_Part9;
+  TheEdge(Zone.TheEdge),
+  TheEdge_Part2(Zone.TheEdge),
+  TheEdge_Part3(Zone.TheEdge),
+  TheEdge_Part4(Zone.TheEdge),
+  TheEdge_Part5(Zone.TheEdge),
+  TheEdge_Part6(Zone.TheEdge),
+  TheEdge_Part7(Zone.TheEdge),
+  TheEdge_Part8(Zone.TheEdge),
+  TheEdge_Part9(Zone.TheEdge);
 
-  final Zone? zone;
+  final Zone zone;
+  World get world => zone.world;
 
-  const MapId([this.zone]);
+  const MapId(this.zone);
 }
 
 class MapArea {
