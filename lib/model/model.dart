@@ -5,24 +5,25 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
-import 'package:rune/generator/generator.dart';
-import 'package:rune/model/conditional.dart';
-import 'package:rune/model/cutscenes.dart';
-import 'package:rune/model/text.dart';
 
+import '../generator/generator.dart';
 import '../src/iterables.dart';
+import 'conditional.dart';
+import 'cutscenes.dart';
 import 'dialog.dart';
+import 'events.dart';
 import 'map.dart';
 import 'movement.dart';
 import 'sound.dart';
-import 'events.dart';
+import 'text.dart';
 
+export 'conditional.dart';
 export 'cutscenes.dart';
 export 'dialog.dart';
+export 'events.dart';
 export 'map.dart';
 export 'movement.dart';
 export 'sound.dart';
-export 'events.dart';
 
 class Game {
   // todo: should also include non-interaction Scenes?
@@ -51,11 +52,21 @@ class Game {
 
     for (var map in _maps.values) {
       map.orderedObjects.forEachIndexed((i, obj) {
-        var maps = interactions.putIfAbsent(obj.onInteract, () => Game());
-        var objects = maps.getOrStartMap(map.id);
+        // Get the game subset for this interaction
+        var gameSubset = interactions.putIfAbsent(obj.onInteract, () => Game());
+        var mapSubset = gameSubset.getOrStartMap(map.id);
         // keep original index in new maps
-        objects.addObject(obj, at: i);
+        mapSubset.addObject(obj, at: i);
       });
+
+      for (var area in map.areas) {
+        var gameSubset =
+            interactions.putIfAbsent(area.onInteract, () => Game());
+        var mapSubset = gameSubset.getOrStartMap(map.id);
+        // todo: if map has any objects, error?
+        // to start at least we won't support objects sharing scenes with areas
+        mapSubset.addArea(area);
+      }
     }
 
     return interactions;

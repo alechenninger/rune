@@ -574,17 +574,8 @@ Future<GameMap> asmToMap(
 
   var lookup = dialogLookup.byLabel(dialogLabel);
 
-  // TODO: Parse interaction areas
-  // Why?
-  // We need to update these.
-  // So we need original as reference.
-  // And the ability to round-trip parse->compile.
-
-  // How to model this stuff to keep round trip for stuff we don't
-  // care so much to modify? (at least as of now)
-  // - chest / temp flags
-  // - chests / shops
-  var areas = await _readAreas(reader, dialogLookup,
+  // todo: pass map instead of returning lists to add to map?
+  var areas = await _readAreas(mapId, reader, dialogLookup,
       isWorldMotavia: mapId.world == World.Motavia);
 
   var dialogTree = await lookup;
@@ -727,7 +718,7 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
           // todo: if shared scene, default speaker may be misleading
           // but maybe better than nothing
           () => toScene(asm.dialogId.value, dialogTree,
-              defaultSpeaker: object, isInteraction: true));
+              defaultSpeaker: object, isObjectInteraction: true));
       (spec as Interactive).onInteract = scene;
     }
 
@@ -736,7 +727,7 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
 }
 
 Future<List<MapArea>> _readAreas(
-    ConstantReader reader, DialogTreeLookup dialogLookup,
+    MapId map, ConstantReader reader, DialogTreeLookup dialogLookup,
     {required bool isWorldMotavia}) async {
   var areas = <MapArea>[];
 
@@ -754,6 +745,7 @@ Future<List<MapArea>> _readAreas(
     var routine = reader.readByte();
     var param = reader.readByteExpression();
 
+    var id = MapAreaId('${map.name}_area_${areas.length}');
     var position = Position(x.value << 3, y.value << 3);
 
     if (routine == Byte.zero) {
@@ -783,11 +775,10 @@ Future<List<MapArea>> _readAreas(
         dialog = await dialogLookup.byLabel(Label('DialogueTree30'));
       }
 
-      // TODO: not sure if this is considered interaction or not
-      // I believe this is meant for object interactions, so setting to false
-      var scene = toScene(param.value, dialog, isInteraction: false);
+      var scene = toScene(param.value, dialog, isObjectInteraction: false);
 
       areas.add(MapArea(
+          id: id,
           at: position,
           range: range,
           spec: InteractiveArea(
@@ -795,6 +786,7 @@ Future<List<MapArea>> _readAreas(
               onInteract: scene)));
     } else {
       areas.add(MapArea(
+          id: id,
           at: position,
           range: range,
           spec: AsmArea(

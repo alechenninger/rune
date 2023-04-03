@@ -123,7 +123,7 @@ extension DialogToAsm on Dialog {
 // todo: this might belong in generator.dart due to symmetry with
 //  SceneAsmGenerator
 Scene toScene(int dialogId, DialogTree tree,
-    {Speaker? defaultSpeaker, bool isInteraction = false}) {
+    {Speaker? defaultSpeaker, bool isObjectInteraction = false}) {
   if (dialogId >= tree.length) {
     // todo: i think this is required b/c some original asm refers to these
     // but check on it
@@ -167,7 +167,7 @@ Scene toScene(int dialogId, DialogTree tree,
     moveBack: () => constId--,
     advance: advanceDialog,
     returnToLast: returnDialog,
-    isInteractionRoot: isInteraction,
+    isObjectInteractionRoot: isObjectInteraction,
   );
 
   for (; constId < constants.length; constId++) {
@@ -195,12 +195,13 @@ class ParseContext {
       required Function(int) advance,
       required Function() returnToLast,
       Speaker? defaultSpeaker,
-      bool isInteractionRoot = false})
+      bool isObjectInteractionRoot = false})
       : _moveBack = moveBack,
         _advance = advance,
         _returnToLast = returnToLast {
     state = DialogState(events,
-        defaultSpeaker: defaultSpeaker, isInteractionRoot: isInteractionRoot);
+        defaultSpeaker: defaultSpeaker,
+        isObjectInteractionRoot: isObjectInteractionRoot);
   }
 
   /// reparses the last byte with new state of [state]
@@ -231,9 +232,9 @@ class DialogState implements DialogParseState {
   bool _needsFacePlayer;
 
   DialogState(this.events,
-      {Speaker? defaultSpeaker, bool isInteractionRoot = false})
+      {Speaker? defaultSpeaker, bool isObjectInteractionRoot = false})
       : speaker = defaultSpeaker,
-        _needsFacePlayer = isInteractionRoot;
+        _needsFacePlayer = isObjectInteractionRoot;
 
   @override
   void call(Expression constant, ParseContext context) {
@@ -249,7 +250,7 @@ class DialogState implements DialogParseState {
       context.state = RunEventState(this);
     } else if (constant == Byte(0xFA)) {
       context.state =
-          EventCheckState(this, isInteractionRoot: _needsFacePlayer);
+          EventCheckState(this, isObjectInteractionRoot: _needsFacePlayer);
       // Will be handled by branches instead.
       _needsFacePlayer = false;
     } else if (constant == Byte(0xFF)) {
@@ -489,9 +490,9 @@ class EventCheckState implements DialogParseState {
   EventFlag? flag;
 
   final DialogState parent;
-  final bool isInteractionRoot;
+  final bool isObjectInteractionRoot;
 
-  EventCheckState(this.parent, {required this.isInteractionRoot});
+  EventCheckState(this.parent, {required this.isObjectInteractionRoot});
 
   @override
   void call(Expression constant, ParseContext context) {
@@ -507,7 +508,7 @@ class EventCheckState implements DialogParseState {
 
     var ifSetOffset = constant.value;
     context.state = IfUnsetState(flag!, ifSetOffset, parent,
-        isInteractionRoot: isInteractionRoot);
+        isObjectInteractionRoot: isObjectInteractionRoot);
   }
 }
 
@@ -515,11 +516,11 @@ class IfUnsetState extends DialogState {
   final EventFlag flag;
   final int ifSetOffset;
   final DialogState parent;
-  final bool isInteractionRoot;
+  final bool isObjectInteractionRoot;
 
   IfUnsetState(this.flag, this.ifSetOffset, this.parent,
-      {required this.isInteractionRoot})
-      : super([], isInteractionRoot: isInteractionRoot) {
+      {required this.isObjectInteractionRoot})
+      : super([], isObjectInteractionRoot: isObjectInteractionRoot) {
     speaker = parent.speaker;
   }
 
@@ -527,7 +528,7 @@ class IfUnsetState extends DialogState {
   void terminate(ParseContext context) {
     context.advanceDialogsBy(ifSetOffset,
         newState: IfSetState(flag, parent, events,
-            isInteractionRoot: isInteractionRoot));
+            isObjectInteractionRoot: isObjectInteractionRoot));
   }
 }
 
@@ -537,7 +538,7 @@ class IfSetState extends DialogState {
   final List<Event> ifUnset;
 
   IfSetState(this.flag, this.parent, this.ifUnset,
-      {required super.isInteractionRoot})
+      {required super.isObjectInteractionRoot})
       : super([]) {
     speaker = parent.speaker;
   }

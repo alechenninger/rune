@@ -506,7 +506,8 @@ void main() {
 	dc.b	"I feel much safer now."
 	dc.b	$FF''');
 
-        var scene = toScene(0, DialogTree()..add(asm), isInteraction: true);
+        var scene =
+            toScene(0, DialogTree()..add(asm), isObjectInteraction: true);
 
         expect(
             scene,
@@ -523,7 +524,8 @@ void main() {
 	dc.b	"I feel much safer now."
 	dc.b	$FF''');
 
-        var scene = toScene(0, DialogTree()..add(asm), isInteraction: true);
+        var scene =
+            toScene(0, DialogTree()..add(asm), isObjectInteraction: true);
 
         expect(
             scene,
@@ -544,7 +546,7 @@ void main() {
 	dc.b	"I feel much safer now."
 	dc.b	$FF''');
 
-        var scene = toScene(0, asm.splitToTree(), isInteraction: true);
+        var scene = toScene(0, asm.splitToTree(), isObjectInteraction: true);
 
         expect(
             scene,
@@ -570,7 +572,7 @@ void main() {
 	dc.b	"I feel much safer now."
 	dc.b	$FF''');
 
-        var scene = toScene(0, asm.splitToTree(), isInteraction: true);
+        var scene = toScene(0, asm.splitToTree(), isObjectInteraction: true);
 
         expect(
             scene,
@@ -593,7 +595,7 @@ void main() {
 	dc.b	"I feel much safer now."
 	dc.b	$FF''');
 
-        var scene = toScene(0, asm.splitToTree(), isInteraction: true);
+        var scene = toScene(0, asm.splitToTree(), isObjectInteraction: true);
 
         expect(
             scene,

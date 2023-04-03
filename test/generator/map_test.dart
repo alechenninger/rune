@@ -779,6 +779,7 @@ void main() {
 
       expect(map.areas, [
         MapArea(
+            id: MapAreaId('test'),
             at: Position(0x1e0, 0x1d0),
             range: AreaRange.x40y40,
             spec: InteractiveArea(

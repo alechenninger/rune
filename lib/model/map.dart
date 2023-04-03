@@ -19,7 +19,7 @@ class GameMap {
   final _indexedObjects = <MapObject?>[];
 
   // doesn't appear to be a limit other than ROM size
-  final _areas = <MapArea>[];
+  final _areas = <MapAreaId, MapArea>{};
 
   GameMap(this.id);
 
@@ -106,17 +106,22 @@ class GameMap {
     addObject(obj.object, at: obj.index);
   }
 
-  Iterable<MapArea> get areas => UnmodifiableListView(_areas);
+  Iterable<MapArea> get areas => UnmodifiableListView(_areas.values);
 
   void addArea(MapArea area) {
-    _areas.add(area);
+    if (_areas.containsKey(area.id)) {
+      throw ArgumentError('map already contains area with id: ${area.id}');
+    }
+    _areas[area.id] = area;
   }
 
-  // update area? addAreaAt?
+  MapArea? area(MapAreaId id) => _areas[id];
 
   @override
   String toString() {
-    return 'GameMap{id: $id, _indexedObjects: $_indexedObjects}';
+    return 'GameMap{id: $id, '
+        '_indexedObjects: $_indexedObjects, '
+        '_areas: $_areas}';
   }
 }
 
@@ -678,18 +683,30 @@ enum MapId {
 }
 
 class MapArea {
-  final Position position;
-  final AreaSpec spec;
-  final AreaRange range;
-
-  MapArea({required Position at, required this.range, required this.spec})
+  MapArea(
+      {required this.id,
+      required Position at,
+      required this.range,
+      required this.spec})
       : position = at;
+
+  final MapAreaId id;
+  final Position position;
+  final AreaRange range;
+  final AreaSpec spec;
+
+  Scene get onInteract {
+    if (isInteractive) {
+      return (spec as Interactive).onInteract;
+    }
+    return Scene.none();
+  }
+
+  bool get isInteractive => spec is Interactive;
 
   @override
   String toString() {
-    return 'InteractionArea{position: $position, '
-        'range: $range, '
-        'spec: $spec}';
+    return 'MapArea{id: $id, position: $position, range: $range, spec: $spec}';
   }
 
   @override
@@ -703,6 +720,25 @@ class MapArea {
 
   @override
   int get hashCode => position.hashCode ^ spec.hashCode ^ range.hashCode;
+}
+
+class MapAreaId {
+  final String value;
+
+  MapAreaId(this.value);
+
+  @override
+  String toString() => value;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MapAreaId &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
 }
 
 enum AreaRange {
@@ -725,9 +761,9 @@ enum AreaRange {
 abstract class AreaSpec {}
 
 class InteractiveArea extends AreaSpec with Interactive {
-  // TODO: other flag types are modelable in ASM
-  // but we don't support other flag types in the model.
-  // do we care?
+  // other flag types are modelable in ASM
+  // however they are never used with interaction types we care about.
+  // hence this is here and not in the MapArea model
   /// Interactions may be conditional on whether [doNotInteractIf] is set.
   ///
   /// If set, the interaction won't take place.
@@ -795,7 +831,7 @@ class AsmArea extends AreaSpec {
 }
 
 // todo: 'with UnnamedSpeaker' – aren't some objects named speakers?
-class MapObject extends FieldObject implements UnnamedSpeaker {
+class MapObject extends FieldObject implements UnnamedSpeaker, Interactive {
   final MapObjectId id;
   // note: can only be in multiples of 8 pixels
   final Position startPosition;
