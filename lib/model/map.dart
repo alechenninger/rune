@@ -682,8 +682,25 @@ enum MapId {
   const MapId(this.zone);
 }
 
-class MapArea {
-  MapArea(
+// todo: use sealed class when available
+abstract class MapElement {}
+
+abstract class InteractiveMapElement implements MapElement, Interactive {}
+
+class MapArea extends MapElement {
+  factory MapArea(
+      {required MapAreaId id,
+      required Position at,
+      required AreaRange range,
+      required AreaSpec spec}) {
+    if (spec is InteractiveAreaSpec) {
+      return InteractiveMapArea._(id: id, at: at, range: range, spec: spec);
+    } else {
+      return MapArea._(id: id, at: at, range: range, spec: spec);
+    }
+  }
+
+  MapArea._(
       {required this.id,
       required Position at,
       required this.range,
@@ -720,6 +737,21 @@ class MapArea {
 
   @override
   int get hashCode => position.hashCode ^ spec.hashCode ^ range.hashCode;
+}
+
+class InteractiveMapArea extends MapArea implements InteractiveMapElement {
+  InteractiveMapArea._(
+      {required super.id,
+      required super.at,
+      required super.range,
+      required InteractiveAreaSpec spec})
+      : super._(spec: spec);
+
+  @override
+  InteractiveAreaSpec get spec => super.spec as InteractiveAreaSpec;
+
+  @override
+  set onInteract(Scene onInteract) => spec.onInteract = onInteract;
 }
 
 class MapAreaId {
@@ -760,7 +792,7 @@ enum AreaRange {
 
 abstract class AreaSpec {}
 
-class InteractiveArea extends AreaSpec with Interactive {
+class InteractiveAreaSpec extends AreaSpec with Interactive {
   // other flag types are modelable in ASM
   // however they are never used with interaction types we care about.
   // hence this is here and not in the MapArea model
@@ -769,7 +801,7 @@ class InteractiveArea extends AreaSpec with Interactive {
   /// If set, the interaction won't take place.
   final EventFlag? doNotInteractIf;
 
-  InteractiveArea(
+  InteractiveAreaSpec(
       {this.doNotInteractIf, Scene onInteract = const Scene.none()}) {
     this.onInteract = onInteract;
   }
@@ -783,7 +815,7 @@ class InteractiveArea extends AreaSpec with Interactive {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is InteractiveArea &&
+      other is InteractiveAreaSpec &&
           runtimeType == other.runtimeType &&
           doNotInteractIf == other.doNotInteractIf &&
           onInteract == other.onInteract;
@@ -831,7 +863,7 @@ class AsmArea extends AreaSpec {
 }
 
 // todo: 'with UnnamedSpeaker' – aren't some objects named speakers?
-class MapObject extends FieldObject implements UnnamedSpeaker, Interactive {
+class MapObject extends FieldObject implements MapElement, UnnamedSpeaker {
   final MapObjectId id;
   // note: can only be in multiples of 8 pixels
   final Position startPosition;
@@ -859,7 +891,34 @@ class MapObject extends FieldObject implements UnnamedSpeaker, Interactive {
     }
   }
 
-  MapObject(
+  factory MapObject(
+      {String? id,
+      required Position startPosition,
+      required MapObjectSpec spec,
+      // todo: maybe use event list instead of Scene model?
+      // issue is modifying scene w/ onInteractFacePlayer
+      // –it's a misleading API
+      // -> or maybe get rid of onInteractFacePlayer now that
+      // it is not necessary to use reference to object itself
+      @Deprecated("use spec") Scene onInteract = const Scene.none(),
+      bool onInteractFacePlayer = true}) {
+    if (spec is InteractiveMapObjectSpec) {
+      return InteractiveMapObject._(
+          id: id,
+          startPosition: startPosition,
+          spec: spec,
+          onInteract: onInteract,
+          onInteractFacePlayer: onInteractFacePlayer);
+    }
+    return MapObject._(
+        id: id,
+        startPosition: startPosition,
+        spec: spec,
+        onInteract: onInteract,
+        onInteractFacePlayer: onInteractFacePlayer);
+  }
+
+  MapObject._(
       {String? id,
       required this.startPosition,
       required this.spec,
@@ -901,6 +960,24 @@ class MapObject extends FieldObject implements UnnamedSpeaker, Interactive {
 
   @override
   int get hashCode => id.hashCode ^ startPosition.hashCode ^ spec.hashCode;
+}
+
+class InteractiveMapObject extends MapObject implements InteractiveMapElement {
+  @override
+  InteractiveMapObjectSpec get spec => super.spec as InteractiveMapObjectSpec;
+
+  InteractiveMapObject._(
+      {super.id,
+      required super.startPosition,
+      required InteractiveMapObjectSpec spec,
+      // todo: maybe use event list instead of Scene model?
+      // issue is modifying scene w/ onInteractFacePlayer
+      // –it's a misleading API
+      // -> or maybe get rid of onInteractFacePlayer now that
+      // it is not necessary to use reference to object itself
+      super.onInteract = const Scene.none(),
+      super.onInteractFacePlayer = true})
+      : super._(spec: spec);
 }
 
 /// Constructs an object which doesn't do anything, but does collide.
@@ -961,6 +1038,9 @@ abstract class Interactive {
   Scene onInteract = Scene.none();
 }
 
+abstract class InteractiveMapObjectSpec extends MapObjectSpec
+    with Interactive {}
+
 /// Spec for class of behaviors with interchangeable sprites.
 class Npc extends MapObjectSpec {
   final Sprite sprite;
@@ -990,7 +1070,7 @@ class Npc extends MapObjectSpec {
   int get hashCode => sprite.hashCode ^ behavior.hashCode;
 }
 
-class InteractiveNpc extends Npc implements Interactive {
+class InteractiveNpc extends Npc implements InteractiveMapObjectSpec {
   @override
   Scene get onInteract => (behavior as Interactive).onInteract;
 
@@ -1146,7 +1226,7 @@ Sprite? spriteByName(String name) {
   return null;
 }
 
-class AlysWaiting extends MapObjectSpec with Interactive {
+class AlysWaiting extends InteractiveMapObjectSpec {
   @override
   final startFacing = Direction.down;
 
@@ -1166,7 +1246,7 @@ class AlysWaiting extends MapObjectSpec with Interactive {
 
 // Sprite is currently not configurable (defined in RAM).
 // We could technically make it configurable but not needed at this time.
-class AiedoShopperWithBags extends MapObjectSpec with Interactive {
+class AiedoShopperWithBags extends InteractiveMapObjectSpec {
   @override
   final Direction startFacing;
 
@@ -1190,7 +1270,7 @@ class AiedoShopperWithBags extends MapObjectSpec with Interactive {
 
 // Sprite is currently not configurable (defined in RAM).
 // We could technically make it configurable but not needed at this time.
-class AiedoShopperMom extends MapObjectSpec with Interactive {
+class AiedoShopperMom extends InteractiveMapObjectSpec {
   @override
   final startFacing = Direction.right;
 
@@ -1208,7 +1288,7 @@ class AiedoShopperMom extends MapObjectSpec with Interactive {
   int get hashCode => toString().hashCode;
 }
 
-class InvisibleBlock extends MapObjectSpec with Interactive {
+class InvisibleBlock extends InteractiveMapObjectSpec {
   @override
   final startFacing = Direction.down;
 
@@ -1450,7 +1530,9 @@ class AsmSpec extends MapObjectSpec {
       artLabel.hashCode ^ routine.hashCode ^ startFacing.hashCode;
 }
 
-class InteractiveAsmSpec extends AsmSpec with Interactive {
+class InteractiveAsmSpec extends AsmSpec
+    with Interactive
+    implements InteractiveMapObjectSpec {
   InteractiveAsmSpec(
       {super.artLabel,
       required super.routine,

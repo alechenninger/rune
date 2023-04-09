@@ -270,17 +270,18 @@ class Slots {
   int get numCharacters => _slots.keys.reduce(max);
 }
 
-class Scene {
-  final List<Event> events;
+class Scene extends IterableBase<Event> {
+  final List<Event> _events;
+  List<Event> get events => List.unmodifiable(_events);
 
-  Scene([Iterable<Event> events = const []]) : events = [] {
+  Scene([Iterable<Event> events = const []]) : _events = [] {
     addEvents(events);
   }
 
   Scene.forNpcInteraction([Iterable<Event> events = const []])
       : this([InteractionObject.facePlayer(), ...events]);
 
-  const Scene.none() : events = const [];
+  const Scene.none() : _events = const [];
 
   // note:
   // because these return new scenes, they kind of break the memory model if
@@ -289,33 +290,65 @@ class Scene {
   // producing a new one.
 
   Scene startingWith(Iterable<Event> events) {
-    return Scene([...events, ...this.events]);
+    return Scene([...events, ..._events]);
   }
 
   Scene unlessSet(EventFlag flag, {required List<Event> then}) {
-    return Scene([IfFlag(flag, isSet: then, isUnset: events)]);
+    return Scene([IfFlag(flag, isSet: then, isUnset: _events)]);
   }
 
+  @override
+  Iterator<Event> get iterator => _events.iterator;
+
   /// Returns [true] if the scene has no game-state-changing events.
-  bool get isEmpty => events
+  bool get isEffectivelyEmpty => _events
       .whereNot((e) => e is SetContext || _isIfFlagWithEmptyBranches(e))
       .isEmpty;
-  bool get isNotEmpty => !isEmpty;
+  bool get isEffectivelyNotEmpty => !isEffectivelyEmpty;
 
   // see TODO on SetContext
   // have to hack around it
   Scene withoutSetContext() {
-    return Scene(events
+    return Scene(_events
         .whereNot((e) => e is SetContext)
         .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e));
   }
 
   void addEvent(Event event) {
-    _addEvent(events, event);
+    _addEvent(_events, event);
   }
 
   void addEvents(Iterable<Event> events) {
     events.forEach(addEvent);
+  }
+
+  /// Adds a conditional [branch] to the scene.
+  ///
+  /// The `branch` is played instead of the current scene if the [whenSet] flag
+  /// is set. If the flag is not set, the current scene is played.
+  ///
+  /// If [createSequence] is `true`, `whenSet` will be set with the current
+  /// scene, thus creating a sequence if the scene is played again.
+  ///
+  /// Advancing to the next branch in sequence can be controlled however
+  /// by setting the [advanceSequenceWhenSet] flag. If provided, advancing the
+  /// sequence will be conditional on the `createSequenceWhenSet` flag.
+  void addBranch(Iterable<Event> branch,
+      {required EventFlag whenSet,
+      bool createSequence = false,
+      EventFlag? advanceSequenceWhenSet}) {
+    if (createSequence) {
+      if (advanceSequenceWhenSet == null) {
+        addEvent(SetFlag(whenSet));
+      } else {
+        addEvent(IfFlag(advanceSequenceWhenSet, isSet: [SetFlag(whenSet)]));
+      }
+    }
+
+    _events.replaceRange(0, _events.length, [
+      IfFlag(whenSet,
+          isSet: branch.toList(growable: false), isUnset: [..._events])
+    ]);
   }
 
   void _addEvent(List<Event> events, Event event) {
@@ -362,7 +395,7 @@ class Scene {
 
   @override
   String toString() {
-    return 'Scene{events: $events}';
+    return 'Scene{events: $_events}';
   }
 
   @override
@@ -370,15 +403,16 @@ class Scene {
       identical(this, other) ||
       other is Scene &&
           runtimeType == other.runtimeType &&
-          const ListEquality<Event>().equals(events, other.events);
+          const ListEquality<Event>().equals(_events, other._events);
 
   @override
-  int get hashCode => const ListEquality<Event>().hash(events);
+  int get hashCode => const ListEquality<Event>().hash(_events);
 }
 
 bool _isIfFlagWithEmptyBranches(Event e) {
   if (e is! IfFlag) return false;
-  return Scene(e.isSet).isEmpty & Scene(e.isUnset).isEmpty;
+  return Scene(e.isSet).isEffectivelyEmpty &
+      Scene(e.isUnset).isEffectivelyEmpty;
 }
 
 final onlyWordCharacters = RegExp(r'^\w+$');

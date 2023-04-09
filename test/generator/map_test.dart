@@ -782,7 +782,7 @@ void main() {
             id: MapAreaId('test'),
             at: Position(0x1e0, 0x1d0),
             range: AreaRange.x40y40,
-            spec: InteractiveArea(
+            spec: InteractiveAreaSpec(
                 onInteract:
                     Scene([Dialog(spans: DialogSpan.parse("It's an area"))])))
       ]);

@@ -19,4 +19,5 @@ dev_dependencies:
   lints: ^2.0.0
   test: ^1.16.3
   js: ^0.6.3
-  google_apps: ^0.1.2
+  google_apps:
+    git: https://github.com/alechenninger/dart_google_apps.git

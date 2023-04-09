@@ -781,7 +781,7 @@ Future<List<MapArea>> _readAreas(
           id: id,
           at: position,
           range: range,
-          spec: InteractiveArea(
+          spec: InteractiveAreaSpec(
               doNotInteractIf: flag != Byte.zero ? toEventFlag(flag) : null,
               onInteract: scene)));
     } else {
