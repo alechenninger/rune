@@ -478,11 +478,9 @@ ${dialog2.toAsm()}
 
       expect(eventRoutines.cutsceneRoutines, hasLength(1));
       expect(
-          asm.withoutComments().tail(6),
+          asm.withoutComments().tail(4),
           Asm([
             jsr(Label('Event_GetAndRunDialogue5').l),
-            moveq(Constant('EventFlag_test').i, d0),
-            jsr(Label('EventFlags_Set').l),
             moveq(0.i, d0),
             rts,
             newLine()

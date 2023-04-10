@@ -268,7 +268,10 @@ class IfFlag extends Event {
   final List<Event> isSet;
   final List<Event> isUnset;
 
-  IfFlag(this.flag, {this.isSet = const [], this.isUnset = const []});
+  IfFlag(this.flag,
+      {Iterable<Event> isSet = const [], Iterable<Event> isUnset = const []})
+      : isSet = Scene(isSet).events,
+        isUnset = Scene(isUnset).events;
 
   @override
   void visit(EventVisitor visitor) {

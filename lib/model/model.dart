@@ -345,15 +345,16 @@ class Scene extends IterableBase<Event> {
       }
     }
 
-    _events.replaceRange(0, _events.length, [
-      IfFlag(whenSet,
-          isSet: branch.toList(growable: false), isUnset: [..._events])
-    ]);
+    var withBranch = <Event>[];
+    _addEvent(withBranch, IfFlag(whenSet, isSet: branch, isUnset: _events));
+    _events.replaceRange(0, _events.length, withBranch);
   }
 
   void _addEvent(List<Event> events, Event event) {
     var last = events.lastOrNull;
     // todo: should IfFlag branches just be Scenes? would simplify this class
+    // todo: i started to use Scenes to set up branches;
+    //  but im not sure what that simplifies here?
     if (last is IfFlag && event is IfFlag && last.flag == event.flag) {
       // normalize conditionals
       events.removeLast();
