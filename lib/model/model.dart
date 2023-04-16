@@ -82,6 +82,21 @@ class Game {
   void addMap(GameMap map) => _maps[map.id] = map;
 
   void addMaps(Iterable<GameMap> maps) => maps.forEach(addMap);
+
+  @override
+  String toString() {
+    return 'Game{maps: ${_maps.values}}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Game &&
+          runtimeType == other.runtimeType &&
+          const MapEquality<MapId, GameMap>().equals(_maps, other._maps);
+
+  @override
+  int get hashCode => const MapEquality<MapId, GameMap>().hash(_maps);
 }
 
 // todo: use sealed type once supported in dart

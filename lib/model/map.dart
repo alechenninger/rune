@@ -120,9 +120,24 @@ class GameMap {
   @override
   String toString() {
     return 'GameMap{id: $id, '
-        '_indexedObjects: $_indexedObjects, '
+        '_objects: $_objects, '
         '_areas: $_areas}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GameMap &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          const MapEquality().equals(_objects, other._objects) &&
+          const MapEquality().equals(_areas, other._areas);
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      const MapEquality().hash(_objects) ^
+      const MapEquality().hash(_areas);
 }
 
 class _MapObjectAt {
@@ -130,6 +145,22 @@ class _MapObjectAt {
   final MapObject object;
 
   _MapObjectAt(this.object, [this.index]);
+
+  @override
+  String toString() {
+    return '_MapObjectAt{index: $index, object: $object}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _MapObjectAt &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          object == other.object;
+
+  @override
+  int get hashCode => index.hashCode ^ object.hashCode;
 }
 
 class IndexedMapObject {

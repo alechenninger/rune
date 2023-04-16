@@ -439,4 +439,170 @@ void main() {
       expect(map.objects, hasLength(2));
     });
   });
+
+  group('game', () {
+    late Game game;
+
+    setUp(() {
+      game = Game();
+    });
+
+    group('scenes by interaction', () {
+      late GameMap map;
+
+      setUp(() {
+        map = game.getOrStartMap(MapId.Test);
+      });
+
+      test('distinct areas', () {
+        var area0 = MapArea(
+            id: MapAreaId('0'),
+            at: Position(0, 0),
+            range: AreaRange.x20y20,
+            spec: InteractiveAreaSpec(
+                onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hello 0')]),
+            ])));
+
+        var area1 = MapArea(
+            id: MapAreaId('1'),
+            at: Position(0x20, 0),
+            range: AreaRange.x20y20,
+            spec: InteractiveAreaSpec(
+                onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hello 1')]),
+            ])));
+
+        map.addArea(area0);
+        map.addArea(area1);
+
+        var scenes = game.byInteraction();
+
+        expect(scenes, hasLength(2));
+
+        expect(scenes[area0.onInteract],
+            Game()..getOrStartMap(MapId.Test).addArea(area0));
+      });
+
+      test('distinct area and objects', () {
+        var area0 = MapArea(
+            id: MapAreaId('0'),
+            at: Position(0, 0),
+            range: AreaRange.x20y20,
+            spec: InteractiveAreaSpec(
+                onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hello 0')]),
+            ])));
+
+        var alys = MapObject(
+            id: 'alys',
+            startPosition: Position(0x20, 0),
+            spec: Npc(
+                Sprite.PalmanWoman1,
+                FaceDown(
+                  onInteract: Scene([
+                    Dialog(spans: [DialogSpan('Hello 1')]),
+                  ]),
+                )));
+
+        map.addArea(area0);
+        map.addObject(alys);
+
+        var scenes = game.byInteraction();
+
+        expect(scenes, hasLength(2));
+
+        expect(scenes[area0.onInteract],
+            Game()..getOrStartMap(MapId.Test).addArea(area0));
+
+        expect(
+            scenes[alys.onInteract],
+            // Split by interaction, the maps are specific
+            // about index in order to retain the original order
+            // regardless of whether index was specified up front.
+            Game()..getOrStartMap(MapId.Test).addObject(alys, at: 0));
+      });
+
+      test('orders by map, then element type objects first', () {
+        var area0 = MapArea(
+            id: MapAreaId('0'),
+            at: Position(0, 0),
+            range: AreaRange.x20y20,
+            spec: InteractiveAreaSpec(
+                onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hello a0')]),
+            ])));
+        var area1 = MapArea(
+            id: MapAreaId('1'),
+            at: Position(0, 0),
+            range: AreaRange.x20y20,
+            spec: InteractiveAreaSpec(
+                onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hello a1')]),
+            ])));
+        var area2 = MapArea(
+            id: MapAreaId('2'),
+            at: Position(0, 0),
+            range: AreaRange.x20y20,
+            spec: InteractiveAreaSpec(
+                onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hello a2')]),
+            ])));
+
+        var obj0 = MapObject(
+            id: '0',
+            startPosition: Position(0x20, 0),
+            spec: Npc(
+                Sprite.PalmanWoman1,
+                FaceDown(
+                  onInteract: Scene([
+                    Dialog(spans: [DialogSpan('Hello o0')]),
+                  ]),
+                )));
+        var obj1 = MapObject(
+            id: '1',
+            startPosition: Position(0x20, 0),
+            spec: Npc(
+                Sprite.PalmanWoman1,
+                FaceDown(
+                  onInteract: Scene([
+                    Dialog(spans: [DialogSpan('Hello o1')]),
+                  ]),
+                )));
+        var obj2 = MapObject(
+            id: '2',
+            startPosition: Position(0x20, 0),
+            spec: Npc(
+                Sprite.PalmanWoman1,
+                FaceDown(
+                  onInteract: Scene([
+                    Dialog(spans: [DialogSpan('Hello o2')]),
+                  ]),
+                )));
+
+        map.addArea(area0);
+        map.addArea(area1);
+        map.addObject(obj0);
+        map.addObject(obj1);
+        game.getOrStartMap(MapId.Test_Part2)
+          ..addArea(area2)
+          ..addObject(obj2);
+
+        var scenes = game.byInteraction();
+
+        expect(scenes, {
+          obj0.onInteract: Game()
+            ..getOrStartMap(MapId.Test).addObject(obj0, at: 0),
+          obj1.onInteract: Game()
+            ..getOrStartMap(MapId.Test).addObject(obj1, at: 1),
+          area0.onInteract: Game()..getOrStartMap(MapId.Test).addArea(area0),
+          obj2.onInteract: Game()
+            ..getOrStartMap(MapId.Test_Part2).addObject(obj2, at: 0),
+          area1.onInteract: Game()..getOrStartMap(MapId.Test).addArea(area1),
+          area2.onInteract: Game()
+            ..getOrStartMap(MapId.Test_Part2).addArea(area2),
+        });
+      });
+    });
+  });
 }
