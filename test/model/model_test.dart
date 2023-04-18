@@ -603,6 +603,32 @@ void main() {
             ..getOrStartMap(MapId.Test_Part2).addArea(area2),
         });
       });
+
+      test('same scenes share a game when split', () {
+        var scene = Scene([
+          Dialog(spans: [DialogSpan('Hello 0')]),
+        ]);
+
+        var area0 = MapArea(
+            id: MapAreaId('0'),
+            at: Position(0, 0),
+            range: AreaRange.x20y20,
+            spec: InteractiveAreaSpec(onInteract: scene));
+
+        var area1 = MapArea(
+            id: MapAreaId('1'),
+            at: Position(0x20, 0),
+            range: AreaRange.x20y20,
+            spec: InteractiveAreaSpec(onInteract: scene));
+
+        map.addArea(area0);
+        map.addArea(area1);
+
+        var scenes = game.byInteraction();
+
+        expect(scenes, hasLength(1));
+        expect(scenes[scene]?.getOrStartMap(map.id).areas, [area0, area1]);
+      });
     });
   });
 }

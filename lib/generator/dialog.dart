@@ -9,10 +9,9 @@ import '../asm/asm.dart';
 import '../asm/dialog.dart';
 import '../asm/events.dart';
 import '../characters.dart';
-import '../model/conditional.dart';
 import '../model/model.dart';
-import 'generator.dart';
 import 'cutscenes.dart';
+import 'generator.dart';
 
 class DialogAsm extends Asm {
   DialogAsm.empty() : super.empty();

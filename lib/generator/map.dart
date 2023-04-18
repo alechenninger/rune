@@ -730,6 +730,7 @@ Future<List<MapArea>> _readAreas(
     MapId map, ConstantReader reader, DialogTreeLookup dialogLookup,
     {required bool isWorldMotavia}) async {
   var areas = <MapArea>[];
+  var scenes = <_DialogAndLabel, Scene>{};
 
   while (true) {
     var xOrTerminate = reader.readWord();
@@ -765,17 +766,23 @@ Future<List<MapArea>> _readAreas(
       // This is based off of the "world index."
       // For Motavia, simply use the first tree ("DialogueTree28")
       // If dialog ID >= 0x7F, use DialogTree29
-      // Else, use DialogTree30.
-      DialogTree dialog;
+      // Else, use DialogTree30
+      Label dialog;
       if (isWorldMotavia) {
-        dialog = await dialogLookup.byLabel(Label('DialogueTree28'));
+        dialog = Label('DialogueTree28');
       } else if (flag.value >= 0x7F) {
-        dialog = await dialogLookup.byLabel(Label('DialogueTree29'));
+        dialog = Label('DialogueTree29');
       } else {
-        dialog = await dialogLookup.byLabel(Label('DialogueTree30'));
+        dialog = Label('DialogueTree30');
       }
 
-      var scene = toScene(param.value, dialog, isObjectInteraction: false);
+      var ref = _DialogAndLabel(param.value, dialog);
+      var scene = scenes[ref];
+      if (scene == null) {
+        scene = toScene(param.value, await dialogLookup.byLabel(dialog),
+            isObjectInteraction: false);
+        scenes[ref] = scene;
+      }
 
       areas.add(MapArea(
           id: id,
@@ -796,6 +803,29 @@ Future<List<MapArea>> _readAreas(
               interactionParameter: param)));
     }
   }
+}
+
+class _DialogAndLabel {
+  final int dialog;
+  final Label label;
+
+  _DialogAndLabel(this.dialog, this.label);
+
+  @override
+  String toString() {
+    return '_DialogAndLabel{dialog: $dialog, label: $label}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _DialogAndLabel &&
+          runtimeType == other.runtimeType &&
+          dialog == other.dialog &&
+          label == other.label;
+
+  @override
+  int get hashCode => dialog.hashCode ^ label.hashCode;
 }
 
 AreaRange _parseRangeType(Word range) {
