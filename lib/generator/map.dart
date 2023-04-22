@@ -428,10 +428,19 @@ void _compileMapAreaData(Asm asm, MapArea area, EventFlags eventFlags,
     ]));
   } else if (spec is InteractiveAreaSpec) {
     var dialogId = compileScene(spec.onInteract);
-    var flag =
-        spec.doNotInteractIf?.map((f) => eventFlags.toConstant(f)) ?? Byte.zero;
 
-    // todo: support or error if flag is extended event flag
+    Expression flag;
+    var doNotInteractIf = spec.doNotInteractIf;
+    if (doNotInteractIf != null) {
+      var value = eventFlags.toConstantValue(doNotInteractIf);
+      if (value.value >= Byte.max) {
+        throw Exception('extended event flags not supported for interaction '
+            'area check. eventFlag=$value');
+      }
+      flag = value.constant;
+    } else {
+      flag = Byte.zero;
+    }
 
     asm.add(dc.b([
       Byte.zero, // always a story event,
