@@ -443,7 +443,7 @@ void _compileMapAreaData(Asm asm, MapArea area, EventFlags eventFlags,
     }
 
     asm.add(dc.b([
-      Byte.zero, // always a story event,
+      Byte.zero, // always a story event
       flag,
       Byte(7), // Interaction_DisplayDialogueGrandCross
       dialogId,
@@ -510,7 +510,10 @@ FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
 }
 
 List<String> preprocessMapToRaw(Asm original,
-    {required String sprites, required String objects, required Label dialog}) {
+    {required String sprites,
+    required String objects,
+    String? areas,
+    required Label dialog}) {
   var reader = ConstantReader.asm(original);
   var processed = <String>[];
 
@@ -569,6 +572,14 @@ List<String> preprocessMapToRaw(Asm original,
   // defineConstants([Label('Map_${mapId.name}_Dialog')]);
   defineConstants([dialog]);
 
+  // ignore & replace real area data, if there is any area data
+  if (areas != null) {
+    _readAreas(reader);
+    addComment('Areas');
+    processed.add(areas);
+    defineConstants([Word(0xffff)]);
+  }
+
   processed.addAll(reader.remaining.lines.map((l) => l.toString()));
 
   return processed;
@@ -624,8 +635,14 @@ Future<GameMap> asmToMap(
   var lookup = dialogLookup.byLabel(dialogLabel);
 
   // todo: pass map instead of returning lists to add to map?
-  var areas = await _readAreas(mapId, reader, dialogLookup,
-      isWorldMotavia: mapId.world == World.Motavia);
+  var scenes = <_DialogAndLabel, Scene>{};
+  var areas = [
+    for (var a in _readAreas(reader))
+      await _buildArea(mapId, a,
+          dialogLookup: dialogLookup,
+          isWorldMotavia: mapId.world == World.Motavia,
+          scenes: scenes)
+  ];
 
   var dialogTree = await lookup;
   var mapObjects = _buildObjects(mapId, sprites, asmObjects, dialogTree);
@@ -635,6 +652,73 @@ Future<GameMap> asmToMap(
   areas.forEach(map.addArea);
 
   return map;
+}
+
+Future<MapArea> _buildArea(MapId map, _AsmArea area,
+    {required DialogTreeLookup dialogLookup,
+    required bool isWorldMotavia,
+    required Map<_DialogAndLabel, Scene> scenes}) async {
+  var id = MapAreaId('${map.name}_area_${area.index}');
+  var position = area.at;
+  var routine = area.routine;
+  var flagType = area.flagType;
+  var flag = area.flag;
+  var range = area.range;
+  var param = area.param;
+
+  if (routine == Byte.zero) {
+    if (flagType != Byte.zero) {
+      // routine is dialog, but flag type is not event flag
+      // means we need to model other flag type
+      throw UnsupportedError(
+          'unexpected flag type with interactive area: ${flagType.value}');
+    }
+
+    if (param is! Byte) {
+      throw UnsupportedError('cannot evaluate constant expression for '
+          'dialog ID. param=$param');
+    }
+
+    // First, determine which dialog tree to use
+    // This is based off of the "world index."
+    // For Motavia, simply use the first tree ("DialogueTree28")
+    // If dialog ID >= 0x7F, use DialogTree29
+    // Else, use DialogTree30
+    Label dialog;
+    if (isWorldMotavia) {
+      dialog = Label('DialogueTree28');
+    } else if (flag.value >= 0x7F) {
+      dialog = Label('DialogueTree29');
+    } else {
+      dialog = Label('DialogueTree30');
+    }
+
+    var ref = _DialogAndLabel(param.value, dialog);
+    var scene = scenes[ref];
+    if (scene == null) {
+      scene = toScene(param.value, await dialogLookup.byLabel(dialog),
+          isObjectInteraction: false);
+      scenes[ref] = scene;
+    }
+
+    return MapArea(
+        id: id,
+        at: position,
+        range: range,
+        spec: InteractiveAreaSpec(
+            doNotInteractIf: flag != Byte.zero ? toEventFlag(flag) : null,
+            onInteract: scene));
+  } else {
+    return MapArea(
+        id: id,
+        at: position,
+        range: range,
+        spec: AsmArea(
+            eventType: flagType,
+            eventFlag: flag,
+            interactionRoutine: routine,
+            interactionParameter: param));
+  }
 }
 
 Iterable<Sized> _skipAfterObjectsToLabels(ConstantReader reader) {
@@ -775,11 +859,8 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
   }).toList(growable: false);
 }
 
-Future<List<MapArea>> _readAreas(
-    MapId map, ConstantReader reader, DialogTreeLookup dialogLookup,
-    {required bool isWorldMotavia}) async {
-  var areas = <MapArea>[];
-  var scenes = <_DialogAndLabel, Scene>{};
+List<_AsmArea> _readAreas(ConstantReader reader) {
+  var areas = <_AsmArea>[];
 
   while (true) {
     var xOrTerminate = reader.readWord();
@@ -794,64 +875,27 @@ Future<List<MapArea>> _readAreas(
     var flag = reader.readByte();
     var routine = reader.readByte();
     var param = reader.readByteExpression();
-
-    var id = MapAreaId('${map.name}_area_${areas.length}');
     var position = Position(x.value << 3, y.value << 3);
 
-    if (routine == Byte.zero) {
-      if (flagType != Byte.zero) {
-        // routine is dialog, but flag type is not event flag
-        // means we need to model other flag type
-        throw UnsupportedError(
-            'unexpected flag type with interactive area: ${flagType.value}');
-      }
-
-      if (param is! Byte) {
-        throw UnsupportedError('cannot evaluate constant expression for '
-            'dialog ID. param=$param');
-      }
-
-      // First, determine which dialog tree to use
-      // This is based off of the "world index."
-      // For Motavia, simply use the first tree ("DialogueTree28")
-      // If dialog ID >= 0x7F, use DialogTree29
-      // Else, use DialogTree30
-      Label dialog;
-      if (isWorldMotavia) {
-        dialog = Label('DialogueTree28');
-      } else if (flag.value >= 0x7F) {
-        dialog = Label('DialogueTree29');
-      } else {
-        dialog = Label('DialogueTree30');
-      }
-
-      var ref = _DialogAndLabel(param.value, dialog);
-      var scene = scenes[ref];
-      if (scene == null) {
-        scene = toScene(param.value, await dialogLookup.byLabel(dialog),
-            isObjectInteraction: false);
-        scenes[ref] = scene;
-      }
-
-      areas.add(MapArea(
-          id: id,
-          at: position,
-          range: range,
-          spec: InteractiveAreaSpec(
-              doNotInteractIf: flag != Byte.zero ? toEventFlag(flag) : null,
-              onInteract: scene)));
-    } else {
-      areas.add(MapArea(
-          id: id,
-          at: position,
-          range: range,
-          spec: AsmArea(
-              eventType: flagType,
-              eventFlag: flag,
-              interactionRoutine: routine,
-              interactionParameter: param)));
-    }
+    areas.add(_AsmArea(areas.length, range, position,
+        flagType: flagType, flag: flag, routine: routine, param: param));
   }
+}
+
+class _AsmArea {
+  int index;
+  AreaRange range;
+  Position at;
+  Byte flagType;
+  Byte flag;
+  Byte routine;
+  Sized param;
+
+  _AsmArea(this.index, this.range, this.at,
+      {required this.flagType,
+      required this.flag,
+      required this.routine,
+      required this.param});
 }
 
 class _DialogAndLabel {

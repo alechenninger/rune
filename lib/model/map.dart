@@ -89,8 +89,11 @@ class GameMap {
       if (at < _indexedObjects.length) {
         var existing = _indexedObjects[at];
         if (existing != null) {
-          throw ArgumentError.value(obj.id.value, 'obj.id',
-              'map already contains object at index $at: ${existing.id}');
+          throw ArgumentError.value(
+              obj.id.value,
+              'obj.id',
+              'map already contains object at index. '
+                  'index[$at]=${existing.id} map=$id');
         }
         _indexedObjects[at] = obj;
       } else {
