@@ -28,7 +28,7 @@ main() {
     program.addMap(map);
     var mapAsm = program.maps[MapId.Test];
     expect(
-        mapAsm?.dialog.withoutComments().head(3),
+        mapAsm?.dialog?.withoutComments().head(3),
         Asm([
           dc.b([Byte(0xf6)]),
           dc.w([Word(0x8000)]),

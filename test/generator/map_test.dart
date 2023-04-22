@@ -259,7 +259,7 @@ void main() {
 
     var asm = program.addMap(testMap);
 
-    expect(asm.dialog.withoutComments().trim().tail(1), dc.b([Byte(0xff)]));
+    expect(asm.dialog?.withoutComments().trim().tail(1), dc.b([Byte(0xff)]));
   });
 
   group('objects with dialog', () {
@@ -437,7 +437,7 @@ void main() {
         var asm = program.addMap(testMap);
 
         expect(
-            asm.dialog.withoutComments().trim(),
+            asm.dialog?.withoutComments().trim(),
             Asm([
               dc.b([Byte(0xf2), Byte(3)]),
               dc.b([Constant('SFXID_Surprise')]),
@@ -461,7 +461,7 @@ void main() {
         var asm = program.addMap(testMap);
 
         expect(
-            asm.dialog.withoutComments().trim(),
+            asm.dialog?.withoutComments().trim(),
             Asm([
               dc.b([Byte(0xf2), Byte(0xb)]),
               dc.b([Constant('EventFlag_test')]),
@@ -570,6 +570,159 @@ void main() {
               .skip(1)
               .take(2),
           Asm([jsr('Panel_Destroy'.toLabel.l), dmaPlanesVInt()]));
+    });
+  });
+
+  group('areas', () {
+    test('generate asm for interactive area', () {
+      testMap.addArea(MapArea(
+          id: MapAreaId('test0'),
+          at: Position(0x50, 0x80),
+          range: AreaRange.xLower,
+          spec: InteractiveAreaSpec(
+              onInteract: Scene([
+            Dialog(spans: [DialogSpan('Hi')])
+          ]))));
+
+      var asm = program.addMap(testMap);
+
+      expect(
+          asm.areas.withoutComments().trim(),
+          Asm([
+            dc.w([Word(0xA), Word(0x10)]),
+            dc.w([Word(4)]),
+            dc.b(Bytes.list([0, 0, 7, 0])),
+          ]));
+    });
+
+    test('generate dialog for interactive area', () {
+      testMap.addArea(MapArea(
+          id: MapAreaId('test0'),
+          at: Position(0x50, 0x80),
+          range: AreaRange.xyExact,
+          spec: InteractiveAreaSpec(
+              onInteract: Scene([
+            Dialog(spans: [DialogSpan('Hi')])
+          ]))));
+
+      program.addMap(testMap);
+
+      var tree = program.dialogTrees.forMap(testMap.id);
+
+      expect(tree.length, 1);
+      expect(
+          tree[0].withoutComments(),
+          DialogAsm([
+            dc.b(Bytes.ascii('Hi')),
+            dc.b([Byte(0xff)])
+          ]));
+    });
+
+    test('generates asm for asm area', () {
+      testMap.addArea(MapArea(
+          id: MapAreaId('test0'),
+          at: Position(0x50, 0x80),
+          range: AreaRange.xyExact,
+          spec: AsmArea(
+              eventType: Byte(1),
+              eventFlag: Byte(0xA),
+              interactionRoutine: Byte(2),
+              interactionParameter: Byte(0xBD))));
+
+      var asm = program.addMap(testMap);
+
+      expect(
+          asm.areas.withoutComments().trim(),
+          Asm([
+            dc.w([Word(0xA), Word(0x10)]),
+            dc.w([Word(3)]),
+            dc.b(Bytes.list([1, 0xA, 2, 0xBD]))
+          ]));
+    });
+
+    test('generates asm for multiple areas', () {
+      testMap.addArea(MapArea(
+          id: MapAreaId('test0'),
+          at: Position(0x50, 0x80),
+          range: AreaRange.xyExact,
+          spec: AsmArea(
+              eventType: Byte(1),
+              eventFlag: Byte(0xA),
+              interactionRoutine: Byte(2),
+              interactionParameter: Byte(0xBD))));
+
+      testMap.addArea(MapArea(
+          id: MapAreaId('test1'),
+          at: Position(0x50, 0x80),
+          range: AreaRange.xLower,
+          spec: InteractiveAreaSpec(
+              onInteract: Scene([
+            Dialog(spans: [DialogSpan('Hi')])
+          ]))));
+
+      var asm = program.addMap(testMap);
+
+      expect(
+          asm.areas.withoutComments().trim(),
+          Asm([
+            dc.w([Word(0xA), Word(0x10)]),
+            dc.w([Word(3)]),
+            dc.b(Bytes.list([1, 0xA, 2, 0xBD])),
+            newLine(),
+            dc.w([Word(0xA), Word(0x10)]),
+            dc.w([Word(4)]),
+            dc.b(Bytes.list([0, 0, 7, 0])),
+          ]));
+    });
+
+    test('generates dialog for multiple areas', () {
+      testMap.addArea(MapArea(
+          id: MapAreaId('test0'),
+          at: Position(0x50, 0x80),
+          range: AreaRange.xyExact,
+          spec: InteractiveAreaSpec(
+              onInteract: Scene([
+            Dialog(spans: [DialogSpan('Hi1')])
+          ]))));
+
+      testMap.addArea(MapArea(
+          id: MapAreaId('test1'),
+          at: Position(0x40, 0x60),
+          range: AreaRange.xLower,
+          spec: InteractiveAreaSpec(
+              onInteract: Scene([
+            Dialog(spans: [DialogSpan('Hi2')])
+          ]))));
+
+      var asm = program.addMap(testMap);
+
+      expect(
+          asm.areas.withoutComments().trim(),
+          Asm([
+            dc.w([Word(0xA), Word(0x10)]),
+            dc.w([Word(3)]),
+            dc.b(Bytes.list([0, 0, 7, 0])),
+            newLine(),
+            dc.w([Word(0x8), Word(0xC)]),
+            dc.w([Word(4)]),
+            dc.b(Bytes.list([0, 0, 7, 1])),
+          ]));
+
+      var tree = program.dialogTrees.forMap(testMap.id);
+
+      expect(tree.length, 2);
+      expect(
+          tree[0].withoutComments(),
+          DialogAsm([
+            dc.b(Bytes.ascii('Hi1')),
+            dc.b([Byte(0xff)])
+          ]));
+      expect(
+          tree[1].withoutComments(),
+          DialogAsm([
+            dc.b(Bytes.ascii('Hi2')),
+            dc.b([Byte(0xff)])
+          ]));
     });
   });
 

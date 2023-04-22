@@ -118,6 +118,8 @@ class Position {
 
   int get distance => (x.abs() + y.abs());
 
+  List<int> get asList => [x, y];
+
   Path pathAlong(Axis a) {
     var product = a * this;
 
@@ -145,19 +147,17 @@ class Position {
   }
 
   /// Scale this point by [factor] as if it were a vector.
-  ///
-  /// *Important* *Note*: This function accepts a `num` as its argument only so
-  /// that you can scale `Position<double>` objects by an `int` factor. Because
-  /// the `*` operator always returns the same type of `Point` as it is called
-  /// on, passing in a double [factor] on a `Position` _causes_ _a_
-  /// _runtime_ _error_.
   Position operator *(int factor) {
     return Position((x * factor), (y * factor));
   }
 
+  Position operator ~/(int factor) {
+    return Position((x ~/ factor), (y ~/ factor));
+  }
+
   @override
   String toString() {
-    return 'Position{$x, $y}';
+    return '($x, $y)';
   }
 }
 

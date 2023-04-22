@@ -222,10 +222,10 @@ class SceneAsmGenerator implements EventVisitor {
 
   // Non-volatile state (state of the code being generated)
   final DialogTrees _dialogTrees;
+  final EventFlags _eventFlags;
   final EventAsm _eventAsm;
   // required if processing interaction (see todo on ctor)
   EventRoutines? _eventRoutines;
-  EventFlags _eventFlags;
   //final Byte _dialogIdOffset;
 
   Mode _gameMode = Mode.event;
@@ -240,7 +240,8 @@ class SceneAsmGenerator implements EventVisitor {
   EventType? _eventType;
 
   final FieldObject? _interactingWith;
-  bool get _isProcessingInteraction => _interactingWith != null;
+  final bool _isProcessingInteraction;
+  bool get _isInteractingWithObject => _interactingWith != null;
 
   var _eventCounter = 1;
   var _finished = false;
@@ -273,14 +274,15 @@ class SceneAsmGenerator implements EventVisitor {
   // todo: This might be a subclass really
   SceneAsmGenerator.forInteraction(GameMap map, this.id, this._dialogTrees,
       this._eventAsm, EventRoutines eventRoutines,
-      {EventFlags? eventFlags})
+      {EventFlags? eventFlags, bool withObject = true})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
-        _interactingWith = const InteractionObject(),
+        _interactingWith = withObject ? const InteractionObject() : null,
+        _isProcessingInteraction = true,
         _eventRoutines = eventRoutines,
         _eventFlags = eventFlags ?? EventFlags() {
     _gameMode = Mode.dialog;
 
-    _memory.putInAddress(a3, const InteractionObject());
+    if (withObject) _memory.putInAddress(a3, const InteractionObject());
     _memory.hasSavedDialogPosition = false;
     _memory.currentMap = map;
     _memory.loadedDialogTree = _dialogTrees.forMap(map.id);
@@ -291,6 +293,7 @@ class SceneAsmGenerator implements EventVisitor {
       {GameMap? startingMap, EventFlags? eventFlags})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = null,
+        _isProcessingInteraction = false,
         // FIXME: also parameterize eventtype so finish() does the right thing
         _eventType = EventType.event,
         _eventFlags = eventFlags ?? EventFlags() {
@@ -476,7 +479,7 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
 
     if (!_inEvent &&
-        _isProcessingInteraction &&
+        _isInteractingWithObject &&
         _lastEventInCurrentDialog == null) {
       // this already will happen by default if the first event
       _lastEventInCurrentDialog = face;
@@ -1249,7 +1252,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   void _expectFacePlayerFirstIfInteraction() {
     if (!_inEvent &&
-        _isProcessingInteraction &&
+        _isInteractingWithObject &&
         _lastEventInCurrentDialog == null) {
       // Not starting with face player, so signal not to.
       _addToDialog(dc.b(Bytes.of(0xf3)));

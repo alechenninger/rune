@@ -17,29 +17,26 @@ import 'generator.dart';
 class MapAsm {
   final Asm sprites;
   final Asm objects;
+  final Asm areas;
   @Deprecated('use DialogTrees API instead')
-  final Asm dialog;
+  final Asm? dialog;
   final Asm events;
-  // todo: i think cutscenes asm is not needed
-  // we just add both kinds of routines to events
-  final Asm cutscenes;
   // might also need dialogTrees ASM
   // if these labels need to be programmatically referred to
 
-  MapAsm({
-    required this.sprites,
-    required this.objects,
-    required this.dialog,
-    required this.events,
-    required this.cutscenes,
-  });
+  MapAsm(
+      {required this.sprites,
+      required this.objects,
+      required this.areas,
+      required this.dialog,
+      required this.events});
 
   MapAsm.empty()
       : sprites = Asm.empty(),
         objects = Asm.empty(),
+        areas = Asm.empty(),
         dialog = Asm.empty(),
-        events = Asm.empty(),
-        cutscenes = Asm.empty();
+        events = Asm.empty();
 
   @override
   String toString() {
@@ -48,10 +45,10 @@ class MapAsm {
       sprites,
       '; objects',
       objects,
+      '; areas',
+      areas,
       '; events',
       events,
-      '; cutscenes',
-      cutscenes,
     ].join('\n');
   }
 }
@@ -192,12 +189,11 @@ class FieldRoutine {
 
 MapAsm compileMap(
     GameMap map, EventRoutines eventRoutines, Word? spriteVramOffset,
-    {required DialogTrees dialogTrees, EventFlags? eventFlags}) {
-  eventFlags = eventFlags ?? EventFlags();
-
+    {required DialogTrees dialogTrees, required EventFlags eventFlags}) {
   var trees = dialogTrees;
   var spritesAsm = Asm.empty();
   var objectsAsm = Asm.empty();
+  var areasAsm = Asm.empty();
   var eventsAsm = EventAsm.empty();
 
   var objects = map.orderedObjects;
@@ -211,30 +207,37 @@ MapAsm compileMap(
 
   var scenes = Map<Scene, Byte>.identity();
 
-  for (var obj in objects) {
-    var scene = obj.onInteract;
-    var dialogId = scenes.putIfAbsent(
+  Byte compileInteraction(Scene scene, SceneId id, {required bool withObject}) {
+    return scenes.putIfAbsent(
         scene,
         () => _compileInteractionScene(
-            map,
-            scene,
-            // todo: scene id arbitrarily refers to first object referenced.
-            // maybe scene id should be a part of scene after all
-            SceneId('${map.id.name}_${obj.id}'),
-            trees,
-            eventsAsm,
-            eventRoutines,
-            eventFlags!));
+            map, scene, id, trees, eventsAsm, eventRoutines, eventFlags,
+            withObject: withObject));
+  }
+
+  for (var obj in objects) {
+    var dialogId = compileInteraction(
+        obj.onInteract, SceneId('${map.id.name}_${obj.id}'),
+        withObject: true);
     var tileNumber = objectsTileNumbers[obj.id] ?? Word(0);
     _compileMapObjectData(objectsAsm, obj, tileNumber, dialogId);
+  }
+
+  for (var area in map.areas) {
+    _compileMapAreaData(
+        areasAsm,
+        area,
+        eventFlags,
+        (s) => compileInteraction(s, SceneId('${map.id.name}_${area.id}'),
+            withObject: false));
   }
 
   return MapAsm(
       sprites: spritesAsm,
       objects: objectsAsm,
+      areas: areasAsm,
       dialog: trees.forMap(map.id).toAsm(),
-      events: eventsAsm,
-      cutscenes: Asm.empty());
+      events: eventsAsm);
 }
 
 Map<MapObjectId, Word> _compileMapSpriteData(
@@ -329,7 +332,8 @@ Byte _compileInteractionScene(
     DialogTrees trees,
     EventAsm asm,
     EventRoutines eventRoutines,
-    EventFlags eventFlags) {
+    EventFlags eventFlags,
+    {required bool withObject}) {
   var events = scene.events;
 
   // todo: handle max
@@ -338,7 +342,7 @@ Byte _compileInteractionScene(
 
   SceneAsmGenerator generator = SceneAsmGenerator.forInteraction(
       map, id, trees, asm, eventRoutines,
-      eventFlags: eventFlags);
+      eventFlags: eventFlags, withObject: withObject);
 
   generator.runEventFromInteractionIfNeeded(events);
 
@@ -402,6 +406,42 @@ void _compileMapObjectData(
 
   asm.add(
       dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]));
+
+  asm.addNewline();
+}
+
+void _compileMapAreaData(Asm asm, MapArea area, EventFlags eventFlags,
+    Byte Function(Scene s) compileScene) {
+  var spec = area.spec;
+
+  asm.add(comment(area.id.toString()));
+  asm.add(dc.w([for (var i in area.position.asList) Word(i ~/ 8)],
+      comment: area.position.toString()));
+  asm.add(dc.w([_rangeTypeId(area.range)], comment: area.range.name));
+
+  if (spec is AsmArea) {
+    asm.add(dc.b([
+      spec.eventType,
+      spec.eventFlag,
+      spec.interactionRoutine,
+      spec.interactionParameter
+    ]));
+  } else if (spec is InteractiveAreaSpec) {
+    var dialogId = compileScene(spec.onInteract);
+    var flag =
+        spec.doNotInteractIf?.map((f) => eventFlags.toConstant(f)) ?? Byte.zero;
+
+    // todo: support or error if flag is extended event flag
+
+    asm.add(dc.b([
+      Byte.zero, // always a story event,
+      flag,
+      Byte(7), // Interaction_DisplayDialogueGrandCross
+      dialogId,
+    ]));
+  } else {
+    throw UnsupportedError('unsupported area spec: $spec');
+  }
 
   asm.addNewline();
 }
@@ -828,39 +868,38 @@ class _DialogAndLabel {
   int get hashCode => dialog.hashCode ^ label.hashCode;
 }
 
+final _rangeIds = BiMap<Word, AreaRange>()
+  ..addAll({
+    Word(1): AreaRange.x40y40,
+    Word(2): AreaRange.x20y20,
+    Word(3): AreaRange.xyExact,
+    Word(4): AreaRange.xLower,
+    Word(5): AreaRange.xHigher,
+    Word(6): AreaRange.yLower,
+    Word(7): AreaRange.yHigher,
+    Word(8): AreaRange.xyLowerAndYLessOrEqualTo_Y_0x2A0,
+    Word(9): AreaRange.x20y10,
+    Word(0xA): AreaRange.x10y60,
+    Word(0xB): AreaRange.x40y20,
+    Word(0xC): AreaRange.x10y20,
+    Word(0xD): AreaRange.x60y10,
+    Word(0xE): AreaRange.x40y10,
+  });
+
 AreaRange _parseRangeType(Word range) {
-  switch (range.value) {
-    case 1:
-      return AreaRange.x40y40;
-    case 2:
-      return AreaRange.x20y20;
-    case 3:
-      return AreaRange.xyExact;
-    case 4:
-      return AreaRange.xLower;
-    case 5:
-      return AreaRange.xHigher;
-    case 6:
-      return AreaRange.yLower;
-    case 7:
-      return AreaRange.yHigher;
-    case 8:
-      return AreaRange.xyLowerAndYLessOrEqualTo_Y_0x2A0;
-    case 9:
-      return AreaRange.x20y10;
-    case 0xA:
-      return AreaRange.x10y60;
-    case 0xB:
-      return AreaRange.x40y20;
-    case 0xC:
-      return AreaRange.x10y20;
-    case 0xD:
-      return AreaRange.x60y10;
-    case 0xE:
-      return AreaRange.x40y10;
-    default:
-      throw UnsupportedError('unsupported range type ${range.hex}');
+  var r = _rangeIds[range];
+  if (r == null) {
+    throw UnsupportedError('unsupported range type ${range.hex}');
   }
+  return r;
+}
+
+Word _rangeTypeId(AreaRange range) {
+  var r = _rangeIds.inverse[range];
+  if (r == null) {
+    throw UnsupportedError('unsupported range type $range');
+  }
+  return r;
 }
 
 MapId labelToMapId(Label lbl) {

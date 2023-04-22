@@ -6,7 +6,6 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
-import 'package:rune/model/conditional.dart';
 
 import '../asm/asm.dart';
 import 'model.dart';
