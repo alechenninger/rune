@@ -1802,6 +1802,7 @@ Constant _asmMapIdOf(MapId map) {
 // generated via dart bin/macro.dart vram-tile-offsets | gsed -E 's/([^,]+),(.*)/Label('"'"'\1'"'"'): Word(\2),/'
 final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_Test'): Word(0x2d0),
+  Label('Map_Test_Part2'): Word(0x2d0),
   Label('Map_Dezolis'): Word(0x39b),
   Label('Map_Piata'): Word(0x2d0),
   Label('Map_PiataAcademy'): Word(0x27f),
