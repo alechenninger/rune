@@ -128,7 +128,7 @@ final storyEvents = [
   EventFlag('RajaTemple'),
   EventFlag('RajaJoined'),
   EventFlag('Snowstorm'),
-  //EventFlag('LandaleWhereabouts'), // optional Gyuna
+  //EventFlag('LandaleWhereabouts'), // optional Gyuna ... or not?
   EventFlag('TylerGrave'),
   EventFlag('DezoSpaceport'),
   EventFlag('Kuran'),
@@ -186,11 +186,11 @@ final storyEvents = [
   EventFlag('SethConversation1'),
   EventFlag('SethConversation2'),
   EventFlag('SoldiersTemple'),
-  EventFlag('DarkForce3'),
-  EventFlag('DarkForce3Defeated'),
   //EventFlag('WeaponPlant'),
   EventFlag('AeroPrism1'),
   EventFlag('AeroPrism2'),
+  EventFlag('DarkForce3'),
+  EventFlag('DarkForce3Defeated'),
   EventFlag('Rykros'),
   EventFlag('LeRoof'),
   EventFlag('StrengthTowerTop'),
