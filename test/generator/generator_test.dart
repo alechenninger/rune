@@ -315,13 +315,13 @@ EventFlag_Test001 = $01'''));
     expect(
         program.dialogTrees.forMap(map.id).toAsm().withoutComments().trim(),
         Asm([
-          dc.b([Byte(0xf4), alys.portraitCode]),
+          dc.b([Byte(0xf4), toPortraitCode(alys.portrait)]),
           dc.b(Bytes.ascii('Hello')),
           dc.b([Byte(0xfd)]),
-          dc.b([Byte(0xf4), const UnnamedSpeaker().portraitCode]),
+          dc.b([Byte(0xf4), toPortraitCode(null)]),
           dc.b([Byte(0xf2), Byte.zero]),
           dc.w([PrincipalPanel.alysGrabsPrincipal.panelIndex.toWord]),
-          dc.b([Byte(0xf4), alys.portraitCode]),
+          dc.b([Byte(0xf4), toPortraitCode(alys.portrait)]),
           dc.b(Bytes.ascii('Bye')),
           dc.b([Byte(0xff)])
         ]));

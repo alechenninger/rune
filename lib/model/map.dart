@@ -905,6 +905,9 @@ class MapObject extends FieldObject implements MapElement, UnnamedSpeaker {
   @override
   final name = const UnnamedSpeaker().name;
 
+  @override
+  final portrait = null;
+
   Scene get onInteract {
     if (isInteractive) {
       return (spec as Interactive).onInteract;

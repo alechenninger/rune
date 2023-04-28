@@ -85,9 +85,9 @@ extension DialogToAsm on Dialog {
 
     // i think byte zero removes portrait if already present.
     // todo: could optimize if we know there is no portrait
-    if (state?.dialogPortrait != speaker) {
-      asm.add(portrait(speaker.portraitCode));
-      state?.dialogPortrait = speaker;
+    if (state?.dialogPortrait != speaker.portrait) {
+      asm.add(portrait(toPortraitCode(speaker.portrait)));
+      state?.dialogPortrait = speaker.portrait;
     }
 
     var ascii = BytesAndAscii([]);
@@ -403,7 +403,7 @@ class PortraitState implements DialogParseState {
       throw ArgumentError.value(constant, 'byte', 'expected Byte');
     }
 
-    parent.speaker = toSpeaker(constant);
+    parent.speaker = _toSpeaker(constant);
     context.state = parent;
   }
 }
@@ -670,69 +670,62 @@ class Quotes {
   }
 }
 
-extension Portrait on Speaker {
-  static final _index = [
-    UnnamedSpeaker(), // dc.l	0						; 0
-    Shay(), // dc.l	ArtNem_ChazDialPortrait	; 1
-    Alys(), // dc.l	ArtNem_AlysDialPortrait	; 2
-    Hahn(), // dc.l	ArtNem_HahnDialPortrait	; 3
-    Rune(), // dc.l	ArtNem_RuneDialPortrait	; 4
-    Gryz(), // dc.l	ArtNem_GryzDialPortrait	; 5
-    Rika(), // dc.l	ArtNem_RikaDialPortrait	; 6
-    Demi(), // dc.l	ArtNem_DemiDialPortrait	; 7
-    Wren(), // dc.l	ArtNem_WrenDialPortrait	; 8
-    Raja(), // dc.l	ArtNem_RajaDialPortrait	; 9
-    Kyra(), // dc.l	ArtNem_KyraDialPortrait	; $A
-    Seth(), // dc.l	ArtNem_SethDialPortrait	; $B
-    Saya(), // dc.l	ArtNem_SayaDialPortrait	; $C
-    Holt(), // dc.l	ArtNem_HoltDialPortrait	; $D
-    PrincipalKroft(), // dc.l	ArtNem_PrincipalDialPortrait	; $E
-    null, // dc.l	ArtNem_DorinDialPortrait	; $F
-    null, // dc.l	ArtNem_PanaDialPortrait	; $10
-    null, // dc.l	ArtNem_HntGuildReceptionistDialPortrait	; $11
-    null, // dc.l	ArtNem_BakerDialPortrait	; $12
-    Zio(), // dc.l	ArtNem_ZioDialPortrait	; $13
-    null, // dc.l	ArtNem_JuzaDialPortrait	; $14
-    null, // dc.l	ArtNem_GyunaDialPortrait	; $15
-    null, // dc.l	ArtNem_EsperDialPortrait	; $16
-    null, // dc.l	ArtNem_EsperDialPortrait	; $17
-    null, // dc.l	ArtNem_EsperChiefDialPortrait	; $18
-    null, // dc.l	ArtNem_EsperChiefDialPortrait	; $19
-    null, // dc.l	ArtNem_GumbiousPriestDialPortrait	; $1A
-    null, // dc.l	ArtNem_GumbiousBishopDialPortrait	; $1B
-    null, // dc.l	ArtNem_LashiecDialPortrait	; $1C
-    null, // dc.l	ArtNem_XeAThoulDialPortrait	; $1D
-    null, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1E
-    null, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1F
-    null, // dc.l	ArtNem_FortuneTellerDialPortrait	; $20
-    null, // dc.l	ArtNem_DElmLarsDialPortrait	; $21
-    null, // dc.l	ArtNem_AlysWoundedDialPortrait	; $22
-    null, // dc.l	ArtNem_ReFazeDialPortrait	; $23
-    null, // dc.l	ArtNem_MissingStudentDialPortrait	; $24
-    null, // dc.l	ArtNem_TallasDialPortrait	; $25
-    null, // dc.l	ArtNem_DyingBoyDialPortrait	; $26
-    null, // dc.l	ArtNem_SekreasDialPortrait	; $27
-  ];
+final _portraits = const [
+  null, // dc.l	0						; 0
+  Portrait.Shay, // dc.l	ArtNem_ChazDialPortrait	; 1
+  Portrait.Alys, // dc.l	ArtNem_AlysDialPortrait	; 2
+  Portrait.Hahn, // dc.l	ArtNem_HahnDialPortrait	; 3
+  Portrait.Rune, // dc.l	ArtNem_RuneDialPortrait	; 4
+  Portrait.Gryz, // dc.l	ArtNem_GryzDialPortrait	; 5
+  Portrait.Rika, // dc.l	ArtNem_RikaDialPortrait	; 6
+  Portrait.Demi, // dc.l	ArtNem_DemiDialPortrait	; 7
+  Portrait.Wren, // dc.l	ArtNem_WrenDialPortrait	; 8
+  Portrait.Raja, // dc.l	ArtNem_RajaDialPortrait	; 9
+  Portrait.Kyra, // dc.l	ArtNem_KyraDialPortrait	; $A
+  Portrait.Seth, // dc.l	ArtNem_SethDialPortrait	; $B
+  Portrait.Saya, // dc.l	ArtNem_SayaDialPortrait	; $C
+  Portrait.Holt, // dc.l	ArtNem_HoltDialPortrait	; $D
+  Portrait.PrincipalKroft, // dc.l	ArtNem_PrincipalDialPortrait	; $E
+  Portrait.Dorin, // dc.l	ArtNem_DorinDialPortrait	; $F
+  Portrait.Pana, // dc.l	ArtNem_PanaDialPortrait	; $10
+  Portrait
+      .HuntersGuildReceptionist, // dc.l	ArtNem_HntGuildReceptionistDialPortrait	; $11
+  Portrait.Baker, // dc.l	ArtNem_BakerDialPortrait	; $12
+  Portrait.Zio, // dc.l	ArtNem_ZioDialPortrait	; $13
+  Portrait.Juza, // dc.l	ArtNem_JuzaDialPortrait	; $14
+  Portrait.Gyuna, // dc.l	ArtNem_GyunaDialPortrait	; $15
+  Portrait.Esper, // dc.l	ArtNem_EsperDialPortrait	; $16
+  Portrait.Esper, // dc.l	ArtNem_EsperDialPortrait	; $17
+  Portrait.EsperChief, // dc.l	ArtNem_EsperChiefDialPortrait	; $18
+  Portrait.EsperChief, // dc.l	ArtNem_EsperChiefDialPortrait	; $19
+  Portrait.GumbiousPriest, // dc.l	ArtNem_GumbiousPriestDialPortrait	; $1A
+  Portrait.GumbiousBishop, // dc.l	ArtNem_GumbiousBishopDialPortrait	; $1B
+  Portrait.Lashiec, // dc.l	ArtNem_LashiecDialPortrait	; $1C
+  Portrait.XeAThoul, // dc.l	ArtNem_XeAThoulDialPortrait	; $1D
+  Portrait.XeAThoul2, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1E
+  Portrait.XeAThoul2, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1F
+  Portrait.FortuneTeller, // dc.l	ArtNem_FortuneTellerDialPortrait	; $20
+  Portrait.DElmLars, // dc.l	ArtNem_DElmLarsDialPortrait	; $21
+  Portrait.AlysWounded, // dc.l	ArtNem_AlysWoundedDialPortrait	; $22
+  Portrait.ReFaze, // dc.l	ArtNem_ReFazeDialPortrait	; $23
+  Portrait.MissingStudent, // dc.l	ArtNem_MissingStudentDialPortrait	; $24
+  Portrait.Tallas, // dc.l	ArtNem_TallasDialPortrait	; $25
+  Portrait.DyingBoy, // dc.l	ArtNem_DyingBoyDialPortrait	; $26
+  Portrait.Sekreas, // dc.l	ArtNem_SekreasDialPortrait	; $27
+];
 
-  Byte get portraitCode {
-    var index = _index.indexOf(this);
+Byte toPortraitCode(Portrait? p) {
+  var index = _portraits.indexOf(p);
 
-    return Byte(max(0, index));
-  }
+  return Byte(max(0, index));
 }
 
-Speaker toSpeaker(Byte byte) {
-  if (byte.value >= Portrait._index.length) {
+Speaker? _toSpeaker(Byte byte) {
+  if (byte.value >= _portraits.length || byte.value < 0) {
     throw ArgumentError.value(byte.value, 'byte', 'invalid portrait index');
   }
+  var portrait = _portraits[byte.value];
+  if (portrait == null) return null;
 
-  var speaker = Portrait._index[byte.value];
-
-  if (speaker == null) {
-    // FIXME temporary hack
-    return UnnamedSpeaker();
-    // throw UnsupportedError('$byte');
-  }
-
-  return speaker;
+  return Speaker.byName(portrait.name) ?? NpcSpeaker(portrait, portrait.name);
 }

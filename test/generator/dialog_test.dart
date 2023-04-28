@@ -12,7 +12,7 @@ import 'scene_test.dart';
 void main() {
   test('generates asm from dialog', () {
     var dialog = Dialog(
-        speaker: Alys(),
+        speaker: alys,
         spans: DialogSpan.parse("Hi I'm Alys! _What are you doing here?_"));
 
     print(dialog);
@@ -26,8 +26,7 @@ void main() {
   });
 
   test('skips repeated spaces', () {
-    var dialog =
-        Dialog(speaker: Alys(), spans: DialogSpan.parse('Test  1 2 3'));
+    var dialog = Dialog(speaker: alys, spans: DialogSpan.parse('Test  1 2 3'));
 
     print(dialog);
 
@@ -47,8 +46,8 @@ void main() {
 
     print(asm);
 
-    expect(asm.toString(), r'''	dc.b	$F4, $00
-	dc.b	$4E, $73, $80, $7A, " ", $77, $6C, $6C, $79, $6C, $6B, " ", $76, $7C, $7B, " ", $76, $7D, $6C, $79, " ", $7B, $6F, $6C
+    expect(asm.toString(),
+        r'''	dc.b	$4E, $73, $80, $7A, " ", $77, $6C, $6C, $79, $6C, $6B, " ", $76, $7C, $7B, " ", $76, $7D, $6C, $79, " ", $7B, $6F, $6C
 	dc.b	$FC
 	dc.b	$5A, $76, $7B, $68, $7D, $70, $68, $75, " ", $7E, $70, $73, $6B, $7A, ", ", $68, $7A, " ", $7B, $6F, $6C, " ", $79, $70, $7A, $70, $75, $6E''');
   });
@@ -125,12 +124,36 @@ void main() {
             dc.b([Byte(0xff)]),
           ]));
     });
+
+    test('for npc speakers', () {
+      SceneAsmGenerator.forEvent(SceneId('test'), dialogTrees, eventAsm,
+          startingMap: map)
+        ..dialog(Dialog(
+            speaker: NpcSpeaker(Portrait.AlysWounded, 'Alys'),
+            spans: DialogSpan.parse('Hello')))
+        ..dialog(Dialog(
+            speaker: NpcSpeaker(Portrait.AlysWounded, 'Alys'),
+            spans: DialogSpan.parse('Hello')))
+        ..finish();
+
+      var dialog = dialogTree[0];
+
+      expect(
+          dialog.withoutComments().trim(),
+          DialogAsm([
+            dc.b([Byte(0xf4), Byte(0x22)]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xfd)]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xff)]),
+          ]));
+    });
   });
 
   group('a cursor separates', () {
     test('every other line from the same dialog', () {
       var dialog = Dialog(
-          speaker: Alys(),
+          speaker: alys,
           spans: DialogSpan.parse(
               "Hi I'm Alys! Lots of words take up lots of lines. You can "
               "only have 32 characters per line! How fascinating it is to "
@@ -156,8 +179,7 @@ void main() {
   group('spans with pauses', () {
     test('just pause and speaker', () {
       var dialog = Dialog(
-          speaker: Alys(),
-          spans: [DialogSpan("", pause: Duration(seconds: 1))]);
+          speaker: alys, spans: [DialogSpan("", pause: Duration(seconds: 1))]);
 
       var asm = dialog.toAsm();
 
@@ -170,13 +192,12 @@ void main() {
 
       var asm = dialog.toAsm();
 
-      expect(asm.toString(), r'''	dc.b	$F4, $00
-	dc.b	$F9, $3C''');
+      expect(asm.toString(), r'''	dc.b	$F9, $3C''');
     });
 
     test('pauses come at the end of spans', () {
       var dialog = Dialog(
-          speaker: Alys(),
+          speaker: alys,
           spans: [DialogSpan("Hi I'm Alys!", pause: Duration(seconds: 1))]);
 
       var asm = dialog.toAsm();
@@ -187,7 +208,7 @@ void main() {
     });
 
     test('bug1', () {
-      var dialog = Dialog(speaker: Shay(), spans: [
+      var dialog = Dialog(speaker: shay, spans: [
         DialogSpan('It takes and it takes. And I owe it nothing...',
             pause: Duration(seconds: 1)),
         DialogSpan('nothing but a fight.  ', pause: Duration(seconds: 1)),
@@ -214,7 +235,7 @@ void main() {
       Span{text: else I walk alone once more., italic: false, pause: 0:00:01.000000}]},
       cause: RangeError (end): Invalid value: Not in inclusive range 0..11: 12}
        */
-      var dialog = Dialog(speaker: Alys(), spans: [
+      var dialog = Dialog(speaker: alys, spans: [
         DialogSpan('Now take heed…', pause: Duration(seconds: 1)),
         DialogSpan('else I walk alone once more.', pause: Duration(seconds: 1)),
       ]);

@@ -6,6 +6,7 @@ import 'model.dart';
 
 class Dialog extends Event {
   Speaker speaker;
+  Portrait? get portrait => speaker.portrait;
   // fixme: toString/==/etc
   bool hidePanelsOnClose = false;
   final List<DialogSpan> _spans = [];
@@ -218,40 +219,37 @@ class Span {
 
 abstract class Speaker {
   String get name;
+  Portrait? get portrait;
 
   /// Returns the [Speaker] if they have a well known [name].
   ///
   /// Case insensitive.
   // todo: could use allSpeakers to build this index instead now?
   static Speaker? byName(String name) {
-    var char = Character.byName(name);
-    if (char != null) {
-      return char;
+    if (name.toLowerCase() == 'unnamed speaker') {
+      return const UnnamedSpeaker();
     }
-    switch (name.toLowerCase()) {
-      case 'unnamed speaker':
-        return const UnnamedSpeaker();
-      case 'kroft':
-      case 'principalkroft':
-      case 'principal kroft':
-        return const PrincipalKroft();
-      case 'saya':
-        return saya;
-      case 'holt':
-        return holt;
-      case 'zio':
-        return const Zio();
-    }
-    return null;
+    return _byName[name.toLowerCase()];
   }
 
   static final Iterable<Speaker> allSpeakers = [
     ...Character.allCharacters,
-    const PrincipalKroft(),
-    saya,
-    holt,
-    const Zio()
+    PrincipalKroft,
+    Saya,
+    Holt,
+    Zio,
   ];
+
+  static final Map<String, Speaker> _byName = allSpeakers.groupFoldBy(
+      (element) => element.name.toLowerCase(), (previous, element) => element);
+
+  // Known NPCs...
+
+  static final PrincipalKroft =
+      NpcSpeaker(Portrait.PrincipalKroft, 'Principal Kroft');
+  static final Saya = NpcSpeaker(Portrait.Saya, 'Saya');
+  static final Holt = NpcSpeaker(Portrait.Holt, 'Holt');
+  static final Zio = NpcSpeaker(Portrait.Zio, 'Zio');
 
   @override
   String toString() => name;
@@ -265,6 +263,9 @@ class UnnamedSpeaker with Speaker {
   final name = 'Unnamed Speaker';
 
   @override
+  final portrait = null;
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is UnnamedSpeaker && runtimeType == other.runtimeType;
@@ -273,32 +274,56 @@ class UnnamedSpeaker with Speaker {
   int get hashCode => name.hashCode;
 }
 
-class PrincipalKroft with Speaker {
-  const PrincipalKroft();
-
+class NpcSpeaker with Speaker {
   @override
-  final name = 'Principal Kroft';
-
+  final Portrait portrait;
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is PrincipalKroft && runtimeType == other.runtimeType;
+  final String name;
 
-  @override
-  int get hashCode => name.hashCode;
+  NpcSpeaker(this.portrait, this.name);
 }
 
-class Zio with Speaker {
-  const Zio();
+enum Portrait {
+  Shay,
+  Alys,
+  Hahn,
+  Rune,
+  Gryz,
+  Rika,
+  Demi,
+  Wren,
+  Raja,
+  Kyra,
+  Seth,
+  Saya,
+  Holt,
+  PrincipalKroft,
+  Dorin,
+  Pana,
+  HuntersGuildReceptionist,
+  Baker,
+  Zio,
+  Juza,
+  Gyuna,
+  Esper,
+  EsperChief,
+  GumbiousPriest,
+  GumbiousBishop,
+  Lashiec,
+  XeAThoul,
+  XeAThoul2,
+  FortuneTeller,
+  DElmLars,
+  AlysWounded,
+  ReFaze,
+  MissingStudent,
+  Tallas,
+  DyingBoy,
+  Sekreas;
 
-  @override
-  final name = 'Zio';
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Zio && runtimeType == other.runtimeType;
-
-  @override
-  int get hashCode => name.hashCode;
+  /// Returns the portrait for the given [name].
+  static Portrait? byName(String name) {
+    return Portrait.values
+        .firstWhereOrNull((e) => e.name.toLowerCase() == name.toLowerCase());
+  }
 }

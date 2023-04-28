@@ -67,10 +67,10 @@ ${dialog2.toAsm()}
       expect(
           program.dialogTrees.forMap(map.id)[0].withoutComments(),
           Asm([
-            dc.b([Byte(0xF4), alys.portraitCode]),
+            dc.b([Byte(0xF4), (toPortraitCode(alys.portrait))]),
             dc.b(Bytes.ascii('Hi')),
             dc.b([Byte(0xFD)]),
-            dc.b([Byte(0xF4), UnnamedSpeaker().portraitCode]),
+            dc.b([Byte(0xF4), (toPortraitCode(UnnamedSpeaker().portrait))]),
             dc.b([Byte(0xF2), Byte.zero]),
             dc.w([Word(PrincipalPanel.principal.panelIndex)]),
             dc.b([Byte(0xff)])
@@ -599,10 +599,10 @@ ${dialog2.toAsm()}
       expect(
           program.dialogTrees.forMap(map.id).toAsm().withoutComments().trim(),
           Asm([
-            dc.b([Byte(0xf4), alys.portraitCode]),
+            dc.b([Byte(0xf4), (toPortraitCode(alys.portrait))]),
             dc.b(Bytes.ascii('Hello')),
             dc.b([Byte(0xf7)]),
-            dc.b([Byte(0xf4), alys.portraitCode]),
+            dc.b([Byte(0xf4), (toPortraitCode(alys.portrait))]),
             dc.b(Bytes.ascii('Hello')),
             dc.b([Byte(0xff)])
           ]));

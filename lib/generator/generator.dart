@@ -868,8 +868,7 @@ class SceneAsmGenerator implements EventVisitor {
   void showPanel(ShowPanel showPanel) {
     var index = showPanel.panel.panelIndex;
 
-    var speaker = showPanel.speaker;
-    if (speaker != null) {
+    if (showPanel.showDialogBox) {
       // This is not using add to dialog or event,
       // because it HAS to run in dialog in this case.
       // It is like a Dialog event in that way.
@@ -877,13 +876,14 @@ class SceneAsmGenerator implements EventVisitor {
       _runOrInterruptDialog(showPanel);
       _memory.addPanel();
 
+      var p = showPanel.portrait;
       _addToDialog(Asm([
-        if (_memory.dialogPortrait != speaker) portrait(speaker.portraitCode),
+        if (_memory.dialogPortrait != p) portrait(toPortraitCode(p)),
         dc.b([Byte(0xf2), Byte.zero]),
         dc.w([Word(index)]),
       ]));
 
-      _memory.dialogPortrait = speaker;
+      _memory.dialogPortrait = p;
     } else {
       _addToEvent(showPanel, (_) {
         _memory.addPanel();
@@ -1379,7 +1379,7 @@ class SceneAsmGenerator implements EventVisitor {
           'but hidePanels == false');
     }
 
-    _memory.dialogPortrait = UnnamedSpeaker();
+    _memory.dialogPortrait = null;
 
     _resetCurrentDialog();
 
@@ -1455,7 +1455,7 @@ class SceneAsmGenerator implements EventVisitor {
       _addToDialog(comment('scene event $eventIndex'));
       _lastEventBreak = _addToDialog(eventBreak());
       _memory.hasSavedDialogPosition = true;
-      _memory.dialogPortrait = UnnamedSpeaker();
+      _memory.dialogPortrait = null;
       _gameMode = Mode.event;
 
       // If any events which could've gone either way,

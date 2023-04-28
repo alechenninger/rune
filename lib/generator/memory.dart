@@ -155,10 +155,10 @@ class Memory implements EventState {
       (map, m) => m._eventState.currentMap = map));
 
   @override
-  Speaker? get dialogPortrait => _eventState.dialogPortrait;
+  Portrait? get dialogPortrait => _eventState.dialogPortrait;
 
   @override
-  set dialogPortrait(Speaker? speaker) => _apply(SetValue<Speaker>(
+  set dialogPortrait(Portrait? speaker) => _apply(SetValue<Portrait>(
       speaker,
       (m) => m._eventState.dialogPortrait,
       (s, m) => m._eventState.dialogPortrait = s));

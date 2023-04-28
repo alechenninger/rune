@@ -167,7 +167,7 @@ class EventState {
 
   bool? isFieldShown = true;
 
-  Speaker? dialogPortrait = UnnamedSpeaker();
+  Portrait? dialogPortrait;
 
   GameMap? currentMap;
 
@@ -544,35 +544,31 @@ const wren = Wren();
 const raja = Raja();
 const kyra = Kyra();
 const seth = Seth();
-const saya = Saya();
-const holt = Holt();
 
 class Alys extends Character {
   const Alys();
-
   @override
   final name = 'Alys';
-
+  @override
+  final portrait = Portrait.Alys;
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Alys && runtimeType == other.runtimeType;
-
   @override
   int get hashCode => name.hashCode;
 }
 
 class Shay extends Character {
   const Shay();
-
   @override
   final name = 'Shay';
-
+  @override
+  final portrait = Portrait.Shay;
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Shay && runtimeType == other.runtimeType;
-
   @override
   int get hashCode => name.hashCode;
 }
@@ -581,6 +577,8 @@ class Hahn extends Character {
   const Hahn();
   @override
   final name = 'Hahn';
+  @override
+  final portrait = Portrait.Hahn;
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -594,6 +592,8 @@ class Rune extends Character {
   @override
   final name = 'Rune';
   @override
+  final portrait = Portrait.Rune;
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Rune && runtimeType == other.runtimeType;
@@ -605,6 +605,8 @@ class Gryz extends Character {
   const Gryz();
   @override
   final name = 'Gryz';
+  @override
+  final portrait = Portrait.Gryz;
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -618,6 +620,8 @@ class Rika extends Character {
   @override
   final name = 'Rika';
   @override
+  final portrait = Portrait.Rika;
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Rika && runtimeType == other.runtimeType;
@@ -629,6 +633,8 @@ class Demi extends Character {
   const Demi();
   @override
   final name = 'Demi';
+  @override
+  final portrait = Portrait.Demi;
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -642,6 +648,8 @@ class Wren extends Character {
   @override
   final name = 'Wren';
   @override
+  final portrait = Portrait.Wren;
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Wren && runtimeType == other.runtimeType;
@@ -653,6 +661,8 @@ class Raja extends Character {
   const Raja();
   @override
   final name = 'Raja';
+  @override
+  final portrait = Portrait.Raja;
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -666,6 +676,8 @@ class Kyra extends Character {
   @override
   final name = 'Kyra';
   @override
+  final portrait = Portrait.Kyra;
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Kyra && runtimeType == other.runtimeType;
@@ -678,33 +690,11 @@ class Seth extends Character {
   @override
   final name = 'Seth';
   @override
+  final portrait = Portrait.Seth;
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Seth && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Saya extends Character {
-  const Saya();
-  @override
-  final name = 'Saya';
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Saya && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Holt extends Character {
-  const Holt();
-  @override
-  final name = 'Holt';
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Holt && runtimeType == other.runtimeType;
   @override
   int get hashCode => name.hashCode;
 }
