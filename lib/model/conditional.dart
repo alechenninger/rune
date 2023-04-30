@@ -235,6 +235,10 @@ class Condition {
       ..lock);
   }
 
+  Condition withFlags(Map<EventFlag, bool> flags) => Condition(_flags.unlock
+    ..addAll(flags)
+    ..lock);
+
   Condition withSet(EventFlag flag) => withFlag(flag, true);
   Condition withNotSet(EventFlag flag) => withFlag(flag, false);
   Condition without(EventFlag flag) => Condition(_flags.unlock
@@ -246,6 +250,20 @@ class Condition {
   bool? operator [](EventFlag flag) => _flags[flag];
   bool isKnownSet(EventFlag flag) => this[flag] == true;
   bool isKnownUnset(EventFlag flag) => this[flag] == false;
+  bool isSatisfiedBy(Condition other) {
+    for (var entry in _flags.entries) {
+      if (other[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
+  bool conflictsWith(Condition other) {
+    for (var entry in other._flags.entries) {
+      var current = this[entry.key];
+      if (current != null && current != entry.value) return true;
+    }
+    return false;
+  }
 
   @override
   bool operator ==(Object other) =>

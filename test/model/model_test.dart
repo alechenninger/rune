@@ -631,4 +631,111 @@ void main() {
       });
     });
   });
+
+  group('scene', () {
+    test('add event to branches', () {
+      var scene = Scene([
+        IfFlag(EventFlag('HahnJoined'), isSet: [
+          Dialog(spans: [DialogSpan('Hi after Hahn joined')])
+        ], isUnset: [
+          IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'), isSet: [
+            Dialog(spans: [DialogSpan('Hi again')])
+          ], isUnset: [
+            IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+              SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+              Dialog(spans: [DialogSpan('Hi after meeting principal')])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Hello world.')])
+            ])
+          ])
+        ])
+      ]);
+
+      scene.addEventToBranches(
+          SetFlag(EventFlag('test')),
+          Condition(
+              {EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'): true}));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('HahnJoined'), isSet: [
+              Dialog(spans: [DialogSpan('Hi after Hahn joined')])
+            ], isUnset: [
+              IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'),
+                  isSet: [
+                    SetFlag(EventFlag('test')),
+                    Dialog(spans: [DialogSpan('Hi again')])
+                  ],
+                  isUnset: [
+                    IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+                      SetFlag(
+                          EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+                      Dialog(spans: [DialogSpan('Hi after meeting principal')])
+                    ], isUnset: [
+                      Dialog(spans: [DialogSpan('Hello world.')])
+                    ])
+                  ])
+            ])
+          ]));
+    });
+
+    test('adds event to all branches which would be taken under condition',
+        () {});
+  });
+
+  group('condition', () {
+    test(
+        'conflicts with conditions that set different values for non null flags',
+        () {
+      var c1 = Condition({EventFlag('a'): true});
+      var c2 = Condition({EventFlag('a'): false});
+
+      expect(c1.conflictsWith(c2), isTrue);
+      expect(c2.conflictsWith(c1), isTrue);
+    });
+
+    test(
+        'does not conflict with conditions that set same values for non null flags',
+        () {
+      var c1 = Condition({EventFlag('a'): true, EventFlag('b'): false});
+      var c2 = Condition({EventFlag('a'): true});
+
+      expect(c1.conflictsWith(c2), isFalse);
+      expect(c2.conflictsWith(c1), isFalse);
+    });
+
+    test('does not conflict with conditions that set additional values', () {
+      var c1 = Condition({EventFlag('a'): true});
+      var c2 = Condition({EventFlag('a'): true, EventFlag('b'): false});
+
+      expect(c1.conflictsWith(c2), isFalse);
+      expect(c2.conflictsWith(c1), isFalse);
+    });
+
+    test(
+        'is satisfied by conditions that set the same value for non null flags',
+        () {
+      var c1 = Condition({EventFlag('a'): true, EventFlag('b'): false});
+      var c2 = Condition({EventFlag('a'): true});
+
+      expect(c1.isSatisfiedBy(c2), isFalse);
+      expect(c2.isSatisfiedBy(c1), isTrue);
+    });
+
+    test(
+        'is not satisfied by conditions that set different values for non null flags',
+        () {
+      var c1 = Condition({EventFlag('a'): true, EventFlag('b'): false});
+      var c2 = Condition({EventFlag('a'): true, EventFlag('b'): true});
+
+      expect(c1.isSatisfiedBy(c2), isFalse);
+      expect(c2.isSatisfiedBy(c1), isFalse);
+    });
+
+    test('empty conditions satisfy and do not conflict', () {
+      expect(Condition.empty().isSatisfiedBy(Condition.empty()), isTrue);
+      expect(Condition.empty().conflictsWith(Condition.empty()), isFalse);
+    });
+  });
 }

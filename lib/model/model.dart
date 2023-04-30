@@ -72,6 +72,10 @@ class Game {
     return interactions;
   }
 
+  GameMap? getMap(MapId id) {
+    return _maps[id];
+  }
+
   GameMap getOrStartMap(MapId id) {
     return _maps.putIfAbsent(id, () => GameMap(id));
   }
@@ -97,6 +101,35 @@ class Game {
 
   @override
   int get hashCode => const MapEquality<MapId, GameMap>().hash(_maps);
+
+  Scene interactionForElements(Iterable<FindsGameElement> elements) {
+    Scene? scene;
+    for (var id in elements) {
+      var element = id.findInGame(this);
+      if (element == null) {
+        throw ArgumentError.value(id, 'elements', 'not found in game');
+      }
+      if (element is InteractiveMapElement) {
+        if (scene == null) {
+          scene = element.onInteract;
+        } else if (!identical(scene, element.onInteract)) {
+          throw ArgumentError.value(
+              element, 'elements', 'must all share the same scene');
+        }
+      } else {
+        throw ArgumentError.value(
+            element, 'elements', 'must be InteractiveMapElement');
+      }
+    }
+    if (scene == null) {
+      throw ArgumentError.value(elements, 'elements', 'must not be empty');
+    }
+    return scene;
+  }
+}
+
+abstract class FindsGameElement {
+  MapElement? findInGame(Game game);
 }
 
 // todo: use sealed type once supported in dart
@@ -329,12 +362,68 @@ class Scene extends IterableBase<Event> {
         .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e));
   }
 
+  Set<EventFlag> flagsSet() {
+    return _events.whereType<SetFlag>().map((e) => e.flag).toSet();
+  }
+
+  bool setsFlag(EventFlag flag) {
+    return _events.any((e) => e is SetFlag && e.flag == flag);
+  }
+
   void addEvent(Event event) {
     _addEvent(_events, event);
   }
 
   void addEvents(Iterable<Event> events) {
     events.forEach(addEvent);
+  }
+
+  void addEventToBranches(Event event, Condition condition) {
+    _addEventToBranches(_events, event, Condition.empty(), condition);
+  }
+
+  /// Find the first IfFlag event with a branch
+  /// that matches the [matching] Condition.
+  /// If found, replace that event with one where [event] is added to
+  /// the matching branch.
+  /// If no IfFlag is found, add event to the top-level [events].
+  bool _addEventToBranches(
+      List<Event> events, Event event, Condition current, Condition matching) {
+    if (matching.isSatisfiedBy(current)) {
+      _addEvent(events, event);
+      return true;
+    }
+
+    var added = false;
+
+    for (int i = 0; i < events.length; i++) {
+      var e = events[i];
+      if (e is IfFlag) {
+        var replace = false;
+        // Check set branch
+        var ifSet = current.withSet(e.flag);
+        var isSetBranch = [...e.isSet];
+        var isUnsetBranch = [...e.isUnset];
+
+        if (!ifSet.conflictsWith(matching)) {
+          replace = _addEventToBranches(isSetBranch, event, ifSet, matching);
+        }
+
+        var ifUnset = current.withNotSet(e.flag);
+        if (!ifUnset.conflictsWith(matching)) {
+          replace =
+              _addEventToBranches(isUnsetBranch, event, ifUnset, matching);
+        }
+
+        if (replace) {
+          added = true;
+          events[i] =
+              IfFlag(e.flag, isSet: isSetBranch, isUnset: isUnsetBranch);
+        }
+      }
+    }
+
+    return added;
   }
 
   /// Adds a conditional [branch] to the scene.
