@@ -485,6 +485,11 @@ class Scene extends IterableBase<Event> {
       // virtue of this reording logic
       events.insert(0, event);
     } else if (event is SetFlag) {
+      // Is this flag already set? If so, we can skip this event.
+      if (events.any((e) => e is SetFlag && e.flag == event.flag)) {
+        return;
+      }
+
       // This reordering results in an optimization.
       // Setting the flag shouldn't matter where it is.
       // But if we do it last, we have to generate in event code.
