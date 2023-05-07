@@ -244,6 +244,75 @@ void main() {
     expect(objectsAsm[12], dc.w(['2d0'.hex.toWord]));
   });
 
+  test('sprites which need duplicates are duplicated', () {
+    testMap.addObject(MapObject(
+        startPosition: Position('1e0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan1, FaceDown())));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('1f0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.GuildReceptionist, FaceDownOrUpLegsHidden())));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('200'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan2, FaceDown())));
+
+    var mapAsm = program.addMap(testMap);
+
+    expect(
+        mapAsm.sprites,
+        Asm([
+          dc.w(['2d0'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan1')]),
+          dc.w(['318'.hex.toWord]),
+          dc.l([Constant('Art_GuildReceptionist')]),
+          dc.w(['340'.hex.toWord]),
+          dc.l([Constant('Art_GuildReceptionist')]),
+          dc.w(['350'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan2')]),
+        ]));
+
+    // todo: this is kind of brittle
+    var objectsAsm = mapAsm.objects.withoutComments();
+    expect(objectsAsm[2], dc.w(['2d0'.hex.toWord]));
+    expect(objectsAsm[7], dc.w(['318'.hex.toWord]));
+    expect(objectsAsm[12], dc.w(['350'.hex.toWord]));
+  });
+
+  test('sprites are not duplicated if would exceed routine tiles', () {
+    testMap.addObject(MapObject(
+        startPosition: Position('1e0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan1, FaceDown())));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('1f0'.hex, '2e0'.hex),
+        spec:
+            Npc(Sprite.GuildReceptionist, FaceDownLegsHiddenNonInteractive())));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('200'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan2, FaceDown())));
+
+    var mapAsm = program.addMap(testMap);
+
+    expect(
+        mapAsm.sprites,
+        Asm([
+          dc.w(['2d0'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan1')]),
+          dc.w(['318'.hex.toWord]),
+          dc.l([Constant('Art_GuildReceptionist')]),
+          dc.w(['320'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan2')]),
+        ]));
+
+    // todo: this is kind of brittle
+    var objectsAsm = mapAsm.objects.withoutComments();
+    expect(objectsAsm[2], dc.w(['2d0'.hex.toWord]));
+    expect(objectsAsm[7], dc.w(['318'.hex.toWord]));
+    expect(objectsAsm[12], dc.w(['320'.hex.toWord]));
+  });
+
   test('objects use position divided by 8', () {}, skip: 'todo');
 
   test('objects use correct facing direction', () {}, skip: 'todo');

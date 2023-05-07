@@ -245,7 +245,7 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   // aggregate all sprites and their vram tiles needed
   // aggregate all objects and their sprites
   // then assign vram tile numbers to objects.
-  var mappingTiles = <Label, int>{};
+  var vramMapping = <Label, _SpriteVramMapping>{};
   // The use of 'multimap' here is exactly why we need an aggregation:
   // a sprite maybe used by multiple objects,
   // and objects may have differing vram tiles needed.
@@ -270,14 +270,20 @@ Map<MapObjectId, Word> _compileMapSpriteData(
       }
 
       var tiles = routine.factory.spriteMappingTiles!;
-      mappingTiles.update(maybeLbl, (current) => max(current, tiles),
-          ifAbsent: () => tiles);
+      // Bit of a hack for this one sprite;
+      // can clean it up if it turns out other sprites need similar treatment
+      var mapping = (maybeLbl == Label('Art_GuildReceptionist') &&
+              tiles >= 0x38 /* 0x28 offset + 16 tile width in sprite */)
+          ? _SpriteVramMapping(tiles, [0x28])
+          : _SpriteVramMapping(tiles);
+      vramMapping.update(maybeLbl, (current) => current.merge(mapping),
+          ifAbsent: () => mapping);
     } else if (spec is AsmSpec) {
       maybeLbl = spec.artLabel;
       if (maybeLbl != null) {
-        mappingTiles.update(
-            maybeLbl, (current) => max(current, _defaultVramTilesPerSprite),
-            ifAbsent: () => _defaultVramTilesPerSprite);
+        vramMapping.update(maybeLbl,
+            (current) => current.merge(const _SpriteVramMapping.defaults()),
+            ifAbsent: () => const _SpriteVramMapping.defaults());
       }
     }
 
@@ -288,14 +294,14 @@ Map<MapObjectId, Word> _compileMapSpriteData(
 
   var objectTiles = <MapObjectId, Word>{};
 
-  for (var entry in mappingTiles.entries) {
+  for (var entry in vramMapping.entries) {
     if (spriteVramOffset == null) {
       throw Exception('no vram offsets defined but map has sprites. '
           'objects=${objectTiles.keys}');
     }
 
     var artLbl = entry.key;
-    var mappingTiles = entry.value;
+    var mapping = entry.value;
 
     // TODO: looks like max vram tile should be 28, 21 (x, y) = ~0x55c
     // >= 0x522~ seems to be weird
@@ -312,7 +318,7 @@ Map<MapObjectId, Word> _compileMapSpriteData(
     }
 
     var tile = Word(spriteVramOffset);
-    spriteVramOffset += mappingTiles;
+    spriteVramOffset += mapping.tiles;
 
     for (var obj in objectSprites[artLbl]) {
       objectTiles[obj] = tile;
@@ -320,9 +326,53 @@ Map<MapObjectId, Word> _compileMapSpriteData(
 
     asm.add(dc.w([tile]));
     asm.add(dc.l([artLbl]));
+
+    for (var offset in mapping.duplicateOffsets) {
+      asm.add(dc.w([Word(tile.value + offset)]));
+      asm.add(dc.l([artLbl]));
+    }
   }
 
   return objectTiles;
+}
+
+class _SpriteVramMapping {
+  /// The total tiles required by the sprite
+  final int tiles;
+
+  /// Additional offsets in vram which duplicate the sprite.
+  ///
+  /// This is used for sprites where the sprite data
+  /// does not alone account for all facing directions needed.
+  final List<int> duplicateOffsets;
+
+  const _SpriteVramMapping(this.tiles, [this.duplicateOffsets = const []]);
+
+  const _SpriteVramMapping.defaults() : this(_defaultVramTilesPerSprite);
+
+  _SpriteVramMapping merge(_SpriteVramMapping other) {
+    if (other.duplicateOffsets != duplicateOffsets) {
+      throw ArgumentError.value(other, 'other',
+          'cannot merge different duplicate offsets. this=$this');
+    }
+    return _SpriteVramMapping(max(tiles, other.tiles), duplicateOffsets);
+  }
+
+  @override
+  String toString() {
+    return '_SpriteVramMapping{tiles: $tiles, offsets: $duplicateOffsets}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _SpriteVramMapping &&
+          runtimeType == other.runtimeType &&
+          tiles == other.tiles &&
+          duplicateOffsets == other.duplicateOffsets;
+
+  @override
+  int get hashCode => tiles.hashCode ^ duplicateOffsets.hashCode;
 }
 
 Byte _compileInteractionScene(
