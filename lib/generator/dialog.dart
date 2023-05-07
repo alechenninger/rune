@@ -731,5 +731,7 @@ Speaker? _toSpeaker(Byte byte) {
   var portrait = _portraits[byte.value];
   if (portrait == null) return null;
 
-  return Speaker.byName(portrait.name) ?? NpcSpeaker(portrait, portrait.name);
+  return Speaker.byPortrait(portrait) ??
+      Speaker.byName(portrait.name) ??
+      NpcSpeaker(portrait, portrait.name);
 }

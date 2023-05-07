@@ -232,6 +232,10 @@ abstract class Speaker {
     return _byName[name.toLowerCase()];
   }
 
+  static Speaker? byPortrait(Portrait portrait) {
+    return allSpeakers.where((s) => s.portrait == portrait).firstOrNull;
+  }
+
   static final Iterable<Speaker> allSpeakers = [
     ...Character.allCharacters,
     PrincipalKroft,
