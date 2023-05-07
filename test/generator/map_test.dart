@@ -5,7 +5,6 @@ import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/map.dart';
-import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
@@ -932,7 +931,169 @@ void main() {
 
       expect(map.areas, [
         MapArea(
-            id: MapAreaId('test'),
+            id: MapAreaId('Test_area_0'),
+            at: Position(0x1e0, 0x1d0),
+            range: AreaRange.x40y40,
+            spec: InteractiveAreaSpec(
+                onInteract:
+                    Scene([Dialog(spans: DialogSpan.parse("It's an area"))])))
+      ]);
+    });
+
+    test('motavia dialog ids above 0x7e use tree 29', () async {
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogTree()
+          ..add(DialogAsm([
+            dc.b(Bytes.ascii('Hi there!')),
+            dc.b([Byte(0xff)])
+          ])),
+        Label('DialogueTree29'): DialogTree()
+          ..addAndExtend(
+              0x7f,
+              DialogAsm([
+                dc.b(Bytes.ascii("It's an area")),
+                dc.b([Byte(0xff)])
+              ]))
+      });
+
+      var asm = (MapAsmFixture()
+            ..addArea(
+                x: 0x3c, // 1e0
+                y: 0x3a, // 1d0
+                range: 1,
+                flagCheckType: 0,
+                flag: 0,
+                routine: 0,
+                parameter: 0x7f))
+          .toAsm();
+
+      var map = await asmToMap(Label('Map_Test'), asm, dialog);
+
+      expect(map.areas, [
+        MapArea(
+            id: MapAreaId('Test_area_0'),
+            at: Position(0x1e0, 0x1d0),
+            range: AreaRange.x40y40,
+            spec: InteractiveAreaSpec(
+                onInteract:
+                    Scene([Dialog(spans: DialogSpan.parse("It's an area"))])))
+      ]);
+    });
+
+    test('motavia dialog ids <= 0x7e use tree 28', () async {
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogTree()
+          ..add(DialogAsm([
+            dc.b(Bytes.ascii('Hi there!')),
+            dc.b([Byte(0xff)])
+          ])),
+        Label('DialogueTree28'): DialogTree()
+          ..addAndExtend(
+              0x7e,
+              DialogAsm([
+                dc.b(Bytes.ascii("It's an area")),
+                dc.b([Byte(0xff)])
+              ]))
+      });
+
+      var asm = (MapAsmFixture()
+            ..addArea(
+                x: 0x3c, // 1e0
+                y: 0x3a, // 1d0
+                range: 1,
+                flagCheckType: 0,
+                flag: 0,
+                routine: 0,
+                parameter: 0x7e))
+          .toAsm();
+
+      var map = await asmToMap(Label('Map_Test'), asm, dialog);
+
+      expect(map.areas, [
+        MapArea(
+            id: MapAreaId('Test_area_0'),
+            at: Position(0x1e0, 0x1d0),
+            range: AreaRange.x40y40,
+            spec: InteractiveAreaSpec(
+                onInteract:
+                    Scene([Dialog(spans: DialogSpan.parse("It's an area"))])))
+      ]);
+    });
+
+    test('non motavia dialog ids above 0x7e use tree 30', () async {
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogTree()
+          ..add(DialogAsm([
+            dc.b(Bytes.ascii('Hi there!')),
+            dc.b([Byte(0xff)])
+          ])),
+        Label('DialogueTree30'): DialogTree()
+          ..addAndExtend(
+              0x7f,
+              DialogAsm([
+                dc.b(Bytes.ascii("It's an area")),
+                dc.b([Byte(0xff)])
+              ]))
+      });
+
+      var asm = (MapAsmFixture()
+            ..mapName = 'RajaTemple'
+            ..addArea(
+                x: 0x3c, // 1e0
+                y: 0x3a, // 1d0
+                range: 1,
+                flagCheckType: 0,
+                flag: 0,
+                routine: 0,
+                parameter: 0x7f))
+          .toAsm();
+
+      var map = await asmToMap(Label('Map_RajaTemple'), asm, dialog);
+
+      expect(map.areas, [
+        MapArea(
+            id: MapAreaId('RajaTemple_area_0'),
+            at: Position(0x1e0, 0x1d0),
+            range: AreaRange.x40y40,
+            spec: InteractiveAreaSpec(
+                onInteract:
+                    Scene([Dialog(spans: DialogSpan.parse("It's an area"))])))
+      ]);
+    });
+
+    test('non motavia dialog ids <= 0x7e also use tree 30', () async {
+      var dialog = TestDialogTreeLookup({
+        Label('TestDialogTree'): DialogTree()
+          ..add(DialogAsm([
+            dc.b(Bytes.ascii('Hi there!')),
+            dc.b([Byte(0xff)])
+          ])),
+        Label('DialogueTree30'): DialogTree()
+          ..addAndExtend(
+              0x7e,
+              DialogAsm([
+                dc.b(Bytes.ascii("It's an area")),
+                dc.b([Byte(0xff)])
+              ]))
+      });
+
+      var asm = (MapAsmFixture()
+            ..mapName = 'RajaTemple'
+            ..addArea(
+                x: 0x3c, // 1e0
+                y: 0x3a, // 1d0
+                range: 1,
+                flagCheckType: 0,
+                flag: 0,
+                routine: 0,
+                parameter: 0x7e))
+          .toAsm();
+
+      var map = await asmToMap(Label('Map_RajaTemple'), asm, dialog);
+
+      expect(map.areas, [
+        MapArea(
+            id: MapAreaId('RajaTemple_area_0'),
             at: Position(0x1e0, 0x1d0),
             range: AreaRange.x40y40,
             spec: InteractiveAreaSpec(

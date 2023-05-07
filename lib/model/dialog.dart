@@ -238,6 +238,7 @@ abstract class Speaker {
     Saya,
     Holt,
     Zio,
+    HuntersGuildClerk,
   ];
 
   static final Map<String, Speaker> _byName = allSpeakers.groupFoldBy(
@@ -250,6 +251,8 @@ abstract class Speaker {
   static final Saya = NpcSpeaker(Portrait.Saya, 'Saya');
   static final Holt = NpcSpeaker(Portrait.Holt, 'Holt');
   static final Zio = NpcSpeaker(Portrait.Zio, 'Zio');
+  static final HuntersGuildClerk =
+      NpcSpeaker(Portrait.HuntersGuildReceptionist, "Hunter's Guild Clerk");
 
   @override
   String toString() => name;

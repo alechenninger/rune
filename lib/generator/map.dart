@@ -679,20 +679,7 @@ Future<MapArea> _buildArea(MapId map, _AsmArea area,
           'dialog ID. param=$param');
     }
 
-    // First, determine which dialog tree to use
-    // This is based off of the "world index."
-    // For Motavia, simply use the first tree ("DialogueTree28")
-    // If dialog ID >= 0x7F, use DialogTree29
-    // Else, use DialogTree30
-    Label dialog;
-    if (isWorldMotavia) {
-      dialog = Label('DialogueTree28');
-    } else if (flag.value >= 0x7F) {
-      dialog = Label('DialogueTree29');
-    } else {
-      dialog = Label('DialogueTree30');
-    }
-
+    var dialog = _dialogLabelForAreaDialogue(isWorldMotavia, param);
     var ref = _DialogAndLabel(param.value, dialog);
     var scene = scenes[ref];
     if (scene == null) {
@@ -718,6 +705,19 @@ Future<MapArea> _buildArea(MapId map, _AsmArea area,
             eventFlag: flag,
             interactionRoutine: routine,
             interactionParameter: param));
+  }
+}
+
+/// See Interaction_DisplayDialogue
+Label _dialogLabelForAreaDialogue(bool isWorldMotavia, Byte param) {
+  if (isWorldMotavia) {
+    if (param.value < 0x7f) {
+      return Label('DialogueTree28');
+    } else {
+      return Label('DialogueTree29');
+    }
+  } else {
+    return Label('DialogueTree30');
   }
 }
 

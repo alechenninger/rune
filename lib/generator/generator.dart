@@ -1618,6 +1618,16 @@ class DialogTree extends IterableBase<DialogAsm> {
     return _dialogs[index];
   }
 
+  /// Replaces the dialog at [index] with [dialog] and
+  /// if necessary, extends the tree with empty dialogs
+  /// in order to achieve the desired index.
+  void addAndExtend(int index, DialogAsm dialog) {
+    for (var i = _dialogs.length; i <= index; i++) {
+      add(DialogAsm.justTerminate());
+    }
+    _dialogs[index] = dialog;
+  }
+
   Asm toAsm({bool ensureFinished = true}) {
     if (ensureFinished) finish();
 

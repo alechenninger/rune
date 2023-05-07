@@ -764,12 +764,14 @@ class MapArea extends MapElement {
       identical(this, other) ||
       other is MapArea &&
           runtimeType == other.runtimeType &&
+          id == other.id &&
           position == other.position &&
-          spec == other.spec &&
-          range == other.range;
+          range == other.range &&
+          spec == other.spec;
 
   @override
-  int get hashCode => position.hashCode ^ spec.hashCode ^ range.hashCode;
+  int get hashCode =>
+      id.hashCode ^ position.hashCode ^ range.hashCode ^ spec.hashCode;
 }
 
 class InteractiveMapArea extends MapArea implements InteractiveMapElement {

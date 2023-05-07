@@ -15,6 +15,10 @@ import 'generator.dart';
 
 class DialogAsm extends Asm {
   DialogAsm.empty() : super.empty();
+  DialogAsm.justTerminate()
+      : super([
+          dc.b([Byte(0xff)])
+        ]);
   DialogAsm.fromRaw(String raw) : super.empty() {
     add(Instruction.parse(raw));
   }
