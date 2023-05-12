@@ -288,6 +288,7 @@ class IfFlag extends Event {
 
   IfFlag(this.flag,
       {Iterable<Event> isSet = const [], Iterable<Event> isUnset = const []})
+      // TODO: Could flatten here if there is IfFlag with same flag
       : isSet = Scene(isSet).events,
         isUnset = Scene(isUnset).events;
 

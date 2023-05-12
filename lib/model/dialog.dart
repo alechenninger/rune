@@ -217,7 +217,7 @@ class Span {
   int get hashCode => text.hashCode ^ italic.hashCode;
 }
 
-abstract class Speaker {
+abstract mixin class Speaker {
   String get name;
   Portrait? get portrait;
 

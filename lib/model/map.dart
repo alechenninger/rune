@@ -1072,7 +1072,7 @@ abstract class MapObjectSpec {
   Direction get startFacing;
 }
 
-abstract class Interactive {
+abstract mixin class Interactive {
   Scene onInteract = Scene.none();
 }
 

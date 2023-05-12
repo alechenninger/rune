@@ -382,11 +382,13 @@ class Scene extends IterableBase<Event> {
     _addEventToBranches(_events, event, Condition.empty(), condition);
   }
 
-  /// Find the first IfFlag event with a branch
-  /// that matches the [matching] Condition.
-  /// If found, replace that event with one where [event] is added to
-  /// the matching branch.
-  /// If no IfFlag is found, add event to the top-level [events].
+  /// Find the first branch, including top-level,
+  /// that satisfies the [matching] Condition.
+  /// Add [event] to that branch.
+  /// If the branch is not top-level,
+  /// the corresponding [IfFlag] event will be replaced.
+  ///
+  /// See [Condition.isSatisfiedBy].
   bool _addEventToBranches(
       List<Event> events, Event event, Condition current, Condition matching) {
     if (matching.isSatisfiedBy(current)) {
@@ -440,7 +442,16 @@ class Scene extends IterableBase<Event> {
   void addBranch(Iterable<Event> branch,
       {required EventFlag whenSet,
       bool createSequence = false,
-      EventFlag? advanceSequenceWhenSet}) {
+      EventFlag? advanceSequenceWhenSet,
+      Condition? asOf}) {
+    /*
+    is asOf is set
+    we need to find the corresponding branch
+    however instead of just adding an event to that branch
+    we need to fork it based on [whenSet],
+    where the branch becomes the isUnset of a new IfFlag at that point
+     */
+
     if (createSequence) {
       if (advanceSequenceWhenSet == null) {
         addEvent(SetFlag(whenSet));
