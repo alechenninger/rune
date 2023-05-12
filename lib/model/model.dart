@@ -133,6 +133,7 @@ abstract class FindsGameElement {
 }
 
 // todo: use sealed type once supported in dart
+// it might remove need for visitor pattern?
 abstract class Event {
   const Event();
 

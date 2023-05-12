@@ -715,10 +715,9 @@ enum MapId {
   const MapId(this.zone);
 }
 
-// todo: use sealed class when available
-abstract class MapElement {}
+sealed class MapElement {}
 
-abstract class InteractiveMapElement implements MapElement, Interactive {}
+sealed class InteractiveMapElement implements MapElement, Interactive {}
 
 class MapArea extends MapElement {
   factory MapArea(
@@ -789,7 +788,7 @@ class InteractiveMapArea extends MapArea implements InteractiveMapElement {
   set onInteract(Scene onInteract) => spec.onInteract = onInteract;
 }
 
-class MapAreaId {
+class MapAreaId extends MapElementId {
   final String value;
 
   MapAreaId(this.value);
@@ -1028,7 +1027,9 @@ MapObject placeholderMapObject(int index) {
 
 final _random = Random();
 
-class MapObjectId {
+sealed class MapElementId {}
+
+class MapObjectId extends MapElementId {
   final String value;
 
   MapObjectId(this.value) {
