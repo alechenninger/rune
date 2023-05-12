@@ -3,7 +3,6 @@ import 'package:rune/asm/events.dart';
 import 'package:rune/generator/cutscenes.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
-import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 

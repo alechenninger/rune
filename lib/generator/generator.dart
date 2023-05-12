@@ -33,7 +33,6 @@ import '../asm/dialog.dart' as asmdialoglib;
 import '../asm/events.dart';
 import '../asm/events.dart' as asmeventslib;
 import '../asm/text.dart';
-import '../model/conditional.dart';
 import '../model/model.dart';
 import '../model/text.dart';
 import 'cutscenes.dart';

@@ -7,7 +7,6 @@ import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/movement.dart';
-import 'package:rune/model/conditional.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
