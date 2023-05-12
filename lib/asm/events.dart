@@ -2,7 +2,6 @@
 
 import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
-import 'package:rune/numbers.dart';
 
 import 'asm.dart';
 

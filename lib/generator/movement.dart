@@ -1,6 +1,5 @@
 // ignore_for_file: constant_identifier_names
 
-import 'dart:collection';
 import 'dart:math' as math;
 
 import 'package:rune/asm/events.dart';
@@ -372,7 +371,6 @@ extension DirectionToAddress on Direction {
       case Direction.down:
         return FacingDir_Down;
     }
-    throw StateError('illegal direction $this');
   }
 
   Address get address {

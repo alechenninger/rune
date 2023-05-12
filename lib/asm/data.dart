@@ -3,8 +3,6 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:characters/characters.dart';
-import 'package:collection/collection.dart';
-import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/check.dart';
 import 'package:quiver/strings.dart';
 import 'package:rune/numbers.dart';

@@ -590,7 +590,7 @@ class Slot extends FieldObject {
   int get hashCode => index.hashCode;
 }
 
-abstract class Character extends FieldObject with Speaker {
+sealed class Character extends FieldObject with Speaker {
   const Character();
 
   static Character? byName(String name) {

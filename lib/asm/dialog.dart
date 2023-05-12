@@ -1,8 +1,6 @@
 import 'dart:math';
 
 import 'package:charcode/ascii.dart';
-import 'package:collection/collection.dart';
-import 'package:rune/generator/map.dart';
 
 import 'asm.dart';
 

@@ -1,15 +1,13 @@
 import '../asm/asm.dart';
 import '../asm/events.dart';
 import '../model/model.dart';
-import '../model/text.dart';
 import '../numbers.dart';
 import 'dialog.dart';
 import 'event.dart';
 import 'generator.dart';
+import 'memory.dart';
 import 'movement.dart';
 import 'scene.dart';
-import 'memory.dart';
-import 'text.dart' as text;
 
 // should track transient state about code generation
 // the known values of registers and memory

@@ -968,6 +968,5 @@ enum PartyArrangement {
       case right:
         return leftOfLead;
     }
-    throw UnimplementedError('unimplemented facing: $facing');
   }
 }

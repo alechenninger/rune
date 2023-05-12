@@ -3,7 +3,6 @@ import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/text.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/model/text.dart';
-import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 void main() {

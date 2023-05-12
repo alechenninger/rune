@@ -1,5 +1,3 @@
-import 'package:rune/model/text.dart';
-
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
 import '../asm/events.dart';
