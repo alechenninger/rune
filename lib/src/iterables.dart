@@ -19,3 +19,7 @@ T greater<T extends Comparable>(T value, T element) {
 }
 
 T sum<T extends num>(T a, T b) => a + b as T;
+
+String toIndentedString(Iterable<Object> o, String indent) => o
+    .map((e) => '$e'.split('\n').map((l) => '$indent$l').join('\n'))
+    .join('\n');

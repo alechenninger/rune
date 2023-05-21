@@ -717,7 +717,8 @@ enum MapId {
 
 sealed class MapElement {}
 
-sealed class InteractiveMapElement implements MapElement, Interactive {}
+sealed class InteractiveMapElement
+    implements MapElement, Interactive<InteractiveMapElement> {}
 
 class MapArea extends MapElement {
   factory MapArea(
@@ -786,6 +787,10 @@ class InteractiveMapArea extends MapArea implements InteractiveMapElement {
 
   @override
   set onInteract(Scene onInteract) => spec.onInteract = onInteract;
+
+  @override
+  InteractiveMapArea withNewInteraction() => InteractiveMapArea._(
+      id: id, at: position, range: range, spec: spec.withNewInteraction());
 }
 
 class MapAreaId extends MapElementId {
@@ -826,7 +831,8 @@ enum AreaRange {
 
 abstract class AreaSpec {}
 
-class InteractiveAreaSpec extends AreaSpec with Interactive {
+class InteractiveAreaSpec extends AreaSpec
+    with Interactive<InteractiveAreaSpec> {
   // other flag types are modelable in ASM
   // however they are never used with interaction types we care about.
   // hence this is here and not in the MapArea model
@@ -839,6 +845,10 @@ class InteractiveAreaSpec extends AreaSpec with Interactive {
       {this.doNotInteractIf, Scene onInteract = const Scene.none()}) {
     this.onInteract = onInteract;
   }
+
+  @override
+  InteractiveAreaSpec withNewInteraction() =>
+      InteractiveAreaSpec(doNotInteractIf: doNotInteractIf);
 
   @override
   String toString() {
@@ -1015,6 +1025,12 @@ class InteractiveMapObject extends MapObject implements InteractiveMapElement {
       super.onInteract = const Scene.none(),
       super.onInteractFacePlayer = true})
       : super._(spec: spec);
+
+  @override
+  InteractiveMapObject withNewInteraction() => InteractiveMapObject._(
+      id: id.value,
+      startPosition: startPosition,
+      spec: spec.withNewInteraction());
 }
 
 /// Constructs an object which doesn't do anything, but does collide.
@@ -1073,12 +1089,13 @@ abstract class MapObjectSpec {
   Direction get startFacing;
 }
 
-abstract mixin class Interactive {
+abstract mixin class Interactive<T extends Interactive<T>> {
   Scene onInteract = Scene.none();
+  T withNewInteraction();
 }
 
 abstract class InteractiveMapObjectSpec extends MapObjectSpec
-    with Interactive {}
+    with Interactive<InteractiveMapObjectSpec> {}
 
 /// Spec for class of behaviors with interchangeable sprites.
 class Npc extends MapObjectSpec {
@@ -1111,14 +1128,22 @@ class Npc extends MapObjectSpec {
 
 class InteractiveNpc extends Npc implements InteractiveMapObjectSpec {
   @override
-  Scene get onInteract => (behavior as Interactive).onInteract;
+  InteractiveNpcBehavior get behavior =>
+      super.behavior as InteractiveNpcBehavior;
 
   @override
-  set onInteract(Scene onInteract) =>
-      (behavior as Interactive).onInteract = onInteract;
+  Scene get onInteract => behavior.onInteract;
+
+  @override
+  set onInteract(Scene onInteract) => behavior.onInteract = onInteract;
 
   InteractiveNpc._(Sprite sprite, InteractiveNpcBehavior behavior)
       : super._(sprite, behavior);
+
+  @override
+  InteractiveNpc withNewInteraction() {
+    return InteractiveNpc._(sprite, behavior.withNewInteraction());
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -1270,6 +1295,9 @@ class AlysWaiting extends InteractiveMapObjectSpec {
   final startFacing = Direction.down;
 
   @override
+  AlysWaiting withNewInteraction() => AlysWaiting();
+
+  @override
   String toString() {
     return 'AlysWaiting{}';
   }
@@ -1290,6 +1318,10 @@ class AiedoShopperWithBags extends InteractiveMapObjectSpec {
   final Direction startFacing;
 
   AiedoShopperWithBags(this.startFacing);
+
+  @override
+  AiedoShopperWithBags withNewInteraction() =>
+      AiedoShopperWithBags(startFacing);
 
   @override
   String toString() {
@@ -1314,6 +1346,9 @@ class AiedoShopperMom extends InteractiveMapObjectSpec {
   final startFacing = Direction.right;
 
   @override
+  AiedoShopperMom withNewInteraction() => AiedoShopperMom();
+
+  @override
   String toString() {
     return 'AiedoShopperMom{}';
   }
@@ -1330,6 +1365,9 @@ class AiedoShopperMom extends InteractiveMapObjectSpec {
 class InvisibleBlock extends InteractiveMapObjectSpec {
   @override
   final startFacing = Direction.down;
+
+  @override
+  InvisibleBlock withNewInteraction() => InvisibleBlock();
 
   @override
   bool operator ==(Object other) =>
@@ -1374,7 +1412,7 @@ abstract class NpcBehavior {
 }
 
 abstract class InteractiveNpcBehavior extends NpcBehavior
-    implements Interactive {
+    implements Interactive<InteractiveNpcBehavior> {
   @override
   Scene onInteract;
 
@@ -1401,6 +1439,9 @@ class FaceDown extends InteractiveNpcBehavior {
   FaceDown({super.onInteract});
 
   @override
+  FaceDown withNewInteraction() => FaceDown();
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       super == other && other is FaceDown && runtimeType == other.runtimeType;
@@ -1419,6 +1460,9 @@ class WanderAround extends InteractiveNpcBehavior {
   final Direction startFacing;
 
   WanderAround(this.startFacing, {super.onInteract});
+
+  @override
+  WanderAround withNewInteraction() => WanderAround(startFacing);
 
   @override
   bool operator ==(Object other) =>
@@ -1442,6 +1486,9 @@ class SlowlyWanderAround extends InteractiveNpcBehavior {
   final Direction startFacing;
 
   SlowlyWanderAround(this.startFacing, {super.onInteract});
+
+  @override
+  SlowlyWanderAround withNewInteraction() => SlowlyWanderAround(startFacing);
 
   @override
   bool operator ==(Object other) =>
@@ -1490,6 +1537,9 @@ class FaceDownOrUpLegsHidden extends InteractiveNpcBehavior {
   FaceDownOrUpLegsHidden({super.onInteract});
 
   @override
+  FaceDownOrUpLegsHidden withNewInteraction() => FaceDownOrUpLegsHidden();
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       super == other &&
@@ -1512,6 +1562,9 @@ class FixedFaceRight extends InteractiveNpcBehavior {
   final startFacing = Direction.right;
 
   FixedFaceRight({super.onInteract});
+
+  @override
+  FixedFaceRight withNewInteraction() => FixedFaceRight();
 
   @override
   bool operator ==(Object other) =>
@@ -1570,7 +1623,7 @@ class AsmSpec extends MapObjectSpec {
 }
 
 class InteractiveAsmSpec extends AsmSpec
-    with Interactive
+    with Interactive<InteractiveMapObjectSpec>
     implements InteractiveMapObjectSpec {
   InteractiveAsmSpec(
       {super.artLabel,
@@ -1584,6 +1637,10 @@ class InteractiveAsmSpec extends AsmSpec
     }
     this.onInteract = onInteract;
   }
+
+  @override
+  InteractiveAsmSpec withNewInteraction() => InteractiveAsmSpec(
+      artLabel: artLabel, routine: routine, startFacing: startFacing);
 
   @override
   String toString() {

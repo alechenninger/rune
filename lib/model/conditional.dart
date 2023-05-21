@@ -1,12 +1,13 @@
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
+import '../src/iterables.dart';
 import 'model.dart';
 
 class EventFlag {
   final String name;
 
-  EventFlag(this.name);
+  const EventFlag(this.name);
 
   @override
   bool operator ==(Object other) =>
@@ -38,7 +39,7 @@ bool isStoryEvent(EventFlag flag) => storyEvents.contains(flag);
 /// - Are set as the story progresses
 /// - Are only ever set in this order
 /// - Can only be set when all preceeding story event flags have been set.
-final storyEvents = [
+const storyEvents = [
   EventFlag('PiataFirstTime'),
   EventFlag('PiataChazControl'),
   EventFlag('AlysFound'),
@@ -220,10 +221,30 @@ final storyEvents = [
   //EventFlag('GuildPlaceholder'),
 ];
 
+final ranchOwnerEvents = [
+  EventFlag('TheRanchOwner'),
+  EventFlag('MileRanchOwner'),
+  EventFlag('MileSandWorm'),
+  EventFlag('RanchOwnerAfterBattle'),
+  EventFlag('RanchOwnerFee'),
+];
+
+final tinkerbellsDogEvents = [
+  EventFlag('TinkerbellsDog'),
+  EventFlag('RockyOwner'),
+  EventFlag('RockyFound'),
+  EventFlag('RockyTermiEscape'),
+  EventFlag('RockyKrupEscape'),
+  EventFlag('RockyMonsenEscape'),
+  EventFlag('RockyHome'),
+  EventFlag('RockyFee'),
+];
+
 class Condition {
   final IMap<EventFlag, bool> _flags;
 
   Condition(Map<EventFlag, bool> flags) : _flags = flags.lock;
+
   const Condition.empty() : _flags = const IMapConst({});
 
   Iterable<EventFlag> get flagsSet => _flags.where((_, isSet) => isSet).keys;
@@ -240,7 +261,9 @@ class Condition {
     ..lock);
 
   Condition withSet(EventFlag flag) => withFlag(flag, true);
+
   Condition withNotSet(EventFlag flag) => withFlag(flag, false);
+
   Condition without(EventFlag flag) => Condition(_flags.unlock
     ..remove(flag)
     ..lock);
@@ -248,8 +271,16 @@ class Condition {
   Iterable<MapEntry<EventFlag, bool>> get entries => _flags.entries;
 
   bool? operator [](EventFlag flag) => _flags[flag];
+
   bool isKnownSet(EventFlag flag) => this[flag] == true;
+
   bool isKnownUnset(EventFlag flag) => this[flag] == false;
+
+  /// This condition is satisfied by another condition
+  /// if the [other] condition has the same value
+  /// as every flag in this condition.
+  ///
+  /// The other condition may contain additional flags.
   bool isSatisfiedBy(Condition other) {
     for (var entry in _flags.entries) {
       if (other[entry.key] != entry.value) return false;
@@ -257,6 +288,12 @@ class Condition {
     return true;
   }
 
+  /// This condition conflicts with another condition
+  /// if this condition contains a flag with a different value
+  /// than any flag in the [other] condition.
+  ///
+  /// The other condition may contain additional flags
+  /// and not necessarily conflit.
   bool conflictsWith(Condition other) {
     for (var entry in other._flags.entries) {
       var current = this[entry.key];
@@ -299,7 +336,12 @@ class IfFlag extends Event {
 
   @override
   String toString() {
-    return 'IfFlag{flag: $flag, isSet: $isSet, isUnset: $isUnset}';
+    return '''IfFlag{$flag, 
+         isSet:
+         ${toIndentedString(isSet, '         ')}
+         isUnset:
+         ${toIndentedString(isUnset, '         ')}
+         }''';
   }
 
   @override

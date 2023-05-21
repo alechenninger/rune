@@ -321,7 +321,6 @@ class Slots {
 
 class Scene extends IterableBase<Event> {
   final List<Event> _events;
-  List<Event> get events => List.unmodifiable(_events);
 
   Scene([Iterable<Event> events = const []]) : _events = [] {
     addEvents(events);
@@ -345,6 +344,8 @@ class Scene extends IterableBase<Event> {
   Scene unlessSet(EventFlag flag, {required List<Event> then}) {
     return Scene([IfFlag(flag, isSet: then, isUnset: _events)]);
   }
+
+  List<Event> get events => List.unmodifiable(this);
 
   @override
   Iterator<Event> get iterator => _events.iterator;
@@ -380,7 +381,8 @@ class Scene extends IterableBase<Event> {
   }
 
   void addEventToBranches(Event event, Condition condition) {
-    _addEventToBranches(_events, event, Condition.empty(), condition);
+    _visitBranch(_events, (branch) => _addEvent(branch, event),
+        Condition.empty(), condition);
   }
 
   /// Find the first branch, including top-level,
@@ -390,10 +392,10 @@ class Scene extends IterableBase<Event> {
   /// the corresponding [IfFlag] event will be replaced.
   ///
   /// See [Condition.isSatisfiedBy].
-  bool _addEventToBranches(
-      List<Event> events, Event event, Condition current, Condition matching) {
+  bool _visitBranch(List<Event> events, Function(List<Event> events) visitor,
+      Condition current, Condition matching) {
     if (matching.isSatisfiedBy(current)) {
-      _addEvent(events, event);
+      visitor(events);
       return true;
     }
 
@@ -409,13 +411,12 @@ class Scene extends IterableBase<Event> {
         var isUnsetBranch = [...e.isUnset];
 
         if (!ifSet.conflictsWith(matching)) {
-          replace = _addEventToBranches(isSetBranch, event, ifSet, matching);
+          replace = _visitBranch(isSetBranch, visitor, ifSet, matching);
         }
 
         var ifUnset = current.withNotSet(e.flag);
         if (!ifUnset.conflictsWith(matching)) {
-          replace =
-              _addEventToBranches(isUnsetBranch, event, ifUnset, matching);
+          replace = _visitBranch(isUnsetBranch, visitor, ifUnset, matching);
         }
 
         if (replace) {
@@ -452,18 +453,37 @@ class Scene extends IterableBase<Event> {
     we need to fork it based on [whenSet],
     where the branch becomes the isUnset of a new IfFlag at that point
      */
+    if (asOf == null) {
+      _addBranch(_events, branch,
+          whenSet: whenSet,
+          createSequence: createSequence,
+          advanceSequenceWhenSet: advanceSequenceWhenSet);
+    } else {
+      _visitBranch(_events, (events) {
+        _addBranch(events, branch,
+            whenSet: whenSet,
+            createSequence: createSequence,
+            advanceSequenceWhenSet: advanceSequenceWhenSet);
+      }, Condition.empty(), asOf);
+    }
+  }
 
+  void _addBranch(List<Event> events, Iterable<Event> branch,
+      {required EventFlag whenSet,
+      bool createSequence = false,
+      EventFlag? advanceSequenceWhenSet}) {
     if (createSequence) {
       if (advanceSequenceWhenSet == null) {
-        addEvent(SetFlag(whenSet));
+        _addEvent(events, SetFlag(whenSet));
       } else {
-        addEvent(IfFlag(advanceSequenceWhenSet, isSet: [SetFlag(whenSet)]));
+        _addEvent(
+            events, IfFlag(advanceSequenceWhenSet, isSet: [SetFlag(whenSet)]));
       }
     }
 
     var withBranch = <Event>[];
-    _addEvent(withBranch, IfFlag(whenSet, isSet: branch, isUnset: _events));
-    _events.replaceRange(0, _events.length, withBranch);
+    _addEvent(withBranch, IfFlag(whenSet, isSet: branch, isUnset: events));
+    events.replaceRange(0, events.length, withBranch);
   }
 
   void _addEvent(List<Event> events, Event event) {
@@ -517,7 +537,7 @@ class Scene extends IterableBase<Event> {
 
   @override
   String toString() {
-    return 'Scene{events: $_events}';
+    return 'Scene{${toIndentedString(_events, '      ')}}';
   }
 
   @override

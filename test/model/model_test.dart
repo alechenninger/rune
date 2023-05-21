@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
@@ -681,7 +683,60 @@ void main() {
     });
 
     test('adds event to all branches which would be taken under condition',
-        () {});
+        () {},
+        skip: 'not implemented');
+
+    test('adds branch as of condition', () {
+      var scene = Scene([
+        IfFlag(EventFlag('HahnJoined'), isSet: [
+          Dialog(spans: [DialogSpan('Hi after Hahn joined')])
+        ], isUnset: [
+          IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'), isSet: [
+            Dialog(spans: [DialogSpan('Hi again')])
+          ], isUnset: [
+            IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+              SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+              Dialog(spans: [DialogSpan('Hi after meeting principal')])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Hello world.')])
+            ])
+          ])
+        ])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('This is an optional quest')])
+      ],
+          whenSet: EventFlag('Quest1'),
+          asOf: Condition({EventFlag('HahnJoined'): false}));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('HahnJoined'), isSet: [
+              Dialog(spans: [DialogSpan('Hi after Hahn joined')])
+            ], isUnset: [
+              IfFlag(EventFlag('Quest1'), isSet: [
+                Dialog(spans: [DialogSpan('This is an optional quest')])
+              ], isUnset: [
+                IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'),
+                    isSet: [
+                      Dialog(spans: [DialogSpan('Hi again')])
+                    ],
+                    isUnset: [
+                      IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+                        SetFlag(EventFlag(
+                            'Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+                        Dialog(
+                            spans: [DialogSpan('Hi after meeting principal')])
+                      ], isUnset: [
+                        Dialog(spans: [DialogSpan('Hello world.')])
+                      ])
+                    ])
+              ])
+            ])
+          ]));
+    });
   });
 
   group('condition', () {
