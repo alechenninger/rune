@@ -847,8 +847,8 @@ class InteractiveAreaSpec extends AreaSpec
   }
 
   @override
-  InteractiveAreaSpec withNewInteraction() =>
-      InteractiveAreaSpec(doNotInteractIf: doNotInteractIf);
+  InteractiveAreaSpec withNewInteraction() => InteractiveAreaSpec(
+      doNotInteractIf: doNotInteractIf, onInteract: Scene.empty());
 
   @override
   String toString() {
