@@ -331,6 +331,8 @@ class Scene extends IterableBase<Event> {
 
   const Scene.none() : _events = const [];
 
+  Scene.empty() : _events = [];
+
   // note:
   // because these return new scenes, they kind of break the memory model if
   // we are treating the identity of a scene as the instance itself in memory
@@ -364,6 +366,35 @@ class Scene extends IterableBase<Event> {
         .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e));
   }
 
+  Scene asOf(Condition asOf) {
+    return Scene(_asOf(_events, asOf, Condition.empty()));
+  }
+
+  Iterable<Event> _asOf(
+      Iterable<Event> events, Condition asOf, Condition current) sync* {
+    for (var event in events) {
+      if (event is IfFlag) {
+        var knownVal = asOf[event.flag];
+        if (knownVal == true) {
+          // We know this is set, so just yield the set branch
+          yield* _asOf(event.isSet, asOf, current);
+        } else if (knownVal == false) {
+          // We know this is not set, so just yield the unset branch
+          yield* _asOf(event.isUnset, asOf, current);
+        } else {
+          // We don't know if this is set or not,
+          // so go through each branch
+          yield IfFlag(event.flag,
+              isSet: _asOf(event.isSet, asOf, current.withSet(event.flag)),
+              isUnset:
+                  _asOf(event.isUnset, asOf, current.withNotSet(event.flag)));
+        }
+      } else {
+        yield event;
+      }
+    }
+  }
+
   Set<EventFlag> flagsSet() {
     return _events.whereType<SetFlag>().map((e) => e.flag).toSet();
   }
@@ -383,6 +414,21 @@ class Scene extends IterableBase<Event> {
   void addEventToBranches(Event event, Condition condition) {
     _visitBranch(_events, (branch) => _addEvent(branch, event),
         Condition.empty(), condition);
+  }
+
+  void addEventsToBranches(Iterable<Event> events, Condition condition) {
+    _visitBranch(_events, (branch) {
+      for (var e in events) {
+        _addEvent(branch, e);
+      }
+    }, Condition.empty(), condition);
+  }
+
+  void replaceBranch(Iterable<Event> events, Condition condition) {
+    _visitBranch(_events, (branch) {
+      branch.clear();
+      branch.addAll(events);
+    }, Condition.empty(), condition);
   }
 
   /// Find the first branch, including top-level,
@@ -537,7 +583,7 @@ class Scene extends IterableBase<Event> {
 
   @override
   String toString() {
-    return 'Scene{${toIndentedString(_events, '      ')}}';
+    return 'Scene{\n${toIndentedString(_events, '      ')}\n}';
   }
 
   @override

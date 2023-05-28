@@ -923,7 +923,7 @@ class MapObject extends FieldObject implements MapElement, UnnamedSpeaker {
     if (isInteractive) {
       return (spec as Interactive).onInteract;
     }
-    return Scene.none();
+    return const Scene.none();
   }
 
   bool get isInteractive => spec is Interactive;
@@ -1295,7 +1295,7 @@ class AlysWaiting extends InteractiveMapObjectSpec {
   final startFacing = Direction.down;
 
   @override
-  AlysWaiting withNewInteraction() => AlysWaiting();
+  AlysWaiting withNewInteraction() => AlysWaiting()..onInteract = Scene.empty();
 
   @override
   String toString() {
@@ -1321,7 +1321,7 @@ class AiedoShopperWithBags extends InteractiveMapObjectSpec {
 
   @override
   AiedoShopperWithBags withNewInteraction() =>
-      AiedoShopperWithBags(startFacing);
+      AiedoShopperWithBags(startFacing)..onInteract = Scene.empty();
 
   @override
   String toString() {
@@ -1346,7 +1346,8 @@ class AiedoShopperMom extends InteractiveMapObjectSpec {
   final startFacing = Direction.right;
 
   @override
-  AiedoShopperMom withNewInteraction() => AiedoShopperMom();
+  AiedoShopperMom withNewInteraction() =>
+      AiedoShopperMom()..onInteract = Scene.empty();
 
   @override
   String toString() {
@@ -1367,7 +1368,8 @@ class InvisibleBlock extends InteractiveMapObjectSpec {
   final startFacing = Direction.down;
 
   @override
-  InvisibleBlock withNewInteraction() => InvisibleBlock();
+  InvisibleBlock withNewInteraction() =>
+      InvisibleBlock()..onInteract = Scene.empty();
 
   @override
   bool operator ==(Object other) =>
@@ -1439,7 +1441,7 @@ class FaceDown extends InteractiveNpcBehavior {
   FaceDown({super.onInteract});
 
   @override
-  FaceDown withNewInteraction() => FaceDown();
+  FaceDown withNewInteraction() => FaceDown(onInteract: Scene.empty());
 
   @override
   bool operator ==(Object other) =>
@@ -1462,7 +1464,8 @@ class WanderAround extends InteractiveNpcBehavior {
   WanderAround(this.startFacing, {super.onInteract});
 
   @override
-  WanderAround withNewInteraction() => WanderAround(startFacing);
+  WanderAround withNewInteraction() =>
+      WanderAround(startFacing, onInteract: Scene.empty());
 
   @override
   bool operator ==(Object other) =>
@@ -1488,7 +1491,8 @@ class SlowlyWanderAround extends InteractiveNpcBehavior {
   SlowlyWanderAround(this.startFacing, {super.onInteract});
 
   @override
-  SlowlyWanderAround withNewInteraction() => SlowlyWanderAround(startFacing);
+  SlowlyWanderAround withNewInteraction() =>
+      SlowlyWanderAround(startFacing, onInteract: Scene.empty());
 
   @override
   bool operator ==(Object other) =>
@@ -1537,7 +1541,8 @@ class FaceDownOrUpLegsHidden extends InteractiveNpcBehavior {
   FaceDownOrUpLegsHidden({super.onInteract});
 
   @override
-  FaceDownOrUpLegsHidden withNewInteraction() => FaceDownOrUpLegsHidden();
+  FaceDownOrUpLegsHidden withNewInteraction() =>
+      FaceDownOrUpLegsHidden(onInteract: Scene.empty());
 
   @override
   bool operator ==(Object other) =>
@@ -1564,7 +1569,8 @@ class FixedFaceRight extends InteractiveNpcBehavior {
   FixedFaceRight({super.onInteract});
 
   @override
-  FixedFaceRight withNewInteraction() => FixedFaceRight();
+  FixedFaceRight withNewInteraction() =>
+      FixedFaceRight(onInteract: Scene.empty());
 
   @override
   bool operator ==(Object other) =>
@@ -1640,7 +1646,10 @@ class InteractiveAsmSpec extends AsmSpec
 
   @override
   InteractiveAsmSpec withNewInteraction() => InteractiveAsmSpec(
-      artLabel: artLabel, routine: routine, startFacing: startFacing);
+      artLabel: artLabel,
+      routine: routine,
+      startFacing: startFacing,
+      onInteract: Scene.empty());
 
   @override
   String toString() {

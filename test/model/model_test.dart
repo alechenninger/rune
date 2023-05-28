@@ -635,6 +635,47 @@ void main() {
   });
 
   group('scene', () {
+    test('toString', () {
+      var scene = Scene([
+        Dialog(spans: [DialogSpan('Hi after Hahn joined')]),
+        SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+        Pause(Duration(seconds: 1))
+      ]);
+
+      expect(scene.toString(), '''Scene{
+      SetFlag{EventFlag{Talk_Test_obj_Test_0_PrincipalMeeting_1}}
+      Dialog{speaker: Unnamed Speaker, hidePanelsOnClose: false, _spans: [DialogSpan{text: Hi after Hahn joined, italic: false, pause: 0:00:00.000000, panel: null}]}
+      Pause{0:00:01.000000}
+}''');
+    });
+
+    test('toString with IfFlag', () {
+      var scene = Scene([
+        Dialog(spans: [DialogSpan('Hi')]),
+        Pause(Duration(seconds: 1)),
+        IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+          SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+          Dialog(spans: [DialogSpan('Hi after meeting principal')])
+        ], isUnset: [
+          Dialog(spans: [DialogSpan('Hello world.')])
+        ])
+      ]);
+
+      print(scene);
+
+      expect(scene.toString(), '''Scene{
+      Dialog{speaker: Unnamed Speaker, hidePanelsOnClose: false, _spans: [DialogSpan{text: Hi, italic: false, pause: 0:00:00.000000, panel: null}]}
+      Pause{0:00:01.000000}
+      IfFlag{EventFlag{PrincipalMeeting}, 
+      isSet:
+               SetFlag{EventFlag{Talk_Test_obj_Test_0_PrincipalMeeting_1}}
+               Dialog{speaker: Unnamed Speaker, hidePanelsOnClose: false, _spans: [DialogSpan{text: Hi after meeting principal, italic: false, pause: 0:00:00.000000, panel: null}]}
+      isUnset:
+               Dialog{speaker: Unnamed Speaker, hidePanelsOnClose: false, _spans: [DialogSpan{text: Hello world., italic: false, pause: 0:00:00.000000, panel: null}]}
+      }
+}''');
+    });
+
     test('add event to branches', () {
       var scene = Scene([
         IfFlag(EventFlag('HahnJoined'), isSet: [

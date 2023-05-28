@@ -276,6 +276,15 @@ class Condition {
 
   bool isKnownUnset(EventFlag flag) => this[flag] == false;
 
+  /// Invert the condition by swapping all flags.
+  Condition inverted() {
+    var invertedFlags = <EventFlag, bool>{};
+    for (var entry in _flags.entries) {
+      invertedFlags[entry.key] = !entry.value;
+    }
+    return Condition(invertedFlags);
+  }
+
   /// This condition is satisfied by another condition
   /// if the [other] condition has the same value
   /// as every flag in this condition.
@@ -325,9 +334,8 @@ class IfFlag extends Event {
 
   IfFlag(this.flag,
       {Iterable<Event> isSet = const [], Iterable<Event> isUnset = const []})
-      // TODO: Could flatten here if there is IfFlag with same flag
-      : isSet = Scene(isSet).events,
-        isUnset = Scene(isUnset).events;
+      : isSet = Scene(isSet).asOf(Condition({flag: true})).events,
+        isUnset = Scene(isUnset).asOf(Condition({flag: false})).events;
 
   @override
   void visit(EventVisitor visitor) {
@@ -336,12 +344,12 @@ class IfFlag extends Event {
 
   @override
   String toString() {
-    return '''IfFlag{$flag, 
-         isSet:
-         ${toIndentedString(isSet, '         ')}
-         isUnset:
-         ${toIndentedString(isUnset, '         ')}
-         }''';
+    return 'IfFlag{$flag, \n'
+        'isSet:\n'
+        '${toIndentedString(isSet, '         ')}\n'
+        'isUnset:\n'
+        '${toIndentedString(isUnset, '         ')}\n'
+        '}';
   }
 
   @override
