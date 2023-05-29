@@ -161,7 +161,7 @@ const storyEvents = [
   //EventFlag('DElmLars'), - optional
   //EventFlag('DElmLarsDefeated'), - optional
 
-  //EventFlag('Spector'),
+  EventFlag('Spector'),
   //EventFlag('DyingBoy'),
   //EventFlag('Culvers'),
   //EventFlag('AlisSword'),
@@ -221,6 +221,25 @@ const storyEvents = [
   //EventFlag('GuildPlaceholder'),
 ];
 
+final subplots = {
+  ranchOwnerEvents,
+  tinkerbellsDogEvents,
+  missingStudentEvents,
+  fissureOfFearEvents,
+  stainInLifeEvents,
+  dyingBoyEvents,
+  manWithTwistEvents,
+  silverSoliderEvents,
+  // Treat these as subplots since they are optional
+  [EventFlag('HahnPicked')],
+  [EventFlag('GryzPicked')],
+  [EventFlag('DemiPicked')],
+  [EventFlag('RajaPicked')],
+  [EventFlag('KyraPicked')],
+};
+
+// TODO: these flags might not be ordered correctly
+
 final ranchOwnerEvents = [
   EventFlag('TheRanchOwner'),
   EventFlag('MileRanchOwner'),
@@ -238,6 +257,65 @@ final tinkerbellsDogEvents = [
   EventFlag('RockyMonsenEscape'),
   EventFlag('RockyHome'),
   EventFlag('RockyFee'),
+];
+
+final missingStudentEvents = [
+  EventFlag('MissingStudent'),
+  EventFlag('DormOwner'),
+  EventFlag('StudentSick'),
+  EventFlag('Perolymate'),
+  EventFlag('StudentRecovered'),
+  EventFlag('StudentFee'),
+];
+
+final fissureOfFearEvents = [
+  EventFlag('FissureOfFear'),
+  EventFlag('TallasMother'),
+  EventFlag('InsideCave'),
+  EventFlag('FractOoze'),
+  EventFlag('TallasSaved'),
+  EventFlag('AfterCrevice'),
+  EventFlag('FissureOfFearFee'),
+];
+
+final stainInLifeEvents = [
+  EventFlag('StainInLife'),
+  EventFlag('MissingGirlsMom'),
+  EventFlag('GirlPrison'),
+  EventFlag('PrisonGuard'),
+  EventFlag('Bail'),
+  EventFlag('BailPaid'),
+  EventFlag('GirlsBailedOut'),
+  EventFlag('StainInLifeFee'),
+];
+
+final dyingBoyEvents = [
+  EventFlag('DyingBoy'),
+  EventFlag('Culvers'),
+  EventFlag('AlisSword'),
+  EventFlag('CulversAfterRecovery'),
+  EventFlag('DyingBoyFee'),
+];
+
+final manWithTwistEvents = [
+  EventFlag('ManWithTwist'),
+  EventFlag('Sekreas'),
+  EventFlag('KingRappy'),
+  EventFlag('SekreasReason'),
+  EventFlag('ManWithTwistFee'),
+];
+
+final silverSoliderEvents = [
+  EventFlag('SilverSoldier'),
+  EventFlag('Servants'),
+  EventFlag('ZemaOldMan'),
+  EventFlag('VahFortBarrier'),
+  EventFlag('VahalFort'),
+  EventFlag('VahalFortMidway'),
+  EventFlag('Dominators'),
+  EventFlag('DaughterShutDown'),
+  EventFlag('OldManZemaAfterDaughter'),
+  EventFlag('SilverSoldierFee'),
 ];
 
 class Condition {

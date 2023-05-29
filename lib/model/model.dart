@@ -24,6 +24,7 @@ export 'events.dart';
 export 'map.dart';
 export 'movement.dart';
 export 'sound.dart';
+export 'text.dart';
 
 class Game {
   // todo: should also include non-interaction Scenes?
