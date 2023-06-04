@@ -267,13 +267,16 @@ bool _isBreakable(int char, Bytes dialog, int index) {
     return true;
   }
 
-  for (var canBreakAfter in _canBreakAfterButNotOn) {
-    if (char != canBreakAfter && dialog[index - 1].value == canBreakAfter) {
-      return true;
+  bool? breakable;
+
+  for (var afterButNotOn in _canBreakAfterButNotOn) {
+    if (char == afterButNotOn) return false;
+    if (dialog[index - 1].value == afterButNotOn) {
+      breakable ??= true;
     }
   }
 
-  return false;
+  return breakable ?? false;
 }
 
-const _canBreakAfterButNotOn = [$dash, $dot];
+const _canBreakAfterButNotOn = [$dash, $dot, $greaterThan];

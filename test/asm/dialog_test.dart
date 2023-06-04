@@ -1,5 +1,7 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
+import 'package:rune/generator/dialog.dart';
+import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -24,6 +26,18 @@ void main() {
     expect(asm.toString(), equals(r'''	dc.b	"It is testing a very long line--"
 	dc.b	$FC
 	dc.b	"broken by dashes."'''));
+  });
+
+  test('can end line before end quote', () {
+    var ascii = DialogSpan(
+            "“The affairs of men weigh heavier than any beastly burden.”")
+        .toAscii();
+    var asm = dialog(ascii);
+    expect(asm.toString(), equals(r'''	dc.b	"<The affairs of men weigh"
+	dc.b	$FC
+	dc.b	"heavier than any beastly"
+	dc.b	$FD
+	dc.b	"burden.>"'''));
   });
 
   test('cannot end line between dashes', () {
