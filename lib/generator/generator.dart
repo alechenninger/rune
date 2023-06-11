@@ -714,20 +714,7 @@ class SceneAsmGenerator implements EventVisitor {
       }
     }, inEvent: (_) {
       var flag = _eventFlags.toConstantValue(setFlag.flag);
-      if (flag.value > Byte.max) {
-        return Asm([
-          move.w(flag.constant.i, d0),
-          jsr('ExtendedEventFlags_Set'.toLabel.l)
-        ]);
-      } else {
-        return Asm([
-          if (flag.value <= Byte(127))
-            moveq(flag.constant.i, d0)
-          else
-            move.b(flag.constant.i, d0),
-          jsr('EventFlags_Set'.toLabel.l)
-        ]);
-      }
+      setEventFlag(flag);
     });
   }
 
@@ -808,25 +795,12 @@ class SceneAsmGenerator implements EventVisitor {
     var currentMap = _memory.currentMap;
     var newMap = loadMap.map;
 
-    var currentId = currentMap?.map((m) => _asmMapIdOf(m.id));
-    var newId = _asmMapIdOf(newMap.id);
+    var currentId = currentMap?.map((m) => mapIdToAsm(m.id));
+    var newId = mapIdToAsm(newMap.id);
     var x = loadMap.startingPosition.x ~/ 8;
     var y = loadMap.startingPosition.y ~/ 8;
     var facing = loadMap.facing.constant;
-    var alignByte = loadMap.arrangement.map((a) {
-      switch (a) {
-        case PartyArrangement.overlapping:
-          return 0;
-        case PartyArrangement.belowLead:
-          return 4;
-        case PartyArrangement.aboveLead:
-          return 8;
-        case PartyArrangement.leftOfLead:
-          return 0xC;
-        case PartyArrangement.rightOfLead:
-          return 0x10;
-      }
-    });
+    var alignByte = loadMap.arrangement.toAsm;
 
     _addToEvent(loadMap, (eventIndex) {
       if (loadMap.showField) {
@@ -1779,25 +1753,6 @@ class TestDialogTreeLookup extends DialogTreeLookup {
     // wow what a hack :laugh:
     return _treeByLabel[lbl] ??
         (throw ArgumentError('no such dialog tree: $lbl'));
-  }
-}
-
-Constant _asmMapIdOf(MapId map) {
-  switch (map) {
-    case MapId.ShayHouse:
-      return Constant('MapID_ChazHouse');
-    case MapId.PiataAcademyF1:
-      return Constant('MapID_PiataAcademy_F1');
-    case MapId.PiataAcademyPrincipalOffice:
-      return Constant('MapID_AcademyPrincipalOffice');
-    case MapId.PiataAcademyBasement:
-      return Constant('MapID_AcademyBasement');
-    case MapId.PiataAcademyBasementB1:
-      return Constant('MapID_AcademyBasement_B1');
-    case MapId.PiataAcademyBasementB2:
-      return Constant('MapID_AcademyBasement_B2');
-    default:
-      return Constant('MapID_${map.name}');
   }
 }
 

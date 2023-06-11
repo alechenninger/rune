@@ -189,6 +189,14 @@ abstract class Expression {
     return ArithmaticExpression('/', this, other);
   }
 
+  Expression operator <<(Expression other) {
+    return ArithmaticExpression('<<', this, other);
+  }
+
+  Expression operator |(Expression other) {
+    return ArithmaticExpression('|', this, other);
+  }
+
   /// Assembly representation of the expression.
   @override
   String toString();

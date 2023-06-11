@@ -324,16 +324,16 @@ void main() {
             Asm([
               bset(0.toByte.i, Char_Move_Flags.w),
               bset(1.toByte.i, Char_Move_Flags.w),
-              moveq(alys.charId, d0),
+              moveq(alys.charIdAddress, d0),
               jsr(Label('Event_GetCharacter').l),
               move.w(0x1b0.toWord.i, dest_x_pos(a4)),
               move.w(0x0c0.toWord.i, dest_y_pos(a4)),
-              moveq(shay.charId, d0),
+              moveq(shay.charIdAddress, d0),
               jsr(Label('Event_GetCharacter').l),
               move.w(0x1c0.toWord.i, d0),
               move.w(0x0c0.toWord.i, d1),
               jsr(Label('Event_MoveCharacter').l),
-              moveq(alys.charId, d0),
+              moveq(alys.charIdAddress, d0),
               jsr(Label('Event_GetCharacter').l),
               moveq(FacingDir_Right.i, d0),
               jsr(Label('Event_UpdateObjFacing').l),
@@ -434,9 +434,9 @@ void main() {
       expect(
           asm,
           Asm([
-            characterByIdToA4(shay.charId),
+            characterByIdToA4(shay.charIdAddress),
             updateObjFacing(right.address),
-            characterByIdToA4(alys.charId),
+            characterByIdToA4(alys.charIdAddress),
             updateObjFacing(left.address),
           ]));
     });
@@ -455,9 +455,9 @@ void main() {
       expect(
           asm,
           Asm([
-            characterByIdToA4(alys.charId),
+            characterByIdToA4(alys.charIdAddress),
             updateObjFacing(up.address),
-            characterByIdToA4(hahn.charId),
+            characterByIdToA4(hahn.charIdAddress),
             moveCharacter(x: Word(0x100).i, y: Word(0xb0).i)
           ]));
     });
@@ -488,12 +488,12 @@ void main() {
       expect(
           asm,
           Asm([
-            characterByIdToA4(hahn.charId),
+            characterByIdToA4(hahn.charIdAddress),
             moveCharacter(x: Word(0x100).i, y: Word(0xb0).i),
-            characterByIdToA4(shay.charId),
+            characterByIdToA4(shay.charIdAddress),
             moveCharacter(x: Word(0x0d0).i, y: Word(0xc0).i),
             updateObjFacing(down.address),
-            characterByIdToA4(alys.charId),
+            characterByIdToA4(alys.charIdAddress),
             updateObjFacing(up.address),
           ]));
     });

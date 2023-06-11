@@ -246,7 +246,7 @@ extension FieldObjectAsm on FieldObject {
       // Slot 1 indexed
       return characterBySlotToA4(slot);
     } else if (moveable is Character) {
-      return characterByIdToA4(moveable.charId);
+      return characterByIdToA4(moveable.charIdAddress);
     } else if (moveable is MapObjectById) {
       var address = moveable.address(ctx);
       return lea(Absolute.long(address), a4);
@@ -319,14 +319,16 @@ extension AddressOfMapObject on MapObject {
 }
 
 extension CharacterData on Character {
-  Address get charId {
+  Expression get charId {
     switch (runtimeType) {
       case Shay:
-        return Constant('CharID_Chaz').i;
+        return Constant('CharID_Chaz');
       default:
-        return Constant('CharID_$this').i;
+        return Constant('CharID_$this');
     }
   }
+
+  Address get charIdAddress => charId.i;
 
   Address get fieldObjectRoutine {
     switch (runtimeType) {
@@ -393,4 +395,14 @@ extension StepSpeedAsm on StepSpeed {
         return Byte.two;
     }
   }
+}
+
+extension PartyArrangementAsm on PartyArrangement {
+  Value get toAsm => Value(switch (this) {
+        PartyArrangement.overlapping => 0,
+        PartyArrangement.belowLead => 4,
+        PartyArrangement.aboveLead => 8,
+        PartyArrangement.leftOfLead => 0xC,
+        PartyArrangement.rightOfLead => 0x10,
+      });
 }

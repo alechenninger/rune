@@ -683,3 +683,18 @@ Asm changeMap(
     refreshMap(refreshObjects: true),
   ]);
 }
+
+Asm setEventFlag(KnownConstantValue flag) {
+  if (flag.value > Byte.max) {
+    return Asm(
+        [move.w(flag.constant.i, d0), jsr('ExtendedEventFlags_Set'.toLabel.l)]);
+  } else {
+    return Asm([
+      if (flag.value <= Byte(127))
+        moveq(flag.constant.i, d0)
+      else
+        move.b(flag.constant.i, d0),
+      jsr('EventFlags_Set'.toLabel.l)
+    ]);
+  }
+}

@@ -55,7 +55,8 @@ Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
 Asm jsr(Address to) => cmd('jsr', [to]);
 Asm jmp(Address to) => cmd('jmp', [to]);
 Asm bset(Address src, Address dst) => cmd('bset', [src, dst]);
-Asm bclr(Address src, Address dst) => cmd('bclr', [src, dst]);
+Asm bclr(Address src, Address dst, {String? comment}) =>
+    cmd('bclr', [src, dst], comment: comment);
 Asm trap(Immediate vector) => cmd('trap', [vector]);
 Asm swap(Address src) => cmd('swap', [src]);
 Asm dbf(Address src, Address dst) => cmd('dbf', [src, dst]);

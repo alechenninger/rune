@@ -53,6 +53,29 @@ class MapAsm {
   }
 }
 
+Constant mapIdToAsm(MapId map) {
+  switch (map) {
+    case MapId.ShayHouse:
+      return Constant('MapID_ChazHouse');
+    case MapId.PiataAcademyF1:
+      return Constant('MapID_PiataAcademy_F1');
+    case MapId.PiataAcademyPrincipalOffice:
+      return Constant('MapID_AcademyPrincipalOffice');
+    case MapId.PiataAcademyBasement:
+      return Constant('MapID_AcademyBasement');
+    case MapId.PiataAcademyBasementB1:
+      return Constant('MapID_AcademyBasement_B1');
+    case MapId.PiataAcademyBasementB2:
+      return Constant('MapID_AcademyBasement_B2');
+    default:
+      return Constant('MapID_${map.name}');
+  }
+}
+
+extension MapIdAsm on MapId {
+  Constant get toAsm => mapIdToAsm(this);
+}
+
 const _defaultVramTilesPerSprite = 0x48;
 
 // These offsets are used to account for assembly specifics, which allows for
