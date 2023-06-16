@@ -72,6 +72,26 @@ Constant mapIdToAsm(MapId map) {
   }
 }
 
+MapId? asmToMapId(Constant c) {
+  var id = c.constant.substring(6);
+  switch (id) {
+    case 'ChazHouse':
+      return MapId.ShayHouse;
+    case 'PiataAcademy_F1':
+      return MapId.PiataAcademyF1;
+    case 'AcademyPrincipalOffice':
+      return MapId.PiataAcademyPrincipalOffice;
+    case 'AcademyBasement':
+      return MapId.PiataAcademyBasement;
+    case 'AcademyBasement_B1':
+      return MapId.PiataAcademyBasementB1;
+    case 'AcademyBasement_B2':
+      return MapId.PiataAcademyBasementB2;
+    default:
+      return MapId.values.firstWhereOrNull((v) => v.name == id);
+  }
+}
+
 extension MapIdAsm on MapId {
   Constant get toAsm => mapIdToAsm(this);
 }
@@ -582,6 +602,53 @@ FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
   return sprites.keys.sorted((a, b) => a.compareTo(b)).firstOrNull;
 }
 
+List<(MapId, Position, Direction, PartyArrangement)> mapTransitions(Asm asm) {
+  var reader = ConstantReader.asm(asm);
+
+  _skipToSprites(reader);
+  _readSprites(reader);
+
+  // skip secondary sprite data
+  // such as those loaded into ram instead of vram
+  reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+
+  // skip map updates
+  reader.skipThrough(value: Size.b.maxValueSized, times: 1);
+
+  var transitions = <(MapId, Position, Direction, PartyArrangement)>[];
+  var numTransitions = 0;
+
+  while (numTransitions < 2) {
+    var termOrRange = reader.readWord();
+    if (termOrRange == Size.w.maxValueSized) {
+      numTransitions++;
+      continue;
+    }
+
+    reader.readWord(); // range type; ignored
+
+    var to = reader.readWordExpression();
+    var x = reader.readByte();
+    var y = reader.readByte();
+    var facing = reader.readByte();
+    var arrangeB = reader.readByte();
+
+    var mapId = asmToMapId(Constant(to.toString()));
+    if (mapId == null) throw ArgumentError('unknown map id: $to');
+    var arrange = asmToArrangement(arrangeB);
+    if (arrange == null) {
+      throw ArgumentError('could not parse arrange: $arrangeB');
+    }
+    transitions.add((
+      mapId,
+      Position(x.value, y.value),
+      _byteToFacingDirection(facing),
+      arrange
+    ));
+  }
+  return transitions;
+}
+
 List<String> preprocessMapToRaw(Asm original,
     {required String sprites,
     required String objects,
@@ -827,6 +894,11 @@ Map<Word, Label> _readSprites(ConstantReader reader) {
     // 	tst.w	(a0)
     // 	bmi.w	loc_51A14
     if (vramTile.isNegative) {
+      // skip over secondary sprites for now
+      if (vramTile == Word(0xfffe)) {
+        reader.skipThrough(value: Size.w.maxValueSized, times: 1);
+      }
+
       return sprites;
     }
     var sprite = reader.readLabel();

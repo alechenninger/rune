@@ -24,6 +24,7 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
+import 'package:rune/generator/debug.dart';
 import 'package:rune/src/iterables.dart';
 import 'package:rune/src/null.dart';
 
@@ -43,6 +44,7 @@ import 'memory.dart';
 import 'movement.dart';
 import 'scene.dart';
 import 'text.dart' as textlib;
+import 'debug.dart' as debug;
 
 export '../asm/asm.dart' show Asm;
 export 'deprecated.dart';
@@ -104,6 +106,20 @@ class Program {
     _cutscenesPointers.add(dc.l([routine], comment: '$cutsceneIndex'));
     _cutsceneIndexOffset = (cutsceneIndex.value + 1).toWord;
     return (cutsceneIndex + Word(0x8000)) as Word;
+  }
+
+  EventAsm debugStart(
+      {required List<EventFlag> eventFlags,
+      required List<Character> party,
+      required LoadMap loadMap}) {
+    var asm = debug.debugStart(
+        party: party,
+        flagsSet: eventFlags,
+        eventFlags: _eventFlags,
+        loadMap: loadMap);
+
+    _scenes[SceneId('gamestart')] = SceneAsm(event: asm);
+    return asm;
   }
 
   SceneAsm addScene(SceneId id, Scene scene, {GameMap? startingMap}) {

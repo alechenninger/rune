@@ -96,8 +96,8 @@ const storyEvents = [
   //EventFlag('WreckageSystem'), - optional dungeon
   EventFlag('Juza'),
   EventFlag('JuzaDefeated'),
-  EventFlag('DemiJoined'),
   EventFlag('Zio'),
+  EventFlag('DemiJoined'),
   EventFlag('MachineCenter'),
   EventFlag('LandRover'),
   //EventFlag('FortuneTeller'),
@@ -151,6 +151,7 @@ const storyEvents = [
   EventFlag('AirCastleFound'),
   EventFlag('AirCastle'),
   EventFlag('XeAThoul'),
+  EventFlag('Spector'),
   EventFlag('Lashiec'),
   EventFlag('EclipseTorch'),
   EventFlag('DarkForce2'),
@@ -161,7 +162,6 @@ const storyEvents = [
   //EventFlag('DElmLars'), - optional
   //EventFlag('DElmLarsDefeated'), - optional
 
-  EventFlag('Spector'),
   //EventFlag('DyingBoy'),
   //EventFlag('Culvers'),
   //EventFlag('AlisSword'),

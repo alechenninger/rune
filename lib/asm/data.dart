@@ -585,8 +585,42 @@ abstract class Sized extends Expression {
       }
       return expression;
     }
+
+    if (expression is Constant) {
+      return SizedConstant(expression, size);
+    }
+
     return _Sized(size, expression);
   }
+}
+
+class SizedConstant extends Sized implements Constant {
+  SizedConstant(this._c, this.size);
+
+  final Constant _c;
+
+  @override
+  final Size size;
+
+  @override
+  final isKnownZero = false;
+
+  @override
+  String get constant => _c.constant;
+
+  @override
+  String toString() => constant;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SizedConstant &&
+          runtimeType == other.runtimeType &&
+          _c == other._c &&
+          size == other.size;
+
+  @override
+  int get hashCode => _c.hashCode ^ size.hashCode;
 }
 
 class _Sized extends Sized {

@@ -196,11 +196,6 @@ enum Direction {
   Path operator *(Steps magnitude) => Path(magnitude, this);
 
   Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
-
-  @override
-  String toString() {
-    return 'Direction{normal: $normal}';
-  }
 }
 
 enum Axis {

@@ -406,3 +406,14 @@ extension PartyArrangementAsm on PartyArrangement {
         PartyArrangement.rightOfLead => 0x10,
       });
 }
+
+PartyArrangement? asmToArrangement(Byte b) {
+  return switch (b.value) {
+    0 => PartyArrangement.overlapping,
+    4 => PartyArrangement.belowLead,
+    8 => PartyArrangement.aboveLead,
+    0xC => PartyArrangement.leftOfLead,
+    0x10 => PartyArrangement.rightOfLead,
+    _ => null
+  };
+}

@@ -23,7 +23,7 @@ void main() {
           EventFlag('PrincipalConfession'),
         ],
         eventFlags: EventFlags(),
-        map: LoadMap(
+        loadMap: LoadMap(
           map: GameMap(MapId.ShayHouse),
           startingPosition: Position(0x1f0, 0x280),
           facing: Direction.down,

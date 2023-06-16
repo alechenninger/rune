@@ -682,6 +682,17 @@ class ConstantReader {
     throw ConstantReadException(Size.w, [c]);
   }
 
+  // todo: test!
+  Sized readWordExpression() {
+    var c = _next();
+    if (c.size == Size.w) return c;
+    if (c.canSplit) {
+      c.splitInto(Size.w).reversed.forEach(_queue.addFirst);
+      return readWordExpression();
+    }
+    throw ConstantReadException(Size.w, [c]);
+  }
+
   Longword readLong() {
     var c = _next();
     if (c is Longword) return c;
@@ -719,5 +730,12 @@ class ConstantReader {
     if (c is Label) return c;
     if (c is! Value) return Label('$c');
     throw StateError('cannot read label from $c');
+  }
+
+  Constant readConstant() {
+    var c = _next();
+    if (c is SizedConstant) return c;
+    if (c is! Value) return Constant('$c');
+    throw StateError('cannot read constant from $c');
   }
 }
