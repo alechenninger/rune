@@ -1287,7 +1287,8 @@ Sprite? spriteByName(String name) {
   for (var s in Sprite.wellKnown) {
     if (s.name.toLowerCase() == name) return s;
   }
-  return null;
+  // Try using as is?
+  return Sprite(name);
 }
 
 class AlysWaiting extends InteractiveMapObjectSpec {

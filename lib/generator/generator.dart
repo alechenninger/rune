@@ -49,6 +49,12 @@ import 'debug.dart' as debug;
 export '../asm/asm.dart' show Asm;
 export 'deprecated.dart';
 
+typedef DebugOptions = ({
+  List<EventFlag> eventFlags,
+  List<Character> party,
+  LoadMap loadMap,
+});
+
 // tracks global state about the program code
 // e.g. event pointers
 // could also use to save generation as it is done, relative to the state
@@ -108,15 +114,12 @@ class Program {
     return (cutsceneIndex + Word(0x8000)) as Word;
   }
 
-  EventAsm debugStart(
-      {required List<EventFlag> eventFlags,
-      required List<Character> party,
-      required LoadMap loadMap}) {
+  EventAsm debugStart(DebugOptions debugOptions) {
     var asm = debug.debugStart(
-        party: party,
-        flagsSet: eventFlags,
+        party: debugOptions.party,
+        flagsSet: debugOptions.eventFlags,
         eventFlags: _eventFlags,
-        loadMap: loadMap);
+        loadMap: debugOptions.loadMap);
 
     _scenes[SceneId('gamestart')] = SceneAsm(event: asm);
     return asm;

@@ -306,19 +306,18 @@ Map<MapObjectId, Word> _compileMapSpriteData(
             'no routine configured for npc behavior ${spec.behavior}');
       }
 
-      maybeLbl = _spriteArtLabels[spec.sprite];
-
-      if (maybeLbl == null) {
-        throw Exception('no art label configured for sprite: ${spec.sprite}');
-      }
+      // try the sprite name as a label itself if not preconfigured
+      maybeLbl = _spriteArtLabels[spec.sprite] ?? Label(spec.sprite.name);
 
       var tiles = routine.factory.spriteMappingTiles!;
+
       // Bit of a hack for this one sprite;
       // can clean it up if it turns out other sprites need similar treatment
       var mapping = (maybeLbl == Label('Art_GuildReceptionist') &&
               tiles >= 0x38 /* 0x28 offset + 16 tile width in sprite */)
           ? _SpriteVramMapping(tiles, [0x28])
           : _SpriteVramMapping(tiles);
+
       vramMapping.update(maybeLbl, (current) => current.merge(mapping),
           ifAbsent: () => mapping);
     } else if (spec is AsmSpec) {
