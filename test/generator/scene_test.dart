@@ -606,6 +606,34 @@ ${dialog2.toAsm()}
             dc.b([Byte(0xff)])
           ]));
     });
+
+    test('dialog with setflag sets flag in event', () {
+      var scene = Scene([
+        SetFlag(EventFlag('AlysFound')),
+        Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),
+      ]);
+
+      var program = Program();
+      program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          program.dialogTrees.forMap(map.id).toAsm().withoutComments().trim(),
+          Asm([
+            dc.b([Byte(0xf4), (toPortraitCode(alys.portrait))]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xff)])
+          ]));
+
+      expect(
+          program.scenes[SceneId('testscene')]?.event
+              .withoutComments()
+              .withoutEmptyLines(),
+          Asm([
+            setEventFlag(EventFlags().toConstantValue(EventFlag('AlysFound'))),
+            moveq(Byte.zero.i, d0),
+            jsr(Label('Event_GetAndRunDialogue3').l),
+          ]));
+    });
   });
 
   group('conditional events', () {

@@ -733,7 +733,7 @@ class SceneAsmGenerator implements EventVisitor {
       }
     }, inEvent: (_) {
       var flag = _eventFlags.toConstantValue(setFlag.flag);
-      setEventFlag(flag);
+      return setEventFlag(flag);
     });
   }
 
