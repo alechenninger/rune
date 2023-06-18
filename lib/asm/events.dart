@@ -417,6 +417,15 @@ Asm vIntPrepareLoop(Word frames) {
   return Asm([move.w(frames.i, d0), jsr(Label('VInt_PrepareLoop').l)]);
 }
 
+Asm doMapUpdateLoop(Word frames) {
+  return Asm([move.w(frames.i, d0), jsr(Label('DoMapUpdateLoop').l)]);
+}
+
+@Deprecated('currently broken, but interesting idea')
+Asm doInteractionUpdatesLoop(Word frames) {
+  return Asm([move.w(frames.i, d0), jsr(Label('DoInteractionUpdatesLoop').l)]);
+}
+
 Asm dialogTreesToRAM(Address dialogTree) {
   return Asm([
     move.l(dialogTree, d0),
