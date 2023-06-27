@@ -36,6 +36,7 @@ void main() {
 	move.b	#CharID_Alys, (Current_Party_Slot_2).w
 	moveq	#CharID_Alys,d0
 	jsr	(Event_AddMacro).l
+
 	move.b	#CharID_Hahn, (Current_Party_Slot_3).w
 	moveq	#CharID_Hahn, d0
 	jsr	(Event_AddMacro).l
@@ -66,6 +67,7 @@ void main() {
 	jsr	(EventFlags_Set).l
 
 	move.w	#MapID_ChazHouse, (Field_Map_Index).w
+	move.w	#$FFFF, (Field_Map_Index_2).w
 	move.w	#$3E, (Map_Start_X_Pos).w
 	move.w	#$50, (Map_Start_Y_Pos).w
 	move.w	#FacingDir_Down, (Map_Start_Facing_Dir).w

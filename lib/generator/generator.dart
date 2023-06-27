@@ -35,7 +35,6 @@ import '../asm/events.dart';
 import '../asm/events.dart' as asmeventslib;
 import '../asm/text.dart';
 import '../model/model.dart';
-import '../model/text.dart';
 import 'cutscenes.dart';
 import 'dialog.dart';
 import 'event.dart';
@@ -47,6 +46,8 @@ import 'text.dart' as textlib;
 import 'debug.dart' as debug;
 
 export '../asm/asm.dart' show Asm;
+export 'scene.dart';
+export 'map.dart';
 export 'deprecated.dart';
 
 typedef DebugOptions = ({
@@ -164,6 +165,7 @@ class Program {
     return _eventFlags
         .customEventFlags()
         .entries
+        .sortedBy<num>((e) => e.key.value)
         .map((e) => Asm.fromRaw('${e.value.constant} = ${e.key}'))
         .reduceOr((a1, a2) => Asm([a1, a2]), ifEmpty: Asm.empty());
   }

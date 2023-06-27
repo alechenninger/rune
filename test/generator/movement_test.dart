@@ -415,7 +415,7 @@ void main() {
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
-              vIntPrepareLoop(Word(8 /*8 frames per step?*/)),
+              doMapUpdateLoop(Word(8 /*8 frames per step?*/)),
               move.w(Word(0x90).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
