@@ -166,8 +166,6 @@ const down = Direction.down;
 const left = Direction.left;
 const right = Direction.right;
 
-// This can just be an enum! Let's fix it to make generation easier.
-// That was easy :D
 enum Direction {
   up(Position(0, -1)),
   left(Position(-1, 0)),

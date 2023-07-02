@@ -40,18 +40,20 @@ extension IndividualMovesToAsm on IndividualMoves {
   EventAsm toAsm(EventState ctx) {
     var asm = EventAsm.empty();
 
-    if (ctx.followLead != false) {
+    // We're going to loop through all movements and remove those from the map
+    // when there's nothing left to do.
+    var remainingMoves = Map.of(moves.map(
+        (moveable, movement) => MapEntry(moveable.resolve(ctx), movement)));
+
+    // Only disable follow leader if moving any characters.
+    if (ctx.followLead != false &&
+        remainingMoves.keys.any((obj) => obj is! MapObject)) {
       asm.add(followLeader(ctx.followLead = false));
     }
 
     if (speed != StepSpeed.fast) {
       asm.add(asmlib.move.b(speed.offset.i, FieldObj_Step_Offset.w));
     }
-
-    // We're going to loop through all movements and remove those from the map
-    // when there's nothing left to do.
-    var remainingMoves = Map.of(moves.map(
-        (moveable, movement) => MapEntry(moveable.resolve(ctx), movement)));
 
     var madeScriptable = <MapObject>{};
     FieldObject? a4;
@@ -63,8 +65,18 @@ extension IndividualMovesToAsm on IndividualMoves {
       }
     }
 
+    void ensureScriptable(FieldObject obj) {
+      if (obj is MapObject && !madeScriptable.contains(obj)) {
+        // Make map object scriptable
+        asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
+        madeScriptable.add(obj);
+      }
+    }
+
     void updateFacing(FieldObject obj, Direction dir) {
       toA4(obj);
+      // this ensures facing doesn't change during subsequent movements.
+      ensureScriptable(obj);
       asm.add(updateObjFacing(dir.address));
       ctx.setFacing(obj, dir);
     }
@@ -163,12 +175,7 @@ extension IndividualMovesToAsm on IndividualMoves {
             var y = Word(destination.y).i;
 
             toA4(moveable);
-
-            if (moveable is MapObject && !madeScriptable.contains(moveable)) {
-              // Make map object scriptable
-              asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
-              madeScriptable.add(moveable);
-            }
+            ensureScriptable(moveable);
 
             if (i == lastMoveIndex) {
               asm.add(moveCharacter(x: x, y: y));

@@ -358,8 +358,6 @@ void main() {
       test('moves ncps', () {
         var scene = Scene([
           SetContext((ctx) {
-            // todo: follow flag shouldn't matter for moving npc
-            ctx.followLead = false;
             ctx.positions[npc] = Position(0x50, 0x50);
             ctx.currentMap = map;
           }),
@@ -388,8 +386,6 @@ void main() {
           () {
         var scene = Scene([
           SetContext((ctx) {
-            // todo: follow flag shouldn't matter for moving npc
-            ctx.followLead = false;
             ctx.positions[npc] = Position(0x50, 0x50);
             ctx.positions[alys] = Position(0x50, 0x40);
             ctx.currentMap = map;
@@ -419,6 +415,32 @@ void main() {
               move.w(Word(0x90).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
+              move.w(npc.routine.index.i, a4.indirect),
+              jsr(npc.routine.label.l),
+            ]));
+      });
+
+      test('faces npcs', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[npc] = Position(0x50, 0x50);
+            ctx.setFacing(npc, Direction.down);
+            ctx.currentMap = map;
+          }),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] =
+                (StepPath()..direction = Direction.right)
+        ]);
+
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(0x8194.toWord.i, a4.indirect),
+              moveq(FacingDir_Right.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
               move.w(npc.routine.index.i, a4.indirect),
               jsr(npc.routine.label.l),
             ]));
