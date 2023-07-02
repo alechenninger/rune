@@ -68,8 +68,8 @@ void main() {
 
 	move.w	#MapID_ChazHouse, (Field_Map_Index).w
 	move.w	#$FFFF, (Field_Map_Index_2).w
-	move.w	#$3E, (Map_Start_X_Pos).w
-	move.w	#$50, (Map_Start_Y_Pos).w
+	move.w	#$003E, (Map_Start_X_Pos).w
+	move.w	#$0050, (Map_Start_Y_Pos).w
 	move.w	#FacingDir_Down, (Map_Start_Facing_Dir).w
 	move.w	#0, (Map_Start_Char_Align).w
 	bclr	#3, (Map_Load_Flags).w	; Don't delete objects
