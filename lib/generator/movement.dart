@@ -2,6 +2,7 @@
 
 import 'dart:math' as math;
 
+import 'package:collection/collection.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/map.dart';
 
@@ -9,6 +10,7 @@ import '../asm/asm.dart';
 import '../asm/asm.dart' as asmlib;
 import '../model/model.dart';
 import 'event.dart';
+import 'memory.dart';
 
 const unitsPerStep = 16;
 
@@ -39,6 +41,7 @@ if independent moves == follow lead moves, just use follow lead flag
 extension IndividualMovesToAsm on IndividualMoves {
   EventAsm toAsm(EventState ctx) {
     var asm = EventAsm.empty();
+    var generator = _MovementGenerator(asm, ctx);
 
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
@@ -51,41 +54,13 @@ extension IndividualMovesToAsm on IndividualMoves {
       asm.add(followLeader(ctx.followLead = false));
     }
 
-    if (speed != StepSpeed.fast) {
-      asm.add(asmlib.move.b(speed.offset.i, FieldObj_Step_Offset.w));
-    }
-
-    var madeScriptable = <MapObject>{};
-    FieldObject? a4;
-
-    void toA4(FieldObject moveable) {
-      if (a4 != moveable) {
-        asm.add(moveable.toA4(ctx));
-        a4 = moveable;
-      }
-    }
-
-    void ensureScriptable(FieldObject obj) {
-      if (obj is MapObject && !madeScriptable.contains(obj)) {
-        // Make map object scriptable
-        asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
-        madeScriptable.add(obj);
-      }
-    }
-
-    void updateFacing(FieldObject obj, Direction dir) {
-      toA4(obj);
-      // this ensures facing doesn't change during subsequent movements.
-      ensureScriptable(obj);
-      asm.add(updateObjFacing(dir.address));
-      ctx.setFacing(obj, dir);
-    }
+    generator.setSpeed(speed);
 
     while (remainingMoves.isNotEmpty) {
       // I tried using a sorted set but iterator was bugged and skipped elements
       var movesList =
           remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
-      var done = <FieldObject, Movement>{};
+      var done = <FieldObject, RelativeMovement>{};
 
       // We could consider sorting movesList by slot
       // so we always start with lead character,
@@ -174,8 +149,8 @@ extension IndividualMovesToAsm on IndividualMoves {
             var x = Word(destination.x).i;
             var y = Word(destination.y).i;
 
-            toA4(moveable);
-            ensureScriptable(moveable);
+            generator.toA4(moveable);
+            generator.ensureScriptable(moveable);
 
             if (i == lastMoveIndex) {
               asm.add(moveCharacter(x: x, y: y));
@@ -184,7 +159,7 @@ extension IndividualMovesToAsm on IndividualMoves {
             }
           } else if (movement.distance == 0.steps &&
               movement.direction != ctx.getFacing(moveable)) {
-            updateFacing(moveable, movement.direction);
+            generator.updateFacing(moveable, movement.direction);
           }
         }
 
@@ -207,13 +182,7 @@ extension IndividualMovesToAsm on IndividualMoves {
       }
     }
 
-    // Return objects back to normal behavior
-    for (var obj in madeScriptable) {
-      toA4(obj);
-      var routine = obj.routine;
-      asm.add(asmlib.move.w(routine.index.i, asmlib.a4.indirect));
-      asm.add(jsr(routine.label.l));
-    }
+    generator.resetObjects();
 
     if (speed != StepSpeed.fast) {
       asm.add(asmlib.move.b(1.i, FieldObj_Step_Offset.w));
@@ -232,6 +201,93 @@ int Function(Move<FieldObject>, Move<FieldObject>) _longestFirst(
     }
     return comparison;
   };
+}
+
+class _MovementGenerator {
+  _MovementGenerator(this.asm, this.ctx);
+
+  final EventAsm asm;
+  final EventState ctx;
+
+  // TODO: this can move to eventstate / memory
+  var madeScriptable = <MapObject>{};
+  FieldObject? a4;
+
+  void setSpeed(StepSpeed speed) {
+    // TODO(movement): move speed to eventstate
+    if (speed != StepSpeed.fast) {
+      asm.add(asmlib.move.b(speed.offset.i, FieldObj_Step_Offset.w));
+    }
+  }
+
+  void toA4(FieldObject moveable) {
+    if (a4 != moveable) {
+      asm.add(moveable.toA4(ctx));
+      a4 = moveable;
+    }
+  }
+
+  void ensureScriptable(FieldObject obj) {
+    if (obj is MapObject && !madeScriptable.contains(obj)) {
+      // Make map object scriptable
+      asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
+      madeScriptable.add(obj);
+    }
+  }
+
+  void updateFacing(FieldObject obj, Direction dir) {
+    toA4(obj);
+    // this ensures facing doesn't change during subsequent movements.
+    ensureScriptable(obj);
+    asm.add(updateObjFacing(dir.address));
+    ctx.setFacing(obj, dir);
+  }
+
+  void resetObjects() {
+    // Return objects back to normal behavior
+    for (var obj in madeScriptable) {
+      toA4(obj);
+      var routine = obj.routine;
+      asm.add(asmlib.move.w(routine.index.i, asmlib.a4.indirect));
+      asm.add(jsr(routine.label.l));
+    }
+  }
+}
+
+EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
+  // We assume we don't know the current positions,
+  // so we don't know which move is longer.
+  // Just start all in parallel.
+  // TODO: technically we might know, in which case we could convert this
+  // to relative movements which would maintain some more context.
+  var asm = EventAsm.empty();
+  var generator = _MovementGenerator(asm, state);
+  var length = moves.destinations.length;
+
+  generator.setSpeed(moves.speed);
+
+  moves.destinations.entries.forEachIndexed((i, dest) {
+    var obj = dest.key;
+    var pos = dest.value;
+
+    generator.toA4(obj);
+    generator.ensureScriptable(obj);
+
+    if (i < length - 1) {
+      asm.add(setDestination(x: pos.x.toWord.i, y: pos.y.toWord.i));
+    } else {
+      asm.add(moveCharacter(x: pos.x.toWord.i, y: pos.y.toWord.i));
+    }
+
+    state.positions[obj] = pos;
+    // If we don't know which direction the object was coming from,
+    // we don't know which direction it will be facing.
+    state.clearFacing(obj);
+  });
+
+  generator.resetObjects();
+
+  return asm;
 }
 
 int minOf(int? i1, int other) {

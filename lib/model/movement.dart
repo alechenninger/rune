@@ -252,11 +252,11 @@ class FacePlayer extends Event {
 }
 
 /// The party follows the leader
-class PartyMove extends Event {
-  Movement movement;
+class RelativePartyMove extends Event {
+  RelativeMovement movement;
   Axis startingAxis = Axis.x;
 
-  PartyMove(this.movement);
+  RelativePartyMove(this.movement);
 
   IndividualMoves toIndividualMoves(EventState ctx) {
     var individual = IndividualMoves();
@@ -338,10 +338,10 @@ class PartyMove extends Event {
   }
 }
 
-/// A group of parallel movements
+/// A group of parallel, relative movements
 class IndividualMoves extends Event {
   // TODO: what if Slot and Character moveables refer to same Character?
-  Map<FieldObject, Movement> moves = {};
+  Map<FieldObject, RelativeMovement> moves = {};
   StepSpeed speed = StepSpeed.fast;
 
   @override
@@ -375,10 +375,37 @@ class IndividualMoves extends Event {
   int get hashCode => const MapEquality().hash(moves) ^ speed.hashCode;
 }
 
+class AbsoluteMoves extends Event {
+  // Facing can be controlled with individual movements
+  Map<FieldObject, Position> destinations = {};
+  StepSpeed speed = StepSpeed.fast;
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.absoluteMoves(this);
+  }
+
+  @override
+  String toString() {
+    return 'AbsoluteMoves{destinations: $destinations, speed: $speed}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AbsoluteMoves &&
+          runtimeType == other.runtimeType &&
+          const MapEquality().equals(destinations, other.destinations) &&
+          speed == other.speed;
+
+  @override
+  int get hashCode => const MapEquality().hash(destinations) ^ speed.hashCode;
+}
+
 class Party extends Moveable {
   const Party();
 
-  PartyMove move(Movement m) => PartyMove(m);
+  RelativePartyMove move(RelativeMovement m) => RelativePartyMove(m);
 }
 
 abstract class Moveable {
@@ -491,10 +518,10 @@ class InteractionObject extends FieldObject {
 // context and then can generate asm for that instead
 // we could replace .resolve() in Moveable with this for example.
 abstract class ContextualMovement {
-  Movement movementIn(EventState ctx);
+  RelativeMovement movementIn(EventState ctx);
 }
 
-abstract class Movement extends ContextualMovement {
+abstract class RelativeMovement extends ContextualMovement {
   /// Delay in steps before movement starts parallel with other movements.
   Steps get delay;
 
@@ -508,9 +535,9 @@ abstract class Movement extends ContextualMovement {
   /// TODO: rename
   Direction get direction;
 
-  Movement? append(Movement m) => null;
+  RelativeMovement? append(RelativeMovement m) => null;
 
-  Movement less(Steps steps);
+  RelativeMovement less(Steps steps);
 
   /// Movements which are continuous (there is no pause in between) and should
   /// start immediately (delay should == 0).
@@ -519,7 +546,7 @@ abstract class Movement extends ContextualMovement {
   List<Path> get continuousPaths;
 
   @override
-  Movement movementIn(EventState ctx) => this;
+  RelativeMovement movementIn(EventState ctx) => this;
 
   // todo: consider returning stepdirections here instead
   MovementLookahead lookahead(Steps steps) {
@@ -573,7 +600,7 @@ abstract class Movement extends ContextualMovement {
   }
 }
 
-class StepPath extends Movement {
+class StepPath extends RelativeMovement {
   @override
   var direction = Direction.up;
   @override
@@ -590,7 +617,7 @@ class StepPath extends Movement {
   List<Path> get continuousPaths => delay > 0.steps ? [] : [asPath];
 
   @override
-  StepPaths? append(Movement m) {
+  StepPaths? append(RelativeMovement m) {
     if (m is StepPath) {
       return StepPaths()
         ..step(this)
@@ -644,11 +671,11 @@ class StepPath extends Movement {
   int get hashCode => direction.hashCode ^ distance.hashCode ^ delay.hashCode;
 }
 
-class StepPaths extends Movement {
+class StepPaths extends RelativeMovement {
   final _paths = <StepPath>[];
 
   @override
-  StepPaths? append(Movement m) {
+  StepPaths? append(RelativeMovement m) {
     if (m is StepPath) {
       var answer = StepPaths().._paths.addAll(_paths);
       answer.step(m);
@@ -779,7 +806,7 @@ class ContextualStepToPoint extends ContextualMovement {
   ContextualStepToPoint(this.from);
 
   @override
-  Movement movementIn(EventState ctx) {
+  RelativeMovement movementIn(EventState ctx) {
     return StepToPoint()
       ..direction = direction
       ..delay = delay.steps
@@ -790,7 +817,7 @@ class ContextualStepToPoint extends ContextualMovement {
 }
 
 /// Simple axis-by-axis movement to a point.
-class StepToPoint extends Movement {
+class StepToPoint extends RelativeMovement {
   // TODO could be used to inform whether multiple characters movements need
   //   to be split up into multiple movement events
   @override
@@ -911,7 +938,7 @@ class MovementLookahead {
 
 class Move<T extends Moveable> {
   final T moveable;
-  final Movement movement;
+  final RelativeMovement movement;
 
   Move(this.moveable, this.movement);
 

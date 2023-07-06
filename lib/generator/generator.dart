@@ -534,13 +534,18 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void absoluteMoves(AbsoluteMoves moves) {
+    _addToEvent(moves, (i) => absoluteMovesToAsm(moves, _memory));
+  }
+
+  @override
   void lockCamera(LockCamera lock) {
     _addToEvent(lock,
         (i) => EventAsm.of(asmeventslib.lockCamera(_memory.cameraLock = true)));
   }
 
   @override
-  void partyMove(PartyMove move) {
+  void partyMove(RelativePartyMove move) {
     _addToEvent(move, (i) => move.toIndividualMoves(_memory).toAsm(_memory));
   }
 

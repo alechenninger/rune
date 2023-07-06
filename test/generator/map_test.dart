@@ -618,7 +618,7 @@ void main() {
                 ShowPanel(PrincipalPanel.shayAndAlys),
                 Dialog(spans: [DialogSpan('Hi')]),
                 HideTopPanels(1),
-                PartyMove(StepPaths()..face(Direction.down))
+                RelativePartyMove(StepPaths()..face(Direction.down))
               ]))));
       testMap.addObject(obj);
 

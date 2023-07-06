@@ -167,7 +167,7 @@ void main() {
         ..addCharacter(shay,
             slot: 2, position: Position(0, 2.steps.toPixels), facing: right);
 
-      var move = PartyMove(StepPath()
+      var move = RelativePartyMove(StepPath()
         ..direction = right
         ..distance = 3.steps);
 
@@ -195,7 +195,7 @@ void main() {
             position: Position.fromSteps(0.step, 2.steps),
             facing: right);
 
-      var move = PartyMove(StepPaths()
+      var move = RelativePartyMove(StepPaths()
         ..step(StepPath()
           ..direction = right
           ..distance = 3.steps)
@@ -236,7 +236,7 @@ void main() {
             position: Position.fromSteps(0.step, 2.steps),
             facing: right);
 
-      var move = PartyMove(StepPaths()
+      var move = RelativePartyMove(StepPaths()
         ..step(StepPath()
           ..direction = right
           ..distance = 3.steps)
@@ -278,7 +278,7 @@ void main() {
             position: Position.fromSteps(0.step, 2.steps),
             facing: right);
 
-      var move = PartyMove(StepPaths()
+      var move = RelativePartyMove(StepPaths()
         ..step(StepPath()
           ..direction = right
           ..distance = 3.steps)
@@ -318,7 +318,7 @@ void main() {
         ..addCharacter(shay,
             slot: 2, position: Position(13 * 16, 10 * 16), facing: left);
 
-      var move = PartyMove(StepPaths()
+      var move = RelativePartyMove(StepPaths()
         ..step(StepPath()
           ..direction = down
           ..distance = 5.steps)

@@ -165,8 +165,9 @@ abstract class EventVisitor {
   void displayText(DisplayText text);
   void facePlayer(FacePlayer face);
   void individualMoves(IndividualMoves moves);
+  void absoluteMoves(AbsoluteMoves moves);
   void lockCamera(LockCamera lock);
-  void partyMove(PartyMove move);
+  void partyMove(RelativePartyMove move);
   void pause(Pause pause);
   void setContext(SetContext set);
   void unlockCamera(UnlockCamera unlock);
@@ -218,8 +219,9 @@ class EventState {
       ..startingAxis = startingAxis
       ..followLead = followLead
       ..cameraLock = cameraLock
-      ..currentMap = currentMap
       ..isFieldShown = isFieldShown
+      ..dialogPortrait = dialogPortrait
+      ..currentMap = currentMap
       ..panelsShown = panelsShown;
   }
 

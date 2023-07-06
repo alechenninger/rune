@@ -1,7 +1,9 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/map.dart';
+import 'package:rune/generator/memory.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
@@ -560,6 +562,93 @@ void main() {
       var asm = generator.facePlayerToAsm(FacePlayer(npc), ctx);
 
       expect(asm, Asm([jsr('Interaction_UpdateObj'.toLabel.l)]));
+    });
+  });
+
+  group('absolute moves', () {
+    late Memory state;
+    late Memory testState;
+    late GameMap map;
+    late MapObject npc;
+
+    setUp(() {
+      map = GameMap(MapId.Test);
+      npc = MapObject(
+          startPosition: Position(0x200, 0x200),
+          spec: Npc(Sprite.PalmanMan1, WanderAround(down)));
+      map.addObject(npc);
+
+      state = Memory()..currentMap = map;
+      testState = state.branch();
+    });
+
+    test('single character', () {
+      var event = AbsoluteMoves()..destinations[shay] = Position(0x1a0, 0x1f0);
+      var asm = absoluteMovesToAsm(event, state);
+
+      expect(
+          asm,
+          EventAsm([
+            shay.toA4(testState),
+            moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
+          ]));
+    });
+
+    test('makes objects scriptable', () {
+      var event = AbsoluteMoves()..destinations[npc] = Position(0x1a0, 0x1f0);
+      var asm = absoluteMovesToAsm(event, state);
+
+      expect(
+          asm,
+          EventAsm([
+            npc.toA4(state),
+            move.w(0x8194.toWord.i, a4.indirect),
+            moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            move.w(npc.routine.index.i, a4.indirect),
+            jsr(npc.routine.label.l)
+          ]));
+    });
+
+    test('multiple characters', () {
+      var event = AbsoluteMoves()
+        ..destinations[shay] = Position(0x1a0, 0x1f0)
+        ..destinations[alys] = Position(0x1b0, 0x200);
+
+      var asm = absoluteMovesToAsm(event, state);
+
+      expect(
+          asm,
+          EventAsm([
+            shay.toA4(testState),
+            setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            alys.toA4(testState),
+            moveCharacter(x: 0x1b0.toWord.i, y: 0x200.toWord.i)
+          ]));
+    });
+
+    test('updates context positions', () {
+      var event = AbsoluteMoves()
+        ..destinations[shay] = Position(0x1a0, 0x1f0)
+        ..destinations[alys] = Position(0x1b0, 0x200);
+
+      var _ = absoluteMovesToAsm(event, state);
+
+      expect(state.positions[shay], Position(0x1a0, 0x1f0));
+      expect(state.positions[alys], Position(0x1b0, 0x200));
+    });
+
+    test('clears context facing', () {
+      state.setFacing(shay, up);
+      state.setFacing(alys, down);
+
+      var event = AbsoluteMoves()
+        ..destinations[shay] = Position(0x1a0, 0x1f0)
+        ..destinations[alys] = Position(0x1b0, 0x200);
+
+      var _ = absoluteMovesToAsm(event, state);
+
+      expect(state.getFacing(shay), isNull);
+      expect(state.getFacing(alys), isNull);
     });
   });
 }

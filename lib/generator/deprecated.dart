@@ -192,7 +192,7 @@ class AsmGenerator {
     return _wrapException(() => move.toAsm(ctx.state), ctx, move);
   }
 
-  EventAsm partyMoveToAsm(PartyMove move, AsmContext ctx) {
+  EventAsm partyMoveToAsm(RelativePartyMove move, AsmContext ctx) {
     return _wrapException(
         () => individualMovesToAsm(move.toIndividualMoves(ctx.state), ctx),
         ctx,
