@@ -445,6 +445,7 @@ abstract class FieldObject extends Moveable {
 
   int? slot(EventState c);
 
+  // TODO(refactor): this api stinks; should not be on same type as "real" thing
   @override
   FieldObject resolve(EventState state) => this;
 }
@@ -936,21 +937,21 @@ class MovementLookahead {
   }
 }
 
-class Move<T extends Moveable> {
+class RelativeMove<T extends Moveable> {
   final T moveable;
   final RelativeMovement movement;
 
-  Move(this.moveable, this.movement);
+  RelativeMove(this.moveable, this.movement);
 
   @override
   String toString() {
-    return 'Move{moveable: $moveable, movement: $movement}';
+    return 'RelativeMove{moveable: $moveable, movement: $movement}';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Move &&
+      other is RelativeMove &&
           runtimeType == other.runtimeType &&
           moveable == other.moveable &&
           movement == other.movement;

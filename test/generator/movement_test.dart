@@ -574,6 +574,7 @@ void main() {
     setUp(() {
       map = GameMap(MapId.Test);
       npc = MapObject(
+          id: 'testnpc',
           startPosition: Position(0x200, 0x200),
           spec: Npc(Sprite.PalmanMan1, WanderAround(down)));
       map.addObject(npc);
@@ -649,6 +650,42 @@ void main() {
 
       expect(state.getFacing(shay), isNull);
       expect(state.getFacing(alys), isNull);
+    });
+
+    test('resolves references', () {
+      var event = AbsoluteMoves()
+        ..destinations[MapObjectById(MapObjectId('testnpc'))] =
+            Position(0x1a0, 0x1f0);
+
+      var asm = absoluteMovesToAsm(event, state);
+
+      expect(
+          asm,
+          EventAsm([
+            npc.toA4(state),
+            move.w(0x8194.toWord.i, a4.indirect),
+            moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            move.w(npc.routine.index.i, a4.indirect),
+            jsr(npc.routine.label.l)
+          ]));
+      expect(state.positions[npc], Position(0x1a0, 0x1f0));
+    });
+
+    test('change speed and reset after', () {
+      var event = AbsoluteMoves()
+        ..destinations[shay] = Position(0x1a0, 0x1f0)
+        ..speed = StepSpeed.slowWalk;
+
+      var asm = absoluteMovesToAsm(event, state);
+
+      expect(
+          asm,
+          EventAsm([
+            move.b(0.toByte.i, FieldObj_Step_Offset.w),
+            shay.toA4(testState),
+            moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            move.b(1.i, FieldObj_Step_Offset.w)
+          ]));
     });
   });
 }

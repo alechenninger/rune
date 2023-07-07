@@ -58,8 +58,9 @@ extension IndividualMovesToAsm on IndividualMoves {
 
     while (remainingMoves.isNotEmpty) {
       // I tried using a sorted set but iterator was bugged and skipped elements
-      var movesList =
-          remainingMoves.entries.map((e) => Move(e.key, e.value)).toList();
+      var movesList = remainingMoves.entries
+          .map((e) => RelativeMove(e.key, e.value))
+          .toList();
       var done = <FieldObject, RelativeMovement>{};
 
       // We could consider sorting movesList by slot
@@ -183,18 +184,15 @@ extension IndividualMovesToAsm on IndividualMoves {
     }
 
     generator.resetObjects();
-
-    if (speed != StepSpeed.fast) {
-      asm.add(asmlib.move.b(1.i, FieldObj_Step_Offset.w));
-    }
+    generator.resetSpeedFrom(speed);
 
     return asm;
   }
 }
 
-int Function(Move<FieldObject>, Move<FieldObject>) _longestFirst(
-    EventState ctx) {
-  return (Move<FieldObject> move1, Move<FieldObject> move2) {
+int Function(RelativeMove<FieldObject>, RelativeMove<FieldObject>)
+    _longestFirst(EventState ctx) {
+  return (RelativeMove<FieldObject> move1, RelativeMove<FieldObject> move2) {
     var comparison = move2.movement.duration.compareTo(move1.movement.duration);
     if (comparison == 0) {
       return move2.moveable.compareTo(move2.moveable, ctx);
@@ -213,10 +211,23 @@ class _MovementGenerator {
   var madeScriptable = <MapObject>{};
   FieldObject? a4;
 
+  void prepare(Iterable<FieldObject> objects) {
+    // Only disable follow leader if moving any characters.
+    if (ctx.followLead != false && objects.any((obj) => obj is! MapObject)) {
+      asm.add(followLeader(ctx.followLead = false));
+    }
+  }
+
   void setSpeed(StepSpeed speed) {
     // TODO(movement): move speed to eventstate
     if (speed != StepSpeed.fast) {
       asm.add(asmlib.move.b(speed.offset.i, FieldObj_Step_Offset.w));
+    }
+  }
+
+  void resetSpeedFrom(StepSpeed speed) {
+    if (speed != StepSpeed.fast) {
+      asm.add(asmlib.move.b(1.i, FieldObj_Step_Offset.w));
     }
   }
 
@@ -228,6 +239,8 @@ class _MovementGenerator {
   }
 
   void ensureScriptable(FieldObject obj) {
+    obj = obj.resolve(ctx);
+
     if (obj is MapObject && !madeScriptable.contains(obj)) {
       // Make map object scriptable
       asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
@@ -267,7 +280,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
   generator.setSpeed(moves.speed);
 
   moves.destinations.entries.forEachIndexed((i, dest) {
-    var obj = dest.key;
+    var obj = dest.key.resolve(state);
     var pos = dest.value;
 
     generator.toA4(obj);
@@ -286,6 +299,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
   });
 
   generator.resetObjects();
+  generator.resetSpeedFrom(moves.speed);
 
   return asm;
 }
@@ -381,6 +395,21 @@ extension AddressOfMapObject on MapObject {
   }
 }
 
+const _characterJumpTable = [
+  null,
+  Shay,
+  Alys,
+  Hahn,
+  Rune,
+  Gryz,
+  Rika,
+  Demi,
+  Wren,
+  Raja,
+  Kyra,
+  Seth
+];
+
 extension CharacterData on Character {
   Expression get charId {
     switch (runtimeType) {
@@ -402,25 +431,8 @@ extension CharacterData on Character {
     }
   }
 
-  /*
-	bra.w	FieldObj_Hahn	; $C
-	bra.w	FieldObj_Rune	; $10
-	bra.w	FieldObj_Gryz	; $14
-	bra.w	FieldObj_Rika	; $18
-	bra.w	FieldObj_Demi	; $1C
-	bra.w	FieldObj_Wren	; $20
-	bra.w	FieldObj_Raja	; $24
-	bra.w	FieldObj_Kyra	; $28
-	bra.w	FieldObj_Seth	; $2C
-   */
   Value get fieldObjectIndex {
-    switch (runtimeType) {
-      case Shay:
-        return 4.toValue;
-      case Alys:
-        return 8.toValue;
-    }
-    throw UnsupportedError('$this.fieldObjectIndex');
+    return (_characterJumpTable.indexOf(runtimeType) * 4).toValue;
   }
 }
 

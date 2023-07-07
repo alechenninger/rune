@@ -234,10 +234,11 @@ class EventState {
     if (panelsShown != null) panelsShown = panelsShown! - n;
   }
 
-  Direction? getFacing(FieldObject obj) => _facing[obj];
-  void setFacing(FieldObject obj, Direction dir) => _facing[obj] = dir;
+  Direction? getFacing(FieldObject obj) => _facing[obj.resolve(this)];
+  void setFacing(FieldObject obj, Direction dir) =>
+      _facing[obj.resolve(this)] = dir;
 
-  void clearFacing(FieldObject obj) => _facing.remove(obj);
+  void clearFacing(FieldObject obj) => _facing.remove(obj.resolve(this));
 
   /// 1-indexed (first slot is 1, there is no slot 0).
   int? slotFor(Character c) => slots.slotFor(c);
