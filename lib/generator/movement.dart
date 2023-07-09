@@ -20,6 +20,8 @@ const FacingDir_Left = Constant('FacingDir_Left');
 const FacingDir_Right = Constant('FacingDir_Right');
 const FieldObj_Step_Offset = Constant('FieldObj_Step_Offset');
 
+final scriptableObjectRoutine = AsmRoutineRef(Word(0x194));
+
 /*
 Follow lead flag notes:
 
@@ -39,7 +41,7 @@ if independent moves == follow lead moves, just use follow lead flag
  */
 
 extension IndividualMovesToAsm on IndividualMoves {
-  EventAsm toAsm(EventState ctx) {
+  EventAsm toAsm(Memory ctx) {
     var asm = EventAsm.empty();
     var generator = _MovementGenerator(asm, ctx);
 
@@ -175,7 +177,6 @@ extension IndividualMovesToAsm on IndividualMoves {
       }
     }
 
-    generator.resetObjects();
     generator.resetSpeedFrom(speed);
 
     return asm;
@@ -226,34 +227,29 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
     state.clearFacing(obj);
   });
 
-  generator.resetObjects();
   generator.resetSpeedFrom(moves.speed);
 
   return asm;
 }
 
 class _MovementGenerator {
-  _MovementGenerator(this.asm, this.ctx);
+  _MovementGenerator(this.asm, this._mem);
 
   final EventAsm asm;
-  final EventState ctx;
-
-  // TODO: this can move to eventstate / memory
-  var madeScriptable = <MapObject>{};
-  FieldObject? a4;
+  final Memory _mem;
 
   void prepare(Iterable<FieldObject> objects) {
     // Only disable follow leader if moving any characters.
-    if (ctx.followLead != false &&
-        objects.any((obj) => obj.resolve(ctx) is! MapObject)) {
-      asm.add(followLeader(ctx.followLead = false));
+    if (_mem.followLead != false &&
+        objects.any((obj) => obj.resolve(_mem) is! MapObject)) {
+      asm.add(followLeader(_mem.followLead = false));
     }
   }
 
   void setStartingAxis(Axis axis) {
-    if (ctx.startingAxis != axis) {
+    if (_mem.startingAxis != axis) {
       asm.add(moveAlongXAxisFirst(axis == Axis.x));
-      ctx.startingAxis = axis;
+      _mem.startingAxis = axis;
     }
   }
 
@@ -271,19 +267,18 @@ class _MovementGenerator {
   }
 
   void toA4(FieldObject moveable) {
-    if (a4 != moveable) {
-      asm.add(moveable.toA4(ctx));
-      a4 = moveable;
+    if (_mem.inAddress(a4)?.obj != moveable) {
+      asm.add(moveable.toA4(_mem));
     }
   }
 
   void ensureScriptable(FieldObject obj) {
-    obj = obj.resolve(ctx);
+    obj = obj.resolve(_mem);
 
-    if (obj is MapObject && !madeScriptable.contains(obj)) {
+    if (obj is MapObject && _mem.getRoutine(obj) != scriptableObjectRoutine) {
       // Make map object scriptable
       asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
-      madeScriptable.add(obj);
+      _mem.setRoutine(obj, scriptableObjectRoutine);
     }
   }
 
@@ -292,17 +287,7 @@ class _MovementGenerator {
     // this ensures facing doesn't change during subsequent movements.
     ensureScriptable(obj);
     asm.add(updateObjFacing(dir.address));
-    ctx.setFacing(obj, dir);
-  }
-
-  void resetObjects() {
-    // Return objects back to normal behavior
-    for (var obj in madeScriptable) {
-      toA4(obj);
-      var routine = obj.routine;
-      asm.add(asmlib.move.w(routine.index.i, asmlib.a4.indirect));
-      asm.add(jsr(routine.label.l));
-    }
+    _mem.setFacing(obj, dir);
   }
 }
 
@@ -318,19 +303,23 @@ extension Cap on int? {
 }
 
 extension FieldObjectAsm on FieldObject {
-  Asm toA4(EventState ctx) {
-    var moveable = this;
-    var slot = moveable.slot(ctx);
+  Asm toA4(Memory ctx) {
+    var obj = this;
+    var slot = obj.slot(ctx);
     if (slot != null) {
       // Slot 1 indexed
+      ctx.putInAddress(a4, obj);
       return characterBySlotToA4(slot);
-    } else if (moveable is Character) {
-      return characterByIdToA4(moveable.charIdAddress);
-    } else if (moveable is MapObjectById) {
-      var address = moveable.address(ctx);
+    } else if (obj is Character) {
+      ctx.putInAddress(a4, obj);
+      return characterByIdToA4(obj.charIdAddress);
+    } else if (obj is MapObjectById) {
+      ctx.putInAddress(a4, obj);
+      var address = obj.address(ctx);
       return lea(Absolute.long(address), a4);
-    } else if (moveable is MapObject) {
-      var address = moveable.address(ctx);
+    } else if (obj is MapObject) {
+      ctx.putInAddress(a4, obj);
+      var address = obj.address(ctx);
       return lea(Absolute.long(address), a4);
     }
 

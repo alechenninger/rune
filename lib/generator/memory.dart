@@ -228,6 +228,14 @@ class Memory implements EventState {
     _apply(RemovePanels(n));
   }
 
+  @override
+  RoutineRef? getRoutine(FieldObject obj) => _eventState.getRoutine(obj);
+
+  @override
+  void setRoutine(FieldObject obj, RoutineRef? r) {
+    _apply(UpdateRoutine(obj, r));
+  }
+
   T _apply<T>(StateChange<T> change) {
     _changes.add(change);
     return change.apply(this);
@@ -489,5 +497,22 @@ class RemovePanels implements StateChange {
   @override
   mayApply(Memory memory) {
     memory._eventState.panelsShown = null;
+  }
+}
+
+class UpdateRoutine implements StateChange {
+  final FieldObject obj;
+  final RoutineRef? routine;
+
+  UpdateRoutine(this.obj, this.routine);
+
+  @override
+  apply(Memory memory) {
+    memory._eventState.setRoutine(obj, routine);
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.setRoutine(obj, null);
   }
 }

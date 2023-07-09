@@ -24,9 +24,6 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
-import 'package:rune/generator/debug.dart';
-import 'package:rune/src/iterables.dart';
-import 'package:rune/src/null.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -35,7 +32,10 @@ import '../asm/events.dart';
 import '../asm/events.dart' as asmeventslib;
 import '../asm/text.dart';
 import '../model/model.dart';
+import '../src/iterables.dart';
+import '../src/null.dart';
 import 'cutscenes.dart';
+import 'debug.dart' as debug;
 import 'dialog.dart';
 import 'event.dart';
 import 'map.dart';
@@ -43,12 +43,11 @@ import 'memory.dart';
 import 'movement.dart';
 import 'scene.dart';
 import 'text.dart' as textlib;
-import 'debug.dart' as debug;
 
 export '../asm/asm.dart' show Asm;
-export 'scene.dart';
-export 'map.dart';
 export 'deprecated.dart';
+export 'map.dart';
+export 'scene.dart';
 
 typedef DebugOptions = ({
   List<EventFlag> eventFlags,
@@ -1038,6 +1037,38 @@ class SceneAsmGenerator implements EventVisitor {
         (_) => diff > 0
             ? addi.l(diff.i, const Constant('Current_Money').w)
             : subi.l(diff.i, const Constant('Current_Money').w));
+  }
+
+  @override
+  void resetObjectRoutine(ResetObjectRoutine resetRoutine) {
+    _checkNotFinished();
+
+    _addToEvent(resetRoutine, (_) {
+      var obj = resetRoutine.object.resolve(_memory);
+
+      if (obj is! MapObject) {
+        throw ArgumentError.value(
+            obj,
+            'resetRoutine.object',
+            'can only change routines for MapObjects '
+                'but type=${obj.runtimeType}');
+      }
+
+      obj.toA4(_memory);
+      var routine = obj.routine;
+
+      // TODO(object routines): this might be problematic since the routine
+      //  may be one defined in the model, but this uses
+      //  an asm routine no matter what.
+      //  we could instead use the routine spec factory
+      //  and examine the spec to determine
+      //  what kind of routine ref to use.
+      //  we could also make routine refs smarter,
+      //  and enable them to understand they are the same
+      _memory.setRoutine(obj, AsmRoutineRef(routine.index));
+
+      return Asm([move.w(routine.index.i, a4.indirect), jsr(routine.label.l)]);
+    });
   }
 
   void finish({bool appendNewline = false}) {

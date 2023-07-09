@@ -13,7 +13,7 @@ void main() {
   group('generates asm for individual movements', () {
     group('step in one direction', () {
       test('move right, after previously not following leader', () {
-        var ctx = EventState();
+        var ctx = Memory();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -42,7 +42,7 @@ void main() {
       });
 
       test('move right, after previously following leader', () {
-        var ctx = EventState();
+        var ctx = Memory();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -101,7 +101,7 @@ void main() {
       });
 
       test('move right different distances, previously following lead', () {
-        var ctx = EventState();
+        var ctx = Memory();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -143,7 +143,7 @@ void main() {
       });
 
       test('multiple move same distance', () {
-        var ctx = EventState();
+        var ctx = Memory();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -177,7 +177,7 @@ void main() {
       });
 
       test('multiple moves with some delayed', () {
-        var ctx = EventState();
+        var ctx = Memory();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -220,7 +220,7 @@ void main() {
 
     group('step in multiple directions', () {
       test('one character right then up', () {
-        var ctx = EventState();
+        var ctx = Memory();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -252,7 +252,7 @@ void main() {
       });
 
       test('stress test', () {
-        var ctx = EventState();
+        var ctx = Memory();
         ctx.slots[1] = alys;
         ctx.slots[2] = shay;
 
@@ -379,12 +379,11 @@ void main() {
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
-              move.w(npc.routine.index.i, a4.indirect),
-              jsr(npc.routine.label.l),
             ]));
       });
 
-      test('multiple moves of the same npc only replaces field routine once',
+      test(
+          'multiple moves of the same npc in same event only replaces field routine once',
           () {
         var scene = Scene([
           SetContext((ctx) {
@@ -417,8 +416,45 @@ void main() {
               move.w(Word(0x90).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
-              move.w(npc.routine.index.i, a4.indirect),
-              jsr(npc.routine.label.l),
+            ]));
+      });
+
+      test(
+          'multiple moves of the same npc across scene only replaces field routine once',
+          () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[npc] = Position(0x50, 0x50);
+            ctx.positions[alys] = Position(0x50, 0x40);
+            ctx.currentMap = map;
+          }),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] = (StepPaths()
+              ..step(StepPath()
+                ..direction = Direction.right
+                ..distance = 2.steps)),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] = (StepPaths()
+              ..step(StepPath()
+                ..delay = 1.step
+                ..direction = Direction.right
+                ..distance = 2.steps))
+        ]);
+
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x70).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              doMapUpdateLoop(Word(8 /*8 frames per step?*/)),
+              move.w(Word(0x90).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
             ]));
       });
 
@@ -443,8 +479,6 @@ void main() {
               move.w(0x8194.toWord.i, a4.indirect),
               moveq(FacingDir_Right.i, d0),
               jsr(Label('Event_UpdateObjFacing').l),
-              move.w(npc.routine.index.i, a4.indirect),
-              jsr(npc.routine.label.l),
             ]));
       });
     });
@@ -454,7 +488,7 @@ void main() {
         ..moves[shay] = (StepPath()..direction = right)
         ..moves[alys] = (StepPath()..direction = left);
 
-      var asm = moves.toAsm(EventState()..followLead = false);
+      var asm = moves.toAsm(Memory()..followLead = false);
       expect(
           asm,
           Asm([
@@ -472,7 +506,7 @@ void main() {
           ..distance = 1.step)
         ..moves[alys] = (StepPath()..direction = up);
 
-      var asm = moves.toAsm(EventState()
+      var asm = moves.toAsm(Memory()
         ..positions[hahn] = Position(0x100, 0x0c0)
         ..followLead = false);
 
@@ -501,7 +535,7 @@ void main() {
           ..delay = 2.steps
           ..direction = up);
 
-      var asm = moves.toAsm(EventState()
+      var asm = moves.toAsm(Memory()
         ..positions[hahn] = Position(0x100, 0x0c0)
         ..positions[shay] = Position(0x0E0, 0x0c0)
         ..positions[alys] = Position(0x0F0, 0x0c0)
@@ -606,8 +640,6 @@ void main() {
             npc.toA4(state),
             move.w(0x8194.toWord.i, a4.indirect),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
-            move.w(npc.routine.index.i, a4.indirect),
-            jsr(npc.routine.label.l)
           ]));
     });
 
@@ -667,8 +699,6 @@ void main() {
             npc.toA4(state),
             move.w(0x8194.toWord.i, a4.indirect),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
-            move.w(npc.routine.index.i, a4.indirect),
-            jsr(npc.routine.label.l)
           ]));
       expect(state.positions[npc], Position(0x1a0, 0x1f0));
     });

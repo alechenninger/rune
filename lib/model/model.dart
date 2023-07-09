@@ -8,6 +8,7 @@ import 'package:quiver/collection.dart';
 
 import '../generator/generator.dart';
 import '../src/iterables.dart';
+import 'objects.dart';
 import 'conditional.dart';
 import 'cutscenes.dart';
 import 'dialog.dart';
@@ -17,6 +18,7 @@ import 'movement.dart';
 import 'sound.dart';
 import 'text.dart';
 
+export 'objects.dart';
 export 'conditional.dart';
 export 'cutscenes.dart';
 export 'dialog.dart';
@@ -183,10 +185,28 @@ abstract class EventVisitor {
   void playMusic(PlayMusic playMusic);
   void stopMusic(StopMusic stopMusic);
   void addMoney(AddMoney addMoney);
+  void resetObjectRoutine(ResetObjectRoutine resetRoutine);
 }
 
 class EventState {
-  final _facing = <FieldObject, Direction>{};
+  EventState() {
+    _positions = Positions._(this);
+  }
+
+  EventState branch() {
+    return EventState()
+      .._facing.addAll(_facing)
+      ..positions.addAll(positions)
+      ..slots.addAll(slots)
+      ..startingAxis = startingAxis
+      ..followLead = followLead
+      ..cameraLock = cameraLock
+      ..isFieldShown = isFieldShown
+      ..dialogPortrait = dialogPortrait
+      ..currentMap = currentMap
+      ..panelsShown = panelsShown
+      .._routines.addAll(_routines);
+  }
 
   late final Positions _positions;
   Positions get positions => _positions;
@@ -207,24 +227,6 @@ class EventState {
 
   GameMap? currentMap;
 
-  EventState() {
-    _positions = Positions._(this);
-  }
-
-  EventState branch() {
-    return EventState()
-      .._facing.addAll(_facing)
-      ..positions.addAll(positions)
-      ..slots.addAll(slots)
-      ..startingAxis = startingAxis
-      ..followLead = followLead
-      ..cameraLock = cameraLock
-      ..isFieldShown = isFieldShown
-      ..dialogPortrait = dialogPortrait
-      ..currentMap = currentMap
-      ..panelsShown = panelsShown;
-  }
-
   int? panelsShown = 0;
   void addPanel() {
     if (panelsShown != null) panelsShown = panelsShown! + 1;
@@ -234,6 +236,7 @@ class EventState {
     if (panelsShown != null) panelsShown = panelsShown! - n;
   }
 
+  final _facing = <FieldObject, Direction>{};
   Direction? getFacing(FieldObject obj) => _facing[obj.resolve(this)];
   void setFacing(FieldObject obj, Direction dir) =>
       _facing[obj.resolve(this)] = dir;
@@ -257,6 +260,12 @@ class EventState {
     if (position != null) positions[c] = position;
     if (facing != null) _facing[c] = facing;
   }
+
+  final _routines = <FieldObject, RoutineRef>{};
+  RoutineRef? getRoutine(FieldObject obj) => _routines[obj.resolve(this)];
+  void setRoutine(FieldObject obj, RoutineRef? r) => r == null
+      ? _routines.remove(obj.resolve(this))
+      : _routines[obj.resolve(this)] = r;
 }
 
 class Positions {
