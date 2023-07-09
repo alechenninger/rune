@@ -272,20 +272,33 @@ class _MovementGenerator {
     }
   }
 
-  void ensureScriptable(FieldObject obj) {
+  /// Returns true if object is made scriptable.
+  bool ensureScriptable(FieldObject obj) {
     obj = obj.resolve(_mem);
 
     if (obj is MapObject && _mem.getRoutine(obj) != scriptableObjectRoutine) {
       // Make map object scriptable
       asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
       _mem.setRoutine(obj, scriptableObjectRoutine);
+      return true;
     }
+
+    return false;
   }
 
   void updateFacing(FieldObject obj, Direction dir) {
     toA4(obj);
     // this ensures facing doesn't change during subsequent movements.
-    ensureScriptable(obj);
+    if (ensureScriptable(obj)) {
+      // Destination attributes are not always set,
+      // resulting in odd character movements with this routine.
+      // Ensure they're set based on context.
+      var position = _mem.positions[obj];
+      if (position == null) {
+        throw StateError('no current position set for $obj');
+      }
+      asm.add(setDestination(x: position.x.i, y: position.y.i));
+    }
     asm.add(updateObjFacing(dir.address));
     _mem.setFacing(obj, dir);
   }

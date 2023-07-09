@@ -506,7 +506,7 @@ void main() {
       test('faces npcs', () {
         var scene = Scene([
           SetContext((ctx) {
-            ctx.positions[npc] = Position(0x50, 0x50);
+            ctx.positions[npc] = Position(0x50, 0x60);
             ctx.setFacing(npc, Direction.down);
             ctx.currentMap = map;
           }),
@@ -522,6 +522,8 @@ void main() {
             Asm([
               lea(0xFFFFC300.toLongword.l, a4),
               move.w(0x8194.toWord.i, a4.indirect),
+              move.w(0x50.i, dest_x_pos(a4)),
+              move.w(0x60.i, dest_y_pos(a4)),
               moveq(FacingDir_Right.i, d0),
               jsr(Label('Event_UpdateObjFacing').l),
             ]));
@@ -550,6 +552,39 @@ void main() {
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
+              move.w(npc.routine.index.i, a4.indirect),
+              jsr(npc.routine.label.l),
+            ]));
+      });
+
+      test('resets npc routine for npc not already in a4', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[npc] = Position(0x50, 0x50);
+            ctx.currentMap = map;
+          }),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] = (StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps),
+          AbsoluteMoves()..destinations[shay] = Position(0x60, 0x60),
+          ResetObjectRoutine(MapObjectById(MapObjectId('testnpc')))
+        ]);
+
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x70).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              followLeader(false),
+              characterByNameToA4('Chaz'),
+              moveCharacter(x: Word(0x60).i, y: Word(0x60).i),
+              lea(0xFFFFC300.toLongword.l, a4),
               move.w(npc.routine.index.i, a4.indirect),
               jsr(npc.routine.label.l),
             ]));

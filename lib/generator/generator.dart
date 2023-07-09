@@ -1059,7 +1059,6 @@ class SceneAsmGenerator implements EventVisitor {
 
       // TODO(object routine): only reset if not already reset
 
-      obj.toA4(_memory);
       var routine = obj.routine;
 
       // TODO(object routines): this might be problematic since the routine
@@ -1072,7 +1071,11 @@ class SceneAsmGenerator implements EventVisitor {
       // and enable them to understand they are the same
       _memory.setRoutine(obj, AsmRoutineRef(routine.index));
 
-      return Asm([move.w(routine.index.i, a4.indirect), jsr(routine.label.l)]);
+      return Asm([
+        if (_memory.inAddress(a4)?.obj != obj) obj.toA4(_memory),
+        move.w(routine.index.i, a4.indirect),
+        jsr(routine.label.l)
+      ]);
     });
   }
 
@@ -1385,6 +1388,8 @@ class SceneAsmGenerator implements EventVisitor {
       _replaceDialogRoutine = ([i]) => _eventAsm.replace(
           line, jsr(Label('Event_GetAndRunDialogue${i ?? ""}').l));
     }
+
+    _memory.unknownAddressRegisters();
 
     _gameMode = Mode.dialog;
   }
