@@ -474,7 +474,10 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void asm(AsmEvent asm) {
-    _addToEvent(asm, (i) => asm.asm);
+    _addToEvent(asm, (i) {
+      _memory.unknownAddressRegisters();
+      return asm.asm;
+    });
   }
 
   @override

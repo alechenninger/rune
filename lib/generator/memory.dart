@@ -231,6 +231,10 @@ class Memory implements EventState {
   @override
   RoutineRef? getRoutine(FieldObject obj) => _eventState.getRoutine(obj);
 
+  void unknownAddressRegisters() {
+    _apply(UnknownAddressRegisters());
+  }
+
   @override
   void setRoutine(FieldObject obj, RoutineRef? r) {
     _apply(UpdateRoutine(obj, r));
@@ -328,6 +332,18 @@ class PutInAddress implements StateChange {
   @override
   mayApply(Memory memory) {
     memory._sysState._putInAddress(register, null);
+  }
+}
+
+class UnknownAddressRegisters implements StateChange {
+  @override
+  apply(Memory memory) {
+    memory._sysState._inAddress.clear();
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._sysState._inAddress.clear();
   }
 }
 

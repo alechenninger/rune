@@ -458,6 +458,51 @@ void main() {
             ]));
       });
 
+      test(
+          'multiple moves of the same npc across scene only replaces field routine once unless asm event',
+          () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[npc] = Position(0x50, 0x50);
+            ctx.positions[alys] = Position(0x50, 0x40);
+            ctx.currentMap = map;
+          }),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] = (StepPaths()
+              ..step(StepPath()
+                ..direction = Direction.right
+                ..distance = 2.steps)),
+          AsmEvent(Asm([
+            // Changes a4!
+            characterBySlotToA4(1),
+          ])),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] = (StepPaths()
+              ..step(StepPath()
+                ..delay = 1.step
+                ..direction = Direction.right
+                ..distance = 2.steps))
+        ]);
+
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x70).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              characterBySlotToA4(1),
+              doMapUpdateLoop(Word(8 /*8 frames per step?*/)),
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(Word(0x90).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+            ]));
+      });
+
       test('faces npcs', () {
         var scene = Scene([
           SetContext((ctx) {
