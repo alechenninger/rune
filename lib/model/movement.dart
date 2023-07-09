@@ -913,24 +913,6 @@ class StepToPoint extends RelativeMovement {
       firstAxis.hashCode;
 }
 
-// class Follow extends Movement {
-//   Moveable following;
-//   @override
-//   int distance = 0;
-//
-//   // or predicate?
-//   // probably can't because its not like we're evaluating the
-//   // program step by step...
-//   // Point? until;
-//
-//   @override
-//   var delay = 0;
-//   int? stopAfterDistance;
-//   int? stopAfterMovements;
-//
-//   Follow(this.following, {this.distance = 0});
-// }
-
 class MovementLookahead {
   final List<Path> pathsWalked;
   Position get relativePosition =>
