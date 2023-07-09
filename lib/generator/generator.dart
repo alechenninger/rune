@@ -1054,17 +1054,19 @@ class SceneAsmGenerator implements EventVisitor {
                 'but type=${obj.runtimeType}');
       }
 
+      // TODO(object routine): only reset if not already reset
+
       obj.toA4(_memory);
       var routine = obj.routine;
 
       // TODO(object routines): this might be problematic since the routine
       //  may be one defined in the model, but this uses
       //  an asm routine no matter what.
-      //  we could instead use the routine spec factory
-      //  and examine the spec to determine
-      //  what kind of routine ref to use.
-      //  we could also make routine refs smarter,
-      //  and enable them to understand they are the same
+      // we could instead use the routine spec factory
+      // and examine the spec to determine
+      // what kind of routine ref to use.
+      // we could also make routine refs smarter,
+      // and enable them to understand they are the same
       _memory.setRoutine(obj, AsmRoutineRef(routine.index));
 
       return Asm([move.w(routine.index.i, a4.indirect), jsr(routine.label.l)]);

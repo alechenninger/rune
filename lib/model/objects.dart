@@ -9,7 +9,9 @@ class ResetObjectRoutine extends Event {
   ResetObjectRoutine(this.object);
 
   @override
-  void visit(EventVisitor visitor) {}
+  void visit(EventVisitor visitor) {
+    visitor.resetObjectRoutine(this);
+  }
 
   @override
   String toString() => 'ResetObjectRoutine{object: $object}';

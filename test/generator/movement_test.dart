@@ -481,6 +481,34 @@ void main() {
               jsr(Label('Event_UpdateObjFacing').l),
             ]));
       });
+
+      test('resets npc routine', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[npc] = Position(0x50, 0x50);
+            ctx.currentMap = map;
+          }),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] = (StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps),
+          ResetObjectRoutine(MapObjectById(MapObjectId('testnpc')))
+        ]);
+
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x70).i, d0),
+              move.w(Word(0x50).i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              move.w(npc.routine.index.i, a4.indirect),
+              jsr(npc.routine.label.l),
+            ]));
+      });
     });
 
     test('just facing with multiple characters', () {
