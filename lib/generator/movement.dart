@@ -101,10 +101,7 @@ extension IndividualMovesToAsm on IndividualMoves {
         maxSteps = maxStepsYFirst;
       }
 
-      if (ctx.startingAxis != firstAxis) {
-        asm.add(moveAlongXAxisFirst(firstAxis == Axis.x));
-        ctx.startingAxis = firstAxis;
-      }
+      generator.setStartingAxis(firstAxis);
 
       // If no movement code is generated because all moves are delayed, we'll
       // have to add an artificial delay later.
@@ -196,6 +193,45 @@ int Function(RelativeMove<FieldObject>, RelativeMove<FieldObject>)
   };
 }
 
+EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
+  // We assume we don't know the current positions,
+  // so we don't know which move is longer.
+  // Just start all in parallel.
+  // TODO: technically we might know, in which case we could convert this
+  // to relative movements which would maintain some more context.
+  var asm = EventAsm.empty();
+  var generator = _MovementGenerator(asm, state);
+  var length = moves.destinations.length;
+
+  generator.prepare(moves.destinations.keys);
+  generator.setSpeed(moves.speed);
+  generator.setStartingAxis(moves.startingAxis);
+
+  moves.destinations.entries.forEachIndexed((i, dest) {
+    var obj = dest.key.resolve(state);
+    var pos = dest.value;
+
+    generator.toA4(obj);
+    generator.ensureScriptable(obj);
+
+    if (i < length - 1) {
+      asm.add(setDestination(x: pos.x.toWord.i, y: pos.y.toWord.i));
+    } else {
+      asm.add(moveCharacter(x: pos.x.toWord.i, y: pos.y.toWord.i));
+    }
+
+    state.positions[obj] = pos;
+    // If we don't know which direction the object was coming from,
+    // we don't know which direction it will be facing.
+    state.clearFacing(obj);
+  });
+
+  generator.resetObjects();
+  generator.resetSpeedFrom(moves.speed);
+
+  return asm;
+}
+
 class _MovementGenerator {
   _MovementGenerator(this.asm, this.ctx);
 
@@ -211,6 +247,13 @@ class _MovementGenerator {
     if (ctx.followLead != false &&
         objects.any((obj) => obj.resolve(ctx) is! MapObject)) {
       asm.add(followLeader(ctx.followLead = false));
+    }
+  }
+
+  void setStartingAxis(Axis axis) {
+    if (ctx.startingAxis != axis) {
+      asm.add(moveAlongXAxisFirst(axis == Axis.x));
+      ctx.startingAxis = axis;
     }
   }
 
@@ -261,44 +304,6 @@ class _MovementGenerator {
       asm.add(jsr(routine.label.l));
     }
   }
-}
-
-EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
-  // We assume we don't know the current positions,
-  // so we don't know which move is longer.
-  // Just start all in parallel.
-  // TODO: technically we might know, in which case we could convert this
-  // to relative movements which would maintain some more context.
-  var asm = EventAsm.empty();
-  var generator = _MovementGenerator(asm, state);
-  var length = moves.destinations.length;
-
-  generator.prepare(moves.destinations.keys);
-  generator.setSpeed(moves.speed);
-
-  moves.destinations.entries.forEachIndexed((i, dest) {
-    var obj = dest.key.resolve(state);
-    var pos = dest.value;
-
-    generator.toA4(obj);
-    generator.ensureScriptable(obj);
-
-    if (i < length - 1) {
-      asm.add(setDestination(x: pos.x.toWord.i, y: pos.y.toWord.i));
-    } else {
-      asm.add(moveCharacter(x: pos.x.toWord.i, y: pos.y.toWord.i));
-    }
-
-    state.positions[obj] = pos;
-    // If we don't know which direction the object was coming from,
-    // we don't know which direction it will be facing.
-    state.clearFacing(obj);
-  });
-
-  generator.resetObjects();
-  generator.resetSpeedFrom(moves.speed);
-
-  return asm;
 }
 
 int minOf(int? i1, int other) {

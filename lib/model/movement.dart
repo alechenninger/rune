@@ -379,7 +379,6 @@ class AbsoluteMoves extends Event {
   // Facing can be controlled with individual movements
   Map<FieldObject, Position> destinations = {};
   StepSpeed speed = StepSpeed.fast;
-  // TODO: implement this
   Axis startingAxis = Axis.x;
 
   @override
@@ -389,7 +388,10 @@ class AbsoluteMoves extends Event {
 
   @override
   String toString() {
-    return 'AbsoluteMoves{destinations: $destinations, speed: $speed}';
+    return 'AbsoluteMoves{destinations: '
+        '$destinations, speed: '
+        '$speed, startingAxis: '
+        '$startingAxis}';
   }
 
   @override
@@ -398,10 +400,14 @@ class AbsoluteMoves extends Event {
       other is AbsoluteMoves &&
           runtimeType == other.runtimeType &&
           const MapEquality().equals(destinations, other.destinations) &&
-          speed == other.speed;
+          speed == other.speed &&
+          startingAxis == other.startingAxis;
 
   @override
-  int get hashCode => const MapEquality().hash(destinations) ^ speed.hashCode;
+  int get hashCode =>
+      const MapEquality().hash(destinations) ^
+      speed.hashCode ^
+      startingAxis.hashCode;
 }
 
 class Party extends Moveable {

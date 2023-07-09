@@ -690,5 +690,21 @@ void main() {
             move.b(1.i, FieldObj_Step_Offset.w)
           ]));
     });
+
+    test('with y axis movement first', () {
+      var event = AbsoluteMoves()
+        ..destinations[shay] = Position(0x1a0, 0x1f0)
+        ..startingAxis = Axis.y;
+      var asm = absoluteMovesToAsm(event, state);
+
+      expect(
+          asm,
+          EventAsm([
+            followLeader(false),
+            moveAlongXAxisFirst(false),
+            shay.toA4(testState),
+            moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
+          ]));
+    });
   });
 }
