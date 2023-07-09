@@ -48,12 +48,7 @@ extension IndividualMovesToAsm on IndividualMoves {
     var remainingMoves = Map.of(moves.map(
         (moveable, movement) => MapEntry(moveable.resolve(ctx), movement)));
 
-    // Only disable follow leader if moving any characters.
-    if (ctx.followLead != false &&
-        remainingMoves.keys.any((obj) => obj is! MapObject)) {
-      asm.add(followLeader(ctx.followLead = false));
-    }
-
+    generator.prepare(remainingMoves.keys);
     generator.setSpeed(speed);
 
     while (remainingMoves.isNotEmpty) {
@@ -213,7 +208,8 @@ class _MovementGenerator {
 
   void prepare(Iterable<FieldObject> objects) {
     // Only disable follow leader if moving any characters.
-    if (ctx.followLead != false && objects.any((obj) => obj is! MapObject)) {
+    if (ctx.followLead != false &&
+        objects.any((obj) => obj.resolve(ctx) is! MapObject)) {
       asm.add(followLeader(ctx.followLead = false));
     }
   }
@@ -277,6 +273,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
   var generator = _MovementGenerator(asm, state);
   var length = moves.destinations.length;
 
+  generator.prepare(moves.destinations.keys);
   generator.setSpeed(moves.speed);
 
   moves.destinations.entries.forEachIndexed((i, dest) {

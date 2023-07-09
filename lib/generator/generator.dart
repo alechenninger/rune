@@ -414,7 +414,8 @@ class SceneAsmGenerator implements EventVisitor {
 
       if (event is FadeOut) {
         faded = true;
-      } else if (event is FadeInField) {
+      } else if (event is FadeInField ||
+          (event is LoadMap && event.showField)) {
         faded = false;
       } else if (event is Dialog && faded) {
         return EventType.cutscene;

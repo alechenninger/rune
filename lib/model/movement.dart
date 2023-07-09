@@ -379,6 +379,8 @@ class AbsoluteMoves extends Event {
   // Facing can be controlled with individual movements
   Map<FieldObject, Position> destinations = {};
   StepSpeed speed = StepSpeed.fast;
+  // TODO: implement this
+  Axis startingAxis = Axis.x;
 
   @override
   void visit(EventVisitor visitor) {

@@ -590,6 +590,7 @@ void main() {
       expect(
           asm,
           EventAsm([
+            followLeader(false),
             shay.toA4(testState),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
           ]));
@@ -620,6 +621,7 @@ void main() {
       expect(
           asm,
           EventAsm([
+            followLeader(false),
             shay.toA4(testState),
             setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
             alys.toA4(testState),
@@ -681,6 +683,7 @@ void main() {
       expect(
           asm,
           EventAsm([
+            followLeader(false),
             move.b(0.toByte.i, FieldObj_Step_Offset.w),
             shay.toA4(testState),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
