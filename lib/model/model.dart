@@ -638,16 +638,23 @@ class SceneId {
   int get hashCode => id.hashCode;
 }
 
+// TODO(refactor): should just be an enum?
 class Slot extends FieldObject {
   final int index;
 
-  Slot(this.index);
+  const Slot(this.index);
+
+  static const one = Slot(1);
+  static const two = Slot(2);
+  static const three = Slot(3);
+  static const four = Slot(4);
+  static const five = Slot(5);
 
   @override
-  Character resolve(EventState state) {
+  FieldObject resolve(EventState state) {
     var inSlot = state.slots[index];
     if (inSlot == null) {
-      throw ResolveException('no character in slot $index');
+      return this;
     }
     return inSlot;
   }

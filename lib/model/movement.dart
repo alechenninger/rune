@@ -380,6 +380,7 @@ class AbsoluteMoves extends Event {
   Map<FieldObject, Position> destinations = {};
   StepSpeed speed = StepSpeed.fast;
   Axis startingAxis = Axis.x;
+  bool followLeader = false;
 
   @override
   void visit(EventVisitor visitor) {
@@ -401,19 +402,24 @@ class AbsoluteMoves extends Event {
           runtimeType == other.runtimeType &&
           const MapEquality().equals(destinations, other.destinations) &&
           speed == other.speed &&
-          startingAxis == other.startingAxis;
+          startingAxis == other.startingAxis &&
+          followLeader == other.followLeader;
 
   @override
   int get hashCode =>
       const MapEquality().hash(destinations) ^
       speed.hashCode ^
-      startingAxis.hashCode;
+      startingAxis.hashCode ^
+      followLeader.hashCode;
 }
 
 class Party extends Moveable {
   const Party();
 
   RelativePartyMove move(RelativeMovement m) => RelativePartyMove(m);
+  AbsoluteMoves moveTo(Position destination) => AbsoluteMoves()
+    ..destinations[Slot(1)] = destination
+    ..followLeader = true;
 }
 
 abstract class Moveable {

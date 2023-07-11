@@ -844,5 +844,72 @@ void main() {
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
           ]));
     });
+
+    group('following leader', () {
+      test('moving leader by slot', () {
+        var event = AbsoluteMoves()
+          ..destinations[Slot.one] = Position(0x1a0, 0x1f0)
+          ..followLeader = true;
+        var asm = absoluteMovesToAsm(event, state);
+
+        expect(
+            asm,
+            EventAsm([
+              Slot.one.toA4(testState),
+              moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
+            ]));
+      });
+
+      test('moving leader y first', () {
+        var event = AbsoluteMoves()
+          ..destinations[Slot.one] = Position(0x1a0, 0x1f0)
+          ..startingAxis = Axis.y
+          ..followLeader = true;
+        var asm = absoluteMovesToAsm(event, state);
+
+        expect(
+            asm,
+            EventAsm([
+              moveAlongXAxisFirst(false),
+              Slot.one.toA4(testState),
+              moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
+            ]));
+      });
+
+      test('moving slot 2 is error', () {
+        var event = AbsoluteMoves()
+          ..destinations[Slot.two] = Position(0x1a0, 0x1f0)
+          ..followLeader = true;
+
+        expect(() => absoluteMovesToAsm(event, state),
+            throwsA(TypeMatcher<StateError>()));
+      });
+
+      test('moving leader by character', () {
+        state.setSlot(1, shay);
+
+        var event = AbsoluteMoves()
+          ..destinations[shay] = Position(0x1a0, 0x1f0)
+          ..followLeader = true;
+
+        var asm = absoluteMovesToAsm(event, state);
+
+        expect(
+            asm,
+            EventAsm([
+              Slot.one.toA4(testState),
+              moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
+            ]));
+      });
+
+      test('moving character (not leader) is error', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] = Position(0x1a0, 0x1f0)
+          ..followLeader = true;
+
+        expect(() => absoluteMovesToAsm(event, state),
+            throwsA(TypeMatcher<StateError>()));
+      });
+    });
   });
 }
