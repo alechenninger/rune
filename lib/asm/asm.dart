@@ -37,8 +37,13 @@ const BranchMnemonic bpl = BranchMnemonic('bpl');
 
 /// Branch if Z is set
 const BranchMnemonic beq = BranchMnemonic('beq');
+
+/// Branch if C is clear
+const BranchMnemonic bcc = BranchMnemonic('bcc');
+
 const AddiMnemonic addi = AddiMnemonic();
 const SubiMnemonic subi = SubiMnemonic();
+const CmpMnemonic cmp = CmpMnemonic();
 const CmpiMnemonic cmpi = CmpiMnemonic();
 const TstMnemonic tst = TstMnemonic();
 
@@ -57,6 +62,7 @@ Asm jmp(Address to) => cmd('jmp', [to]);
 Asm bset(Address src, Address dst) => cmd('bset', [src, dst]);
 Asm bclr(Address src, Address dst, {String? comment}) =>
     cmd('bclr', [src, dst], comment: comment);
+Asm bchg(Address src, Address dst) => cmd('bchg', [src, dst]);
 Asm trap(Immediate vector) => cmd('trap', [vector]);
 Asm swap(Address src) => cmd('swap', [src]);
 Asm dbf(Address src, Address dst) => cmd('dbf', [src, dst]);
@@ -144,6 +150,14 @@ class DivuMnemonic {
 
   Asm w(Address from, Address to) => cmd('divu.w', [from, to]);
   Asm l(Address from, Address to) => cmd('divu.l', [from, to]);
+}
+
+class CmpMnemonic {
+  const CmpMnemonic();
+
+  Asm b(Address from, Address to) => cmd('cmp.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('cmp.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('cmp.l', [from, to]);
 }
 
 class CmpiMnemonic {
@@ -335,7 +349,7 @@ class _Instruction extends Instruction {
   final String line;
 
   static final _validLabelPattern =
-      RegExp(r'^[A-Za-z\d_@.+-/]+[A-Za-z\d_/+-]*$');
+      RegExp(r'^[A-Za-z\d_@.+-/$]+[A-Za-z\d_/+-]*$');
   static final _noColonLabel = RegExp(r'^(\++|/+|-+|\.\S+)$');
 
   /// appends : depending on the kind of label
