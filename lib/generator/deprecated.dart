@@ -205,7 +205,7 @@ class AsmGenerator {
       var asm = EventAsm.empty();
 
       if (ctx.inAddress(a3) != AddressOf(face.object)) {
-        asm.add(face.object.toA3(ctx.state));
+        //asm.add(face.object.toA3(ctx.state));
         // could set a3 in context, but not clearing it everywhere
       }
 

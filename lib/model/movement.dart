@@ -95,7 +95,7 @@ class Path {
 }
 
 /// A fork of [Point] for our domain model.
-class Position {
+class Position implements PositionExpression {
   final int x;
   final int y;
 
@@ -166,7 +166,7 @@ const down = Direction.down;
 const left = Direction.left;
 const right = Direction.right;
 
-enum Direction {
+enum Direction implements DirectionExpression {
   up(Position(0, -1)),
   left(Position(-1, 0)),
   right(Position(1, 0)),
@@ -190,6 +190,13 @@ enum Direction {
     }
     return up;
   }
+
+  Direction get opposite => switch (this) {
+        up => down,
+        down => up,
+        left => right,
+        right => left,
+      };
 
   Path operator *(Steps magnitude) => Path(magnitude, this);
 
@@ -986,4 +993,39 @@ enum PartyArrangement {
         return leftOfLead;
     }
   }
+}
+
+class Face extends Event {
+  final FieldObject object;
+  final DirectionExpression direction;
+
+  Face(this.object, this.direction);
+
+  @override
+  void visit(EventVisitor visitor) {
+    // TODO: implement visit
+  }
+}
+
+sealed class DirectionExpression {}
+
+class TowardsPlayer extends DirectionExpression {
+  final PositionExpression from;
+
+  TowardsPlayer(this.from);
+}
+
+class DirectionOfVector extends DirectionExpression {
+  final PositionExpression from;
+  final PositionExpression to;
+
+  DirectionOfVector({required this.from, required this.to});
+}
+
+sealed class PositionExpression {}
+
+class PositionOfObject extends PositionExpression {
+  final FieldObject obj;
+
+  PositionOfObject(this.obj);
 }

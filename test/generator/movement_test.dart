@@ -10,6 +10,18 @@ import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  Asm generate(List<Event> events, {GameMap? inMap}) {
+    var asm = EventAsm.empty();
+    var generator = SceneAsmGenerator.forEvent(
+        SceneId('test'), DialogTrees(), asm,
+        startingMap: inMap);
+    for (var event in events) {
+      event.visit(generator);
+    }
+    generator.finish();
+    return asm.withoutComments();
+  }
+
   group('generates asm for individual movements', () {
     group('step in one direction', () {
       test('move right, after previously not following leader', () {
@@ -681,7 +693,7 @@ void main() {
       var map = GameMap(MapId.Piata)..addObject(npc);
       ctx.state.currentMap = map;
 
-      var asm = generator.facePlayerToAsm(FacePlayer(npc), ctx);
+      var asm = generate([FacePlayer(npc)], inMap: map);
 
       print(asm);
 
@@ -909,6 +921,102 @@ void main() {
 
         expect(() => absoluteMovesToAsm(event, state),
             throwsA(TypeMatcher<StateError>()));
+      });
+    });
+  });
+
+  group('direction expressions', () {
+    late Memory mem;
+
+    setUp(() {
+      mem = Memory();
+    });
+
+    group('of vector', () {
+      group('known', () {
+        test('exactly up', () {
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x50, 0x40))
+                  .known(mem),
+              Direction.up);
+        });
+
+        test('exactly down', () {
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x50, 0x60))
+                  .known(mem),
+              Direction.down);
+        });
+
+        test('exactly left', () {
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x40, 0x50))
+                  .known(mem),
+              Direction.left);
+        });
+
+        test('exactly right', () {
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x60, 0x50))
+                  .known(mem),
+              Direction.right);
+        });
+
+        test('approximately up', () {
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x60, 0x30))
+                  .known(mem),
+              Direction.up);
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x40, 0x30))
+                  .known(mem),
+              Direction.up);
+        });
+
+        test('approximately down', () {
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x60, 0x70))
+                  .known(mem),
+              Direction.down);
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x40, 0x70))
+                  .known(mem),
+              Direction.down);
+        });
+
+        test('approximately left', () {
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x30, 0x40))
+                  .known(mem),
+              Direction.left);
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x30, 0x60))
+                  .known(mem),
+              Direction.left);
+        });
+
+        test('approximately right vector', () {
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x70, 0x40))
+                  .known(mem),
+              Direction.right);
+          expect(
+              DirectionOfVector(
+                      from: Position(0x50, 0x50), to: Position(0x70, 0x60))
+                  .known(mem),
+              Direction.right);
+        });
       });
     });
   });

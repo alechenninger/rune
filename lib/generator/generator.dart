@@ -525,6 +525,7 @@ class SceneAsmGenerator implements EventVisitor {
 	bchg	#2, d0
 	jsr	(Event_UpdateObjFacing).l
        */
+      // FIXME: this only works if player is facing the obj
       asm.add(jsr(Label('Interaction_UpdateObj').l));
 
       return asm;

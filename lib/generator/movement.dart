@@ -327,6 +327,10 @@ extension Cap on int? {
 
 extension FieldObjectAsm on FieldObject {
   Asm toA4(Memory ctx) {
+    if (ctx.inAddress(a4)?.obj == AddressOf(resolve(ctx))) {
+      return Asm.empty();
+    }
+
     var obj = this;
     var slot = obj.slot(ctx);
     if (slot != null) {
@@ -367,17 +371,23 @@ extension FieldObjectAsm on FieldObject {
     throw UnsupportedError('$this.toA4');
   }
 
-  Asm toA3(EventState ctx) {
+  Asm toA3(Memory ctx) => toA(a3, ctx);
+
+  Asm toA(DirectAddressRegister a, Memory memory) {
+    if (memory.inAddress(a)?.obj == AddressOf(resolve(memory))) {
+      return Asm.empty();
+    }
+
     var obj = this;
     if (obj is MapObject) {
-      var address = obj.address(ctx);
-      return lea(Absolute.long(address), a3);
+      var address = obj.address(memory);
+      return lea(Absolute.long(address), a);
     } else if (obj is MapObjectById) {
-      var address = obj.address(ctx);
-      return lea(Absolute.long(address), a3);
+      var address = obj.address(memory);
+      return lea(Absolute.long(address), a);
     } else if (obj is Slot) {
       // why word? this is what asm appears to do
-      return lea('Character_${obj.index}'.toConstant.w, a3);
+      return lea('Character_${obj.index}'.toConstant.w, a);
     }
 
     throw UnsupportedError('must be mapobject or slot');
@@ -506,3 +516,149 @@ PartyArrangement? asmToArrangement(Byte b) {
     _ => null
   };
 }
+
+extension DirectionExpressionAsm on DirectionExpression {
+  Asm load(Address to, Memory memory) {
+    return switch (this) {
+      Direction d => move.b(d.constant.i, to),
+      DirectionOfVector d => d.load(to, memory),
+      TowardsPlayer d => d.load(to, memory),
+    };
+  }
+}
+
+extension DirectionOfVectorAsm on DirectionOfVector {
+  Direction? known(Memory mem) {
+    var from = this.from.known(mem);
+    var to = this.to.known(mem);
+    if (from == null || to == null) {
+      return null;
+    }
+    var vector = to - from;
+    if (vector.x == 0 && vector.y == 0) return Direction.up;
+    var angle = math.atan2(vector.y, vector.x) * 180 / math.pi;
+    return switch (angle) {
+      >= -45 && < 45 => Direction.right,
+      >= 45 && < 135 => Direction.down,
+      >= -135 && < -45 => Direction.up,
+      _ => Direction.left
+    };
+  }
+
+  Asm load(Address addr, Memory memory) {
+    return Asm([
+      moveq(FacingDir_Down.i, addr),
+      from.withY(memory: memory, asm: (y) => move.w(y, d1)),
+      to.withY(
+          memory: memory,
+          asm: (y) => y is Immediate ? cmpi.w(y, d1) : cmp.w(y, d1)),
+      beq.s(Label(r'$$checkx')),
+      bcc.s(Label(r'$$keep')), // keep up
+      move.w(FacingDir_Up.i, addr),
+      bra.s(Label(r'$$keep')), // keep
+      label(Label(r'$$checkx')),
+      move.w(FacingDir_Right.i, addr),
+      from.withX(memory: memory, asm: (x) => move.w(x, d1)),
+      to.withX(
+          memory: memory,
+          asm: (y) => y is Immediate ? cmpi.w(y, d1) : cmp.w(y, d1)),
+      bcc.s(Label(r'$$keep')), // keep up
+      move.w(FacingDir_Left.i, addr),
+      label(Label(r'$$keep')),
+    ]);
+  }
+}
+
+extension TowardsPlayerAsm on TowardsPlayer {
+  Asm load(Address addr, Memory memory) {
+    if (from == PositionOfObject(InteractionObject())) {
+      // Character is facing this object,
+      // so we only need to face the opposite direction
+      var known = memory.getFacing(Slot.one);
+
+      if (known != null) {
+        return move.b(known.opposite.address, addr);
+      }
+
+      // Evaluate at runtime
+      return Asm([
+        Slot.one.toA3(memory),
+        move.w(facing_dir(a3), addr),
+        bchg(2.i, addr),
+      ]);
+    }
+
+    return DirectionOfVector(from: from, to: PositionOfObject(Slot(1)))
+        .load(addr, memory);
+  }
+}
+
+extension PositionExpressionAsm on PositionExpression {
+  Position? known(Memory mem) => switch (this) {
+        Position p => p,
+        PositionOfObject p => mem.positions[p.obj]
+      };
+
+  Asm withX({required Memory memory, required Asm Function(Address) asm}) {
+    return switch (this) {
+      Position p => asm(p.x.toWord.i),
+      PositionOfObject p => p.withX(memory: memory, asm: asm),
+    };
+  }
+
+  Asm withY({required Memory memory, required Asm Function(Address) asm}) {
+    return switch (this) {
+      Position p => asm(p.y.toWord.i),
+      PositionOfObject p => p.withY(memory: memory, asm: asm),
+    };
+  }
+}
+
+extension PositionOfObjectAsm on PositionOfObject {
+  Asm loadX(Address to, {required Memory memory}) {
+    return withX(memory: memory, asm: (x) => move.w(x, to));
+  }
+
+  Asm withX({required Memory memory, required Asm Function(Address) asm}) {
+    var position = memory.positions[obj];
+    if (position != null) {
+      return asm(position.x.toWord.i);
+    }
+    return Asm([obj.toA4(memory), asm(curr_x_pos(a4))]);
+  }
+
+  Asm loadY(Address to, {required Memory memory}) {
+    return withY(memory: memory, asm: (y) => move.w(y, to));
+  }
+
+  Asm withY({required Memory memory, required Asm Function(Address) asm}) {
+    var position = memory.positions[obj];
+    if (position != null) {
+      return asm(position.y.toWord.i);
+    }
+    return Asm([obj.toA4(memory), asm(curr_y_pos(a4))]);
+  }
+}
+
+/*
+moveq    #CharID_Rune, d0
+    jsr    (Event_GetCharacter).l
+    lea    (a4), a3
+    lea    (Field_Obj_Secondary).w, a4
+    move.w    #0, d0
+    move.w    $34(a3), d1
+    cmp.w    $34(a4), d1    ; compare rune and dorin y
+    beq.s    loc_6F112        ; branch if same
+    bcc.s    loc_6F124     ; if rune above dorin
+    move.w    #4, d0        ; face up
+    bra.s    loc_6F124        ; otherwise face down
+loc_6F112:
+    move.w    #8, d0        ; face right
+    ; Compare x position
+    move.w    $30(a3), d1
+    cmp.w    $30(a4), d1
+    bcc.s    loc_6F124        ; branch if negative (always, in original)
+    move.w    #$C, d0        ; face left
+loc_6F124:
+    jsr    (Event_UpdateObjFacing).l
+*/
