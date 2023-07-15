@@ -1375,6 +1375,8 @@ class BytesBuilder {
         return lastSpan.bytes.last;
       }
     }
+
+    return null;
   }
 
   void writeAsciiCharacter(String c) {

@@ -58,7 +58,6 @@ extension IndividualMovesToAsm on IndividualMoves {
       var movesList = remainingMoves.entries
           .map((e) => RelativeMove(e.key, e.value))
           .toList();
-      var done = <FieldObject, RelativeMovement>{};
 
       // We could consider sorting movesList by slot
       // so we always start with lead character,
@@ -130,7 +129,7 @@ extension IndividualMovesToAsm on IndividualMoves {
           if (afterSteps.relativeDistance > 0.steps) {
             var current = ctx.positions[moveable];
             if (current == null) {
-              // TODO: We can do some math instead, maybe store in register
+              // TODO(movement): use runtime expression
               // e.g. look up cur position, save in data register
               // might need to look up each time based on necessary math and
               // available data registers
@@ -144,7 +143,7 @@ extension IndividualMovesToAsm on IndividualMoves {
             var x = Word(destination.x).i;
             var y = Word(destination.y).i;
 
-            generator.toA4(moveable);
+            asm.add(moveable.toA4(generator._mem));
             generator.ensureScriptable(moveable);
 
             if (i == lastMoveIndex) {
@@ -152,19 +151,18 @@ extension IndividualMovesToAsm on IndividualMoves {
             } else {
               asm.add(setDestination(x: x, y: y));
             }
-          } else if (movement.distance == 0.steps &&
-              movement.direction != ctx.getFacing(moveable)) {
-            generator.updateFacing(moveable, movement.direction);
+          } else {
+            var facing = movement.facing;
+            if (facing != null && facing != ctx.getFacing(moveable)) {
+              generator.updateFacing(moveable, facing);
+            }
           }
         }
 
         movement = movement.less(stepsToTake);
 
-        // todo: but this ignores delay?
-        if (movement.distance == 0.steps &&
-            movement.direction == ctx.getFacing(moveable)) {
+        if (movement.still) {
           remainingMoves.remove(moveable);
-          done[moveable] = movement;
         } else {
           remainingMoves[moveable] = movement;
         }
@@ -222,7 +220,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
 
     var pos = dest.value;
 
-    generator.toA4(obj);
+    generator.asm.add(obj.toA4(generator._mem));
     generator.ensureScriptable(obj);
 
     if (i < length - 1) {
@@ -276,12 +274,6 @@ class _MovementGenerator {
     }
   }
 
-  void toA4(FieldObject moveable) {
-    if (_mem.inAddress(a4)?.obj != moveable) {
-      asm.add(moveable.toA4(_mem));
-    }
-  }
-
   /// Returns true if object is made scriptable.
   bool ensureScriptable(FieldObject obj) {
     obj = obj.resolve(_mem);
@@ -296,21 +288,26 @@ class _MovementGenerator {
     return false;
   }
 
-  void updateFacing(FieldObject obj, Direction dir) {
-    toA4(obj);
+  void updateFacing(FieldObject obj, DirectionExpression dir) {
+    asm.add(obj.toA4(_mem));
+
     // this ensures facing doesn't change during subsequent movements.
     if (ensureScriptable(obj)) {
       // Destination attributes are not always set,
       // resulting in odd character movements with this routine.
-      // Ensure they're set based on context.
-      var position = _mem.positions[obj];
-      if (position == null) {
-        throw StateError('no current position set for $obj');
-      }
-      asm.add(setDestination(x: position.x.i, y: position.y.i));
+      asm.add(PositionOfObject(obj).withPosition(
+          memory: _mem, asm: (x, y) => setDestination(x: x, y: y)));
     }
-    asm.add(updateObjFacing(dir.address));
-    _mem.setFacing(obj, dir);
+
+    asm.add(dir.withDirection(memory: _mem, asm: (d) => updateObjFacing(d)));
+
+    var known = dir.known(_mem);
+
+    if (known == null) {
+      _mem.clearFacing(obj);
+    } else {
+      _mem.setFacing(obj, known);
+    }
   }
 }
 
@@ -327,30 +324,28 @@ extension Cap on int? {
 
 extension FieldObjectAsm on FieldObject {
   Asm toA4(Memory ctx) {
-    if (ctx.inAddress(a4)?.obj == AddressOf(resolve(ctx))) {
+    if (ctx.inAddress(a4)?.obj == resolve(ctx)) {
       return Asm.empty();
     }
 
     var obj = this;
     var slot = obj.slot(ctx);
-    if (slot != null) {
-      // Slot 1 indexed
-      ctx.putInAddress(a4, obj);
-      return characterBySlotToA4(slot);
-    } else if (obj is Character) {
-      ctx.putInAddress(a4, obj);
-      return characterByIdToA4(obj.charIdAddress);
-    } else if (obj is MapObjectById) {
-      ctx.putInAddress(a4, obj);
-      var address = obj.address(ctx);
-      return lea(Absolute.long(address), a4);
-    } else if (obj is MapObject) {
-      ctx.putInAddress(a4, obj);
-      var address = obj.address(ctx);
-      return lea(Absolute.long(address), a4);
-    }
 
-    /*
+    try {
+      if (slot != null) {
+        // Slot 1 indexed
+        return characterBySlotToA4(slot);
+      } else if (obj is Character) {
+        return characterByIdToA4(obj.charIdAddress);
+      } else if (obj is MapObjectById) {
+        var address = obj.address(ctx);
+        return lea(Absolute.long(address), a4);
+      } else if (obj is MapObject) {
+        var address = obj.address(ctx);
+        return lea(Absolute.long(address), a4);
+      }
+
+      /*
     notes:
 	jsr	(Event_GetCharacter).l
 	bmi.s	loc_6E212
@@ -368,7 +363,10 @@ extension FieldObjectAsm on FieldObject {
     that is, just use findcharslot directly.
      */
 
-    throw UnsupportedError('$this.toA4');
+      throw UnsupportedError('$this.toA4');
+    } finally {
+      ctx.putInAddress(a4, obj);
+    }
   }
 
   Asm toA3(Memory ctx) => toA(a3, ctx);
@@ -518,6 +516,25 @@ PartyArrangement? asmToArrangement(Byte b) {
 }
 
 extension DirectionExpressionAsm on DirectionExpression {
+  Direction? known(Memory memory) => switch (this) {
+        Direction d => d,
+        DirectionOfVector d => d.known(memory),
+        TowardsPlayer d => d.known(memory),
+      };
+
+  Asm withDirection(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      Address destination = d0}) {
+    return switch (this) {
+      Direction d => asm(d.address),
+      DirectionOfVector d =>
+        d.withDirection(memory: memory, asm: asm, destination: destination),
+      TowardsPlayer d =>
+        d.withDirection(memory: memory, asm: asm, destination: destination),
+    };
+  }
+
   Asm load(Address to, Memory memory) {
     return switch (this) {
       Direction d => move.b(d.constant.i, to),
@@ -545,59 +562,105 @@ extension DirectionOfVectorAsm on DirectionOfVector {
     };
   }
 
-  Asm load(Address addr, Memory memory) {
+  Asm withDirection(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      Address destination = d0}) {
+    var known = this.known(memory);
+    if (known != null) {
+      return asm(known.address);
+    }
+
     return Asm([
-      moveq(FacingDir_Down.i, addr),
+      moveq(FacingDir_Down.i, destination),
       from.withY(memory: memory, asm: (y) => move.w(y, d1)),
       to.withY(
           memory: memory,
           asm: (y) => y is Immediate ? cmpi.w(y, d1) : cmp.w(y, d1)),
       beq.s(Label(r'$$checkx')),
       bcc.s(Label(r'$$keep')), // keep up
-      move.w(FacingDir_Up.i, addr),
+      move.w(FacingDir_Up.i, destination),
       bra.s(Label(r'$$keep')), // keep
       label(Label(r'$$checkx')),
-      move.w(FacingDir_Right.i, addr),
+      move.w(FacingDir_Right.i, destination),
       from.withX(memory: memory, asm: (x) => move.w(x, d1)),
       to.withX(
           memory: memory,
           asm: (y) => y is Immediate ? cmpi.w(y, d1) : cmp.w(y, d1)),
       bcc.s(Label(r'$$keep')), // keep up
-      move.w(FacingDir_Left.i, addr),
+      move.w(FacingDir_Left.i, destination),
       label(Label(r'$$keep')),
+      asm(destination)
     ]);
   }
+
+  Asm load(Address addr, Memory memory) => withDirection(
+      memory: memory,
+      asm: (d) => d == addr ? Asm.empty() : move.b(d, addr),
+      destination: addr);
 }
 
 extension TowardsPlayerAsm on TowardsPlayer {
-  Asm load(Address addr, Memory memory) {
+  Direction? known(Memory mem) {
+    if (from == PositionOfObject(InteractionObject())) {
+      return mem.getFacing(Slot.one)?.opposite;
+    }
+    return null;
+  }
+
+  Asm withDirection(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      Address destination = d0}) {
     if (from == PositionOfObject(InteractionObject())) {
       // Character is facing this object,
       // so we only need to face the opposite direction
-      var known = memory.getFacing(Slot.one);
+      var known = memory.getFacing(Slot.one)?.opposite;
 
       if (known != null) {
-        return move.b(known.opposite.address, addr);
+        return asm(known.address);
       }
 
-      // Evaluate at runtime
+      // Optimized runtime evaluation
       return Asm([
         Slot.one.toA3(memory),
-        move.w(facing_dir(a3), addr),
-        bchg(2.i, addr),
+        move.w(facing_dir(a3), destination),
+        bchg(2.i, destination),
+        asm(destination),
       ]);
     }
 
+    // Otherwise do more math
     return DirectionOfVector(from: from, to: PositionOfObject(Slot(1)))
-        .load(addr, memory);
+        .withDirection(memory: memory, asm: asm, destination: destination);
   }
+
+  Asm load(Address addr, Memory memory) => withDirection(
+      memory: memory,
+      asm: (d) => d == addr ? Asm.empty() : move.b(d, addr),
+      destination: addr);
 }
+
+// TODO(refactor): separate class hierarchy for asm?
+// this is essentially trying to be polymorphic
+// so it might make sense to convert the model
+// to a parallel class hierarchy for generation
+// rather than use a bunch of extension methods and switch statements
 
 extension PositionExpressionAsm on PositionExpression {
   Position? known(Memory mem) => switch (this) {
         Position p => p,
         PositionOfObject p => mem.positions[p.obj]
       };
+
+  Asm withPosition(
+      {required Memory memory,
+      required Asm Function(Address x, Address y) asm}) {
+    return switch (this) {
+      Position p => asm(p.x.toWord.i, p.y.toWord.i),
+      PositionOfObject p => p.withPosition(memory: memory, asm: asm),
+    };
+  }
 
   Asm withX({required Memory memory, required Asm Function(Address) asm}) {
     return switch (this) {
@@ -619,46 +682,27 @@ extension PositionOfObjectAsm on PositionOfObject {
     return withX(memory: memory, asm: (x) => move.w(x, to));
   }
 
-  Asm withX({required Memory memory, required Asm Function(Address) asm}) {
-    var position = memory.positions[obj];
-    if (position != null) {
-      return asm(position.x.toWord.i);
-    }
-    return Asm([obj.toA4(memory), asm(curr_x_pos(a4))]);
-  }
-
   Asm loadY(Address to, {required Memory memory}) {
     return withY(memory: memory, asm: (y) => move.w(y, to));
   }
 
-  Asm withY({required Memory memory, required Asm Function(Address) asm}) {
+  Asm withPosition(
+      {required Memory memory,
+      required Asm Function(Address x, Address y) asm}) {
     var position = memory.positions[obj];
     if (position != null) {
-      return asm(position.y.toWord.i);
+      return asm(position.x.toWord.i, position.y.toWord.i);
     }
-    return Asm([obj.toA4(memory), asm(curr_y_pos(a4))]);
+    // Evaluate at runtime
+    return Asm([
+      obj.toA4(memory),
+      asm(curr_x_pos(a4), curr_y_pos(a4)),
+    ]);
   }
-}
 
-/*
-moveq    #CharID_Rune, d0
-    jsr    (Event_GetCharacter).l
-    lea    (a4), a3
-    lea    (Field_Obj_Secondary).w, a4
-    move.w    #0, d0
-    move.w    $34(a3), d1
-    cmp.w    $34(a4), d1    ; compare rune and dorin y
-    beq.s    loc_6F112        ; branch if same
-    bcc.s    loc_6F124     ; if rune above dorin
-    move.w    #4, d0        ; face up
-    bra.s    loc_6F124        ; otherwise face down
-loc_6F112:
-    move.w    #8, d0        ; face right
-    ; Compare x position
-    move.w    $30(a3), d1
-    cmp.w    $30(a4), d1
-    bcc.s    loc_6F124        ; branch if negative (always, in original)
-    move.w    #$C, d0        ; face left
-loc_6F124:
-    jsr    (Event_UpdateObjFacing).l
-*/
+  Asm withX({required Memory memory, required Asm Function(Address) asm}) =>
+      withPosition(memory: memory, asm: (x, _) => asm(x));
+
+  Asm withY({required Memory memory, required Asm Function(Address) asm}) =>
+      withPosition(memory: memory, asm: (_, y) => asm(y));
+}

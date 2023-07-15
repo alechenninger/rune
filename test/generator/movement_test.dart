@@ -524,7 +524,7 @@ void main() {
           }),
           IndividualMoves()
             ..moves[MapObjectById(MapObjectId('testnpc'))] =
-                (StepPath()..direction = Direction.right)
+                (StepPath()..facing = Direction.right)
         ]);
 
         var sceneAsm = program.addScene(SceneId('testscene'), scene);
@@ -534,8 +534,33 @@ void main() {
             Asm([
               lea(0xFFFFC300.toLongword.l, a4),
               move.w(0x8194.toWord.i, a4.indirect),
-              move.w(0x50.i, dest_x_pos(a4)),
-              move.w(0x60.i, dest_y_pos(a4)),
+              move.w(0x50.toWord.i, dest_x_pos(a4)),
+              move.w(0x60.toWord.i, dest_y_pos(a4)),
+              moveq(FacingDir_Right.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+            ]));
+      });
+
+      test('faces npcs without knowing current position', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.setFacing(npc, Direction.down);
+            ctx.currentMap = map;
+          }),
+          IndividualMoves()
+            ..moves[MapObjectById(MapObjectId('testnpc'))] =
+                (StepPath()..facing = Direction.right)
+        ]);
+
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              lea(0xFFFFC300.toLongword.l, a4),
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(curr_x_pos(a4), dest_x_pos(a4)),
+              move.w(curr_y_pos(a4), dest_y_pos(a4)),
               moveq(FacingDir_Right.i, d0),
               jsr(Label('Event_UpdateObjFacing').l),
             ]));
@@ -605,8 +630,8 @@ void main() {
 
     test('just facing with multiple characters', () {
       var moves = IndividualMoves()
-        ..moves[shay] = (StepPath()..direction = right)
-        ..moves[alys] = (StepPath()..direction = left);
+        ..moves[shay] = Face(right)
+        ..moves[alys] = Face(left);
 
       var asm = moves.toAsm(Memory()..followLead = false);
       expect(
@@ -624,7 +649,7 @@ void main() {
         ..moves[hahn] = (StepPath()
           ..direction = up
           ..distance = 1.step)
-        ..moves[alys] = (StepPath()..direction = up);
+        ..moves[alys] = Face(up);
 
       var asm = moves.toAsm(Memory()
         ..positions[hahn] = Position(0x100, 0x0c0)
@@ -651,9 +676,7 @@ void main() {
             ..direction = left
             ..distance = 1.step)
           ..face(down))
-        ..moves[alys] = (StepPath()
-          ..delay = 2.steps
-          ..direction = up);
+        ..moves[alys] = (Face(up)..delay = 2.steps);
 
       var asm = moves.toAsm(Memory()
         ..positions[hahn] = Position(0x100, 0x0c0)
@@ -757,7 +780,7 @@ void main() {
       expect(
           asm,
           EventAsm([
-            npc.toA4(state),
+            npc.toA4(testState),
             move.w(0x8194.toWord.i, a4.indirect),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
           ]));
@@ -816,7 +839,7 @@ void main() {
       expect(
           asm,
           EventAsm([
-            npc.toA4(state),
+            npc.toA4(testState),
             move.w(0x8194.toWord.i, a4.indirect),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
           ]));

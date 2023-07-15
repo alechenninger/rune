@@ -94,6 +94,27 @@ class Path {
   int get hashCode => length.hashCode ^ direction.hashCode;
 }
 
+sealed class PositionExpression {}
+
+class PositionOfObject extends PositionExpression {
+  final FieldObject obj;
+
+  PositionOfObject(this.obj);
+
+  @override
+  String toString() => 'PositionOfObject{obj: $obj}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PositionOfObject &&
+          runtimeType == other.runtimeType &&
+          obj == other.obj;
+
+  @override
+  int get hashCode => obj.hashCode;
+}
+
 /// A fork of [Point] for our domain model.
 class Position implements PositionExpression {
   final int x;
@@ -159,6 +180,50 @@ class Position implements PositionExpression {
   String toString() {
     return '($x, $y)';
   }
+}
+
+sealed class DirectionExpression {}
+
+class TowardsPlayer extends DirectionExpression {
+  final PositionExpression from;
+
+  TowardsPlayer(this.from);
+
+  @override
+  String toString() {
+    return 'TowardsPlayer{from: $from}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is TowardsPlayer &&
+      runtimeType == other.runtimeType &&
+      from == other.from;
+
+  @override
+  int get hashCode => from.hashCode;
+}
+
+class DirectionOfVector extends DirectionExpression {
+  final PositionExpression from;
+  final PositionExpression to;
+
+  DirectionOfVector({required this.from, required this.to});
+
+  @override
+  String toString() {
+    return 'DirectionOfVector{from: $from, to: $to}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DirectionOfVector &&
+      runtimeType == other.runtimeType &&
+      from == other.from &&
+      to == other.to;
+
+  @override
+  int get hashCode => from.hashCode ^ to.hashCode;
 }
 
 const up = Direction.up;
@@ -384,6 +449,9 @@ class IndividualMoves extends Event {
 
 class AbsoluteMoves extends Event {
   // Facing can be controlled with individual movements
+  // TODO(movement): we could support delays
+  // even though we don't know the duration of movements,
+  // we can still delay individual movements.
   Map<FieldObject, Position> destinations = {};
   StepSpeed speed = StepSpeed.fast;
   Axis startingAxis = Axis.x;
@@ -557,12 +625,26 @@ abstract class RelativeMovement extends ContextualMovement {
   /// TODO: rename
   Direction get direction;
 
+  /// Direction to face after the first continuous movement is traveled
+  /// (when either the end or first delay is encountered).
+  ///
+  /// If `null`, the object will face in the same direction as it last moved.
+  DirectionExpression? get facing;
+
+  /// If this movement represents an object standing still (doing nothing).
+  bool get still => duration == 0.steps && facing == null;
+
   RelativeMovement? append(RelativeMovement m) => null;
 
+  /// If [steps] is 0, and the only continuous path is a [facing],
+  /// then the [facing] is considered traveled,
+  /// and the resulting movement will have no [facing].
+  ///
+  /// Facing can only be traveled this way; otherwise it will be skipped.
   RelativeMovement less(Steps steps);
 
-  /// Movements which are continuous (there is no pause in between) and should
-  /// start immediately (delay should == 0).
+  /// Movements which are continuous (there is no pause or facing in between)
+  /// and should start immediately (delay should == 0).
   // todo: should this just be StepDirection to include delays?
   // todo: should probably be method instead of getter
   List<Path> get continuousPaths;
@@ -629,6 +711,8 @@ class StepPath extends RelativeMovement {
   var distance = 0.steps;
   @override
   var delay = 0.steps;
+  @override
+  DirectionExpression? facing;
 
   @override
   Steps get duration => delay + distance;
@@ -669,12 +753,18 @@ class StepPath extends RelativeMovement {
     var remainingToTravel = steps - lessDelay;
     answer.distance = distance - remainingToTravel;
 
+    answer.facing =
+        answer.duration == 0.steps && steps == 0.steps ? null : facing;
+
     return answer;
   }
 
   @override
   String toString() {
-    return 'StepDirection{direction: $direction, distance: $distance, delay: $delay}';
+    return 'StepPath{direction: $direction, '
+        'distance: $distance, '
+        'delay: $delay, '
+        'facing: $facing}';
   }
 
   @override
@@ -684,13 +774,16 @@ class StepPath extends RelativeMovement {
           runtimeType == other.runtimeType &&
           direction == other.direction &&
           distance == other.distance &&
-          delay == other.delay) ||
+          delay == other.delay &&
+          facing == other.facing) ||
       (other is StepPaths &&
           other._paths.length == 1 &&
-          this == other._paths.first);
+          this == other._paths.first) ||
+      (other is Face && this == other.asStep());
 
   @override
-  int get hashCode => direction.hashCode ^ distance.hashCode ^ delay.hashCode;
+  int get hashCode =>
+      direction.hashCode ^ distance.hashCode ^ delay.hashCode ^ facing.hashCode;
 }
 
 class StepPaths extends RelativeMovement {
@@ -724,10 +817,14 @@ class StepPaths extends RelativeMovement {
       if (last.direction == step.direction) {
         if (step.delay == 0.steps) {
           _paths.removeLast();
-          _paths.add(last..distance = last.distance + step.distance);
+          _paths.add(last
+            ..distance = last.distance + step.distance
+            ..facing = step.facing);
         } else if (last.delay > 0.steps && last.distance == 0.steps) {
           _paths.removeLast();
-          _paths.add(step..delay = last.delay + step.delay);
+          _paths.add(step
+            ..delay = last.delay + step.delay
+            ..facing = step.facing);
         } else {
           _paths.add(step);
         }
@@ -737,11 +834,12 @@ class StepPaths extends RelativeMovement {
     }
   }
 
-  // TODO: this probably doesn't work at any arbitrary point, only at the end.
-  //  because distance is 0, hard to know it is actually supposed to generate
-  //  code.
-  void face(Direction direction) {
-    step(StepPath()..direction = direction);
+  /// Face the object in the direction of [direction].
+  ///
+  /// Only affects the end of [continuousPaths]. If there is a subsequent step
+  /// without delay, the facing will be ignored.
+  void face(DirectionExpression direction) {
+    step(Face(direction).asStep());
   }
 
   @override
@@ -758,6 +856,15 @@ class StepPaths extends RelativeMovement {
       : _paths.map((s) => s.duration).reduce((sum, d) => sum + d);
 
   @override
+  DirectionExpression? get facing {
+    if (_paths.isEmpty) {
+      return null;
+    }
+
+    return _paths.takeWhile((step) => step.delay == 0.steps).lastOrNull?.facing;
+  }
+
+  @override
   Direction get direction =>
       // TODO: what to do if no steps?
       _paths.isEmpty ? Direction.down : _paths.first.direction;
@@ -771,21 +878,31 @@ class StepPaths extends RelativeMovement {
   @override
   StepPaths less(Steps steps) {
     if (steps > duration) throw StateError('negative distance');
-    if (steps == 0.steps) return this;
 
-    var totalSubtracted = 0.steps;
+    Steps? totalSubtracted;
     var answer = StepPaths();
     StepPath? lastStep;
 
     for (var path in _paths) {
-      var canMove = (steps - totalSubtracted).min(path.duration);
-      lastStep = path.less(canMove);
+      var canMove = (steps - (totalSubtracted ?? 0.steps)).min(path.duration);
 
-      if (lastStep.duration > 0.steps || answer._paths.isNotEmpty) {
+      if (totalSubtracted != steps) {
+        lastStep = path.less(canMove);
+      } else {
+        lastStep = path;
+      }
+
+      if (lastStep.duration > 0.steps ||
+          lastStep.facing != null ||
+          answer._paths.isNotEmpty) {
         answer.step(lastStep);
       }
 
-      totalSubtracted += canMove;
+      if (totalSubtracted == null) {
+        totalSubtracted = canMove;
+      } else {
+        totalSubtracted += canMove;
+      }
     }
 
     if (answer._paths.isEmpty && lastStep != null) {
@@ -806,7 +923,8 @@ class StepPaths extends RelativeMovement {
       (other is StepPaths &&
           runtimeType == other.runtimeType &&
           const ListEquality().equals(_paths, other._paths)) ||
-      (other is StepPath && _paths.length == 1 && _paths.first == other);
+      (other is StepPath && _paths.length == 1 && _paths.first == other) ||
+      (other is Face && this == other.asStep());
 
   @override
   int get hashCode => _paths.length == 1
@@ -854,6 +972,9 @@ class StepToPoint extends RelativeMovement {
   @override
   Steps get duration => delay + distance;
 
+  @override
+  DirectionExpression? facing;
+
   Position from = Position(0, 0);
   Position to = Position(0, 0);
   Position get relativePosition => to - from;
@@ -879,11 +1000,14 @@ class StepToPoint extends RelativeMovement {
     var newDelay = delay - lessDelay;
     var newStart = from + firstMove.asPosition + secondMove.asPosition;
 
+    var newFacing = steps == 0.steps && duration == 0.steps ? null : facing;
+
     return StepToPoint()
       ..delay = newDelay
       ..from = newStart
       ..to = to
-      ..firstAxis = firstAxis;
+      ..firstAxis = firstAxis
+      ..facing = newFacing;
   }
 
   @override
@@ -995,37 +1119,59 @@ enum PartyArrangement {
   }
 }
 
-class Face extends Event {
-  final FieldObject object;
-  final DirectionExpression direction;
-
-  Face(this.object, this.direction);
+class Face extends RelativeMovement {
+  @override
+  List<Path> get continuousPaths =>
+      delay > 0.steps ? [] : [Path(0.steps, direction)];
 
   @override
-  void visit(EventVisitor visitor) {
-    // TODO: implement visit
+  var delay = 0.steps;
+
+  /// Meaningless because distance is always 0.
+  @override
+  final direction = Direction.up;
+
+  @override
+  final distance = 0.steps;
+
+  @override
+  Steps get duration => delay;
+
+  @override
+  DirectionExpression facing;
+
+  Face(this.facing);
+
+  StepPath asStep() => StepPath()
+    ..delay = delay
+    ..facing = facing;
+
+  @override
+  RelativeMovement less(Steps steps) {
+    if (steps > duration) throw ArgumentError('negative distance');
+
+    if (duration == 0.steps) {
+      // Once faced, then return a still movement.
+      return StepPath();
+    }
+
+    return Face(facing)..delay = delay - steps;
   }
-}
 
-sealed class DirectionExpression {}
+  @override
+  String toString() {
+    return 'Face{facing: $facing, delay: $delay}';
+  }
 
-class TowardsPlayer extends DirectionExpression {
-  final PositionExpression from;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Face &&
+          runtimeType == other.runtimeType &&
+          facing == other.facing &&
+          delay == other.delay) ||
+      (other is RelativeMovement && asStep() == other);
 
-  TowardsPlayer(this.from);
-}
-
-class DirectionOfVector extends DirectionExpression {
-  final PositionExpression from;
-  final PositionExpression to;
-
-  DirectionOfVector({required this.from, required this.to});
-}
-
-sealed class PositionExpression {}
-
-class PositionOfObject extends PositionExpression {
-  final FieldObject obj;
-
-  PositionOfObject(this.obj);
+  @override
+  int get hashCode => asStep().hashCode;
 }

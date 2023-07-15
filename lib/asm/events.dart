@@ -499,7 +499,7 @@ Asm characterByNameToA4(String name) {
 
 Asm updateObjFacing(Address direction) {
   return Asm([
-    moveq(direction, d0),
+    if (direction != d0) moveq(direction, d0),
     jsr(Label('Event_UpdateObjFacing').l),
   ]);
 }

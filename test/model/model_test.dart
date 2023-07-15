@@ -110,6 +110,29 @@ void main() {
       var step = StepPath()..distance = 5.steps;
       expect(step.less(2.steps), StepPath()..distance = 3.steps);
     });
+
+    test('less total steps leaves facing', () {
+      var step = StepPath()
+        ..distance = 5.steps
+        ..direction = Direction.up
+        ..facing = Direction.right;
+
+      expect(
+          step.less(5.steps),
+          StepPath()
+            ..distance = 0.steps
+            ..direction = Direction.up
+            ..facing = Direction.right);
+    });
+
+    test('with only facing, less 0 steps removes facing', () {
+      var step = StepPath()..facing = Direction.right;
+
+      step = step.less(0.steps);
+
+      expect(step, StepPath()..facing = null);
+      expect(step.still, isTrue);
+    });
   });
 
   group('step directions', () {
@@ -154,6 +177,57 @@ void main() {
 
       expect(move.continuousPathsWithFirstAxis(Axis.x),
           [Path(3.steps, right), Path(2.steps, up)]);
+    });
+
+    test('at pause after facing has facing', () {
+      var move = StepPaths();
+      move.step((Face(right)..delay = 1.step).asStep());
+      move.step(StepPath()
+        ..delay = 1.step
+        ..direction = down
+        ..distance = 1.step);
+
+      move = move.less(1.step);
+
+      expect(move.facing, right);
+    });
+
+    test('at end has facing', () {
+      var move = StepPaths();
+      move.step(StepPath()
+        ..delay = 1.step
+        ..direction = down
+        ..distance = 1.step);
+      move.step(StepPath()
+        ..direction = right
+        ..distance = 2.steps
+        ..facing = up);
+
+      move = move.less(4.step);
+
+      expect(move.duration, 0.steps);
+      expect(move.facing, up);
+    });
+
+    test('at end less 0 steps removes facing', () {
+      var move = StepPaths();
+      move.step(StepPath()
+        ..delay = 1.step
+        ..direction = down
+        ..distance = 1.step);
+      move.step(StepPath()
+        ..direction = right
+        ..distance = 2.steps
+        ..facing = up);
+
+      move = move.less(4.step);
+
+      expect(move.still, isFalse);
+
+      move = move.less(0.step);
+
+      expect(move.facing, null);
+      expect(move.still, isTrue);
     });
   });
 

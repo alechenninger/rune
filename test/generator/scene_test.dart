@@ -523,8 +523,7 @@ ${dialog2.toAsm()}
           ctx.slots[1] = alys;
           ctx.positions[alys] = Position(0x50, 0x50);
         }),
-        IndividualMoves()
-          ..moves[alys] = (StepPath()..direction = Direction.right),
+        IndividualMoves()..moves[alys] = Face(Direction.right),
         Dialog(spans: DialogSpan.parse('Hello')),
       ]);
 
