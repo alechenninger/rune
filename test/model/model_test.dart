@@ -705,6 +705,22 @@ void main() {
         expect(scenes, hasLength(1));
         expect(scenes[scene]?.getOrStartMap(map.id).areas, [area0, area1]);
       });
+
+      test('noninteractive objects should not share scenes', () {
+        var obj0 = MapObject(
+            id: '0', startPosition: Position(0, 0), spec: Elevator(down));
+        var obj1 = MapObject(
+            id: '1', startPosition: Position(0, 0), spec: Elevator(down));
+
+        map.addObject(obj0);
+        map.addObject(obj1);
+
+        var scenes = game.byInteraction();
+
+        expect(scenes, hasLength(2));
+        expect(scenes[obj0.onInteract]?.getOrStartMap(map.id).objects, [obj0]);
+        expect(scenes[obj1.onInteract]?.getOrStartMap(map.id).objects, [obj1]);
+      });
     });
   });
 

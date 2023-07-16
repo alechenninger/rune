@@ -919,11 +919,12 @@ class MapObject extends FieldObject implements MapElement, UnnamedSpeaker {
   @override
   final portrait = null;
 
+  Scene? _none;
   Scene get onInteract {
     if (isInteractive) {
       return (spec as Interactive).onInteract;
     }
-    return const Scene.none();
+    return _none ??= Scene.none();
   }
 
   bool get isInteractive => spec is Interactive;
