@@ -484,7 +484,7 @@ class Party extends Moveable {
     ..followLeader = true;
 }
 
-abstract class Moveable {
+sealed class Moveable {
   const Moveable();
 
   /// Throws [ResolveException] if cannot resolve.
