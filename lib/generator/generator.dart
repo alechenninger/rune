@@ -517,7 +517,7 @@ class SceneAsmGenerator implements EventVisitor {
           face.object == const InteractionObject()) {
         asm.add(jsr(Label('Interaction_UpdateObj').l));
       } else {
-        asm.add(face.toMoves().toAsm(_memory));
+        asm.add(face.toMoves().toAsm(_memory, eventIndex: i));
       }
 
       return asm;
@@ -526,7 +526,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void individualMoves(IndividualMoves moves) {
-    _addToEvent(moves, (i) => moves.toAsm(_memory));
+    _addToEvent(moves, (i) => moves.toAsm(_memory, eventIndex: i));
   }
 
   @override

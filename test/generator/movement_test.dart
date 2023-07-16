@@ -1071,22 +1071,22 @@ void main() {
       expect(
           asm,
           Asm([
-            moveq(FacingDir_Down.i, d0),
             Slot.two.toA3(testState),
-            move.w(curr_y_pos(a3), d1),
+            move.w(curr_y_pos(a3), d2),
             Slot.one.toA4(testState),
-            cmp.w(curr_y_pos(a4), d1),
-            beq.s(Label(r'$$checkx')),
-            bcc.s(Label(r'$$keep')),
+            moveq(FacingDir_Down.i, d0),
+            cmp.w(curr_y_pos(a4), d2),
+            beq.s(Label(r'.checkx_1_Slot1_0')),
+            bcc.s(Label(r'.keep_1_Slot1_0')),
             move.w(FacingDir_Up.i, d0),
-            bra.s(Label(r'$$keep')),
-            label(Label(r'$$checkx')),
+            bra.s(Label(r'.keep_1_Slot1_0')),
+            label(Label(r'.checkx_1_Slot1_0')),
             move.w(FacingDir_Right.i, d0),
-            move.w(curr_x_pos(a3), d1),
-            cmp.w(curr_x_pos(a4), d1),
-            bcc.s(Label(r'$$keep')),
+            move.w(curr_x_pos(a3), d2),
+            cmp.w(curr_x_pos(a4), d2),
+            bcc.s(Label(r'.keep_1_Slot1_0')),
             move.w(FacingDir_Left.i, d0),
-            label(Label(r'$$keep')),
+            label(Label(r'.keep_1_Slot1_0')),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
@@ -1098,28 +1098,78 @@ void main() {
           asm,
           Asm([
             // Note a4 is only loaded once.
-            moveq(FacingDir_Down.i, d0),
             rune.toA3(testState),
-            move.w(curr_y_pos(a3), d1),
+            move.w(curr_y_pos(a3), d2),
             alys.toA4(testState),
-            cmp.w(curr_y_pos(a4), d1),
-            beq.s(Label(r'$$checkx')),
-            bcc.s(Label(r'$$keep')),
+            moveq(FacingDir_Down.i, d0),
+            cmp.w(curr_y_pos(a4), d2),
+            beq.s(Label(r'.checkx_1_Alys_0')),
+            bcc.s(Label(r'.keep_1_Alys_0')),
             move.w(FacingDir_Up.i, d0),
-            bra.s(Label(r'$$keep')),
-            label(Label(r'$$checkx')),
+            bra.s(Label(r'.keep_1_Alys_0')),
+            label(Label(r'.checkx_1_Alys_0')),
             move.w(FacingDir_Right.i, d0),
-            move.w(curr_x_pos(a3), d1),
-            cmp.w(curr_x_pos(a4), d1),
-            bcc.s(Label(r'$$keep')),
+            move.w(curr_x_pos(a3), d2),
+            cmp.w(curr_x_pos(a4), d2),
+            bcc.s(Label(r'.keep_1_Alys_0')),
             move.w(FacingDir_Left.i, d0),
-            label(Label(r'$$keep')),
+            label(Label(r'.keep_1_Alys_0')),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
 
-    // TODO(optimization, movement): what if we have multiple characters facing another?
-    // will result in some redundant loads currently
+    test('multiple characters face character', () {
+      // TODO(optimization, movement): could technically reuse data registers
+      // could also use different address registers
+      // to avoid collision with update facing routine
+      // or push/pop on stack
+
+      var moves = IndividualMoves()
+        ..moves[alys] = Face(alys.towards(rune))
+        ..moves[shay] = Face(shay.towards(rune));
+
+      var asm = generate([moves]);
+      expect(
+          asm,
+          Asm([
+            rune.toA3(testState),
+            move.w(curr_y_pos(a3), d2),
+            alys.toA4(testState),
+            moveq(FacingDir_Down.i, d0),
+            cmp.w(curr_y_pos(a4), d2),
+            beq.s(Label(r'.checkx_1_Alys_0')),
+            bcc.s(Label(r'.keep_1_Alys_0')),
+            move.w(FacingDir_Up.i, d0),
+            bra.s(Label(r'.keep_1_Alys_0')),
+            label(Label(r'.checkx_1_Alys_0')),
+            move.w(FacingDir_Right.i, d0),
+            move.w(curr_x_pos(a3), d2),
+            cmp.w(curr_x_pos(a4), d2),
+            bcc.s(Label(r'.keep_1_Alys_0')),
+            move.w(FacingDir_Left.i, d0),
+            label(Label(r'.keep_1_Alys_0')),
+            jsr(Label('Event_UpdateObjFacing').l),
+            // Must be loaded again due to UpdateObjFacing routine
+            // see 'todo' above
+            rune.toA3(testState..putInAddress(a3, null)),
+            move.w(curr_y_pos(a3), d2),
+            shay.toA4(testState),
+            moveq(FacingDir_Down.i, d0),
+            cmp.w(curr_y_pos(a4), d2),
+            beq.s(Label(r'.checkx_1_Shay_1')),
+            bcc.s(Label(r'.keep_1_Shay_1')),
+            move.w(FacingDir_Up.i, d0),
+            bra.s(Label(r'.keep_1_Shay_1')),
+            label(Label(r'.checkx_1_Shay_1')),
+            move.w(FacingDir_Right.i, d0),
+            move.w(curr_x_pos(a3), d2),
+            cmp.w(curr_x_pos(a4), d2),
+            bcc.s(Label(r'.keep_1_Shay_1')),
+            move.w(FacingDir_Left.i, d0),
+            label(Label(r'.keep_1_Shay_1')),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
+    });
 
     test('interaction object faces player optimization', () {
       var moves =

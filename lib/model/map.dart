@@ -994,7 +994,7 @@ class MapObject extends FieldObject implements MapElement, UnnamedSpeaker {
 
   @override
   String toString() {
-    return 'MapObject{id: $id}';
+    return 'MapObject{$id}';
   }
 
   @override

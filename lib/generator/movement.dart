@@ -41,9 +41,9 @@ if independent moves == follow lead moves, just use follow lead flag
  */
 
 extension IndividualMovesToAsm on IndividualMoves {
-  EventAsm toAsm(Memory ctx) {
+  EventAsm toAsm(Memory ctx, {int? eventIndex}) {
     var asm = EventAsm.empty();
-    var generator = _MovementGenerator(asm, ctx);
+    var generator = _MovementGenerator(asm, ctx, eventIndex);
 
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
@@ -159,7 +159,7 @@ extension IndividualMovesToAsm on IndividualMoves {
           } else {
             var facing = movement.facing;
             if (facing != null && facing != ctx.getFacing(moveable)) {
-              generator.updateFacing(moveable, facing);
+              generator.updateFacing(moveable, facing, i);
             }
           }
         }
@@ -250,10 +250,11 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
 }
 
 class _MovementGenerator {
-  _MovementGenerator(this.asm, this._mem);
+  _MovementGenerator(this.asm, this._mem, [this._eventIndex]);
 
   final EventAsm asm;
   final Memory _mem;
+  final int? _eventIndex;
 
   void setStartingAxis(Axis axis) {
     if (_mem.startingAxis != axis) {
@@ -295,8 +296,13 @@ class _MovementGenerator {
         _mem.getRoutine(obj) == scriptableObjectRoutine;
   }
 
-  void updateFacing(FieldObject obj, DirectionExpression dir) {
+  void updateFacing(FieldObject obj, DirectionExpression dir, int moveIndex) {
     asm.add(dir.withDirection(
+        labelSuffix: '_${[
+          _eventIndex,
+          _labelSafeString(obj),
+          moveIndex
+        ].whereNotNull().join('_')}',
         memory: _mem,
         asm: (d) {
           return Asm([
@@ -314,6 +320,7 @@ class _MovementGenerator {
         }));
 
     _mem.setRoutine(obj, scriptableObjectRoutine);
+    _mem.putInAddress(a3, null);
 
     var known = dir.known(_mem);
 
@@ -336,7 +343,12 @@ extension Cap on int? {
   }
 }
 
+String _labelSafeString(FieldObject obj) {
+  return obj.toString().replaceAll(RegExp(r'[{}:,]'), '');
+}
+
 extension FieldObjectAsm on FieldObject {
+  /// NOTE! May overwrite data registers.
   Asm toA4(Memory ctx) {
     if (ctx.inAddress(a4)?.obj == resolve(ctx)) {
       return Asm.empty();
@@ -386,8 +398,10 @@ extension FieldObjectAsm on FieldObject {
     }
   }
 
+  /// NOTE! May overwrite data registers.
   Asm toA3(Memory ctx) => toA(a3, ctx);
 
+  /// NOTE! May overwrite data registers.
   Asm toA(DirectAddressRegister a, Memory memory) {
     if (a == a4) return toA4(memory);
 
@@ -554,11 +568,15 @@ extension DirectionExpressionAsm on DirectionExpression {
   Asm withDirection(
       {required Memory memory,
       required Asm Function(Address) asm,
-      Address destination = d0}) {
+      Address destination = d0,
+      String? labelSuffix}) {
     return switch (this) {
       Direction d => asm(d.address),
-      DirectionOfVector d =>
-        d.withDirection(memory: memory, asm: asm, destination: destination),
+      DirectionOfVector d => d.withDirection(
+          labelSuffix: labelSuffix,
+          memory: memory,
+          asm: asm,
+          destination: destination),
     };
   }
 
@@ -600,7 +618,8 @@ extension DirectionOfVectorAsm on DirectionOfVector {
   Asm withDirection(
       {required Memory memory,
       required Asm Function(Address) asm,
-      Address destination = d0}) {
+      Address destination = d0,
+      String? labelSuffix}) {
     var known = this.known(memory);
     if (known != null) {
       return asm(known.address);
@@ -615,27 +634,31 @@ extension DirectionOfVectorAsm on DirectionOfVector {
       ]);
     }
 
+    labelSuffix ??= '';
+
     return Asm([
-      moveq(FacingDir_Down.i, destination),
-      to.withY(memory: memory, asm: (y) => move.w(y, d1), load: a3),
+      to.withY(memory: memory, asm: (y) => move.w(y, d2), load: a3),
       from.withY(
           memory: memory,
-          asm: (y) => y is Immediate ? cmpi.w(y, d1) : cmp.w(y, d1),
+          asm: (y) => Asm([
+                moveq(FacingDir_Down.i, destination),
+                y is Immediate ? cmpi.w(y, d2) : cmp.w(y, d2)
+              ]),
           load: a4),
-      beq.s(Label(r'$$checkx')),
-      bcc.s(Label(r'$$keep')), // keep up
+      beq.s(Label(r'.checkx' + labelSuffix)),
+      bcc.s(Label(r'.keep' + labelSuffix)), // keep up
       move.w(FacingDir_Up.i, destination),
-      bra.s(Label(r'$$keep')), // keep
-      label(Label(r'$$checkx')),
+      bra.s(Label(r'.keep' + labelSuffix)), // keep
+      label(Label(r'.checkx' + labelSuffix)),
       move.w(FacingDir_Right.i, destination),
-      to.withX(memory: memory, asm: (x) => move.w(x, d1), load: a3),
+      to.withX(memory: memory, asm: (x) => move.w(x, d2), load: a3),
       from.withX(
           memory: memory,
-          asm: (x) => x is Immediate ? cmpi.w(x, d1) : cmp.w(x, d1),
+          asm: (x) => x is Immediate ? cmpi.w(x, d2) : cmp.w(x, d2),
           load: a4),
-      bcc.s(Label(r'$$keep')), // keep up
+      bcc.s(Label(r'.keep' + labelSuffix)), // keep up
       move.w(FacingDir_Left.i, destination),
-      label(Label(r'$$keep')),
+      label(Label(r'.keep' + labelSuffix)),
       asm(destination)
     ]);
   }
