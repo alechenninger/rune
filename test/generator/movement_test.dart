@@ -1065,17 +1065,16 @@ void main() {
       testState = state.branch();
     });
 
-    // Given an object, face it towards another object
-    test('face towards', () {
+    test('slot faces slot', () {
       var moves = Face(Slot.one.towards(Slot.two)).move(Slot.one);
       var asm = generate([moves]);
       expect(
           asm,
           Asm([
-            Slot.one.toA4(testState),
             moveq(FacingDir_Down.i, d0),
             Slot.two.toA3(testState),
             move.w(curr_y_pos(a3), d1),
+            Slot.one.toA4(testState),
             cmp.w(curr_y_pos(a4), d1),
             beq.s(Label(r'$$checkx')),
             bcc.s(Label(r'$$keep')),
@@ -1092,8 +1091,37 @@ void main() {
           ]));
     });
 
-    // Interaction object facing player optimization
-    test('interaction object facing player', () {
+    test('character faces character', () {
+      var moves = Face(alys.towards(rune)).move(alys);
+      var asm = generate([moves]);
+      expect(
+          asm,
+          Asm([
+            // Note a4 is only loaded once.
+            moveq(FacingDir_Down.i, d0),
+            rune.toA3(testState),
+            move.w(curr_y_pos(a3), d1),
+            alys.toA4(testState),
+            cmp.w(curr_y_pos(a4), d1),
+            beq.s(Label(r'$$checkx')),
+            bcc.s(Label(r'$$keep')),
+            move.w(FacingDir_Up.i, d0),
+            bra.s(Label(r'$$keep')),
+            label(Label(r'$$checkx')),
+            move.w(FacingDir_Right.i, d0),
+            move.w(curr_x_pos(a3), d1),
+            cmp.w(curr_x_pos(a4), d1),
+            bcc.s(Label(r'$$keep')),
+            move.w(FacingDir_Left.i, d0),
+            label(Label(r'$$keep')),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
+    });
+
+    // TODO(optimization, movement): what if we have multiple characters facing another?
+    // will result in some redundant loads currently
+
+    test('interaction object faces player optimization', () {
       var moves =
           Face(InteractionObject().towards(Slot.one)).move(InteractionObject());
       var asm = EventAsm.empty();
@@ -1106,10 +1134,11 @@ void main() {
       expect(
           asm.withoutComments().skip(1).take(5),
           Asm([
-            lea(a3.indirect, a4),
-            Slot.one.toA3(testState),
-            move.w(facing_dir(a3), d0),
+            Slot.one.toA4(testState),
+            move.w(facing_dir(a4), d0),
             bchg(2.i, d0),
+            // or maybe exg?
+            lea(a3.indirect, a4),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });

@@ -279,8 +279,9 @@ class _MovementGenerator {
   bool ensureScriptable(FieldObject obj) {
     obj = obj.resolve(_mem);
 
-    if (obj is MapObject && _mem.getRoutine(obj) != scriptableObjectRoutine) {
+    if (!scriptable(obj)) {
       // Make map object scriptable
+      asm.add(obj.toA4(_mem));
       asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
       _mem.setRoutine(obj, scriptableObjectRoutine);
       return true;
@@ -289,18 +290,30 @@ class _MovementGenerator {
     return false;
   }
 
+  bool scriptable(FieldObject obj) {
+    return obj.resolve(_mem) is! MapObject ||
+        _mem.getRoutine(obj) == scriptableObjectRoutine;
+  }
+
   void updateFacing(FieldObject obj, DirectionExpression dir) {
-    asm.add(obj.toA4(_mem));
+    asm.add(dir.withDirection(
+        memory: _mem,
+        asm: (d) {
+          return Asm([
+            obj.toA4(_mem),
+            // This ensures facing doesn't change during subsequent movements.
+            if (!scriptable(obj)) ...[
+              asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect),
+              // Destination attributes are not always set,
+              // resulting in odd character movements with this routine.
+              PositionOfObject(obj).withPosition(
+                  memory: _mem, asm: (x, y) => setDestination(x: x, y: y)),
+            ],
+            updateObjFacing(d)
+          ]);
+        }));
 
-    // this ensures facing doesn't change during subsequent movements.
-    if (ensureScriptable(obj)) {
-      // Destination attributes are not always set,
-      // resulting in odd character movements with this routine.
-      asm.add(PositionOfObject(obj).withPosition(
-          memory: _mem, asm: (x, y) => setDestination(x: x, y: y)));
-    }
-
-    asm.add(dir.withDirection(memory: _mem, asm: (d) => updateObjFacing(d)));
+    _mem.setRoutine(obj, scriptableObjectRoutine);
 
     var known = dir.known(_mem);
 
@@ -344,8 +357,8 @@ extension FieldObjectAsm on FieldObject {
       } else if (obj is MapObject) {
         var address = obj.address(ctx);
         return lea(Absolute.long(address), a4);
-      } else if (obj is InteractionObject &&
-          ctx.inAddress(a3)?.obj == InteractionObject()) {
+      } else if (ctx.inAddress(a3)?.obj == obj) {
+        // TODO(movement): this could generalize to checking every a register
         return lea(a3.indirect, a4);
       }
 
@@ -595,8 +608,8 @@ extension DirectionOfVectorAsm on DirectionOfVector {
 
     if (playerIsFacingFrom) {
       return Asm([
-        Slot.one.toA3(memory),
-        move.w(facing_dir(a3), destination),
+        Slot.one.toA4(memory),
+        move.w(facing_dir(a4), destination),
         bchg(2.i, destination),
         asm(destination),
       ]);
