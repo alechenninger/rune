@@ -50,7 +50,12 @@ extension IndividualMovesToAsm on IndividualMoves {
     var remainingMoves = Map.of(moves.map(
         (moveable, movement) => MapEntry(moveable.resolve(ctx), movement)));
 
-    generator.charactersDoNotFollowLeader(remainingMoves.keys);
+    if (ctx.followLead != false &&
+        remainingMoves.entries.any((move) =>
+            move.key.resolve(ctx) is! MapObject &&
+            move.value.distance > 0.steps)) {
+      asm.add(followLeader(ctx.followLead = false));
+    }
     generator.setSpeed(speed);
 
     while (remainingMoves.isNotEmpty) {
@@ -203,7 +208,11 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
   var length = moves.destinations.length;
 
   if (!moves.followLeader) {
-    generator.charactersDoNotFollowLeader(moves.destinations.keys);
+    if (state.followLead != false &&
+        moves.destinations.keys
+            .any((obj) => obj.resolve(state) is! MapObject)) {
+      asm.add(followLeader(state.followLead = false));
+    }
   }
   generator.setSpeed(moves.speed);
   generator.setStartingAxis(moves.startingAxis);
@@ -245,14 +254,6 @@ class _MovementGenerator {
 
   final EventAsm asm;
   final Memory _mem;
-
-  void charactersDoNotFollowLeader(Iterable<FieldObject> objects) {
-    // Only disable follow leader if moving any characters.
-    if (_mem.followLead != false &&
-        objects.any((obj) => obj.resolve(_mem) is! MapObject)) {
-      asm.add(followLeader(_mem.followLead = false));
-    }
-  }
 
   void setStartingAxis(Axis axis) {
     if (_mem.startingAxis != axis) {
@@ -343,6 +344,9 @@ extension FieldObjectAsm on FieldObject {
       } else if (obj is MapObject) {
         var address = obj.address(ctx);
         return lea(Absolute.long(address), a4);
+      } else if (obj is InteractionObject &&
+          ctx.inAddress(a3)?.obj == InteractionObject()) {
+        return lea(a3.indirect, a4);
       }
 
       /*
@@ -372,23 +376,36 @@ extension FieldObjectAsm on FieldObject {
   Asm toA3(Memory ctx) => toA(a3, ctx);
 
   Asm toA(DirectAddressRegister a, Memory memory) {
-    if (memory.inAddress(a)?.obj == AddressOf(resolve(memory))) {
+    if (a == a4) return toA4(memory);
+
+    if (memory.inAddress(a)?.obj == resolve(memory)) {
       return Asm.empty();
     }
 
     var obj = this;
-    if (obj is MapObject) {
-      var address = obj.address(memory);
-      return lea(Absolute.long(address), a);
-    } else if (obj is MapObjectById) {
-      var address = obj.address(memory);
-      return lea(Absolute.long(address), a);
-    } else if (obj is Slot) {
-      // why word? this is what asm appears to do
-      return lea('Character_${obj.index}'.toConstant.w, a);
-    }
 
-    throw UnsupportedError('must be mapobject or slot');
+    try {
+      if (obj is MapObject) {
+        var address = obj.address(memory);
+        return lea(Absolute.long(address), a);
+      } else if (obj is MapObjectById) {
+        var address = obj.address(memory);
+        return lea(Absolute.long(address), a);
+      } else if (obj is Slot) {
+        // why word? this is what asm appears to do
+        return lea('Character_${obj.index}'.toConstant.w, a);
+      } else if (obj is InteractionObject &&
+          memory.inAddress(a3)?.obj == InteractionObject()) {
+        if (a == a3) return Asm.empty();
+        return lea(a3.indirect, a);
+      } else {
+        var asm = Asm([obj.toA4(memory), lea(a4.indirect, a)]);
+        memory.putInAddress(a4, obj);
+        return asm;
+      }
+    } finally {
+      memory.putInAddress(a, obj);
+    }
   }
 }
 
@@ -519,7 +536,6 @@ extension DirectionExpressionAsm on DirectionExpression {
   Direction? known(Memory memory) => switch (this) {
         Direction d => d,
         DirectionOfVector d => d.known(memory),
-        TowardsPlayer d => d.known(memory),
       };
 
   Asm withDirection(
@@ -530,8 +546,6 @@ extension DirectionExpressionAsm on DirectionExpression {
       Direction d => asm(d.address),
       DirectionOfVector d =>
         d.withDirection(memory: memory, asm: asm, destination: destination),
-      TowardsPlayer d =>
-        d.withDirection(memory: memory, asm: asm, destination: destination),
     };
   }
 
@@ -539,19 +553,27 @@ extension DirectionExpressionAsm on DirectionExpression {
     return switch (this) {
       Direction d => move.b(d.constant.i, to),
       DirectionOfVector d => d.load(to, memory),
-      TowardsPlayer d => d.load(to, memory),
     };
   }
 }
 
 extension DirectionOfVectorAsm on DirectionOfVector {
+  bool get playerIsFacingFrom =>
+      from == const InteractionObject().position() && to == Slot.one.position();
+
   Direction? known(Memory mem) {
-    var from = this.from.known(mem);
-    var to = this.to.known(mem);
-    if (from == null || to == null) {
+    var knownFrom = from.known(mem);
+    var knownTo = to.known(mem);
+    if (knownFrom == null || knownTo == null) {
+      // If we know the player is facing this object,
+      // try using the opposite direction of the player facing.
+      if (playerIsFacingFrom) {
+        return mem.getFacing(Slot.one)?.opposite;
+      }
+
       return null;
     }
-    var vector = to - from;
+    var vector = knownTo - knownFrom;
     if (vector.x == 0 && vector.y == 0) return Direction.up;
     var angle = math.atan2(vector.y, vector.x) * 180 / math.pi;
     return switch (angle) {
@@ -571,57 +593,7 @@ extension DirectionOfVectorAsm on DirectionOfVector {
       return asm(known.address);
     }
 
-    return Asm([
-      moveq(FacingDir_Down.i, destination),
-      from.withY(memory: memory, asm: (y) => move.w(y, d1)),
-      to.withY(
-          memory: memory,
-          asm: (y) => y is Immediate ? cmpi.w(y, d1) : cmp.w(y, d1)),
-      beq.s(Label(r'$$checkx')),
-      bcc.s(Label(r'$$keep')), // keep up
-      move.w(FacingDir_Up.i, destination),
-      bra.s(Label(r'$$keep')), // keep
-      label(Label(r'$$checkx')),
-      move.w(FacingDir_Right.i, destination),
-      from.withX(memory: memory, asm: (x) => move.w(x, d1)),
-      to.withX(
-          memory: memory,
-          asm: (y) => y is Immediate ? cmpi.w(y, d1) : cmp.w(y, d1)),
-      bcc.s(Label(r'$$keep')), // keep up
-      move.w(FacingDir_Left.i, destination),
-      label(Label(r'$$keep')),
-      asm(destination)
-    ]);
-  }
-
-  Asm load(Address addr, Memory memory) => withDirection(
-      memory: memory,
-      asm: (d) => d == addr ? Asm.empty() : move.b(d, addr),
-      destination: addr);
-}
-
-extension TowardsPlayerAsm on TowardsPlayer {
-  Direction? known(Memory mem) {
-    if (from == PositionOfObject(InteractionObject())) {
-      return mem.getFacing(Slot.one)?.opposite;
-    }
-    return null;
-  }
-
-  Asm withDirection(
-      {required Memory memory,
-      required Asm Function(Address) asm,
-      Address destination = d0}) {
-    if (from == PositionOfObject(InteractionObject())) {
-      // Character is facing this object,
-      // so we only need to face the opposite direction
-      var known = memory.getFacing(Slot.one)?.opposite;
-
-      if (known != null) {
-        return asm(known.address);
-      }
-
-      // Optimized runtime evaluation
+    if (playerIsFacingFrom) {
       return Asm([
         Slot.one.toA3(memory),
         move.w(facing_dir(a3), destination),
@@ -630,9 +602,29 @@ extension TowardsPlayerAsm on TowardsPlayer {
       ]);
     }
 
-    // Otherwise do more math
-    return DirectionOfVector(from: from, to: PositionOfObject(Slot(1)))
-        .withDirection(memory: memory, asm: asm, destination: destination);
+    return Asm([
+      moveq(FacingDir_Down.i, destination),
+      to.withY(memory: memory, asm: (y) => move.w(y, d1), load: a3),
+      from.withY(
+          memory: memory,
+          asm: (y) => y is Immediate ? cmpi.w(y, d1) : cmp.w(y, d1),
+          load: a4),
+      beq.s(Label(r'$$checkx')),
+      bcc.s(Label(r'$$keep')), // keep up
+      move.w(FacingDir_Up.i, destination),
+      bra.s(Label(r'$$keep')), // keep
+      label(Label(r'$$checkx')),
+      move.w(FacingDir_Right.i, destination),
+      to.withX(memory: memory, asm: (x) => move.w(x, d1), load: a3),
+      from.withX(
+          memory: memory,
+          asm: (x) => x is Immediate ? cmpi.w(x, d1) : cmp.w(x, d1),
+          load: a4),
+      bcc.s(Label(r'$$keep')), // keep up
+      move.w(FacingDir_Left.i, destination),
+      label(Label(r'$$keep')),
+      asm(destination)
+    ]);
   }
 
   Asm load(Address addr, Memory memory) => withDirection(
@@ -655,24 +647,32 @@ extension PositionExpressionAsm on PositionExpression {
 
   Asm withPosition(
       {required Memory memory,
-      required Asm Function(Address x, Address y) asm}) {
+      required Asm Function(Address x, Address y) asm,
+      DirectAddressRegister load = a4}) {
     return switch (this) {
       Position p => asm(p.x.toWord.i, p.y.toWord.i),
-      PositionOfObject p => p.withPosition(memory: memory, asm: asm),
+      PositionOfObject p =>
+        p.withPosition(memory: memory, asm: asm, load: load),
     };
   }
 
-  Asm withX({required Memory memory, required Asm Function(Address) asm}) {
+  Asm withX(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectAddressRegister load = a4}) {
     return switch (this) {
       Position p => asm(p.x.toWord.i),
-      PositionOfObject p => p.withX(memory: memory, asm: asm),
+      PositionOfObject p => p.withX(memory: memory, asm: asm, load: load),
     };
   }
 
-  Asm withY({required Memory memory, required Asm Function(Address) asm}) {
+  Asm withY(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectAddressRegister load = a4}) {
     return switch (this) {
       Position p => asm(p.y.toWord.i),
-      PositionOfObject p => p.withY(memory: memory, asm: asm),
+      PositionOfObject p => p.withY(memory: memory, asm: asm, load: load),
     };
   }
 }
@@ -688,21 +688,28 @@ extension PositionOfObjectAsm on PositionOfObject {
 
   Asm withPosition(
       {required Memory memory,
-      required Asm Function(Address x, Address y) asm}) {
+      required Asm Function(Address x, Address y) asm,
+      DirectAddressRegister load = a4}) {
     var position = memory.positions[obj];
     if (position != null) {
       return asm(position.x.toWord.i, position.y.toWord.i);
     }
     // Evaluate at runtime
     return Asm([
-      obj.toA4(memory),
-      asm(curr_x_pos(a4), curr_y_pos(a4)),
+      obj.toA(load, memory),
+      asm(curr_x_pos(load), curr_y_pos(load)),
     ]);
   }
 
-  Asm withX({required Memory memory, required Asm Function(Address) asm}) =>
-      withPosition(memory: memory, asm: (x, _) => asm(x));
+  Asm withX(
+          {required Memory memory,
+          required Asm Function(Address) asm,
+          DirectAddressRegister load = a4}) =>
+      withPosition(memory: memory, asm: (x, _) => asm(x), load: load);
 
-  Asm withY({required Memory memory, required Asm Function(Address) asm}) =>
-      withPosition(memory: memory, asm: (_, y) => asm(y));
+  Asm withY(
+          {required Memory memory,
+          required Asm Function(Address) asm,
+          DirectAddressRegister load = a4}) =>
+      withPosition(memory: memory, asm: (_, y) => asm(y), load: load);
 }

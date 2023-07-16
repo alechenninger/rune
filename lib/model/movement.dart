@@ -96,6 +96,11 @@ class Path {
 
 sealed class PositionExpression {}
 
+extension PositionExpressions on PositionExpression {
+  DirectionOfVector towards(PositionExpression other) =>
+      DirectionOfVector(from: this, to: other);
+}
+
 class PositionOfObject extends PositionExpression {
   final FieldObject obj;
 
@@ -183,26 +188,6 @@ class Position implements PositionExpression {
 }
 
 sealed class DirectionExpression {}
-
-class TowardsPlayer extends DirectionExpression {
-  final PositionExpression from;
-
-  TowardsPlayer(this.from);
-
-  @override
-  String toString() {
-    return 'TowardsPlayer{from: $from}';
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      other is TowardsPlayer &&
-      runtimeType == other.runtimeType &&
-      from == other.from;
-
-  @override
-  int get hashCode => from.hashCode;
-}
 
 class DirectionOfVector extends DirectionExpression {
   final PositionExpression from;
@@ -296,6 +281,8 @@ class FacePlayer extends Event {
   final FieldObject object;
 
   FacePlayer(this.object);
+
+  IndividualMoves toMoves() => Face(object.towards(Slot.one)).move(object);
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
@@ -539,6 +526,12 @@ abstract class FieldObject extends Moveable {
   FieldObject resolve(EventState state) => this;
 }
 
+extension ObjectExpressions on FieldObject {
+  PositionOfObject position() => PositionOfObject(this);
+  DirectionOfVector towards(FieldObject other) =>
+      DirectionOfVector(from: position(), to: other.position());
+}
+
 class MapObjectById extends FieldObject {
   final MapObjectId id;
 
@@ -651,6 +644,8 @@ abstract class RelativeMovement extends ContextualMovement {
 
   @override
   RelativeMovement movementIn(EventState ctx) => this;
+
+  IndividualMoves move(FieldObject obj) => IndividualMoves()..moves[obj] = this;
 
   // todo: consider returning stepdirections here instead
   MovementLookahead lookahead(Steps steps) {

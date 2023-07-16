@@ -9,6 +9,8 @@ import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
+import '../fixtures.dart';
+
 void main() {
   Asm generate(List<Event> events, {GameMap? inMap}) {
     var asm = EventAsm.empty();
@@ -709,23 +711,24 @@ void main() {
       ctx = AsmContext.forEvent(EventState());
     });
 
-    test('delegates to Interaction_UpdateObj', () {
+    // Not sure if this behavior is correct
+    test('uses interaction_updateobj if interaction object', () {
       var npc = MapObject(
           startPosition: Position(0x200, 0x200),
           spec: Npc(Sprite.PalmanMan1, FaceDown()));
       var map = GameMap(MapId.Piata)..addObject(npc);
       ctx.state.currentMap = map;
 
-      var asm = generate([FacePlayer(npc)], inMap: map);
+      var asm = EventAsm.empty();
+      SceneAsmGenerator.forInteraction(
+          map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
+          withObject: true)
+        ..runEventFromInteraction()
+        ..facePlayer(FacePlayer(InteractionObject()))
+        ..finish();
 
-      print(asm);
-
-      expect(
-          asm,
-          Asm([
-            lea(Absolute.long(map.addressOf(npc)), a3),
-            jsr('Interaction_UpdateObj'.toLabel.l)
-          ]));
+      expect(asm.withoutComments().skip(1).take(1),
+          Asm([jsr('Interaction_UpdateObj'.toLabel.l)]));
     });
 
     test('reuses a3 in context', () {
@@ -1041,6 +1044,74 @@ void main() {
               Direction.right);
         });
       });
+    });
+  });
+
+  group('faces using expressions', () {
+    late Memory state;
+    late Memory testState;
+    late GameMap map;
+    late MapObject npc;
+
+    setUp(() {
+      map = GameMap(MapId.Test);
+      npc = MapObject(
+          id: 'testnpc',
+          startPosition: Position(0x200, 0x200),
+          spec: Npc(Sprite.PalmanMan1, WanderAround(down)));
+      map.addObject(npc);
+
+      state = Memory()..currentMap = map;
+      testState = state.branch();
+    });
+
+    // Given an object, face it towards another object
+    test('face towards', () {
+      var moves = Face(Slot.one.towards(Slot.two)).move(Slot.one);
+      var asm = generate([moves]);
+      expect(
+          asm,
+          Asm([
+            Slot.one.toA4(testState),
+            moveq(FacingDir_Down.i, d0),
+            Slot.two.toA3(testState),
+            move.w(curr_y_pos(a3), d1),
+            cmp.w(curr_y_pos(a4), d1),
+            beq.s(Label(r'$$checkx')),
+            bcc.s(Label(r'$$keep')),
+            move.w(FacingDir_Up.i, d0),
+            bra.s(Label(r'$$keep')),
+            label(Label(r'$$checkx')),
+            move.w(FacingDir_Right.i, d0),
+            move.w(curr_x_pos(a3), d1),
+            cmp.w(curr_x_pos(a4), d1),
+            bcc.s(Label(r'$$keep')),
+            move.w(FacingDir_Left.i, d0),
+            label(Label(r'$$keep')),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
+    });
+
+    // Interaction object facing player optimization
+    test('interaction object facing player', () {
+      var moves =
+          Face(InteractionObject().towards(Slot.one)).move(InteractionObject());
+      var asm = EventAsm.empty();
+      SceneAsmGenerator.forInteraction(
+          map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
+          withObject: true)
+        ..runEventFromInteraction()
+        ..individualMoves(moves)
+        ..finish();
+      expect(
+          asm.withoutComments().skip(1).take(5),
+          Asm([
+            lea(a3.indirect, a4),
+            Slot.one.toA3(testState),
+            move.w(facing_dir(a3), d0),
+            bchg(2.i, d0),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
     });
   });
 }

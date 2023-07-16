@@ -503,7 +503,8 @@ class SceneAsmGenerator implements EventVisitor {
 
     if (!_inEvent &&
         _isInteractingWithObject &&
-        _lastEventInCurrentDialog == null) {
+        _lastEventInCurrentDialog == null &&
+        face.object == const InteractionObject()) {
       // this already will happen by default if the first event
       _lastEventInCurrentDialog = face;
       return;
@@ -512,21 +513,12 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(face, (i) {
       var asm = EventAsm.empty();
 
-      if (_memory.inAddress(a3) != AddressOf(face.object)) {
-        asm.add(face.object.toA3(_memory));
-        _memory.putInAddress(a3, face.object);
+      if (_memory.inAddress(a3) == AddressOf(face.object) &&
+          face.object == const InteractionObject()) {
+        asm.add(jsr(Label('Interaction_UpdateObj').l));
+      } else {
+        asm.add(face.toMoves().toAsm(_memory));
       }
-
-      /*
-      sometimes this is done in events:
-  lea	($FFFFC400).w, a4
-	lea	(Character_1).w, a3
-	move.w	$6(a3), d0
-	bchg	#2, d0
-	jsr	(Event_UpdateObjFacing).l
-       */
-      // FIXME: this only works if player is facing the obj
-      asm.add(jsr(Label('Interaction_UpdateObj').l));
 
       return asm;
     });
