@@ -1192,5 +1192,22 @@ void main() {
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
+
+    test('character 1 facing interaction object is noop', () {
+      var moves = Face(Slot.one.towards(InteractionObject())).move(Slot.one);
+      var asm = EventAsm.empty();
+      SceneAsmGenerator.forInteraction(
+          map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
+          withObject: true)
+        ..runEventFromInteraction()
+        ..individualMoves(moves)
+        ..finish();
+
+      expect(asm.withoutComments().head(-3).skip(1), Asm.empty());
+    }, skip: 'not done but not very useful');
+
+    test('character 1 by name facing interaction object is noop', () {},
+        skip: "i don't think this is possible "
+            "unless we know slot one compile time");
   });
 }

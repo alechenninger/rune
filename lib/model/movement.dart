@@ -187,13 +187,18 @@ class Position implements PositionExpression {
   }
 }
 
-sealed class DirectionExpression {}
+sealed class DirectionExpression {
+  DirectionExpression get opposite;
+}
 
 class DirectionOfVector extends DirectionExpression {
   final PositionExpression from;
   final PositionExpression to;
 
   DirectionOfVector({required this.from, required this.to});
+
+  @override
+  DirectionExpression get opposite => DirectionOfVector(from: to, to: from);
 
   @override
   String toString() {
@@ -241,6 +246,7 @@ enum Direction implements DirectionExpression {
     return up;
   }
 
+  @override
   Direction get opposite => switch (this) {
         up => down,
         down => up,
@@ -358,11 +364,12 @@ class RelativePartyMove extends Event {
           // fixme facing
           step = StepPath()..delay = 1.step;
         } else {
+          var facing = ctx.getFacing(Slot(1));
           var move = StepToPoint()
             ..from = position
             ..to = nextLeaderPosition
             ..firstAxis = startingAxis
-            ..direction = ctx.getFacing(Slot(1)) ?? Direction.up; // fixme
+            ..direction = facing is Direction ? facing : Direction.up; // fixme
 
           var lookahead = move.lookahead(1.step);
           positions[s] = position + lookahead.relativePosition;

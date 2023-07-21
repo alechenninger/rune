@@ -237,7 +237,7 @@ class EventState {
   }
 
   final _facing = <FieldObject, Direction>{};
-  Direction? getFacing(FieldObject obj) => _facing[obj.resolve(this)];
+  DirectionExpression? getFacing(FieldObject obj) => _facing[obj.resolve(this)];
   void setFacing(FieldObject obj, Direction dir) =>
       _facing[obj.resolve(this)] = dir;
 

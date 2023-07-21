@@ -599,7 +599,8 @@ extension DirectionOfVectorAsm on DirectionOfVector {
       // If we know the player is facing this object,
       // try using the opposite direction of the player facing.
       if (playerIsFacingFrom) {
-        return mem.getFacing(Slot.one)?.opposite;
+        var dir = mem.getFacing(Slot.one)?.opposite;
+        if (dir is Direction) return dir;
       }
 
       return null;
@@ -633,6 +634,11 @@ extension DirectionOfVectorAsm on DirectionOfVector {
         asm(destination),
       ]);
     }
+
+    // todo(optimization): we could make this a noop IF we knew that slot
+    // one direction hadn't changed since the interaction started.
+    // if (to == const InteractionObject().position() &&
+    //     from == Slot.one.position()) {}
 
     labelSuffix ??= '';
 

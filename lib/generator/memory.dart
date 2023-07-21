@@ -1,5 +1,7 @@
 import 'dart:collection';
 
+import 'package:collection/collection.dart';
+
 import '../asm/asm.dart';
 import '../model/model.dart';
 import 'generator.dart';
@@ -87,6 +89,13 @@ class Memory implements EventState {
 
   AddressOf? inAddress(DirectAddressRegister a) => _sysState._inAddress[a];
 
+  /// Return the address register the object is referenced in, if any.
+  DirectAddressRegister? addressRegisterFor(Object obj) {
+    return _sysState._inAddress.entries
+        .firstWhereOrNull((e) => e.value.obj == obj)
+        ?.key;
+  }
+
   /// [obj] should not be wrapped in [AddressOf].
   void putInAddress(DirectAddressRegister a, Object? obj) {
     _apply(PutInAddress(a, obj));
@@ -164,7 +173,7 @@ class Memory implements EventState {
       (s, m) => m._eventState.dialogPortrait = s));
 
   @override
-  Direction? getFacing(FieldObject obj) => _eventState.getFacing(obj);
+  DirectionExpression? getFacing(FieldObject obj) => _eventState.getFacing(obj);
 
   @override
   void setFacing(FieldObject obj, Direction dir) {
