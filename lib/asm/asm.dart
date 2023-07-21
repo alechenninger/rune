@@ -237,7 +237,12 @@ class Asm extends IterableBase<Instruction> {
   }
 
   Asm head(int lines) {
-    lines = min(lines, length);
+    if (lines < 0) {
+      lines = length + lines;
+      lines = max(0, lines);
+    } else {
+      lines = min(lines, length);
+    }
     return Asm.fromInstructions(this.lines.sublist(0, lines));
   }
 
