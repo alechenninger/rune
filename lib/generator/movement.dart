@@ -145,7 +145,9 @@ extension IndividualMovesToAsm on IndividualMoves {
                     mem: ctx)));
           } else {
             var facing = movement.facing;
-            if (facing != null && facing != ctx.getFacing(moveable)) {
+            if (movement.distance == 0.steps &&
+                facing != null &&
+                facing != ctx.getFacing(moveable)) {
               generator.updateFacing(moveable, facing, i);
             }
           }
@@ -256,7 +258,10 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
             .any((obj) => obj.resolve(state) is! MapObject)) {
       asm.add(followLeader(state.followLead = false));
     }
+  } else if (state.followLead != true) {
+    asm.add(followLeader(state.followLead = true));
   }
+
   generator.setSpeed(moves.speed);
   generator.setStartingAxis(moves.startingAxis);
 
