@@ -60,6 +60,12 @@ class Absolute extends _Address {
 /// A fixed value
 class Immediate extends _Address {
   const Immediate(Expression e) : super('#$e');
+
+  int get value {
+    var e = toString().substring(1);
+    if (e.startsWith(r'$')) return int.parse(e.substring(1), radix: 16);
+    return int.parse(e);
+  }
 }
 
 /// Value in one of the address registers

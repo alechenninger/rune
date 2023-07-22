@@ -132,30 +132,17 @@ extension IndividualMovesToAsm on IndividualMoves {
           var afterSteps = movement.lookahead(stepsToTake);
 
           if (afterSteps.relativeDistance > 0.steps) {
-            var current = ctx.positions[moveable];
-            if (current == null) {
-              // TODO(movement): use runtime expression
-              // e.g. look up cur position, save in data register
-              // might need to look up each time based on necessary math and
-              // available data registers
-              throw StateError('no current position set for $moveable');
-            }
-
-            var destination = current + afterSteps.relativePosition;
-            ctx.positions[moveable] = destination;
-            ctx.setFacing(moveable, afterSteps.facing);
-
-            var x = Word(destination.x).i;
-            var y = Word(destination.y).i;
-
-            asm.add(moveable.toA4(generator._mem));
             generator.ensureScriptable(moveable);
 
-            if (i == lastMoveIndex) {
-              asm.add(moveCharacter(x: x, y: y));
-            } else {
-              asm.add(setDestination(x: x, y: y));
-            }
+            asm.add(moveable.position().withPosition(
+                memory: ctx,
+                asm: (x, y) => _moveObject(
+                    movement: afterSteps,
+                    object: moveable,
+                    runMove: i == lastMoveIndex,
+                    currentX: x,
+                    currentY: y,
+                    mem: ctx)));
           } else {
             var facing = movement.facing;
             if (facing != null && facing != ctx.getFacing(moveable)) {
@@ -184,6 +171,62 @@ extension IndividualMovesToAsm on IndividualMoves {
 
     return asm;
   }
+}
+
+Asm _moveObject({
+  required MovementLookahead movement,
+  required FieldObject object,
+  required bool runMove,
+  required Address currentX,
+  required Address currentY,
+  required Memory mem,
+}) {
+  var relativePosition = movement.relativePosition;
+
+  if (currentX is Immediate && currentY is Immediate) {
+    var destination =
+        Position(currentX.value, currentY.value) + relativePosition;
+    mem.positions[object] = destination;
+    mem.setFacing(object, movement.facing);
+
+    var x = destination.x.toWord.i;
+    var y = destination.y.toWord.i;
+
+    return Asm([
+      object.toA4(mem),
+      if (runMove) moveCharacter(x: x, y: y) else setDestination(x: x, y: y)
+    ]);
+  } else {
+    mem.positions[object] = null;
+    mem.setFacing(object, movement.facing);
+
+    return Asm([
+      asmlib.move.w(currentX, d0),
+      asmlib.move.w(currentY, d1),
+      _addRelativePosition(relativePosition, d0, d1),
+      object.toA4(mem),
+      if (runMove)
+        jsr(Label('Event_MoveCharacter').l)
+      else
+        setDestination(x: d0, y: d1)
+    ]);
+  }
+}
+
+Asm _addRelativePosition(Position position, Address x, Address y) {
+  var xDiff = position.x;
+  var yDiff = position.y;
+
+  return Asm([
+    if (xDiff > 0)
+      addi.w(xDiff.toWord.i, x)
+    else if (xDiff < 0)
+      subi.w(xDiff.abs().toWord.i, x),
+    if (yDiff > 0)
+      addi.w(yDiff.toWord.i, y)
+    else if (yDiff < 0)
+      subi.w(yDiff.abs().toWord.i, y)
+  ]);
 }
 
 int Function(RelativeMove<FieldObject>, RelativeMove<FieldObject>)

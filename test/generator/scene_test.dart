@@ -806,34 +806,34 @@ ${dialog2.toAsm()}
           ])));
     });
 
-    test('events which require context should fail if context is unknown', () {
+    test('events which use context cannot when context is ambiguous', () {
       var eventAsm = EventAsm.empty();
 
-      var generator =
-          SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
-            ..setContext(
-                SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
-            ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
-              IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
-            ], isUnset: [
-              IndividualMoves()
-                ..moves[alys] = (StepPath()
-                  ..direction = Direction.right
-                  ..distance = 2.steps)
-            ]));
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..setContext(
+            SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
+        ], isUnset: [
+          IndividualMoves()
+            ..moves[alys] = (StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps)
+        ]))
+        ..individualMoves(
+            IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps))
+        ..finish();
 
       // generator should not have failed at this point.
       print(eventAsm);
 
-      // but then, add a relative move. because we do not know where alys might
-      // be to start with, this should fail
-      // (unless relative move code is later updated to deal with this
-      // ambiguity, in which case we'll have to test it does generate code that
-      // deals with that e.g. performs arithmetic in the asm)
-      expect(() {
-        generator.individualMoves(
-            IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps));
-      }, throwsStateError);
+      // Generate the last move when context is also unknown
+      var expected = generateEventAsm([
+        IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
+      ]).withoutComments();
+
+      // Should be equivalent
+      expect(expected, eventAsm.withoutComments().tail(expected.length));
     });
 
     test('events use context from previous branched states', () {

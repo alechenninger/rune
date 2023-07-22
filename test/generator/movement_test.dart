@@ -55,6 +55,31 @@ void main() {
             ]));
       });
 
+      test('move without context computes destination at runtime', () {
+        var ctx = Memory();
+        ctx.slots[1] = alys;
+        ctx.followLead = false;
+
+        var moveRight = IndividualMoves();
+        moveRight.moves[alys] = StepPath()
+          ..distance = 5.steps
+          ..direction = Direction.right;
+
+        var asm = moveRight.toAsm(ctx);
+
+        print(asm);
+
+        expect(
+            asm,
+            Asm([
+              lea(Constant('Character_1').w, a4),
+              move.w(curr_x_pos(a4), d0),
+              move.w(curr_y_pos(a4), d1),
+              addi.w(0x50.toWord.i, d0),
+              jsr(Label('Event_MoveCharacter').l)
+            ]));
+      });
+
       test('move right, after previously following leader', () {
         var ctx = Memory();
         ctx.slots[1] = alys;
@@ -261,6 +286,36 @@ void main() {
               lea(Constant('Character_1').w, a4),
               move.w('280'.hex.toWord.i, d0),
               move.w('200'.hex.toWord.i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+            ]));
+      });
+
+      test('moves without context compute destination at runtime', () {
+        var ctx = Memory();
+        ctx.slots[1] = alys;
+
+        var moves = IndividualMoves();
+        moves.moves[alys] = StepPaths()
+          ..step(StepPath()
+            ..distance = 5.steps
+            ..direction = Direction.right)
+          ..step(StepPath()
+            ..distance = 4.steps
+            ..direction = Direction.up);
+
+        var asm = moves.toAsm(ctx);
+
+        print(asm);
+
+        expect(
+            asm,
+            Asm([
+              bset(Byte.zero.i, Char_Move_Flags.w),
+              lea(Constant('Character_1').w, a4),
+              move.w(curr_x_pos(a4), d0),
+              move.w(curr_y_pos(a4), d1),
+              addi.w(0x50.toWord.i, d0),
+              subi.w(0x40.toWord.i, d1),
               jsr(Label('Event_MoveCharacter').l),
             ]));
       });
@@ -1208,6 +1263,6 @@ void main() {
 
     test('character 1 by name facing interaction object is noop', () {},
         skip: "i don't think this is possible "
-            "unless we know slot one compile time");
+            "unless we know slot one at compile time");
   });
 }
