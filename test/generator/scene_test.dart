@@ -6,6 +6,7 @@ import 'package:rune/generator/cutscenes.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/generator/memory.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
@@ -861,11 +862,81 @@ ${dialog2.toAsm()}
             ..moves[alys] = (StepPath()
               ..direction = Direction.up
               ..distance = 2.steps)
-        ]));
+        ]))
+        ..finish();
 
       print(eventAsm);
 
       // success if doesn't throw; but should also assert output
+      expect(
+          eventAsm.withoutComments().tail(12),
+          Asm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset5')),
+            move.w(0x30.toWord.i, d0),
+            move.w(0x30.toWord.i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+            bra.w(Label('test_Test_cont5')),
+            setLabel('test_Test_unset5'),
+            move.w(0x70.toWord.i, d0),
+            move.w(0x30.toWord.i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+            label(Label('test_Test_cont5')),
+          ]));
+    });
+
+    test('events cannot use context from previous branched states if ambiguous',
+        () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm,
+          startingMap: GameMap(MapId.Test))
+        ..setContext(
+            SetContext((ctx) => ctx.positions[alys] = Position(0x50, 0x50)))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
+        ], isUnset: [
+          IndividualMoves()
+            ..moves[alys] = (StepPath()
+              ..direction = Direction.right
+              ..distance = 2.steps)
+        ]))
+        ..dialog(Dialog.parse('Hi'))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          IndividualMoves()
+            ..moves[alys] = (StepPath()
+              ..direction = Direction.left
+              ..distance = 2.steps)
+        ], isUnset: [
+          IndividualMoves()
+            ..moves[alys] = (StepPath()
+              ..direction = Direction.up
+              ..distance = 2.steps)
+        ]))
+        ..finish();
+
+      print(eventAsm);
+
+      // success if doesn't throw; but should also assert output
+      expect(
+          eventAsm.withoutComments().tail(16),
+          Asm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset5')),
+            alys.toA4(Memory()),
+            move.w(0x30.toWord.i, d0),
+            move.w(0x30.toWord.i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+            bra.w(Label('test_Test_cont5')),
+            setLabel('test_Test_unset5'),
+            alys.toA4(Memory()),
+            move.w(0x70.toWord.i, d0),
+            move.w(0x30.toWord.i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+            label(Label('test_Test_cont5')),
+          ]));
     });
 
     group('in interactions', () {

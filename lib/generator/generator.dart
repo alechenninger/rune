@@ -282,6 +282,9 @@ class SceneAsmGenerator implements EventVisitor {
   // conditional runtime state
 
   /// For currently generating branch, what is the known state of event flags
+  // note: empty is currently used to understand "root" condition
+  // if we allow starting scenes with other conditions,
+  // we'll need to store the starting point.
   Condition _currentCondition = Condition.empty();
 
   /// mem state which exactly matches current flags; other states may need
@@ -585,6 +588,10 @@ class SceneAsmGenerator implements EventVisitor {
 
     var flag = ifFlag.flag;
 
+    // If a state already exists for this flag,
+    // ensure it is updated with changes that apply from this parent.
+    _updateStateGraphChildren();
+
     var knownState = _currentCondition[flag];
     if (knownState != null) {
       // one branch is dead code so only run the other, and skip useless
@@ -654,6 +661,8 @@ class SceneAsmGenerator implements EventVisitor {
       if (_currentCondition == Condition.empty()) {
         finish(appendNewline: true);
       }
+
+      // TODO(ifflag): should we update state graph here?
     } else {
       _addToEvent(ifFlag, (i) {
         // note that if we need to move further than beq.w
@@ -1272,6 +1281,22 @@ class SceneAsmGenerator implements EventVisitor {
     sibling?.clearChanges();
   }
 
+  /// States applied to the current condition
+  /// apply to all "children" of this condition.
+  void _updateStateGraphChildren() {
+    for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
+      // In the current condition, state has already been applied
+      // Don't apply twice out of order!
+      if (condition == _currentCondition) continue;
+      if (_currentCondition.isSatisfiedBy(condition)) {
+        for (var change in _memory.changes) {
+          change.apply(state);
+        }
+      }
+    }
+    _memory.clearChanges();
+  }
+
   void _runOrInterruptDialog(Event event) {
     _expectFacePlayerFirstIfInteraction();
 
@@ -1296,20 +1321,6 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void _runDialog() {
-    // todo: differentiate "walking" from "still" states
-    /*
-      idea here is that if done moving for a frame, or have called update
-      facing, then the character is known to be still.
-      otherwise, the character might be mid-movement frame, which is awkward
-      when going to dialog. if walking, and going to dialog, we could call
-      update facing to ensure still.
-       */
-    // var lastEvent = _lastEventInCurrentDialog;
-    // if (lastEvent is IndividualMoves) {
-    //   for (var obj in lastEvent.moves.keys) {
-    //   }
-    // }
-
     _eventAsm.add(Asm([comment('${_eventCounter++}: $Dialog')]));
 
     // todo if null, have to check somehow?
@@ -1467,6 +1478,7 @@ class SceneAsmGenerator implements EventVisitor {
       _currentDialog = DialogAsm.empty();
       _currentDialogId = _currentDialogTree().add(_currentDialog!);
     }
+
     return _currentDialog!.add(asm);
   }
 

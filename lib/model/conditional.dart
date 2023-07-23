@@ -368,6 +368,9 @@ class Condition {
   /// as every flag in this condition.
   ///
   /// The other condition may contain additional flags.
+  ///
+  /// An empty condition only satisfies another empty condition
+  /// (but an empty condition *is satisfied by* every condition).
   bool isSatisfiedBy(Condition other) {
     for (var entry in _flags.entries) {
       if (other[entry.key] != entry.value) return false;
@@ -381,6 +384,8 @@ class Condition {
   ///
   /// The other condition may contain additional flags
   /// and not necessarily conflit.
+  ///
+  /// Any empty condition never conflicts with another condition.
   bool conflictsWith(Condition other) {
     for (var entry in other._flags.entries) {
       var current = this[entry.key];
