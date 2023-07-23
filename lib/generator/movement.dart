@@ -280,10 +280,13 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
     generator.asm.add(obj.toA4(generator._mem));
     generator.ensureScriptable(obj);
 
-    if (i < length - 1) {
-      asm.add(setDestination(x: pos.x.toWord.i, y: pos.y.toWord.i));
-    } else {
+    if (length == 1) {
       asm.add(moveCharacter(x: pos.x.toWord.i, y: pos.y.toWord.i));
+    } else {
+      asm.add(setDestination(x: pos.x.toWord.i, y: pos.y.toWord.i));
+      if (i == length - 1) {
+        asm.add(jsr(Label('Event_MoveCharacters').l));
+      }
     }
 
     state.positions[obj] = pos;

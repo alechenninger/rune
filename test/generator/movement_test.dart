@@ -461,6 +461,78 @@ void main() {
               jsr(Label('Event_UpdateObjFacing').l),
             ]));
       });
+
+      test('facing while others move then face while others still move', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[alys] = Position(0x1f0, 0x0a0);
+            ctx.positions[shay] = Position(0x1f0, 0x090);
+            ctx.positions[hahn] = Position(0x200, 0x090);
+          }),
+          IndividualMoves()
+            ..moves[rune] = Face(up)
+            ..moves[alys] = (StepPaths()
+              ..step(StepPath()
+                ..distance = 2.steps
+                ..direction = Direction.down)
+              ..face(Direction.right))
+            ..moves[shay] = (StepPaths()
+              ..step(StepPath()
+                ..distance = 2.steps
+                ..direction = Direction.down)
+              ..face(right))
+            ..moves[hahn] = (StepPaths()
+              ..step(StepPath()
+                ..distance = 1.steps
+                ..direction = Direction.down)
+              ..face(right))
+        ]);
+
+        var program = Program();
+        var sceneAsm = program.addScene(SceneId('testscene'), scene);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              bset(0.toByte.i, Char_Move_Flags.w),
+              moveq(rune.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              moveq(FacingDir_Up.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+              moveq(alys.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(0x1f0.toWord.i, dest_x_pos(a4)),
+              move.w(0x0b0.toWord.i, dest_y_pos(a4)),
+              moveq(shay.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(0x1f0.toWord.i, dest_x_pos(a4)),
+              move.w(0x0a0.toWord.i, dest_y_pos(a4)),
+              moveq(hahn.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(0x200.toWord.i, d0),
+              move.w(0x0a0.toWord.i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              moveq(FacingDir_Right.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+              moveq(alys.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(0x1f0.toWord.i, dest_x_pos(a4)),
+              move.w(0x0c0.toWord.i, dest_y_pos(a4)),
+              moveq(shay.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(0x1f0.toWord.i, d0),
+              move.w(0x0b0.toWord.i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              moveq(alys.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              moveq(FacingDir_Right.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+              moveq(shay.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              moveq(FacingDir_Right.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+            ]));
+      });
     });
 
     group('npcs', () {
@@ -909,7 +981,8 @@ void main() {
             shay.toA4(testState),
             setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
             alys.toA4(testState),
-            moveCharacter(x: 0x1b0.toWord.i, y: 0x200.toWord.i)
+            setDestination(x: 0x1b0.toWord.i, y: 0x200.toWord.i),
+            jsr(Label('Event_MoveCharacters').l),
           ]));
     });
 
