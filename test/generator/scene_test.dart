@@ -745,8 +745,6 @@ ${dialog2.toAsm()}
             isUnset: [Pause(3.second)], isSet: [Pause(4.seconds)]))
         ..finish();
 
-      print(eventAsm);
-
       expect(
           eventAsm.withoutComments(),
           EventAsm([
@@ -780,11 +778,6 @@ ${dialog2.toAsm()}
         ..ifFlag(IfFlag(EventFlag('Test'), isSet: [Dialog(spans: hello)]))
         ..dialog(Dialog(spans: greetings))
         ..finish();
-
-      print('> event');
-      print(eventAsm);
-      print('> dialog');
-      print(dialog);
 
       expect(
           eventAsm.withoutComments(),
@@ -825,9 +818,6 @@ ${dialog2.toAsm()}
             IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps))
         ..finish();
 
-      // generator should not have failed at this point.
-      print(eventAsm);
-
       // Generate the last move when context is also unknown
       var expected = generateEventAsm([
         IndividualMoves()..moves[alys] = (StepPath()..distance = 2.steps)
@@ -865,9 +855,6 @@ ${dialog2.toAsm()}
         ]))
         ..finish();
 
-      print(eventAsm);
-
-      // success if doesn't throw; but should also assert output
       expect(
           eventAsm.withoutComments().tail(12),
           Asm([
@@ -916,9 +903,6 @@ ${dialog2.toAsm()}
         ]))
         ..finish();
 
-      print(eventAsm);
-
-      // success if doesn't throw; but should also assert output
       expect(
           eventAsm.withoutComments().tail(16),
           Asm([
