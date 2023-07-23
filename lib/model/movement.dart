@@ -10,7 +10,7 @@ import 'model.dart';
 class Steps implements Comparable<Steps> {
   final int toInt;
 
-  Steps(this.toInt);
+  const Steps(this.toInt);
 
   @override
   int compareTo(Steps other) {
@@ -793,6 +793,8 @@ class StepPaths extends RelativeMovement {
 
   @override
   StepPaths? append(RelativeMovement m) {
+    // TODO(movement); this is missing Face now
+    // use sealed type?
     if (m is StepPath) {
       var answer = StepPaths().._paths.addAll(_paths);
       answer.step(m);
@@ -808,6 +810,10 @@ class StepPaths extends RelativeMovement {
     }
 
     return null;
+  }
+
+  void wait(Steps duration) {
+    step(StepPath()..delay = duration);
   }
 
   void step(StepPath step) {
@@ -916,7 +922,7 @@ class StepPaths extends RelativeMovement {
 
   @override
   String toString() {
-    return 'StepDirections{$_paths}';
+    return 'StepPaths{$_paths}';
   }
 
   @override
