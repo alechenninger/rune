@@ -873,7 +873,8 @@ ${dialog2.toAsm()}
           ]));
     });
 
-    test('events cannot use context from previous branched states if ambiguous',
+    test(
+        'events cannot use context from previous branched states if overwritten',
         () {
       var eventAsm = EventAsm.empty();
 
