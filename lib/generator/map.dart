@@ -126,9 +126,18 @@ final _mapObjectSpecRoutines = {
       SpecFactory((_) => InvisibleBlock())),
 };
 
+// TODO(generation): it would be nice if we could describe mapping needs
+//  for routines without having to create model objects
+// After creating the parser, the high level model is less useful.
+// Kinda just boilerplate.
 final _npcBehaviorRoutines = {
   FaceDown: FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1'),
       SpecFactory.npc((s, _) => Npc(s, FaceDown()))),
+  FaceDownSimpleSprite: FieldRoutine(
+      Word(0x134),
+      Label('FieldObj_Pana'),
+      SpecFactory.npc((s, _) => Npc(s, FaceDownSimpleSprite()),
+          spriteMappingTiles: 18)),
   WanderAround: FieldRoutine(Word('3C'.hex), Label('FieldObj_NPCType2'),
       SpecFactory.npc((s, d) => Npc(s, WanderAround(d)))),
   SlowlyWanderAround: FieldRoutine(Word('40'.hex), Label('FieldObj_NPCType3'),
@@ -323,9 +332,16 @@ Map<MapObjectId, Word> _compileMapSpriteData(
     } else if (spec is AsmSpec) {
       maybeLbl = spec.artLabel;
       if (maybeLbl != null) {
-        vramMapping.update(maybeLbl,
-            (current) => current.merge(const _SpriteVramMapping.defaults()),
-            ifAbsent: () => const _SpriteVramMapping.defaults());
+        // Get custom vram tile width if known for this routine,
+        // even though it's not specified in the model.
+        var factory = _specFactories[spec.routine];
+        var tiles = factory?.spriteMappingTiles;
+        var spriteMapping = tiles == null
+            ? _SpriteVramMapping.defaults()
+            : _SpriteVramMapping(tiles);
+
+        vramMapping.update(maybeLbl, (current) => current.merge(spriteMapping),
+            ifAbsent: () => spriteMapping);
       }
     }
 
@@ -335,6 +351,13 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   }
 
   var objectTiles = <MapObjectId, Word>{};
+  // If need to support required mappings...
+  // This happens when hard coded in routine, but where the sprite
+  // is still variable.
+  // Maybe if the sprite isn't really variable, we just define it
+  // in the map data? (past normal vram mappings)
+  // var requiredMappings = PriorityQueue<_SpriteVramMapping>(
+  //     (a, b) => a.requiredVramTile!.compareTo(b.requiredVramTile!));
 
   for (var entry in vramMapping.entries) {
     if (spriteVramOffset == null) {
@@ -360,6 +383,16 @@ Map<MapObjectId, Word> _compileMapSpriteData(
     }
 
     var tile = Word(spriteVramOffset);
+
+    // if (requiredMappings.isNotEmpty) {
+    //   var required = requiredMappings.first;
+    //   if (required.requiredVramTile! <= tile) {
+    //     tile = required.requiredVramTile!;
+    //     mapping = required;
+    //     requiredMappings.removeFirst();
+    //   }
+    // }
+
     spriteVramOffset += mapping.tiles;
 
     for (var obj in objectSprites[artLbl]) {
@@ -387,6 +420,9 @@ class _SpriteVramMapping {
   /// This is used for sprites where the sprite data
   /// does not alone account for all facing directions needed.
   final List<int> duplicateOffsets;
+
+  // See notes in _compileMapSpriteData
+  // final Word? requiredVramTile;
 
   const _SpriteVramMapping(this.tiles, [this.duplicateOffsets = const []]);
 

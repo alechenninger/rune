@@ -215,6 +215,47 @@ void main() {
         ]));
   });
 
+  test(
+      'objects requiring fewer tiles use fewer tiles even if specified with asm spec',
+      () {
+    testMap.addObject(MapObject(
+        startPosition: Position('1e0'.hex, '2e0'.hex),
+        spec: InteractiveAsmSpec(
+            routine: Word(0x108),
+            startFacing: down,
+            artLabel: Label('Art_PalmanMan1'),
+            onInteract: Scene([
+              Dialog(spans: [DialogSpan('Hello world!')])
+            ]))));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('1f0'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanWoman1, FaceDown()),
+        onInteract: Scene([
+          Dialog(spans: [DialogSpan('Hello world!')])
+        ])));
+
+    testMap.addObject(MapObject(
+        startPosition: Position('200'.hex, '2e0'.hex),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()),
+        onInteract: Scene([
+          Dialog(spans: [DialogSpan('Hello world!')])
+        ])));
+
+    var mapAsm = program.addMap(testMap);
+
+    expect(
+        mapAsm.sprites,
+        Asm([
+          dc.w(['2d0'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan1')]),
+          dc.w(['308'.hex.toWord]),
+          dc.l([Constant('Art_PalmanWoman1')]),
+          dc.w(['350'.hex.toWord]),
+          dc.l([Constant('Art_PalmanMan2')]),
+        ]));
+  });
+
   test('sprites are reused for multiple objects of the same sprite', () {
     testMap.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),

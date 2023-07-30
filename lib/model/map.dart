@@ -1459,6 +1459,34 @@ class FaceDown extends InteractiveNpcBehavior {
   }
 }
 
+/// Like [FaceDown], but only works with "simpler" sprite mapping
+/// that uses fewer tiles.
+class FaceDownSimpleSprite extends InteractiveNpcBehavior {
+  @override
+  final startFacing = Direction.down;
+
+  FaceDownSimpleSprite({super.onInteract});
+
+  @override
+  FaceDownSimpleSprite withNewInteraction() =>
+      FaceDownSimpleSprite(onInteract: Scene.empty());
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      super == other &&
+          other is FaceDownSimpleSprite &&
+          runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode ^ super.hashCode;
+
+  @override
+  String toString() {
+    return 'FaceDownSimpleSprite{}';
+  }
+}
+
 class WanderAround extends InteractiveNpcBehavior {
   @override
   final Direction startFacing;
