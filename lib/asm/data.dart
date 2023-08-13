@@ -669,9 +669,12 @@ class _Sized extends Sized {
 // see: http://mrjester.hapisan.com/04_MC68/Sect04Part02/Index.html
 abstract class SizedValue extends Value implements Sized {
   SizedValue(int value) : super(value) {
-    if (value > size.maxValue) {
-      throw AsmError(value, 'too large to fit in ${size.bytes} bytes');
-    }
+    _checkValue(value, size);
+  }
+
+  SizedValue.signed(int value, Size size)
+      : super(_negativeToSigned(value, size)) {
+    _checkValue(value, size);
   }
 
   static int truncate(int value, Size size) {
@@ -679,14 +682,25 @@ abstract class SizedValue extends Value implements Sized {
         .value;
   }
 
+  static int _negativeToSigned(int value, Size size) {
+    if (value < 0) {
+      return size.maxValue + value + 1;
+    }
+    return value;
+  }
+
+  static void _checkValue(int value, Size size) {
+    if (value > size.maxValue) {
+      throw AsmError(value, 'too large to fit in ${size.bytes} bytes');
+    }
+  }
+
   const SizedValue._(int value) : super.constant(value);
 
   bool get isNegative => value > size.maxValue ~/ 2;
   bool get isPositive => value <= size.maxValue ~/ 2;
 
-  // TODO: need a model representation of this
-  // can't use Value because negative integers aren't valid expressions
-  // int get signed => isPositive ? value :
+  int get signedValue => isPositive ? value : value - size.maxValue - 1;
 
   /// Size in bytes
   @override
@@ -719,6 +733,7 @@ class Byte extends SizedValue {
   static const max = Byte._(0xFF);
 
   Byte(int value) : super(value);
+  Byte.signed(int value) : super.signed(value, Size.b);
   factory Byte.truncate(int value) => Size.b.truncate(value) as Byte;
 
   const Byte._(int value) : super._(value);
@@ -771,6 +786,7 @@ class Byte extends SizedValue {
 
 class Word extends SizedValue {
   Word(int value) : super(value);
+  Word.signed(int value) : super.signed(value, Size.w);
 
   factory Word.concatBytes(Byte b1, Byte b2) {
     return Word((b1.value << 8) + b2.value);
@@ -833,6 +849,7 @@ class Word extends SizedValue {
 
 class Longword extends SizedValue {
   Longword(int value) : super(value);
+  Longword.signed(int value) : super.signed(value, Size.l);
 
   factory Longword.concatBytes(Byte b1, Byte b2, Byte b3, Byte b4) {
     return Longword(
@@ -908,6 +925,14 @@ enum Size {
   bool operator >(Size other) {
     return bytes > other.bytes;
   }
+
+  /// Returns true if signed [value] can be represented in this size as a
+  /// signed value.
+  bool fitsSigned(int value) => switch (this) {
+        b => value >= (-0xff ~/ 2 - 1) && value <= (0xff ~/ 2),
+        w => value >= (-0xffff ~/ 2 - 1) && value <= (0xffff ~/ 2),
+        l => value >= (-0xffffffff ~/ 2 - 1) && value <= (0xffffffff ~/ 2),
+      };
 
   Size get nextLarger => this == b ? w : l;
 
@@ -992,8 +1017,17 @@ extension ToValue on int {
   Immediate get i => toValue.i;
   Value get toValue => Value(this);
   Byte get toByte => Byte(this);
+
+  /// Value should be in the range of half max to -half max.
+  Byte get toSignedByte => Byte.signed(this);
   Word get toWord => Word(this);
+
+  /// Value should be in the range of half max to -half max.
+  Word get toSignedWord => Word.signed(this);
   Longword get toLongword => Longword(this);
+
+  /// Value should be in the range of half max to -half max.
+  Longword get toSignedLongword => Longword.signed(this);
 }
 
 extension ToExpression on String {
