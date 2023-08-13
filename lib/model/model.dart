@@ -19,6 +19,7 @@ import 'movement.dart';
 import 'sound.dart';
 import 'text.dart';
 
+export 'animate.dart';
 export 'objects.dart';
 export 'conditional.dart';
 export 'cutscenes.dart';
