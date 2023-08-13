@@ -3,6 +3,7 @@ library;
 
 import 'dart:math';
 
+import 'package:quiver/check.dart';
 import 'package:rune/generator/generator.dart';
 
 import 'model.dart';
@@ -73,7 +74,11 @@ class JumpObject extends Event {
   final Duration duration;
   final int height;
 
-  JumpObject(this.object, {required this.duration, required this.height});
+  JumpObject(this.object, {required this.duration, required this.height}) {
+    checkArgument(duration > Duration.zero,
+        message: 'Duration must be greater than 0.');
+    checkArgument(height > 0, message: 'Height must be greater than 0.');
+  }
 
   List<StepObject> toSteps() {
     var framesUp = duration.toFrames() ~/ 2;
