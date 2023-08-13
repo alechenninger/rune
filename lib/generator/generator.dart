@@ -31,6 +31,7 @@ import '../asm/dialog.dart' as asmdialoglib;
 import '../asm/events.dart';
 import '../asm/events.dart' as asmeventslib;
 import '../asm/text.dart';
+import '../model/animate.dart';
 import '../model/model.dart';
 import '../src/iterables.dart';
 import '../src/null.dart';
@@ -535,6 +536,51 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void absoluteMoves(AbsoluteMoves moves) {
     _addToEvent(moves, (i) => absoluteMovesToAsm(moves, _memory));
+  }
+
+  @override
+  void stepObject(StepObject step) {
+    _addToEvent(step, (i) {
+      /// Current x and y positions in memory are stored
+      /// as a longword with fractional component.
+      /// The higher order word is the position,
+      /// but the lower order word can be used as a fractional part.
+      /// This allows moving a pixel to take longer than one frame
+      /// in the step objects loop,
+      /// since the pixel is only read from the higher order word.
+      /// This converts the double x and y positions
+      /// to their longword counterparts.
+      var x = (step.stepPerFrame.x * (1 << 4 * 4)).truncate();
+      var y = (step.stepPerFrame.y * (1 << 4 * 4)).truncate();
+
+      var current = _memory.positions[alys];
+      if (current != null) {
+        var totalSteps = (step.stepPerFrame * step.frames).truncate();
+        _memory.positions[alys] = current + Position.fromPoint(totalSteps);
+      }
+
+      return Asm([
+        step.object.toA4(_memory),
+        if (step.onTop) move.b(1.i, 5(a4)),
+        if (Size.b.fitsSigned(x))
+          moveq(x.toSignedByte.i, d0)
+        else
+          move.l(x.toSignedLongword.i, d0),
+        if (Size.b.fitsSigned(y))
+          moveq(y.toSignedByte.i, d1)
+        else
+          move.l(y.toSignedLongword.i, d1),
+        if (step.frames <= 127)
+          moveq(step.frames.toByte.i, d2)
+        else
+          move.w(step.frames.toWord.i, d2),
+        if (step.animate)
+          jsr(Label('Event_StepObject').l)
+        else
+          jsr(Label('Event_StepObjectNoAnimate').l),
+        if (step.onTop) clr.b(5(a4)),
+      ]);
+    });
   }
 
   @override

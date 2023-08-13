@@ -3,6 +3,9 @@ import 'package:rune/asm/events.dart';
 import 'package:rune/generator/cutscenes.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/generator/memory.dart';
+import 'package:rune/generator/movement.dart';
+import 'package:rune/model/animate.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
@@ -340,5 +343,101 @@ EventFlag_Test001 = $01'''));
           move.b(Music.motaviaTown.musicId.i, Constant('Sound_Index').l),
           move.b(Music.motaviaTown.musicId.i, Constant('Saved_Sound_Index').w)
         ]));
+  });
+
+  group('step object', () {
+    test('with fractional negative step', () {
+      var scene =
+          Scene([StepObject(alys, stepPerFrame: Point(0, -0.5), frames: 7)]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            alys.toA4(Memory()),
+            moveq(0.toByte.i, d0),
+            move.l(0xffff8000.toLongword.i, d1),
+            moveq(7.i, d2),
+            jsr(Label('Event_StepObject').l),
+          ]));
+    });
+
+    test('with fractional step', () {
+      var scene =
+          Scene([StepObject(alys, stepPerFrame: Point(0, 0.5), frames: 7)]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            alys.toA4(Memory()),
+            moveq(0.toByte.i, d0),
+            move.l(0x00008000.toLongword.i, d1),
+            moveq(7.i, d2),
+            jsr(Label('Event_StepObject').l),
+          ]));
+    });
+
+    test('with integer step 2 directions', () {
+      var scene =
+          Scene([StepObject(alys, stepPerFrame: Point(1, 1), frames: 7)]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            alys.toA4(Memory()),
+            move.l(0x00010000.toLongword.i, d0),
+            move.l(0x00010000.toLongword.i, d1),
+            moveq(7.i, d2),
+            jsr(Label('Event_StepObject').l),
+          ]));
+    });
+
+    test('sets new position of object if known', () {
+      var scene = Scene([
+        SetContext((ctx) => ctx.positions[alys] = Position(0x100, 0x100)),
+        StepObject(alys, stepPerFrame: Point(0x1, 0), frames: 0x10),
+        // Alys should now be at 0x110, 0x100
+        IndividualMoves()
+          ..moves[alys] = (StepPath()
+            ..distance = 1.step
+            ..direction = down)
+      ]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(asm.event.withoutComments().tail(3).head(2),
+          Asm([move.w(0x110.toWord.i, d0), move.w(0x110.toWord.i, d1)]));
+    });
+
+    test('does not set position for object if not known', () {
+      var scene = Scene([
+        StepObject(alys, stepPerFrame: Point(0x1, 0), frames: 0x10),
+        IndividualMoves()
+          ..moves[alys] = (StepPath()
+            ..distance = 1.step
+            ..direction = down)
+      ]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments().tail(4),
+          Asm([
+            move.w(curr_x_pos(a4), d0),
+            move.w(curr_y_pos(a4), d1),
+            addi.w(0x0010.toWord.i, d1),
+            jsr(Label('Event_MoveCharacter').l)
+          ]));
+    });
   });
 }

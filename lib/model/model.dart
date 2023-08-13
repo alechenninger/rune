@@ -8,6 +8,7 @@ import 'package:quiver/collection.dart';
 
 import '../generator/generator.dart';
 import '../src/iterables.dart';
+import 'animate.dart';
 import 'objects.dart';
 import 'conditional.dart';
 import 'cutscenes.dart';
@@ -168,6 +169,7 @@ abstract class EventVisitor {
   void facePlayer(FacePlayer face);
   void individualMoves(IndividualMoves moves);
   void absoluteMoves(AbsoluteMoves moves);
+  void stepObject(StepObject step);
   void lockCamera(LockCamera lock);
   void partyMove(RelativePartyMove move);
   void pause(Pause pause);

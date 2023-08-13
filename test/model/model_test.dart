@@ -1,6 +1,5 @@
-import 'dart:developer';
-
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/animate.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
@@ -422,6 +421,26 @@ void main() {
               ..distance = 3.steps));
 
       print(moves.generateAsm(AsmGenerator(), AsmContext.forEvent(ctx)));
+    });
+  });
+
+  group('animation', () {
+    test('jump object computes equivalent step up and step down animations',
+        () {
+      var jump = JumpObject(alys, duration: 1.second, height: 10);
+
+      expect(jump.toSteps(), [
+        StepObject(alys,
+            onTop: true,
+            animate: false,
+            frames: 0.5.seconds.toFrames(),
+            stepPerFrame: Point(0, -10 / 0.5.seconds.toFrames())),
+        StepObject(alys,
+            onTop: true,
+            animate: false,
+            frames: 0.5.second.toFrames(),
+            stepPerFrame: Point(0, 10 / 0.5.seconds.toFrames())),
+      ]);
     });
   });
 

@@ -1276,7 +1276,12 @@ MapObject testObjectForScene(Scene scene, {String id = '0'}) {
           WanderAround(Direction.down, onInteract: scene)));
 }
 
-extension EasyDuration on int {
+extension EasyIntDuration on int {
   Duration get second => Duration(seconds: this);
   Duration get seconds => Duration(seconds: this);
+}
+
+extension EasyDoubleDuration on double {
+  Duration get second => Duration(milliseconds: (this * 1000).truncate());
+  Duration get seconds => Duration(milliseconds: (this * 1000).truncate());
 }

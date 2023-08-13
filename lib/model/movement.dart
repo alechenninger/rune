@@ -131,6 +131,8 @@ class Position implements PositionExpression {
       : x = x.toPixels,
         y = y.toPixels;
 
+  Position.fromPoint(Point<int> point) : this(point.x, point.y);
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
