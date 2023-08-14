@@ -72,23 +72,31 @@ class StepObject extends Event {
 class JumpObject extends Event {
   final FieldObject object;
   final Duration duration;
+  // todo: this could be Point movement like above
+  // to allow jumping up/down as well.
+  // However there is some complexity as actually moving up would potentially
+  // mean z ordering would need to change during the jump.
+  final int xMovement;
   final int height;
 
-  JumpObject(this.object, {required this.duration, required this.height}) {
+  JumpObject(this.object,
+      {required this.duration, required this.height, this.xMovement = 0}) {
     checkArgument(duration > Duration.zero,
         message: 'Duration must be greater than 0.');
     checkArgument(height > 0, message: 'Height must be greater than 0.');
   }
 
   List<StepObject> toSteps() {
-    var framesUp = duration.toFrames() ~/ 2;
-    var down = Point<double>(0, height / framesUp);
-    var up = Point<double>(0, down.y * -1);
+    var totalFrames = duration.toFrames();
+    var halfFrames = totalFrames ~/ 2;
+    var halfXStep = xMovement / totalFrames / 2;
+    var down = Point<double>(halfXStep, height / halfFrames);
+    var up = Point<double>(halfXStep, down.y * -1);
     return [
       StepObject(object,
-          stepPerFrame: up, frames: framesUp, onTop: true, animate: false),
+          stepPerFrame: up, frames: halfFrames, onTop: true, animate: false),
       StepObject(object,
-          stepPerFrame: down, frames: framesUp, onTop: true, animate: false)
+          stepPerFrame: down, frames: halfFrames, onTop: true, animate: false)
     ];
   }
 
@@ -101,7 +109,10 @@ class JumpObject extends Event {
 
   @override
   String toString() {
-    return 'JumpObject(object: $object, duration: $duration, height: $height)';
+    return 'JumpObject(object: $object, '
+        'duration: $duration, '
+        'height: $height, '
+        'xMovement: $xMovement)';
   }
 
   @override
@@ -110,11 +121,16 @@ class JumpObject extends Event {
     return other is JumpObject &&
         other.object == object &&
         other.duration == duration &&
+        other.xMovement == xMovement &&
         other.height == height;
   }
 
   @override
-  int get hashCode => object.hashCode ^ duration.hashCode ^ height.hashCode;
+  int get hashCode =>
+      object.hashCode ^
+      duration.hashCode ^
+      height.hashCode ^
+      xMovement.hashCode;
 }
 
 extension TruncatePoint on Point<double> {
