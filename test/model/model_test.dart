@@ -442,6 +442,24 @@ void main() {
             stepPerFrame: Point(0, 10 / 0.5.seconds.toFrames())),
       ]);
     });
+
+    test('jump object travels total x movement', () {
+      var jump =
+          JumpObject(alys, duration: 1.second, height: 10, xMovement: -16);
+
+      expect(jump.toSteps(), [
+        StepObject(alys,
+            onTop: true,
+            animate: false,
+            frames: 0.5.seconds.toFrames(),
+            stepPerFrame: Point(-8 / 30, -10 / 30)),
+        StepObject(alys,
+            onTop: true,
+            animate: false,
+            frames: 0.5.second.toFrames(),
+            stepPerFrame: Point(-8 / 30, 10 / 30)),
+      ]);
+    });
   });
 
   group('dialog', () {

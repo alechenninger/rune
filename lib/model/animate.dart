@@ -89,9 +89,9 @@ class JumpObject extends Event {
   List<StepObject> toSteps() {
     var totalFrames = duration.toFrames();
     var halfFrames = totalFrames ~/ 2;
-    var halfXStep = xMovement / totalFrames / 2;
-    var down = Point<double>(halfXStep, height / halfFrames);
-    var up = Point<double>(halfXStep, down.y * -1);
+    var xPerFrame = xMovement / totalFrames;
+    var down = Point<double>(xPerFrame, height / halfFrames);
+    var up = Point<double>(xPerFrame, down.y * -1);
     return [
       StepObject(object,
           stepPerFrame: up, frames: halfFrames, onTop: true, animate: false),
