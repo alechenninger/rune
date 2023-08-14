@@ -359,7 +359,7 @@ EventFlag_Test001 = $01'''));
             alys.toA4(Memory()),
             moveq(0.toByte.i, d0),
             move.l(0xffff8000.toLongword.i, d1),
-            moveq(7.i, d2),
+            moveq(7.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
           ]));
     });
@@ -377,7 +377,7 @@ EventFlag_Test001 = $01'''));
             alys.toA4(Memory()),
             moveq(0.toByte.i, d0),
             move.l(0x00008000.toLongword.i, d1),
-            moveq(7.i, d2),
+            moveq(7.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
           ]));
     });
@@ -395,7 +395,7 @@ EventFlag_Test001 = $01'''));
             alys.toA4(Memory()),
             move.l(0x00010000.toLongword.i, d0),
             move.l(0x00010000.toLongword.i, d1),
-            moveq(7.i, d2),
+            moveq(7.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
           ]));
     });
