@@ -122,7 +122,7 @@ class FadeInField extends Event {
   int get hashCode => 0;
 }
 
-class Panel {}
+sealed class Panel {}
 
 // See _panelData for generation
 final allPanels = <Panel>[

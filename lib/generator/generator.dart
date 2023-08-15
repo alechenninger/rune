@@ -1776,17 +1776,23 @@ extension FramesPerSecond on Duration {
 }
 
 extension SfxId on Sound {
-  static Constant _defaultConstant(Sound s) {
+  Expression get sfxId {
+    var s = this;
     var first = s.name.substring(0, 1);
     var rest = s.name.substring(1);
-    return Constant('SFXID_${first.toUpperCase()}$rest');
-  }
-
-  Expression get sfxId {
-    switch (this) {
-      default:
-        return _defaultConstant(this);
-    }
+    var capitalized = '${first.toUpperCase()}$rest';
+    return switch (s) {
+      Sound.spaceshipRadar ||
+      Sound.landRover ||
+      Sound.hydrofoil =>
+        Constant('SpcSFXID_$capitalized'),
+      Sound.stopMusic ||
+      Sound.stopSFX ||
+      Sound.stopSpcSFX ||
+      Sound.stopAll =>
+        Constant('Sound_$capitalized'),
+      _ => Constant('SFXID_$capitalized')
+    };
   }
 }
 
