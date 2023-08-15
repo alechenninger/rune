@@ -345,6 +345,32 @@ EventFlag_Test001 = $01'''));
         ]));
   });
 
+  test('events runnable in dialog or event run in event when no continue arrow',
+      () {
+    // events that are ambiguous should wait until there is a an upcoming
+    // dialog event before running in dialog
+    // otherwise they cause an additional dialog window to display
+    var scene = Scene([
+      Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),
+      PlaySound(Sound.stopAll),
+      PlaySound(Sound.surprise),
+      Pause(Duration(seconds: 1)),
+      Dialog(speaker: alys, spans: DialogSpan.parse('Bye')),
+    ]);
+
+    var asm = Program().addScene(SceneId('testscene'), scene, startingMap: map);
+    expect(
+        asm.event.withoutComments(),
+        Asm([
+          moveq(Byte.zero.i, d0),
+          jsr(Label('Event_GetAndRunDialogue3').l),
+          move.b(Constant('Sound_StopAll').i, (Sound_Index).l),
+          move.b(Constant('SFXID_Surprise').i, (Sound_Index).l),
+          doMapUpdateLoop(Word(0x3c)),
+          popAndRunDialog3
+        ]));
+  });
+
   group('step object', () {
     test('with fractional negative step', () {
       var scene =

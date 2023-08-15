@@ -1594,7 +1594,7 @@ class SceneAsmGenerator implements EventVisitor {
       generateEvent();
     } else {
       // may go either way
-      _queuedGeneration.addFirst(_QueuedGeneration(() {
+      _queuedGeneration.add(_QueuedGeneration(() {
         _runOrInterruptDialog(event);
         inDialog();
         after?.call();

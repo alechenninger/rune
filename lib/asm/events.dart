@@ -70,6 +70,8 @@ const Map_Start_Facing_Dir = Constant('Map_Start_Facing_Dir');
 const Map_Start_Char_Align = Constant('Map_Start_Char_Align');
 const Map_Load_Flags = Constant('Map_Load_Flags');
 
+const Sound_Index = Constant('Sound_Index');
+
 final eventFlags = BiMap<Constant, Byte>()
   ..addAll({
     Constant('EventFlag_PiataFirstTime'):
