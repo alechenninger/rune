@@ -1,5 +1,6 @@
 import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/asm/text.dart';
 import 'package:rune/generator/cutscenes.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
@@ -8,6 +9,8 @@ import 'package:rune/generator/movement.dart';
 import 'package:rune/model/animate.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
+
+import 'scene_test.dart';
 
 main() {
   late GameMap map;
@@ -352,8 +355,9 @@ EventFlag_Test001 = $01'''));
     // otherwise they cause an additional dialog window to display
     var scene = Scene([
       Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),
-      PlaySound(Sound.stopAll),
+      ShowPanel(MolcumPanel.alysSurprised, showDialogBox: true),
       PlaySound(Sound.surprise),
+      HideAllPanels(),
       Pause(Duration(seconds: 1)),
       Dialog(speaker: alys, spans: DialogSpan.parse('Bye')),
     ]);
@@ -364,10 +368,46 @@ EventFlag_Test001 = $01'''));
         Asm([
           moveq(Byte.zero.i, d0),
           jsr(Label('Event_GetAndRunDialogue3').l),
-          move.b(Constant('Sound_StopAll').i, (Sound_Index).l),
           move.b(Constant('SFXID_Surprise').i, (Sound_Index).l),
+          jsr(Label('Panel_DestroyAll').l),
           doMapUpdateLoop(Word(0x3c)),
           popAndRunDialog3
+        ]));
+  });
+
+  test('consecutive sounds in event code are interspersed with vint', () {
+    // When PlaySound and PlayMusic events are back to back, there must be
+    // a vintprepare call to allow the sound index change to be read
+    // This happens after every sound in dialog loop.
+    var scene = Scene([
+      PlayMusic(Music.motaviaTown),
+      Pause(1.second),
+      PlaySound(Sound.stopAll),
+      PlayMusic(Music.suspicion),
+      PlaySound(Sound.surprise),
+      PlaySound(Sound.megid),
+      ShowPanel(MolcumPanel.alysSurprised)
+    ]);
+
+    var asm = Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments(),
+        Asm([
+          move.b(Music.motaviaTown.musicId.i, Constant('Sound_Index').l),
+          move.b(Music.motaviaTown.musicId.i, Constant('Saved_Sound_Index').w),
+          doMapUpdateLoop(Word(0x3c)),
+          move.b(Sound.stopAll.sfxId.i, Constant('Sound_Index').l),
+          vIntPrepare(),
+          move.b(Music.suspicion.musicId.i, Constant('Sound_Index').l),
+          move.b(Music.suspicion.musicId.i, Constant('Saved_Sound_Index').w),
+          vIntPrepare(),
+          move.b(Sound.surprise.sfxId.i, Constant('Sound_Index').l),
+          vIntPrepare(),
+          move.b(Sound.megid.sfxId.i, Constant('Sound_Index').l),
+          move.w(MolcumPanel.alysSurprised.panelIndex.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          dmaPlanesVInt()
         ]));
   });
 

@@ -1016,13 +1016,20 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void playSound(PlaySound playSound) {
-    _addToEventOrDialog(playSound,
-        inDialog: () {
-          _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
-          _addToDialog(dc.b([playSound.sound.sfxId]));
-        },
-        inEvent: (_) =>
-            move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l));
+    _addToEventOrDialog(playSound, inDialog: () {
+      _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
+      _addToDialog(dc.b([playSound.sound.sfxId]));
+    }, inEvent: (_) {
+      return Asm([
+        // Necessary to ensure previous sound change occurs
+        // TODO: as last event in current dialog is relevant to current dialog
+        // depending on how dialog generation is managed this may miss cases
+        if (_lastEventInCurrentDialog is PlaySound ||
+            _lastEventInCurrentDialog is PlayMusic)
+          vIntPrepare(),
+        move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l),
+      ]);
+    });
   }
 
   @override
@@ -1042,6 +1049,12 @@ class SceneAsmGenerator implements EventVisitor {
       // TODO: note in this case, saved sound index is not set
     }, inEvent: (_) {
       return Asm([
+        // Necessary to ensure previous sound change occurs
+        // TODO: as last event in current dialog is relevant to current dialog
+        // depending on how dialog generation is managed this may miss cases
+        if (_lastEventInCurrentDialog is PlaySound ||
+            _lastEventInCurrentDialog is PlayMusic)
+          vIntPrepare(),
         move.b(musicId.i, Constant('Sound_Index').l),
         move.b(musicId.i, Constant('Saved_Sound_Index').w)
       ]);
