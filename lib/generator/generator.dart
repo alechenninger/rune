@@ -590,6 +590,30 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void unlockCamera(UnlockCamera unlock) {
+    _addToEvent(
+        unlock,
+        (i) =>
+            EventAsm.of(asmeventslib.lockCamera(_memory.cameraLock = false)));
+  }
+
+  @override
+  void moveCamera(MoveCamera move) {
+    _addToEvent(move, (i) {
+      _memory.unknownAddressRegisters();
+
+      return move.to.withPosition(
+          memory: _memory,
+          asm: ((x, y) => EventAsm.of(asmeventslib.moveCamera(
+              x: x,
+              y: y,
+              // TODO: speed
+              // seems to mostly be 1 but not sure if this is slow or fast
+              speed: 1.i))));
+    });
+  }
+
+  @override
   void partyMove(RelativePartyMove move) {
     _addToEvent(move, (i) => move.toIndividualMoves(_memory).toAsm(_memory));
   }
@@ -614,14 +638,6 @@ class SceneAsmGenerator implements EventVisitor {
   void setContext(SetContext set) {
     _checkNotFinished();
     set(_memory);
-  }
-
-  @override
-  void unlockCamera(UnlockCamera unlock) {
-    _addToEvent(
-        unlock,
-        (i) =>
-            EventAsm.of(asmeventslib.lockCamera(_memory.cameraLock = false)));
   }
 
   @override

@@ -553,9 +553,9 @@ Asm stepObject(
 Asm moveCamera(
     {required Address x, required Address y, required Address speed}) {
   return Asm([
-    move.l(x, d0),
-    move.l(y, d1),
-    move.l(speed, d2),
+    move.w(x, d0),
+    move.w(y, d1),
+    move.w(speed, d2),
     jsr(Label('Event_MoveCamera').l),
   ]);
 }

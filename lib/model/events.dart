@@ -102,40 +102,6 @@ class Pause extends Event {
   int get hashCode => duration.hashCode;
 }
 
-class LockCamera extends Event {
-  @override
-  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
-    return generator.lockCameraToAsm(ctx);
-  }
-
-  @override
-  void visit(EventVisitor visitor) {
-    visitor.lockCamera(this);
-  }
-
-  @override
-  String toString() {
-    return 'LockCamera{}';
-  }
-}
-
-class UnlockCamera extends Event {
-  @override
-  Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
-    return generator.unlockCameraToAsm(ctx);
-  }
-
-  @override
-  void visit(EventVisitor visitor) {
-    visitor.unlockCamera(this);
-  }
-
-  @override
-  String toString() {
-    return 'UnlockCamera{}';
-  }
-}
-
 class LoadMap extends Event {
   // todo: should not be map, should be map id
   //   map might not actually even be in the same game model

@@ -1,4 +1,3 @@
-import '../asm/asm.dart';
 import '../asm/events.dart';
 import '../model/model.dart';
 import '../numbers.dart';
@@ -7,7 +6,8 @@ import 'event.dart';
 import 'generator.dart';
 import 'memory.dart';
 import 'movement.dart';
-import 'scene.dart';
+
+export '../asm/asm.dart';
 
 // should track transient state about code generation
 // the known values of registers and memory
