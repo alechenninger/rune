@@ -38,8 +38,17 @@ const BranchMnemonic bpl = BranchMnemonic('bpl');
 /// Branch if Z is set
 const BranchMnemonic beq = BranchMnemonic('beq');
 
-/// Branch if C is clear
+/// Branch if C is clear (unsigned ≥)
 const BranchMnemonic bcc = BranchMnemonic('bcc');
+
+/// Branch if C is set (unsigned <)
+const BranchMnemonic bcs = BranchMnemonic('bcs');
+
+/// Branch if C and Z are unset. (unsigned >)
+const BranchMnemonic bhi = BranchMnemonic('bhi');
+
+/// Branch if C or Z are set. (unsigned ≤)
+const BranchMnemonic bls = BranchMnemonic('bls');
 
 const AddiMnemonic addi = AddiMnemonic();
 const SubiMnemonic subi = SubiMnemonic();
@@ -173,19 +182,22 @@ class AsmError extends ArgumentError {
 }
 
 class Asm extends IterableBase<Instruction> {
-  final List<Instruction> lines = [];
+  final List<Instruction> lines;
 
-  Asm.empty();
+  Asm.empty() : lines = [];
 
-  Asm(List<Asm> asm) {
+  /// Const constructor. Cannot be modified.
+  const Asm.none() : lines = const [];
+
+  Asm(List<Asm> asm) : lines = [] {
     asm.forEach(add);
   }
 
-  Asm.fromInstruction(Instruction line) {
+  Asm.fromInstruction(Instruction line) : lines = [] {
     addLine(line);
   }
 
-  Asm.fromInstructions(Iterable<Instruction> lines) {
+  Asm.fromInstructions(Iterable<Instruction> lines) : lines = [] {
     lines.forEach(addLine);
   }
 
