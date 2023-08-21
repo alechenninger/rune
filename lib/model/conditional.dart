@@ -410,6 +410,85 @@ class Condition {
   }
 }
 
+class ExpressionCondition implements Condition {
+  final Set<BooleanExpression> _expressions = {};
+
+  @override
+  bool? operator [](EventFlag flag) => null;
+
+  @override
+  // TODO: implement _flags
+  IMap<EventFlag, bool> get _flags => throw UnimplementedError();
+
+  @override
+  bool conflictsWith(Condition other) {
+    // TODO: implement conflictsWith
+    throw UnimplementedError();
+  }
+
+  @override
+  // TODO: implement entries
+  Iterable<MapEntry<EventFlag, bool>> get entries => throw UnimplementedError();
+
+  @override
+  // TODO: implement flagsSet
+  Iterable<EventFlag> get flagsSet => throw UnimplementedError();
+
+  @override
+  Condition inverted() {
+    // TODO: implement inverted
+    throw UnimplementedError();
+  }
+
+  @override
+  bool isKnownSet(EventFlag flag) {
+    // TODO: implement isKnownSet
+    throw UnimplementedError();
+  }
+
+  @override
+  bool isKnownUnset(EventFlag flag) {
+    // TODO: implement isKnownUnset
+    throw UnimplementedError();
+  }
+
+  @override
+  bool isSatisfiedBy(Condition other) {
+    // TODO: implement isSatisfiedBy
+    throw UnimplementedError();
+  }
+
+  @override
+  Condition withFlag(EventFlag flag, bool isSet) {
+    // TODO: implement withFlag
+    throw UnimplementedError();
+  }
+
+  @override
+  Condition withFlags(Map<EventFlag, bool> flags) {
+    // TODO: implement withFlags
+    throw UnimplementedError();
+  }
+
+  @override
+  Condition withNotSet(EventFlag flag) {
+    // TODO: implement withNotSet
+    throw UnimplementedError();
+  }
+
+  @override
+  Condition withSet(EventFlag flag) {
+    // TODO: implement withSet
+    throw UnimplementedError();
+  }
+
+  @override
+  Condition without(EventFlag flag) {
+    // TODO: implement without
+    throw UnimplementedError();
+  }
+}
+
 class IfFlag extends Event {
   final EventFlag flag;
   final List<Event> isSet;
@@ -487,4 +566,101 @@ class SetFlag extends Event {
 
   @override
   int get hashCode => flag.hashCode;
+}
+
+class IfExpression extends Event {
+  final BooleanExpression expression;
+  final List<Event> isTrue;
+  final List<Event> isFalse;
+
+  IfExpression(this.expression,
+      {this.isTrue = const [], this.isFalse = const []});
+
+  @override
+  void visit(EventVisitor visitor) {
+    // TODO: implement visit
+  }
+
+  @override
+  String toString() {
+    return 'IfExpression{$expression, \n'
+        'isTrue:\n'
+        '${toIndentedString(isTrue, '         ')}\n'
+        'isFalse:\n'
+        '${toIndentedString(isFalse, '         ')}\n'
+        '}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IfExpression &&
+          runtimeType == other.runtimeType &&
+          expression == other.expression &&
+          const ListEquality<Event>().equals(isTrue, other.isTrue) &&
+          const ListEquality<Event>().equals(isFalse, other.isFalse);
+
+  @override
+  int get hashCode =>
+      expression.hashCode ^
+      const ListEquality<Event>().hash(isTrue) ^
+      const ListEquality<Event>().hash(isFalse);
+
+  IfExpression withoutSetContextInBranches() {
+    return IfExpression(expression,
+        isTrue: isTrue
+            .whereNot((e) => e is SetContext)
+            .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e)
+            .toList(),
+        isFalse: isFalse
+            .whereNot((e) => e is SetContext)
+            .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e)
+            .toList());
+  }
+}
+
+class IfValues<T extends ModelExpression> extends Event {
+  //final T op1, op2;
+
+  /// Branches which have any events.
+  List<Branch> get branches {}
+
+  @override
+  void visit(EventVisitor visitor) {
+    // TODO: implement visit
+  }
+}
+
+const gte = BranchCondition.gte;
+const lte = BranchCondition.lte;
+const neq = BranchCondition.neq;
+const eq = BranchCondition.eq;
+const gt = BranchCondition.gt;
+const lt = BranchCondition.lt;
+
+enum BranchCondition {
+  gte,
+  lte,
+  neq,
+  eq,
+  gt,
+  lt;
+
+  BranchCondition get invert {
+    return switch (this) {
+      gte => lt,
+      lte => gt,
+      neq => eq,
+      eq => neq,
+      gt => lte,
+      lt => gte
+    };
+  }
+}
+
+class Branch {
+  final BranchCondition condition;
+  final List<Event> events;
+
+  Branch(this.condition, this.events);
 }

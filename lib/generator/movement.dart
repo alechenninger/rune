@@ -12,8 +12,6 @@ import '../model/model.dart';
 import 'event.dart';
 import 'memory.dart';
 
-const unitsPerStep = 16;
-
 const FacingDir_Up = Constant('FacingDir_Up');
 const FacingDir_Down = Constant('FacingDir_Down');
 const FacingDir_Left = Constant('FacingDir_Left');

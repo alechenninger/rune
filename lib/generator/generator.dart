@@ -24,6 +24,8 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
+import 'package:quiver/iterables.dart';
+import 'package:rune/generator/conditional.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -815,6 +817,76 @@ class SceneAsmGenerator implements EventVisitor {
     });
   }
 
+  // @override
+  void ifValues(IfValues ifVal) {
+    _addToEvent(ifVal, (i) {
+      // Evaluate expression at runtime if needed
+      // at code where expression is true, fork memory state,
+      var parent = _memory;
+
+      // These branches are not added to state graph intentionally,
+      // since we don't have ways to express these conditions in the graph
+      // currently.
+      var states = <Memory>[];
+
+      void runBranch(List<Event> events) {
+        states.add(_memory = parent.branch());
+
+        for (var event in events) {
+          event.visit(this);
+        }
+        _terminateDialog();
+      }
+
+      _eventAsm.add(ifVal.compare(memory: _memory));
+
+      Label branchTo(Branch b) {
+        var lbl = Label('.${i}_${b.condition}');
+        _eventAsm.add(b.condition.mnemonicUnsigned.w(lbl));
+        return lbl;
+      }
+
+      var continueLbl = Label('.${i}_continue');
+
+      var branches = ifVal.branches;
+
+      if (branches.length == 1) {
+        // optimization
+        var b = branches.single;
+
+        // Get the opposite of this branch, then just branch to continue
+        _eventAsm.add(b.condition.invert.mnemonicUnsigned.w(continueLbl));
+
+        runBranch(b.events);
+      } else {
+        var branched = branches
+            .sublist(0, branches.length - 1)
+            .map((b) => (b, branchTo(b)));
+
+        runBranch(branches.last.events);
+
+        for (var (b, lbl) in branched) {
+          _eventAsm.add(bra.w(continueLbl));
+          _eventAsm.add(label(lbl));
+          runBranch(b.events);
+        }
+      }
+
+      _eventAsm.add(label(continueLbl));
+
+      // As for now we are not tracking these states in the graph,
+      // consider their events as possibly applied to any reachable state
+      // from this point in the graph.
+      for (var state in states) {
+        for (var change in state.changes) {
+          for (var reachable in concat([_parentStates(), _childStates()])) {
+            change.mayApply(reachable);
+          }
+        }
+      }
+    });
+  }
+
   @override
   void fadeInField(FadeInField fadeIn) {
     if (_memory.isFieldShown == true) return;
@@ -1359,17 +1431,34 @@ class SceneAsmGenerator implements EventVisitor {
   /// States applied to the current condition
   /// apply to all "children" of this condition.
   void _updateStateGraphChildren() {
+    for (var state in _childStates()) {
+      for (var change in _memory.changes) {
+        change.apply(state);
+      }
+    }
+    _memory.clearChanges();
+  }
+
+  Iterable<Memory> _childStates() sync* {
     for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
       // In the current condition, state has already been applied
       // Don't apply twice out of order!
       if (condition == _currentCondition) continue;
       if (_currentCondition.isSatisfiedBy(condition)) {
-        for (var change in _memory.changes) {
-          change.apply(state);
-        }
+        yield state;
       }
     }
-    _memory.clearChanges();
+  }
+
+  Iterable<Memory> _parentStates() sync* {
+    for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
+      // In the current condition, state has already been applied
+      // Don't apply twice out of order!
+      if (condition == _currentCondition) continue;
+      if (condition.isSatisfiedBy(_currentCondition)) {
+        yield state;
+      }
+    }
   }
 
   void _runOrInterruptDialog(Event event) {
@@ -1911,6 +2000,21 @@ class TestDialogTreeLookup extends DialogTreeLookup {
     // wow what a hack :laugh:
     return _treeByLabel[lbl] ??
         (throw ArgumentError('no such dialog tree: $lbl'));
+  }
+}
+
+class AsmGenerationException {
+  final Memory memory;
+  final Object? model;
+  final Object? cause;
+  final StackTrace? causeTrace;
+
+  AsmGenerationException(this.memory, this.model, this.cause, this.causeTrace);
+
+  @override
+  String toString() {
+    return 'AsmGenerationException{memory: $memory, model: $model, cause: $cause, '
+        'causeTrace: $causeTrace}';
   }
 }
 
