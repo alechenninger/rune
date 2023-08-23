@@ -3,6 +3,11 @@ extension OnIterable<T> on Iterable<T> {
     if (isEmpty) return ifEmpty;
     return reduce(combine);
   }
+
+  T? reduceOrNull(T Function(T, T) combine) {
+    if (isEmpty) return null;
+    return reduce(combine);
+  }
 }
 
 extension OnIterableOfComparable<E extends Comparable> on Iterable<E> {

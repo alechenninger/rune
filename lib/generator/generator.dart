@@ -24,7 +24,7 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
-import 'package:quiver/iterables.dart';
+import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/conditional.dart';
 
 import '../asm/asm.dart';
@@ -817,9 +817,9 @@ class SceneAsmGenerator implements EventVisitor {
     });
   }
 
-  // @override
-  void ifValues(IfValues ifVal) {
-    _addToEvent(ifVal, (i) {
+  @override
+  void ifValue(IfValue ifValue) {
+    _addToEvent(ifValue, (i) {
       // Evaluate expression at runtime if needed
       // at code where expression is true, fork memory state,
       var parent = _memory;
@@ -838,38 +838,34 @@ class SceneAsmGenerator implements EventVisitor {
         _terminateDialog();
       }
 
-      _eventAsm.add(ifVal.compare(memory: _memory));
+      _eventAsm.add(ifValue.compare(memory: _memory));
 
       Label branchTo(Branch b) {
-        var lbl = Label('.${i}_${b.condition}');
+        var lbl = Label('.${i}_${b.condition.name}');
         _eventAsm.add(b.condition.mnemonicUnsigned.w(lbl));
         return lbl;
       }
 
       var continueLbl = Label('.${i}_continue');
 
-      var branches = ifVal.branches;
+      var branches = ifValue.branches;
+      var emptyBranch = ifValue.emptyBranch;
 
-      if (branches.length == 1) {
-        // optimization
-        var b = branches.single;
+      if (emptyBranch != null) {
+        _eventAsm.add(emptyBranch.mnemonicUnsigned.w(continueLbl));
+      }
 
-        // Get the opposite of this branch, then just branch to continue
-        _eventAsm.add(b.condition.invert.mnemonicUnsigned.w(continueLbl));
+      var branched = branches
+          .sublist(0, branches.length - 1)
+          .map((b) => (b, branchTo(b)))
+          .toList();
 
+      runBranch(branches.last.events);
+
+      for (var (b, lbl) in branched) {
+        _eventAsm.add(bra.w(continueLbl));
+        _eventAsm.add(label(lbl));
         runBranch(b.events);
-      } else {
-        var branched = branches
-            .sublist(0, branches.length - 1)
-            .map((b) => (b, branchTo(b)));
-
-        runBranch(branches.last.events);
-
-        for (var (b, lbl) in branched) {
-          _eventAsm.add(bra.w(continueLbl));
-          _eventAsm.add(label(lbl));
-          runBranch(b.events);
-        }
       }
 
       _eventAsm.add(label(continueLbl));
@@ -884,6 +880,8 @@ class SceneAsmGenerator implements EventVisitor {
           }
         }
       }
+
+      return null;
     });
   }
 

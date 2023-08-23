@@ -804,3 +804,17 @@ extension PositionOfObjectAsm on PositionOfObject {
           DirectAddressRegister load = a4}) =>
       withPosition(memory: memory, asm: (_, y) => asm(y), load: load);
 }
+
+extension PositionComponentOfObjectAsm on PositionComponentOfObject {
+  Asm withValue(
+      {required Memory memory,
+      required Asm Function(Address a) asm,
+      DirectAddressRegister load = a4}) {
+    var offset = switch (component) { Axis.x => curr_x_pos, _ => curr_y_pos };
+
+    return Asm([
+      obj.toA(load, memory),
+      asm(offset(load)),
+    ]);
+  }
+}

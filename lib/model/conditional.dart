@@ -619,15 +619,56 @@ class IfExpression extends Event {
   }
 }
 
-class IfValues<T extends ModelExpression> extends Event {
-  //final T op1, op2;
+class IfValue<T extends ModelExpression> extends Event {
+  final T op1, op2;
+
+  final _branches = <Branch>[];
+  BranchCondition? emptyBranch;
+
+  IfValue(
+    this.op1, {
+    List<Event> equal = const [],
+    List<Event> notEqual = const [],
+    List<Event> greater = const [],
+    List<Event> greaterOrEqual = const [],
+    List<Event> less = const [],
+    List<Event> lessOrEqual = const [],
+    required T comparedTo,
+  }) : op2 = comparedTo {
+    var conditions = <BranchCondition>{};
+
+    void addBranch(BranchCondition condition, List<Event> events) {
+      if (events.isEmpty) return;
+      for (var c in condition.parts) {
+        if (!conditions.add(c)) {
+          throw ModelException('condition already defined: $c');
+        }
+      }
+      _branches.add(Branch(condition, events));
+    }
+
+    addBranch(eq, equal);
+    addBranch(neq, notEqual);
+    addBranch(gt, greater);
+    addBranch(gte, greaterOrEqual);
+    addBranch(lt, less);
+    addBranch(lte, lessOrEqual);
+
+    if (conditions.isEmpty) {
+      throw ArgumentError('must provide at least one branch with events');
+    }
+
+    emptyBranch = BranchCondition.canonical
+        .difference(conditions)
+        .reduceOrNull((value, element) => value.or(element));
+  }
 
   /// Branches which have any events.
-  List<Branch> get branches {}
+  List<Branch> get branches => List.unmodifiable(_branches);
 
   @override
   void visit(EventVisitor visitor) {
-    // TODO: implement visit
+    visitor.ifValue(this);
   }
 }
 
@@ -645,6 +686,27 @@ enum BranchCondition {
   eq,
   gt,
   lt;
+
+  static const canonical = {gt, eq, lt};
+
+  BranchCondition or(BranchCondition other) {
+    var parts = {...this.parts, ...other.parts};
+
+    if (parts.containsAll(const [gt, eq])) return gte;
+    if (parts.containsAll(const [lt, eq])) return lte;
+    if (parts.containsAll(const [gt, lt])) return neq;
+
+    throw ArgumentError('invalid combination: $this, $other');
+  }
+
+  /// Decomposes a condition into canonical set of positive "parts":
+  /// one or more of [gt], [eq], or [lt] (see [canonical]).
+  Set<BranchCondition> get parts => switch (this) {
+        gte => {gt, eq},
+        lte => {lt, eq},
+        neq => {gt, lt},
+        _ => {this}
+      };
 
   BranchCondition get invert {
     return switch (this) {

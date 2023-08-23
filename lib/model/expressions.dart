@@ -10,21 +10,10 @@ class Comparison<T extends ModelExpression> {
   Comparison(this.op1, this.op2);
 }
 
-sealed class ScalarExpression extends ModelExpression {}
-
-// sealed class TupleExpression {
-//   ScalarExpression first();
-//   ScalarExpression second();
-// }
+sealed class PositionComponentExpression extends ModelExpression {}
 
 sealed class PositionExpression extends ModelExpression {
-  // @override
-  // ScalarExpression first() => xComponent();
-  // @override
-  // ScalarExpression second() => yComponent();
-
-  // ScalarExpression xComponent();
-  // ScalarExpression yComponent();
+  PositionComponentExpression component(Axis axis);
 }
 
 extension PositionExpressions on PositionExpression {
@@ -38,6 +27,10 @@ class PositionOfObject extends PositionExpression {
   PositionOfObject(this.obj);
 
   @override
+  PositionComponentOfObject component(Axis axis) =>
+      PositionComponentOfObject(obj, axis);
+
+  @override
   String toString() => 'PositionOfObject{obj: $obj}';
 
   @override
@@ -49,6 +42,25 @@ class PositionOfObject extends PositionExpression {
 
   @override
   int get hashCode => obj.hashCode;
+}
+
+class PositionComponentOfObject extends PositionComponentExpression {
+  final FieldObject obj;
+  final Axis component;
+
+  PositionComponentOfObject(this.obj, this.component);
+
+  @override
+  String toString() => 'PositionComponentOfObject{obj: $obj, '
+      'component: $component}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PositionComponentOfObject &&
+          runtimeType == other.runtimeType &&
+          obj == other.obj &&
+          component == other.component;
 }
 
 const unitsPerStep = 16;
@@ -117,9 +129,39 @@ class Position implements PositionExpression {
   }
 
   @override
+  PositionComponent component(Axis axis) =>
+      PositionComponent.fromPosition(this, axis);
+
+  @override
   String toString() {
     return '($x, $y)';
   }
+}
+
+class PositionComponent extends PositionComponentExpression {
+  final Axis axis;
+  final int value;
+
+  PositionComponent.fromPosition(Position p, Axis axis)
+      : this(switch (axis) { Axis.x => p.x, Axis.y => p.y }, axis);
+
+  PositionComponent(this.value, this.axis);
+
+  @override
+  String toString() {
+    return 'PositionComponent{$axis: $value}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PositionComponent &&
+          runtimeType == other.runtimeType &&
+          axis == other.axis &&
+          value == other.value;
+
+  @override
+  int get hashCode => axis.hashCode ^ value.hashCode;
 }
 
 sealed class DirectionExpression extends ModelExpression {

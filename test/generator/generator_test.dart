@@ -545,10 +545,11 @@ EventFlag_Test001 = $01'''));
     }, skip: 'TODO');
   });
 
-  group('if values', () {
+  group('if value', () {
     test('eq, gt, lt with expression and scalar', () {
       var scene = Scene([
-        IfValues(rune.position().yComponent(), Scalar(0x200),
+        IfValue(rune.position().component(Axis.y),
+            comparedTo: PositionComponent(0x200, Axis.y),
             equal: [Face(up).move(rune)],
             greater: [Face(down).move(rune)],
             less: [Face(right).move(rune)])
@@ -561,8 +562,7 @@ EventFlag_Test001 = $01'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d1),
-            cmp.w(curr_y_pos(a4), d1),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
             beq.w(Label('.1_eq')),
             bhi.w(Label('.1_gt')),
             // lt branch
@@ -585,7 +585,8 @@ EventFlag_Test001 = $01'''));
 
     test('gte, lt with expression and scalar', () {
       var scene = Scene([
-        IfValues(rune.position().yComponent(), Scalar(0x200),
+        IfValue(rune.position().component(Axis.y),
+            comparedTo: PositionComponent(0x200, Axis.y),
             greaterOrEqual: [Face(down).move(rune)],
             less: [Face(right).move(rune)])
       ]);
@@ -597,16 +598,16 @@ EventFlag_Test001 = $01'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d1),
-            cmp.w(curr_y_pos(a4), d1),
-            bcs.w(Label('.1_lt')),
-            // gte branch
-            updateObjFacing(down.address),
-            bra.w(Label('.1_continue')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            bcc.w(Label('.1_gte')),
 
             // lt branch
-            label(Label('.1_lt')),
             updateObjFacing(right.address),
+            bra.w(Label('.1_continue')),
+
+            // gte branch
+            label(Label('.1_gte')),
+            updateObjFacing(down.address),
 
             // continue
             label(Label('.1_continue')),
@@ -615,8 +616,11 @@ EventFlag_Test001 = $01'''));
 
     test('gte with expression and scalar', () {
       var scene = Scene([
-        IfValues(rune.position().yComponent(), Scalar(0x200),
-            greaterOrEqual: [Face(down).move(rune)],
+        IfValue(
+          rune.position().component(Axis.y),
+          greaterOrEqual: [Face(down).move(rune)],
+          comparedTo: PositionComponent(0x200, Axis.y),
+        )
       ]);
 
       var asm =
@@ -626,8 +630,7 @@ EventFlag_Test001 = $01'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d1),
-            cmp.w(curr_y_pos(a4), d1),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
             bcs.w(Label('.1_continue')),
             // gte branch
             updateObjFacing(down.address),
@@ -638,9 +641,10 @@ EventFlag_Test001 = $01'''));
 
     test('gt, lte with expression and scalar', () {
       var scene = Scene([
-        IfValues(rune.position().yComponent(), Scalar(0x200),
+        IfValue(rune.position().component(Axis.y),
             greater: [Face(down).move(rune)],
-            lessOrEqual: [Face(right).move(rune)])
+            lessOrEqual: [Face(right).move(rune)],
+            comparedTo: PositionComponent(0x200, Axis.y))
       ]);
 
       var asm =
@@ -650,9 +654,8 @@ EventFlag_Test001 = $01'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d1),
-            cmp.w(curr_y_pos(a4), d1),
-            bcc.w(Label('.1_gt')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            bhi.w(Label('.1_gt')),
             // lte branch
             updateObjFacing(right.address),
             bra.w(Label('.1_continue')),
@@ -668,8 +671,10 @@ EventFlag_Test001 = $01'''));
 
     test('gt, lt with expression and scalar', () {
       var scene = Scene([
-        IfValues(rune.position().yComponent(), Scalar(0x200),
-            greater: [Face(down).move(rune)], less: [Face(right).move(rune)])
+        IfValue(rune.position().component(Axis.y),
+            comparedTo: PositionComponent(0x200, Axis.y),
+            greater: [Face(down).move(rune)],
+            less: [Face(right).move(rune)])
       ]);
 
       var asm =
@@ -679,10 +684,9 @@ EventFlag_Test001 = $01'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d1),
-            cmp.w(curr_y_pos(a4), d1),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
             beq.w(Label('.1_continue')),
-            bcc.w(Label('.1_gt')),
+            bhi.w(Label('.1_gt')),
             // lt branch
             updateObjFacing(right.address),
             bra.w(Label('.1_continue')),
@@ -698,7 +702,8 @@ EventFlag_Test001 = $01'''));
 
     test('gt with expression and scalar', () {
       var scene = Scene([
-        IfValues(rune.position().yComponent(), Scalar(0x200),
+        IfValue(rune.position().component(Axis.y),
+            comparedTo: PositionComponent(0x200, Axis.y),
             greater: [Face(down).move(rune)])
       ]);
 
@@ -709,13 +714,10 @@ EventFlag_Test001 = $01'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d1),
-            cmp.w(curr_y_pos(a4), d1),
-            bcc.w(Label('.1_gt')),
-            bra.w(Label('.1_continue')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            bls.w(Label('.1_continue')),
 
             // gt branch
-            label(Label('.1_gt')),
             updateObjFacing(down.address),
 
             // continue

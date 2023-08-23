@@ -181,8 +181,9 @@ abstract class EventVisitor {
   void partyMove(RelativePartyMove move);
   void pause(Pause pause);
   void setContext(SetContext set);
-  void ifFlag(IfFlag ifEvent);
+  void ifFlag(IfFlag ifFlag);
   void setFlag(SetFlag setFlag);
+  void ifValue(IfValue ifValue);
   void showPanel(ShowPanel showPanel);
   void hideTopPanels(HideTopPanels hidePanels);
   void hideAllPanels(HideAllPanels hidePanels);
