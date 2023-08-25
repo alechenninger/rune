@@ -724,5 +724,60 @@ EventFlag_Test001 = $01'''));
             label(Label('.1_continue')),
           ]));
     });
+
+    test('gt with scalar and expression', () {
+      var scene = Scene([
+        IfValue(PositionComponent(0x200, Axis.y),
+            comparedTo: rune.position().component(Axis.y),
+            greater: [Face(down).move(rune)])
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            move.w(0x200.toWord.i, d0),
+            cmp.w(curr_y_pos(a4), d0),
+            bls.w(Label('.1_continue')),
+
+            // gt branch
+            updateObjFacing(down.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('gt with expressions', () {
+      var scene = Scene([
+        IfValue(alys.position().component(Axis.y),
+            comparedTo: rune.position().component(Axis.y),
+            greater: [Face(down).move(rune)])
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            lea(a4.indirect, a3),
+            characterByIdToA4(alys.charIdAddress),
+            move.w(curr_y_pos(a4), d0),
+            cmp.w(curr_y_pos(a3), d0),
+            bls.w(Label('.1_continue')),
+
+            // gt branch
+            characterByIdToA4(rune.charIdAddress),
+            updateObjFacing(down.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
   });
 }

@@ -25,6 +25,11 @@ abstract class Address {
   static DirectAddressRegister a(int num) => DirectAddressRegister(num);
 }
 
+abstract class AddressRegister extends Address {
+  int get register;
+  AddressRegister withRegister(int num);
+}
+
 class _Address implements Address {
   final String _string;
 
@@ -69,7 +74,8 @@ class Immediate extends _Address {
 }
 
 /// Value in one of the address registers
-class DirectAddressRegister extends _Address {
+class DirectAddressRegister extends _Address implements AddressRegister {
+  @override
   final int register;
 
   DirectAddressRegister(this.register) : super('a$register') {
@@ -77,6 +83,10 @@ class DirectAddressRegister extends _Address {
       throw AsmError(register, 'is not a valid address register');
     }
   }
+
+  @override
+  DirectAddressRegister withRegister(int register) =>
+      DirectAddressRegister(register);
 
   const DirectAddressRegister._(this.register) : super('a$register');
 
@@ -98,7 +108,7 @@ class DirectDataRegister extends _Address {
 }
 
 /// Value in memory at an address pointed to by an address register
-class IndirectAddressRegister extends _Address {
+class IndirectAddressRegister extends _Address implements AddressRegister {
   final int register;
   final Expression displacement;
   final DirectDataRegister? variableDisplacement;
@@ -114,6 +124,12 @@ class IndirectAddressRegister extends _Address {
       throw AsmError(register, 'is not a valid address register');
     }
   }
+
+  @override
+  IndirectAddressRegister withRegister(int register) =>
+      IndirectAddressRegister(register,
+          displacement: displacement,
+          variableDisplacement: variableDisplacement);
 
   IndirectAddressRegister plus(Expression exp) =>
       IndirectAddressRegister(register,

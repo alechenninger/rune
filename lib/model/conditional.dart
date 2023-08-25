@@ -625,6 +625,7 @@ class IfValue<T extends ModelExpression> extends Event {
   final _branches = <Branch>[];
   BranchCondition? emptyBranch;
 
+  /// [comparedTo] is subtracted from [op1] (`op1 - comparedTo`)
   IfValue(
     this.op1, {
     List<Event> equal = const [],

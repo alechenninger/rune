@@ -14,17 +14,35 @@ extension IfValueAsm on IfValue {
   /// as in `cmpi.w #constant, curr_x_pos(a4)`
   Asm compare({required Memory memory}) {
     Asm compareTo(Address src) {
-      return switch (op1) {
-        PositionComponentExpression c =>
-          c.withValue(memory: memory, asm: (dst) => _cmp(src, dst, Size.w)),
-        PositionExpression p => throw 'todo',
-        DirectionExpression d => throw 'todo',
-      };
+      var asm = Asm.empty();
+
+      switch (op1) {
+        case PositionComponent c:
+          asm.add(c.withValue(
+              memory: memory, asm: (dst) => _cmp(src, dst, Size.w)));
+          break;
+        case PositionComponentOfObject c:
+          if (src is AddressRegister) {
+            asm.add(lea(Address.a(src.register).indirect, a3));
+            src = src.withRegister(3);
+          }
+
+          asm.add(c.withValue(
+              memory: memory, load: a4, asm: (dst) => _cmp(src, dst, Size.w)));
+
+          break;
+        case PositionExpression p:
+          throw 'todo';
+        case DirectionExpression d:
+          throw 'todo';
+      }
+
+      return asm;
     }
 
     return switch (op2) {
       PositionComponentExpression c =>
-        c.withValue(memory: memory, asm: compareTo),
+        c.withValue(memory: memory, load: a4, asm: compareTo),
       PositionExpression p => throw 'todo',
       DirectionExpression d => throw 'todo',
     };
@@ -33,17 +51,13 @@ extension IfValueAsm on IfValue {
 
 Asm _cmp(Address src, Address dst, Size size, {DirectDataRegister dR = d0}) {
   var width = switch (size) {
-    Size.b => (c) => c.b,
-    Size.w => (c) => c.w,
-    Size.l => (c) => c.l
+    byte => (c) => c.b,
+    word => (c) => c.w,
+    long => (c) => c.l
   };
 
   if (src is Immediate) {
     return width(cmpi)(src, dst);
-  }
-
-  if (dst is Immediate) {
-    return width(cmp)(src, dst);
   }
 
   return Asm([
@@ -65,10 +79,13 @@ extension BranchConditionAsm on BranchCondition {
 
 extension PositionComponentExpressionAsm on PositionComponentExpression {
   Asm withValue(
-      {required Memory memory, required Asm Function(Address c) asm}) {
+      {required Memory memory,
+      required Asm Function(Address c) asm,
+      DirectAddressRegister load = a4}) {
     return switch (this) {
       PositionComponent p => asm(Word(p.value).i),
-      PositionComponentOfObject p => p.withValue(memory: memory, asm: asm)
+      PositionComponentOfObject p =>
+        p.withValue(memory: memory, load: load, asm: asm)
     };
   }
 }
