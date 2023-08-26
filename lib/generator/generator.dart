@@ -654,7 +654,13 @@ class SceneAsmGenerator implements EventVisitor {
 
     // If a state already exists for this flag,
     // ensure it is updated with changes that apply from this parent.
-    _updateStateGraphChildren();
+    // It is also invalid for multiple states to have queued changes at once,
+    // because we will not know in what order to apply the changes
+    // to reachable states.
+    // This event is currently the only one that would change states
+    // and thus add changes, so it must be called here.
+    // TODO(state graph): could this still allow out of order changes?
+    _updateStateGraph();
 
     var knownState = _currentCondition[flag];
     if (knownState != null) {
@@ -789,7 +795,7 @@ class SceneAsmGenerator implements EventVisitor {
           _terminateDialog();
         }
 
-        _updateStateGraph(flag);
+        _updateStateGraphAndSibling(flag);
         _flagUnknown(flag);
 
         // define routine for continuing
@@ -820,9 +826,18 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void ifValue(IfValue ifValue) {
     _addToEvent(ifValue, (i) {
-      // Prevents update to children from being applied out of order
-      // TODO: might also need to do this to parent states?
-      _updateStateGraphChildren();
+      // This event will apply changes to reachable states in the graph.
+      // Because of this, we need to be sure any queued changes
+      // are applied first,
+      // since they must come before this event.
+      _updateStateGraph();
+
+      /*
+      lets say parent has queued set position
+      then in ifvalues we change that position
+      then next ifflag the set position could get applied to children erroneously
+
+      */
 
       // Evaluate expression at runtime if needed
       // at code where expression is true, fork memory state,
@@ -1366,7 +1381,7 @@ class SceneAsmGenerator implements EventVisitor {
   /// * In all of the remaining branches, we won't know if these flags are also
   /// set or not the next they are evaluated, so we have to tell these states
   /// that these changes may have applied.
-  void _updateStateGraph(EventFlag branchFlag) {
+  void _updateStateGraphAndSibling(EventFlag branchFlag) {
     var currentBranch = _currentCondition[branchFlag];
     if (currentBranch == null) {
       throw ArgumentError.value(
@@ -1439,15 +1454,43 @@ class SceneAsmGenerator implements EventVisitor {
     sibling?.clearChanges();
   }
 
-  /// States applied to the current condition
-  /// apply to all "children" of this condition.
-  void _updateStateGraphChildren() {
-    for (var state in _childStates()) {
-      for (var change in _memory.changes) {
-        change.apply(state);
+  /// Applies the same logic as [_updateStateGraphAndSibling] but for
+  /// only the [_currentCondition]'s changes.
+  ///
+  /// This is appropriate if this state is the only state with queued changes.
+  /// When a sibling state has changes queued (such as during [ifFlag]),
+  /// [_updateStateGraphAndSibling] must be used instead.
+  /// Otherwise, changes may be applied out of order in the graph.
+  void _updateStateGraph() {
+    for (var (reachability, state) in _allStates()) {
+      switch (reachability) {
+        case _Reachability.child:
+          for (var change in _memory.changes) {
+            change.apply(state);
+          }
+          break;
+        case _Reachability.reachable:
+          for (var change in _memory.changes) {
+            change.mayApply(state);
+          }
+          break;
+        case _Reachability.unreachable:
+          break;
       }
     }
     _memory.clearChanges();
+  }
+
+  Iterable<(_Reachability, Memory)> _allStates() sync* {
+    for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
+      if (_currentCondition.conflictsWith(condition)) {
+        yield (_Reachability.unreachable, state);
+      } else if (_currentCondition.isSatisfiedBy(condition)) {
+        yield (_Reachability.child, state);
+      } else {
+        yield (_Reachability.reachable, state);
+      }
+    }
   }
 
   /// Returns all states that are "reachable" from the current conditions.
@@ -1457,28 +1500,6 @@ class SceneAsmGenerator implements EventVisitor {
   Iterable<Memory> _reachableStates() sync* {
     for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
       if (!_currentCondition.conflictsWith(condition)) {
-        yield state;
-      }
-    }
-  }
-
-  Iterable<Memory> _childStates() sync* {
-    for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
-      // In the current condition, state has already been applied
-      // Don't apply twice out of order!
-      if (condition == _currentCondition) continue;
-      if (_currentCondition.isSatisfiedBy(condition)) {
-        yield state;
-      }
-    }
-  }
-
-  Iterable<Memory> _parentStates() sync* {
-    for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
-      // In the current condition, state has already been applied
-      // Don't apply twice out of order!
-      if (condition == _currentCondition) continue;
-      if (condition.isSatisfiedBy(_currentCondition)) {
         yield state;
       }
     }
@@ -2040,6 +2061,8 @@ class AsmGenerationException {
         'causeTrace: $causeTrace}';
   }
 }
+
+enum _Reachability { child, reachable, unreachable }
 
 // These offsets are used to account for assembly specifics, which allows for
 // variances in maps to be coded manually (such as objects).
