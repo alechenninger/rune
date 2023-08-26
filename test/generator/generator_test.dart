@@ -779,5 +779,226 @@ EventFlag_Test001 = $01'''));
             label(Label('.1_continue')),
           ]));
     });
+
+    test('terminates dialog', () {
+      var scene = Scene([
+        IfValue(PositionComponent(0x200, Axis.y),
+            comparedTo: rune.position().component(Axis.y),
+            greater: [Dialog.parse('howdy')],
+            less: [Dialog.parse('ho')])
+      ]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            move.w(0x200.toWord.i, d0),
+            cmp.w(curr_y_pos(a4), d0),
+            beq.w(Label('.1_continue')),
+            bhi.w(Label('.1_gt')),
+
+            // lt branch
+            getAndRunDialog3(Byte.zero.i),
+            bra.w(Label('.1_continue')),
+
+            label(Label('.1_gt')),
+            // gt branch
+            getAndRunDialog3(Byte.one.i),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+
+      expect(
+          program.dialogTrees.forMap(map.id),
+          DialogTree()
+            ..add(DialogAsm([
+              dc.b(Bytes.ascii('ho')),
+              dc.b([Byte(0xff)])
+            ]))
+            ..add(DialogAsm([
+              dc.b(Bytes.ascii('howdy')),
+              dc.b([Byte(0xff)])
+            ])));
+    });
+
+    test('makes state ambiguous in outer branch', () {
+      var scene = Scene([
+        AbsoluteMoves()..destinations[rune] = Position(0x100, 0x200),
+        IfValue(alys.position().component(Axis.x),
+            comparedTo: PositionComponent(0x100, Axis.x),
+            greaterOrEqual: [
+              AbsoluteMoves()..destinations[rune] = Position(0x110, 0x200)
+            ]),
+        IndividualMoves()
+          ..moves[rune] = (StepPath()
+            ..direction = down
+            ..distance = 2.steps)
+      ]);
+
+      var asm = Program().addScene(SceneId('test'), scene, startingMap: map);
+
+      print(asm);
+
+      expect(
+        asm.event.withoutComments().tail(6),
+        Asm([
+          moveq(Constant('CharID_Rune').i, d0),
+          jsr(Label('Event_GetCharacter').l),
+          move.w(curr_x_pos(a4), d0),
+          move.w(curr_y_pos(a4), d1),
+          addi.w(0x0020.toWord.i, d1),
+          jsr(Label('Event_MoveCharacter').l),
+        ]),
+      );
+    });
+
+    test('makes state ambiguous in parent branches', () {
+      // Add an IfFlag branch, an within that add IfValue branch
+      // The outter most branch should also have ambiguous state.
+
+      var scene = Scene([
+        AbsoluteMoves()..destinations[rune] = Position(0x100, 0x200),
+        IfFlag(EventFlag('test'), isSet: [
+          IfValue(alys.position().component(Axis.x),
+              comparedTo: PositionComponent(0x100, Axis.x),
+              greaterOrEqual: [
+                AbsoluteMoves()..destinations[rune] = Position(0x110, 0x200)
+              ]),
+        ]),
+        IndividualMoves()
+          ..moves[rune] = (StepPath()
+            ..direction = down
+            ..distance = 2.steps)
+      ]);
+
+      var asm = Program().addScene(SceneId('test'), scene, startingMap: map);
+
+      print(asm);
+
+      expect(
+        asm.event.withoutComments().tail(6),
+        Asm([
+          moveq(Constant('CharID_Rune').i, d0),
+          jsr(Label('Event_GetCharacter').l),
+          move.w(curr_x_pos(a4), d0),
+          move.w(curr_y_pos(a4), d1),
+          addi.w(0x0020.toWord.i, d1),
+          jsr(Label('Event_MoveCharacter').l),
+        ]),
+      );
+    });
+
+    test('makes state ambiguous in child branches', () {
+      var scene = Scene([
+        IfFlag(EventFlag('testflag'), isSet: [
+          AbsoluteMoves()..destinations[rune] = Position(0x100, 0x200),
+        ]),
+        IfValue(alys.position().component(Axis.x),
+            comparedTo: PositionComponent(0x100, Axis.x),
+            greaterOrEqual: [
+              AbsoluteMoves()..destinations[rune] = Position(0x110, 0x200)
+            ]),
+        IfFlag(EventFlag('testflag'), isSet: [
+          IndividualMoves()
+            ..moves[rune] = (StepPath()
+              ..direction = down
+              ..distance = 2.steps)
+        ]),
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      print(asm);
+
+      expect(
+        asm.event.withoutComments().tail(7),
+        Asm([
+          moveq(Constant('CharID_Rune').i, d0),
+          jsr(Label('Event_GetCharacter').l),
+          move.w(curr_x_pos(a4), d0),
+          move.w(curr_y_pos(a4), d1),
+          addi.w(0x0020.toWord.i, d1),
+          jsr(Label('Event_MoveCharacter').l),
+          label(Label('testscene_testflag_unset5')),
+        ]),
+      );
+    });
+
+    test('makes state ambiguous in reachable peer branches', () {
+      var scene = Scene([
+        IfFlag(EventFlag('testflag'), isSet: [
+          AbsoluteMoves()..destinations[rune] = Position(0x100, 0x200),
+        ]),
+        IfFlag(EventFlag('peerflag'), isSet: [
+          IfValue(alys.position().component(Axis.x),
+              comparedTo: PositionComponent(0x100, Axis.x),
+              greaterOrEqual: [
+                AbsoluteMoves()..destinations[rune] = Position(0x110, 0x200)
+              ]),
+        ]),
+        IfFlag(EventFlag('testflag'), isSet: [
+          IndividualMoves()
+            ..moves[rune] = (StepPath()
+              ..direction = down
+              ..distance = 2.steps)
+        ]),
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+        asm.event.withoutComments().tail(7),
+        Asm([
+          moveq(Constant('CharID_Rune').i, d0),
+          jsr(Label('Event_GetCharacter').l),
+          move.w(curr_x_pos(a4), d0),
+          move.w(curr_y_pos(a4), d1),
+          addi.w(0x0020.toWord.i, d1),
+          jsr(Label('Event_MoveCharacter').l),
+          label(Label('testscene_testflag_unset6')),
+        ]),
+      );
+    });
+
+    test('does not make state ambiguous in unreachable peer branches', () {
+      var scene = Scene([
+        IfFlag(EventFlag('testflag'), isSet: [
+          AbsoluteMoves()..destinations[rune] = Position(0x100, 0x200),
+        ], isUnset: [
+          IfValue(alys.position().component(Axis.x),
+              comparedTo: PositionComponent(0x100, Axis.x),
+              greaterOrEqual: [
+                AbsoluteMoves()..destinations[rune] = Position(0x110, 0x200)
+              ]),
+        ]),
+        // Unconditional pause is necessary to avoid branch normalization
+        Pause(1.second),
+        IfFlag(EventFlag('testflag'), isSet: [
+          IndividualMoves()
+            ..moves[rune] = (StepPath()
+              ..direction = down
+              ..distance = 2.steps)
+        ]),
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+        asm.event.withoutComments().tail(4),
+        Asm([
+          move.w(0x100.toWord.i, d0),
+          move.w(0x220.toWord.i, d1),
+          jsr(Label('Event_MoveCharacter').l),
+          label(Label('testscene_testflag_unset6')),
+        ]),
+      );
+    });
   });
 }

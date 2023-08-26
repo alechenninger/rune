@@ -820,6 +820,10 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void ifValue(IfValue ifValue) {
     _addToEvent(ifValue, (i) {
+      // Prevents update to children from being applied out of order
+      // TODO: might also need to do this to parent states?
+      _updateStateGraphChildren();
+
       // Evaluate expression at runtime if needed
       // at code where expression is true, fork memory state,
       var parent = _memory;
@@ -835,6 +839,7 @@ class SceneAsmGenerator implements EventVisitor {
         for (var event in events) {
           event.visit(this);
         }
+
         _terminateDialog();
       }
 
@@ -870,12 +875,20 @@ class SceneAsmGenerator implements EventVisitor {
 
       _eventAsm.add(label(continueLbl));
 
+      _memory = parent;
+
       // As for now we are not tracking these states in the graph,
-      // consider their events as possibly applied to any reachable state
-      // from this point in the graph.
+      // consider their events as possibly applied
+      // to the parent of these branches and
+      // any reachable state from this point in the graph.
+      // TODO(optimization): technically we could model these conditions
+      // in the graph, also, and avoid unnecessary calculations later on.
       for (var state in states) {
         for (var change in state.changes) {
-          for (var reachable in concat([_parentStates(), _childStates()])) {
+          for (var reachable in concat([
+            [_memory],
+            _reachableStates()
+          ])) {
             change.mayApply(reachable);
           }
         }
@@ -1435,6 +1448,18 @@ class SceneAsmGenerator implements EventVisitor {
       }
     }
     _memory.clearChanges();
+  }
+
+  /// Returns all states that are "reachable" from the current conditions.
+  ///
+  /// This means that, while the current condition is true, it is also possible
+  /// that any of the returned states' conditions may be true.
+  Iterable<Memory> _reachableStates() sync* {
+    for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
+      if (!_currentCondition.conflictsWith(condition)) {
+        yield state;
+      }
+    }
   }
 
   Iterable<Memory> _childStates() sync* {

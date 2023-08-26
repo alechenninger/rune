@@ -385,7 +385,7 @@ class Condition {
   /// The other condition may contain additional flags
   /// and not necessarily conflit.
   ///
-  /// Any empty condition never conflicts with another condition.
+  /// An empty condition never conflicts with another condition.
   bool conflictsWith(Condition other) {
     for (var entry in other._flags.entries) {
       var current = this[entry.key];

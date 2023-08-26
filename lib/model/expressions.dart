@@ -139,6 +139,7 @@ class Position implements PositionExpression {
 }
 
 class PositionComponent extends PositionComponentExpression {
+  // todo: maybe remove this
   final Axis axis;
   final int value;
 
