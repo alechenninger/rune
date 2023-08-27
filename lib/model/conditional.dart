@@ -318,14 +318,24 @@ final silverSoliderEvents = [
   EventFlag('SilverSoldierFee'),
 ];
 
+typedef Values = (ModelExpression, ModelExpression);
+
 class Condition {
   final IMap<EventFlag, bool> _flags;
+  final IMap<Values, BranchCondition> _values;
 
-  Condition(Map<EventFlag, bool> flags) : _flags = flags.lock;
+  Condition(Map<EventFlag, bool> flags, {Map<Values, BranchCondition>? values})
+      : _flags = flags.lock,
+        _values = (values ?? {}).lock;
 
-  const Condition.empty() : _flags = const IMapConst({});
+  const Condition.empty()
+      : _flags = const IMapConst({}),
+        _values = const IMapConst({});
 
   Iterable<EventFlag> get flagsSet => _flags.where((_, isSet) => isSet).keys;
+
+  EventFlagCondition get flags => EventFlagCondition(this);
+  ValueCondition get values => ValueCondition(this);
 
   Condition withFlag(EventFlag flag, bool isSet) {
     if (this[flag] == isSet) return this;
@@ -354,42 +364,58 @@ class Condition {
 
   bool isKnownUnset(EventFlag flag) => this[flag] == false;
 
-  /// Invert the condition by swapping all flags.
-  Condition inverted() {
-    var invertedFlags = <EventFlag, bool>{};
-    for (var entry in _flags.entries) {
-      invertedFlags[entry.key] = !entry.value;
-    }
-    return Condition(invertedFlags);
+  BranchCondition? branchFor(Values operand) {
+    return _values[operand];
+  }
+
+  Condition withBranch(Values operand, BranchCondition branch) {
+    if (branchFor(operand) == branch) return this;
+    return Condition({},
+        values: _values.unlock
+          ..[operand] = branch
+          ..lock);
   }
 
   /// This condition is satisfied by another condition
   /// if the [other] condition has the same value
-  /// as every flag in this condition.
+  /// as every flag in this condition,
+  /// and has the same branch condition
+  /// as every value in this condition.
   ///
-  /// The other condition may contain additional flags.
+  /// The other condition may contain additional flags or values.
   ///
   /// An empty condition only satisfies another empty condition
   /// (but an empty condition *is satisfied by* every condition).
   bool isSatisfiedBy(Condition other) {
-    for (var entry in _flags.entries) {
-      if (other[entry.key] != entry.value) return false;
+    for (var MapEntry(key: flag, value: state) in _flags.entries) {
+      if (other[flag] != state) return false;
+    }
+    for (var MapEntry(key: values, value: branch) in _values.entries) {
+      // TODO: is equal comparison appropriate?
+      // does eq or lt satisfy lte?
+      if (other.branchFor(values) != branch) return false;
     }
     return true;
   }
 
   /// This condition conflicts with another condition
   /// if this condition contains a flag with a different value
-  /// than any flag in the [other] condition.
+  /// than any flag in the [other] condition,
+  /// or contains a value with a different branch condition
+  /// than any pair of values in the [other] condition.
   ///
-  /// The other condition may contain additional flags
+  /// The other condition may contain additional flags or values
   /// and not necessarily conflit.
   ///
   /// An empty condition never conflicts with another condition.
   bool conflictsWith(Condition other) {
-    for (var entry in other._flags.entries) {
-      var current = this[entry.key];
-      if (current != null && current != entry.value) return true;
+    for (var MapEntry(key: flag, value: state) in other._flags.entries) {
+      var current = this[flag];
+      if (current != null && current != state) return true;
+    }
+    for (var MapEntry(key: values, value: branch) in other._values.entries) {
+      var current = branchFor(values);
+      if (current != null && current != branch) return true;
     }
     return false;
   }
@@ -399,94 +425,59 @@ class Condition {
       identical(this, other) ||
       other is Condition &&
           runtimeType == other.runtimeType &&
-          _flags == other._flags;
+          _flags == other._flags &&
+          _values == other._values;
 
   @override
   int get hashCode => _flags.hashCode;
 
   @override
   String toString() {
-    return 'Condition{$_flags}';
+    return 'Condition{$_flags, $_values}';
   }
 }
 
-class ExpressionCondition implements Condition {
-  final Set<BooleanExpression> _expressions = {};
+sealed class SingleTypeCondition<T, U> {
+  U? branchFor(T operand);
+  SingleTypeCondition<T, U> withBranch(T operand, U branch);
+}
+
+class ValueCondition extends SingleTypeCondition<Values, BranchCondition> {
+  final Condition condition;
+
+  ValueCondition(this.condition);
+
+  EventFlagCondition get flags => EventFlagCondition(condition);
 
   @override
-  bool? operator [](EventFlag flag) => null;
-
-  @override
-  // TODO: implement _flags
-  IMap<EventFlag, bool> get _flags => throw UnimplementedError();
-
-  @override
-  bool conflictsWith(Condition other) {
-    // TODO: implement conflictsWith
-    throw UnimplementedError();
+  BranchCondition? branchFor(Values operand) {
+    return condition._values[operand];
   }
 
   @override
-  // TODO: implement entries
-  Iterable<MapEntry<EventFlag, bool>> get entries => throw UnimplementedError();
-
-  @override
-  // TODO: implement flagsSet
-  Iterable<EventFlag> get flagsSet => throw UnimplementedError();
-
-  @override
-  Condition inverted() {
-    // TODO: implement inverted
-    throw UnimplementedError();
+  ValueCondition withBranch(Values operand, BranchCondition branch) {
+    if (branchFor(operand) == branch) return this;
+    return ValueCondition(Condition({},
+        values: condition._values.unlock
+          ..[operand] = branch
+          ..lock));
   }
+}
+
+class EventFlagCondition extends SingleTypeCondition<EventFlag, bool> {
+  final Condition condition;
+
+  EventFlagCondition(this.condition);
+
+  ValueCondition get values => ValueCondition(condition);
 
   @override
-  bool isKnownSet(EventFlag flag) {
-    // TODO: implement isKnownSet
-    throw UnimplementedError();
-  }
+  bool? branchFor(EventFlag operand) => condition[operand];
 
   @override
-  bool isKnownUnset(EventFlag flag) {
-    // TODO: implement isKnownUnset
-    throw UnimplementedError();
-  }
-
-  @override
-  bool isSatisfiedBy(Condition other) {
-    // TODO: implement isSatisfiedBy
-    throw UnimplementedError();
-  }
-
-  @override
-  Condition withFlag(EventFlag flag, bool isSet) {
-    // TODO: implement withFlag
-    throw UnimplementedError();
-  }
-
-  @override
-  Condition withFlags(Map<EventFlag, bool> flags) {
-    // TODO: implement withFlags
-    throw UnimplementedError();
-  }
-
-  @override
-  Condition withNotSet(EventFlag flag) {
-    // TODO: implement withNotSet
-    throw UnimplementedError();
-  }
-
-  @override
-  Condition withSet(EventFlag flag) {
-    // TODO: implement withSet
-    throw UnimplementedError();
-  }
-
-  @override
-  Condition without(EventFlag flag) {
-    // TODO: implement without
-    throw UnimplementedError();
-  }
+  SingleTypeCondition<EventFlag, bool> withBranch(
+          EventFlag operand, bool branch) =>
+      EventFlagCondition(condition.withFlag(operand, branch));
 }
 
 class IfFlag extends Event {
@@ -619,7 +610,7 @@ class IfExpression extends Event {
   }
 }
 
-class IfValue<T extends ModelExpression> extends Event {
+final class IfValue<T extends ModelExpression> extends Event {
   final T op1, op2;
 
   final _branches = <Branch>[];
@@ -670,6 +661,27 @@ class IfValue<T extends ModelExpression> extends Event {
   @override
   void visit(EventVisitor visitor) {
     visitor.ifValue(this);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IfValue &&
+          // runtimeType check intentionally omitted
+          // to prevent generic type from being checked
+          op1 == other.op1 &&
+          op2 == other.op2 &&
+          const ListEquality<Branch>().equals(_branches, other._branches);
+
+  @override
+  int get hashCode =>
+      op1.hashCode ^
+      op2.hashCode ^
+      const ListEquality<Branch>().hash(_branches);
+
+  @override
+  String toString() {
+    return 'IfValue{$op1, $op2, $_branches}';
   }
 }
 
@@ -726,4 +738,21 @@ class Branch {
   final List<Event> events;
 
   Branch(this.condition, this.events);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Branch &&
+          runtimeType == other.runtimeType &&
+          condition == other.condition &&
+          const ListEquality<Event>().equals(events, other.events);
+
+  @override
+  int get hashCode =>
+      condition.hashCode ^ const ListEquality<Event>().hash(events);
+
+  @override
+  String toString() {
+    return 'Branch{$condition, $events}';
+  }
 }

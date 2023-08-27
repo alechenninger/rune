@@ -918,11 +918,47 @@ void main() {
       expect(c2.conflictsWith(c1), isTrue);
     });
 
+    test('conflicts with conditions that set different branch for values', () {
+      var c1 = Condition({}, values: {
+        (alys.position().component(Axis.x), rune.position().component(Axis.x)):
+            eq
+      });
+      var c2 = Condition({}, values: {
+        (alys.position().component(Axis.x), rune.position().component(Axis.x)):
+            gt
+      });
+
+      expect(c1.conflictsWith(c2), isTrue);
+      expect(c2.conflictsWith(c1), isTrue);
+    });
+
     test(
         'does not conflict with conditions that set same values for non null flags',
         () {
       var c1 = Condition({EventFlag('a'): true, EventFlag('b'): false});
       var c2 = Condition({EventFlag('a'): true});
+
+      expect(c1.conflictsWith(c2), isFalse);
+      expect(c2.conflictsWith(c1), isFalse);
+    });
+
+    test(
+        'does not conflict with conditions that set same values for non null flags and same branch for values',
+        () {
+      var c1 = Condition({
+        EventFlag('a'): true,
+        EventFlag('b'): false
+      }, values: {
+        (alys.position(), rune.position()): gt,
+        (shay.position().component(Axis.x), PositionComponent(0x100, Axis.y)):
+            eq
+      });
+      var c2 = Condition({
+        EventFlag('a'): true
+      }, values: {
+        (shay.position().component(Axis.x), PositionComponent(0x100, Axis.y)):
+            eq
+      });
 
       expect(c1.conflictsWith(c2), isFalse);
       expect(c2.conflictsWith(c1), isFalse);
@@ -947,10 +983,49 @@ void main() {
     });
 
     test(
+        'is satisfied by conditions that set the same value for non null flags and branch for values',
+        () {
+      var c1 = Condition({
+        EventFlag('a'): true,
+        EventFlag('b'): false
+      }, values: {
+        (alys.position(), rune.position()): gt,
+        (shay.position().component(Axis.x), PositionComponent(0x100, Axis.y)):
+            eq
+      });
+      var c2 = Condition({
+        EventFlag('a'): true
+      }, values: {
+        (alys.position(), rune.position()): gt,
+      });
+
+      expect(c1.isSatisfiedBy(c2), isFalse);
+      expect(c2.isSatisfiedBy(c1), isTrue);
+    });
+
+    test(
         'is not satisfied by conditions that set different values for non null flags',
         () {
       var c1 = Condition({EventFlag('a'): true, EventFlag('b'): false});
       var c2 = Condition({EventFlag('a'): true, EventFlag('b'): true});
+
+      expect(c1.isSatisfiedBy(c2), isFalse);
+      expect(c2.isSatisfiedBy(c1), isFalse);
+    });
+
+    test(
+        'is not satisfied by conditions that have different branches for values',
+        () {
+      var c1 = Condition({}, values: {
+        (alys.position(), rune.position()): gt,
+        (shay.position().component(Axis.x), PositionComponent(0x100, Axis.y)):
+            lte
+      });
+      var c2 = Condition({}, values: {
+        (alys.position(), rune.position()): gt,
+        (shay.position().component(Axis.x), PositionComponent(0x100, Axis.y)):
+            eq
+      });
 
       expect(c1.isSatisfiedBy(c2), isFalse);
       expect(c2.isSatisfiedBy(c1), isFalse);
