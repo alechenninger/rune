@@ -12,8 +12,8 @@ class Dialog extends Event {
   final List<DialogSpan> _spans = [];
   List<DialogSpan> get spans => UnmodifiableListView(_spans);
 
-  factory Dialog.parse(String markup) {
-    return Dialog(spans: DialogSpan.parse(markup));
+  factory Dialog.parse(String markup, {Speaker? speaker}) {
+    return Dialog(spans: DialogSpan.parse(markup), speaker: speaker);
   }
 
   Dialog({Speaker? speaker, List<DialogSpan> spans = const []})
