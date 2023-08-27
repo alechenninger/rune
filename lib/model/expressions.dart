@@ -61,6 +61,9 @@ class PositionComponentOfObject extends PositionComponentExpression {
           runtimeType == other.runtimeType &&
           obj == other.obj &&
           component == other.component;
+
+  @override
+  int get hashCode => obj.hashCode ^ component.hashCode;
 }
 
 const unitsPerStep = 16;
