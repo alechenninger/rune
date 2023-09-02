@@ -526,6 +526,28 @@ EventFlag_Test001 = $01'''));
           ]));
     });
 
+    test('if locked, unlocks then relocks', () {
+      var scene = Scene([
+        LockCamera(),
+        MoveCamera(Position(0x1b0, 0x2a0)),
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            lockCamera(true),
+            lockCamera(false),
+            move.w(0x1b0.toWord.i, d0),
+            move.w(0x2a0.toWord.i, d1),
+            move.w(1.i, d2),
+            jsr(Label('Event_MoveCamera').l),
+            lockCamera(true),
+          ]));
+    });
+
     test('requries reloading address registers after', () {
       var scene = Scene([
         MoveCamera(Position(0x1b0, 0x2a0)),

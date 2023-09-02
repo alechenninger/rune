@@ -606,12 +606,16 @@ class SceneAsmGenerator implements EventVisitor {
 
       return move.to.withPosition(
           memory: _memory,
-          asm: ((x, y) => EventAsm.of(asmeventslib.moveCamera(
-              x: x,
-              y: y,
-              // TODO: speed
-              // seems to mostly be 1 but not sure if this is slow or fast
-              speed: 1.i))));
+          asm: ((x, y) => Asm([
+                if (_memory.cameraLock == true) asmeventslib.lockCamera(false),
+                asmeventslib.moveCamera(
+                    x: x,
+                    y: y,
+                    // TODO: speed
+                    // seems to mostly be 1 but not sure if this is slow or fast
+                    speed: 1.i),
+                if (_memory.cameraLock == true) asmeventslib.lockCamera(true),
+              ])));
     });
   }
 
