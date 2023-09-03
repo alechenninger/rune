@@ -25,7 +25,6 @@ import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
-import 'package:rune/generator/conditional.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -33,10 +32,10 @@ import '../asm/dialog.dart' as asmdialoglib;
 import '../asm/events.dart';
 import '../asm/events.dart' as asmeventslib;
 import '../asm/text.dart';
-import '../model/animate.dart';
 import '../model/model.dart';
 import '../src/iterables.dart';
 import '../src/null.dart';
+import 'conditional.dart';
 import 'cutscenes.dart';
 import 'debug.dart' as debug;
 import 'dialog.dart';
@@ -603,6 +602,12 @@ class SceneAsmGenerator implements EventVisitor {
   void moveCamera(MoveCamera move) {
     _addToEvent(move, (i) {
       _memory.unknownAddressRegisters();
+
+      var panels = _memory.panelsShown;
+      if (panels != null && panels > 0) {
+        throw StateError('moving camera while panels are shown '
+            'creates artifacts.');
+      }
 
       return move.to.withPosition(
           memory: _memory,
