@@ -640,7 +640,11 @@ class SceneAsmGenerator implements EventVisitor {
       // if (_isProcessingInteraction) {
       //   return EventAsm.of(doInteractionUpdatesLoop(Word(frames)));
       // } else {
-      return EventAsm.of(doMapUpdateLoop(Word(frames)));
+      if (_memory.isFieldShown == false || (_memory.panelsShown ?? 0) > 0) {
+        return vIntPrepareLoop(Word(frames));
+      } else {
+        return doMapUpdateLoop(Word(frames));
+      }
       // }
     });
   }
