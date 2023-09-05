@@ -540,6 +540,11 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void instantMoves(InstantMoves moves) {
+    _addToEvent(moves, (i) => instantMovesToAsm(moves, _memory, eventIndex: i));
+  }
+
+  @override
   void stepObject(StepObject step) {
     _addToEvent(step, (i) {
       /// Current x and y positions in memory are stored

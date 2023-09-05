@@ -316,6 +316,36 @@ class AbsoluteMoves extends Event {
       followLeader.hashCode;
 }
 
+class InstantMoves extends Event {
+  Map<FieldObject, (PositionExpression? position, DirectionExpression? facing)>
+      destinations = {};
+
+  void move(FieldObject obj,
+      {PositionExpression? to, DirectionExpression? face}) {
+    destinations[obj] = (to, face);
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.instantMoves(this);
+  }
+
+  @override
+  String toString() {
+    return 'InstantMoves{$destinations}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InstantMoves &&
+          runtimeType == other.runtimeType &&
+          const MapEquality().equals(destinations, other.destinations);
+
+  @override
+  int get hashCode => const MapEquality().hash(destinations);
+}
+
 class Party extends Moveable {
   const Party();
 

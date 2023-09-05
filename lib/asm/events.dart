@@ -521,10 +521,13 @@ Asm lockCamera(bool lock) {
 /// Multiple characters can move with [moveCharacter], but they must be prepared
 /// prior to calling. Load each character into a4, call this, and then after
 /// loading the last character, call [moveCharacter].
-Asm setDestination({required Address x, required Address y}) {
+Asm setDestination(
+    {required Address x,
+    required Address y,
+    DirectAddressRegister object = a4}) {
   return Asm([
-    move.w(x, a4.indirect.plus(dest_x_pos)),
-    move.w(y, a4.indirect.plus(dest_y_pos)),
+    move.w(x, object.indirect.plus(dest_x_pos)),
+    move.w(y, object.indirect.plus(dest_y_pos)),
   ]);
 }
 

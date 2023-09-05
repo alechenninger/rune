@@ -298,6 +298,63 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
   return asm;
 }
 
+Asm instantMovesToAsm(InstantMoves moves, Memory memory,
+    {required int eventIndex, DirectAddressRegister load = a4}) {
+  var asm = EventAsm.empty();
+
+  for (var MapEntry(key: obj, value: (position, facing))
+      in moves.destinations.entries) {
+    if (position != null) {
+      asm.add(
+        position.withPosition(
+            memory: memory,
+            load: load == a4 ? a3 : a4,
+            asm: (x, y) {
+              load = memory.addressRegisterFor(obj) ?? load;
+
+              return Asm([
+                obj.toA(load, memory),
+                move.w(x, curr_x_pos(load)),
+                move.w(y, curr_y_pos(load)),
+                move.w(x, dest_x_pos(load)),
+                move.w(y, dest_y_pos(load)),
+              ]);
+            }),
+      );
+
+      memory.positions[obj] = position.known(memory);
+    }
+
+    if (facing != null) {
+      asm.add(
+        facing.withDirection(
+            labelSuffix: '_${[
+              eventIndex,
+              _labelSafeString(obj),
+            ].whereNotNull().join('_')}',
+            memory: memory,
+            load1: load == a4 ? a3 : a4,
+            load2: load == a4 ? a2 : a3,
+            asm: (d) => Asm([
+                  obj.toA(load, memory),
+                  move.w(d, facing_dir(load)),
+                ])),
+      );
+
+      switch (facing.known(memory)) {
+        case Direction d:
+          memory.setFacing(obj, d);
+          break;
+        case null:
+          memory.clearFacing(obj);
+          break;
+      }
+    }
+  }
+
+  return asm;
+}
+
 class _MovementGenerator {
   _MovementGenerator(this.asm, this._mem, [this._eventIndex]);
 
@@ -618,6 +675,8 @@ extension DirectionExpressionAsm on DirectionExpression {
       {required Memory memory,
       required Asm Function(Address) asm,
       Address destination = d0,
+      DirectAddressRegister load1 = a4,
+      DirectAddressRegister load2 = a3,
       String? labelSuffix}) {
     return switch (this) {
       Direction d => asm(d.address),
@@ -625,7 +684,10 @@ extension DirectionExpressionAsm on DirectionExpression {
           labelSuffix: labelSuffix,
           memory: memory,
           asm: asm,
-          destination: destination),
+          destination: destination,
+          load1: load1,
+          load2: load2,
+        ),
     };
   }
 
@@ -669,6 +731,8 @@ extension DirectionOfVectorAsm on DirectionOfVector {
       {required Memory memory,
       required Asm Function(Address) asm,
       Address destination = d0,
+      DirectAddressRegister load1 = a4,
+      DirectAddressRegister load2 = a3,
       String? labelSuffix}) {
     var known = this.known(memory);
     if (known != null) {
@@ -677,8 +741,8 @@ extension DirectionOfVectorAsm on DirectionOfVector {
 
     if (playerIsFacingFrom) {
       return Asm([
-        Slot.one.toA4(memory),
-        move.w(facing_dir(a4), destination),
+        Slot.one.toA(load1, memory),
+        move.w(facing_dir(load1), destination),
         bchg(2.i, destination),
         asm(destination),
       ]);
@@ -692,25 +756,25 @@ extension DirectionOfVectorAsm on DirectionOfVector {
     labelSuffix ??= '';
 
     return Asm([
-      to.withY(memory: memory, asm: (y) => move.w(y, d2), load: a3),
+      to.withY(memory: memory, asm: (y) => move.w(y, d2), load: load2),
       from.withY(
           memory: memory,
           asm: (y) => Asm([
                 moveq(FacingDir_Down.i, destination),
                 y is Immediate ? cmpi.w(y, d2) : cmp.w(y, d2)
               ]),
-          load: a4),
+          load: load1),
       beq.s(Label(r'.checkx' + labelSuffix)),
       bcc.s(Label(r'.keep' + labelSuffix)), // keep up
       move.w(FacingDir_Up.i, destination),
       bra.s(Label(r'.keep' + labelSuffix)), // keep
       label(Label(r'.checkx' + labelSuffix)),
       move.w(FacingDir_Right.i, destination),
-      to.withX(memory: memory, asm: (x) => move.w(x, d2), load: a3),
+      to.withX(memory: memory, asm: (x) => move.w(x, d2), load: load2),
       from.withX(
           memory: memory,
           asm: (x) => x is Immediate ? cmpi.w(x, d2) : cmp.w(x, d2),
-          load: a4),
+          load: load1),
       bcc.s(Label(r'.keep' + labelSuffix)), // keep up
       move.w(FacingDir_Left.i, destination),
       label(Label(r'.keep' + labelSuffix)),
@@ -785,6 +849,8 @@ extension PositionOfObjectAsm on PositionOfObject {
     if (position != null) {
       return asm(position.x.toWord.i, position.y.toWord.i);
     }
+
+    load = memory.addressRegisterFor(obj) ?? load;
     // Evaluate at runtime
     return Asm([
       obj.toA(load, memory),
@@ -811,6 +877,8 @@ extension PositionComponentOfObjectAsm on PositionComponentOfObject {
       required Asm Function(Address a) asm,
       DirectAddressRegister load = a4}) {
     var offset = switch (component) { Axis.x => curr_x_pos, _ => curr_y_pos };
+
+    load = memory.addressRegisterFor(obj) ?? load;
 
     return Asm([
       obj.toA(load, memory),

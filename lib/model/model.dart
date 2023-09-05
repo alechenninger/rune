@@ -174,6 +174,7 @@ abstract class EventVisitor {
   void facePlayer(FacePlayer face);
   void individualMoves(IndividualMoves moves);
   void absoluteMoves(AbsoluteMoves moves);
+  void instantMoves(InstantMoves moves);
   void stepObject(StepObject step);
   void lockCamera(LockCamera lock);
   void unlockCamera(UnlockCamera unlock);

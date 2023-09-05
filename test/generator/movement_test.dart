@@ -1,8 +1,6 @@
-import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
-import 'package:rune/generator/map.dart';
 import 'package:rune/generator/memory.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/model/model.dart';
@@ -1403,5 +1401,169 @@ void main() {
     test('character 1 by name facing interaction object is noop', () {},
         skip: "i don't think this is possible "
             "unless we know slot one at compile time");
+  });
+
+  group('instant moves generate asm', () {
+    test('one object position', () {
+      var moves = InstantMoves()..move(shay, to: Position(0x100, 0x50));
+      var asm = generate([moves]);
+      expect(
+          asm,
+          Asm([
+            shay.toA4(Memory()),
+            move.w(0x100.toWord.i, curr_x_pos(a4)),
+            move.w(0x50.toWord.i, curr_y_pos(a4)),
+            move.w(0x100.toWord.i, dest_x_pos(a4)),
+            move.w(0x50.toWord.i, dest_y_pos(a4)),
+          ]));
+    });
+
+    test('one object facing', () {
+      var moves = InstantMoves()..move(alys, face: up);
+      var asm = generate([moves]);
+      expect(
+          asm,
+          Asm([
+            alys.toA4(Memory()),
+            move.w(FacingDir_Up.i, facing_dir(a4)),
+          ]));
+    });
+
+    test('one object position and facing', () {
+      var moves = InstantMoves()
+        ..move(shay, to: Position(0x100, 0x50), face: down);
+      var asm = generate([moves]);
+      expect(
+          asm,
+          Asm([
+            shay.toA4(Memory()),
+            move.w(0x100.toWord.i, curr_x_pos(a4)),
+            move.w(0x50.toWord.i, curr_y_pos(a4)),
+            move.w(0x100.toWord.i, dest_x_pos(a4)),
+            move.w(0x50.toWord.i, dest_y_pos(a4)),
+            move.w(FacingDir_Down.i, facing_dir(a4)),
+          ]));
+    });
+
+    test('multiple object positions', () {
+      var moves = InstantMoves()
+        ..move(alys, to: Position(0x100, 0x50))
+        ..move(shay, to: Position(0x200, 0x80));
+
+      var asm = generate([moves]);
+
+      expect(
+          asm,
+          Asm([
+            alys.toA4(Memory()),
+            move.w(0x100.toWord.i, curr_x_pos(a4)),
+            move.w(0x50.toWord.i, curr_y_pos(a4)),
+            move.w(0x100.toWord.i, dest_x_pos(a4)),
+            move.w(0x50.toWord.i, dest_y_pos(a4)),
+            shay.toA4(Memory()),
+            move.w(0x200.toWord.i, curr_x_pos(a4)),
+            move.w(0x80.toWord.i, curr_y_pos(a4)),
+            move.w(0x200.toWord.i, dest_x_pos(a4)),
+            move.w(0x80.toWord.i, dest_y_pos(a4)),
+          ]));
+    });
+
+    test('multiple object positions and facing', () {
+      var moves = InstantMoves()
+        ..move(alys, to: Position(0x100, 0x50), face: down)
+        ..move(shay, to: Position(0x200, 0x80), face: up);
+
+      var asm = generate([moves]);
+
+      expect(
+          asm,
+          Asm([
+            alys.toA4(Memory()),
+            move.w(0x100.toWord.i, curr_x_pos(a4)),
+            move.w(0x50.toWord.i, curr_y_pos(a4)),
+            move.w(0x100.toWord.i, dest_x_pos(a4)),
+            move.w(0x50.toWord.i, dest_y_pos(a4)),
+            move.w(FacingDir_Down.i, facing_dir(a4)),
+            shay.toA4(Memory()),
+            move.w(0x200.toWord.i, curr_x_pos(a4)),
+            move.w(0x80.toWord.i, curr_y_pos(a4)),
+            move.w(0x200.toWord.i, dest_x_pos(a4)),
+            move.w(0x80.toWord.i, dest_y_pos(a4)),
+            move.w(FacingDir_Up.i, facing_dir(a4)),
+          ]));
+    });
+
+    test('mix of positions and facing', () {
+      var moves = InstantMoves()
+        ..move(alys, to: Position(0x100, 0x50))
+        ..move(shay, face: up)
+        ..move(hahn, to: Position(0x200, 0x80), face: down);
+
+      var asm = generate([moves]);
+
+      expect(
+          asm,
+          Asm([
+            alys.toA4(Memory()),
+            move.w(0x100.toWord.i, curr_x_pos(a4)),
+            move.w(0x50.toWord.i, curr_y_pos(a4)),
+            move.w(0x100.toWord.i, dest_x_pos(a4)),
+            move.w(0x50.toWord.i, dest_y_pos(a4)),
+            shay.toA4(Memory()),
+            move.w(FacingDir_Up.i, facing_dir(a4)),
+            hahn.toA4(Memory()),
+            move.w(0x200.toWord.i, curr_x_pos(a4)),
+            move.w(0x80.toWord.i, curr_y_pos(a4)),
+            move.w(0x200.toWord.i, dest_x_pos(a4)),
+            move.w(0x80.toWord.i, dest_y_pos(a4)),
+            move.w(FacingDir_Down.i, facing_dir(a4)),
+          ]));
+    });
+
+    group('using expressions', () {
+      test('multiple object positions and facing', () {
+        var moves = InstantMoves()
+          ..move(alys, to: PositionOfObject(shay), face: down)
+          ..move(shay, to: Position(0x100, 0x50), face: shay.towards(alys));
+
+        var asm = generate([moves]);
+        var testState = Memory();
+
+        print(asm);
+
+        expect(
+            asm,
+            Asm([
+              shay.toA3(testState),
+              alys.toA4(testState),
+              move.w(curr_x_pos(a3), curr_x_pos(a4)),
+              move.w(curr_y_pos(a3), curr_y_pos(a4)),
+              move.w(curr_x_pos(a3), dest_x_pos(a4)),
+              move.w(curr_y_pos(a3), dest_y_pos(a4)),
+              move.w(FacingDir_Down.i, facing_dir(a4)),
+              move.w(0x100.toWord.i, curr_x_pos(a3)),
+              move.w(0x50.toWord.i, curr_y_pos(a3)),
+              move.w(0x100.toWord.i, dest_x_pos(a3)),
+              move.w(0x50.toWord.i, dest_y_pos(a3)),
+              move.w(curr_y_pos(a4), d2),
+              moveq(FacingDir_Down.i, d0),
+              // We just positioned,
+              // so can use immediate values.
+              cmpi.w(0x50.toWord.i, d2),
+              beq.s(Label(r'.checkx_1_Shay')),
+              bcc.s(Label(r'.keep_1_Shay')),
+              move.w(FacingDir_Up.i, d0),
+              bra.s(Label(r'.keep_1_Shay')),
+              label(Label(r'.checkx_1_Shay')),
+              move.w(FacingDir_Right.i, d0),
+              move.w(curr_x_pos(a4), d2),
+              cmpi.w(0x100.toWord.i, d2),
+              bcc.s(Label(r'.keep_1_Shay')),
+              move.w(FacingDir_Left.i, d0),
+              label(Label(r'.keep_1_Shay')),
+              move.w(d0, facing_dir(a3)),
+            ]));
+      });
+    });
   });
 }
