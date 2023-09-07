@@ -325,6 +325,16 @@ class InstantMoves extends Event {
     destinations[obj] = (to, face);
   }
 
+  void put(FieldObject obj, PositionExpression at) {
+    destinations.update(obj, (result) => (at, result.$2),
+        ifAbsent: () => (at, null));
+  }
+
+  void face(FieldObject obj, DirectionExpression face) {
+    destinations.update(obj, (result) => (result.$1, face),
+        ifAbsent: () => (null, face));
+  }
+
   @override
   void visit(EventVisitor visitor) {
     visitor.instantMoves(this);
