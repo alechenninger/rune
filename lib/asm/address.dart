@@ -17,6 +17,7 @@ const a4 = DirectAddressRegister._(4);
 const a5 = DirectAddressRegister._(5);
 const a6 = DirectAddressRegister._(6);
 const a7 = DirectAddressRegister._(7);
+const sp = a7;
 
 abstract class Address {
   static Absolute absolute(Expression e) => Absolute.long(e);
@@ -96,6 +97,10 @@ class DirectAddressRegister extends _Address implements AddressRegister {
       indirect.plusD(dataRegister);
 
   IndirectAddressRegister get indirect => IndirectAddressRegister(register);
+
+  PreDecAddress operator -() => PreDecAddress(register);
+
+  PostIncAddress postInc() => PostIncAddress(register);
 }
 
 /// Value in one of the data registers

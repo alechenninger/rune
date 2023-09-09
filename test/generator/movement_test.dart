@@ -1415,6 +1415,13 @@ void main() {
             move.w(0x50.toWord.i, curr_y_pos(a4)),
             move.w(0x100.toWord.i, dest_x_pos(a4)),
             move.w(0x50.toWord.i, dest_y_pos(a4)),
+            move.l(a4, -sp),
+            jsr(Label('Field_UpdateObjects').l),
+            jsr(Label('UpdateCameraXPosFG').l),
+            jsr(Label('UpdateCameraYPosFG').l),
+            jsr(Label('UpdateCameraXPosBG').l),
+            jsr(Label('UpdateCameraYPosBG').l),
+            move.l(sp.postInc(), a4),
           ]));
     });
 
@@ -1426,6 +1433,9 @@ void main() {
           Asm([
             alys.toA4(Memory()),
             move.w(FacingDir_Up.i, facing_dir(a4)),
+            move.l(a4, -sp),
+            jsr(Label('Field_UpdateObjects').l),
+            move.l(sp.postInc(), a4),
           ]));
     });
 
@@ -1442,6 +1452,13 @@ void main() {
             move.w(0x100.toWord.i, dest_x_pos(a4)),
             move.w(0x50.toWord.i, dest_y_pos(a4)),
             move.w(FacingDir_Down.i, facing_dir(a4)),
+            move.l(a4, -sp),
+            jsr(Label('Field_UpdateObjects').l),
+            jsr(Label('UpdateCameraXPosFG').l),
+            jsr(Label('UpdateCameraYPosFG').l),
+            jsr(Label('UpdateCameraXPosBG').l),
+            jsr(Label('UpdateCameraYPosBG').l),
+            move.l(sp.postInc(), a4),
           ]));
     });
 
@@ -1465,6 +1482,13 @@ void main() {
             move.w(0x80.toWord.i, curr_y_pos(a4)),
             move.w(0x200.toWord.i, dest_x_pos(a4)),
             move.w(0x80.toWord.i, dest_y_pos(a4)),
+            move.l(a4, -sp),
+            jsr(Label('Field_UpdateObjects').l),
+            jsr(Label('UpdateCameraXPosFG').l),
+            jsr(Label('UpdateCameraYPosFG').l),
+            jsr(Label('UpdateCameraXPosBG').l),
+            jsr(Label('UpdateCameraYPosBG').l),
+            move.l(sp.postInc(), a4),
           ]));
     });
 
@@ -1490,6 +1514,13 @@ void main() {
             move.w(0x200.toWord.i, dest_x_pos(a4)),
             move.w(0x80.toWord.i, dest_y_pos(a4)),
             move.w(FacingDir_Up.i, facing_dir(a4)),
+            move.l(a4, -sp),
+            jsr(Label('Field_UpdateObjects').l),
+            jsr(Label('UpdateCameraXPosFG').l),
+            jsr(Label('UpdateCameraYPosFG').l),
+            jsr(Label('UpdateCameraXPosBG').l),
+            jsr(Label('UpdateCameraYPosBG').l),
+            move.l(sp.postInc(), a4),
           ]));
     });
 
@@ -1517,6 +1548,13 @@ void main() {
             move.w(0x200.toWord.i, dest_x_pos(a4)),
             move.w(0x80.toWord.i, dest_y_pos(a4)),
             move.w(FacingDir_Down.i, facing_dir(a4)),
+            move.l(a4, -sp),
+            jsr(Label('Field_UpdateObjects').l),
+            jsr(Label('UpdateCameraXPosFG').l),
+            jsr(Label('UpdateCameraYPosFG').l),
+            jsr(Label('UpdateCameraXPosBG').l),
+            jsr(Label('UpdateCameraYPosBG').l),
+            move.l(sp.postInc(), a4),
           ]));
     });
 
@@ -1562,6 +1600,13 @@ void main() {
               move.w(FacingDir_Left.i, d0),
               label(Label(r'.keep_1_Shay')),
               move.w(d0, facing_dir(a3)),
+              move.l(a4, -sp),
+              jsr(Label('Field_UpdateObjects').l),
+              jsr(Label('UpdateCameraXPosFG').l),
+              jsr(Label('UpdateCameraYPosFG').l),
+              jsr(Label('UpdateCameraXPosBG').l),
+              jsr(Label('UpdateCameraYPosBG').l),
+              move.l(sp.postInc(), a4),
             ]));
       });
     });

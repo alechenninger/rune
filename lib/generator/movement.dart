@@ -301,10 +301,16 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
 Asm instantMovesToAsm(InstantMoves moves, Memory memory,
     {required int eventIndex, DirectAddressRegister load = a4}) {
   var asm = EventAsm.empty();
+  var adjustCamera = false;
 
   for (var MapEntry(key: obj, value: (position, facing))
       in moves.destinations.entries) {
     if (position != null) {
+      var slot = obj.slot(memory);
+      if (slot == 1 || slot == null) {
+        adjustCamera = true;
+      }
+
       asm.add(
         position.withPosition(
             memory: memory,
@@ -351,6 +357,19 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
       }
     }
   }
+
+  // Reposition objects and camera
+  asm.add(Asm([
+    move.l(a4, -sp),
+    jsr(Label('Field_UpdateObjects').l),
+    if (memory.cameraLock != true && adjustCamera) ...[
+      jsr(Label('UpdateCameraXPosFG').l),
+      jsr(Label('UpdateCameraYPosFG').l),
+      jsr(Label('UpdateCameraXPosBG').l),
+      jsr(Label('UpdateCameraYPosBG').l),
+    ],
+    move.l(sp.postInc(), a4),
+  ]));
 
   return asm;
 }
