@@ -52,6 +52,7 @@ const BranchMnemonic bls = BranchMnemonic('bls');
 
 const AddiMnemonic addi = AddiMnemonic();
 const SubiMnemonic subi = SubiMnemonic();
+const SubqMnemonic subq = SubqMnemonic();
 const CmpMnemonic cmp = CmpMnemonic();
 const CmpiMnemonic cmpi = CmpiMnemonic();
 const TstMnemonic tst = TstMnemonic();
@@ -152,6 +153,14 @@ class SubiMnemonic {
   Asm b(Address from, Address to) => cmd('subi.b', [from, to]);
   Asm w(Address from, Address to) => cmd('subi.w', [from, to]);
   Asm l(Address from, Address to) => cmd('subi.l', [from, to]);
+}
+
+class SubqMnemonic {
+  const SubqMnemonic();
+
+  Asm b(Address from, Address to) => cmd('subq.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('subq.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('subq.l', [from, to]);
 }
 
 class DivuMnemonic {

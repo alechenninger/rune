@@ -937,13 +937,15 @@ class SceneAsmGenerator implements EventVisitor {
 
     _addToEvent(fadeIn, (eventIndex) {
       var wasFieldShown = _memory.isFieldShown;
-      var needsRefresh =
-          _memory.isMapInCram != true || _memory.isMapInVram != true;
+      var needsRefresh = _memory.isMapInCram != true ||
+          _memory.isMapInVram != true ||
+          _memory.isDialogInCram != true;
       var panelsShown = _memory.panelsShown;
 
       _memory.isFieldShown = true;
       _memory.isMapInVram = true;
       _memory.isMapInCram = true;
+      _memory.isDialogInCram = true;
       _memory.panelsShown = 0;
 
       return Asm([
@@ -971,6 +973,7 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(fadeOut, (eventIndex) {
       _memory.isFieldShown = false;
       _memory.isMapInCram = false;
+      _memory.isDialogInCram = false;
       _memory.isDisplayEnabled = false;
 
       // map vram untouched.
@@ -1021,6 +1024,7 @@ class SceneAsmGenerator implements EventVisitor {
           if (_memory.isMapInCram != false) {
             _eventAsm.add(asmeventslib.fadeOut());
             _memory.isMapInCram = false;
+            _memory.isDialogInCram = false;
           }
           _eventAsm.add(jsr(Label('Pal_FadeIn').l));
           _eventAsm.add(jsr(Label('VInt_Prepare').l));
@@ -1047,6 +1051,7 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.loadedDialogTree = _dialogTree;
     _memory.hasSavedDialogPosition = false;
     _memory.isMapInCram = true;
+    _memory.isDialogInCram = true;
     _memory.isMapInVram = true;
   }
 
@@ -1093,13 +1098,35 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void hideAllPanels(HideAllPanels hidePanels) {
-    _addToEventOrDialog(hidePanels, inDialog: () {
-      _addToDialog(dc.b([Byte(0xf2), Byte.two]));
-    }, inEvent: (_) {
-      return jsr(Label('Panel_DestroyAll').l);
-    }, after: () {
-      _memory.panelsShown = 0;
-    });
+    _checkNotFinished();
+
+    var panelsShown = _memory.panelsShown;
+    if (panelsShown == 0) return;
+
+    if (hidePanels.instantly) {
+      _addToEvent(
+          hidePanels,
+          (i) => Asm([
+                moveq(0.i, d0),
+                if (panelsShown == null)
+                  move.b(Constant('Panel_Num').w, d0)
+                else
+                  move.b(panelsShown.i, d0),
+                subq.b(1.i, d0),
+                label(Label('.${i}_nextPanel')),
+                jsr(Label('Panel_Destroy').l),
+                dbf(d0, Label('.${i}_nextPanel')),
+                jsr(Label('DMAPlanes_VInt').l),
+              ]));
+    } else {
+      _addToEventOrDialog(hidePanels, inDialog: () {
+        _addToDialog(dc.b([Byte(0xf2), Byte.two]));
+      }, inEvent: (_) {
+        return jsr(Label('Panel_DestroyAll').l);
+      }, after: () {
+        _memory.panelsShown = 0;
+      });
+    }
   }
 
   @override
@@ -1114,6 +1141,8 @@ class SceneAsmGenerator implements EventVisitor {
     if (panelsShown != null) {
       panels = min(panels, panelsShown);
     }
+
+    // todo(hide top panels): support instantly
 
     _addToEventOrDialog(hidePanels, inDialog: () {
       _memory.removePanels(panels);
@@ -1557,11 +1586,20 @@ class SceneAsmGenerator implements EventVisitor {
         // fading in will cause artifacts
         // otherwise, fade in may fade in map,
         // but consider this intentional
-        if (_memory.isMapInVram == true && _memory.isMapInCram == false) {
+        if ((_memory.isMapInVram == true && _memory.isMapInCram == false) ||
+            _memory.isDialogInCram == false) {
           _initVramAndCram();
         }
         _eventAsm.add(jsr(Label('Pal_FadeIn').l));
         _memory.isDisplayEnabled = true;
+      } else if (_memory.isDialogInCram == false) {
+        _eventAsm.add(Asm([
+          lea(Constant('Pal_Init_Line_3').l, a0),
+          lea(Constant('Palette_Line_3').w, a1),
+          move.w(0xF.i, d7),
+          trap(1.i),
+        ]));
+        _memory.isDialogInCram = true;
       }
 
       _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
@@ -1809,6 +1847,7 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.isMapInCram = false;
     _memory.isMapInVram = false;
     _memory.isFieldShown = false;
+    _memory.isDialogInCram = true;
   }
 }
 
@@ -1816,7 +1855,7 @@ int? _lastLineIfFadeOut(Asm asm) {
   for (var i = asm.lines.length - 1; i >= 0; --i) {
     var line = asm.lines[i];
     if (line.isCommentOnly) continue;
-    if (line == asmeventslib.fadeOut(initVramAndCram: false).first) {
+    if (line == asmeventslib.fadeOut(initVramAndCram: false).single) {
       return i;
     }
     break;

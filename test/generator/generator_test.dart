@@ -1,4 +1,3 @@
-import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/asm/text.dart';
 import 'package:rune/generator/cutscenes.dart';
@@ -6,7 +5,6 @@ import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/memory.dart';
 import 'package:rune/generator/movement.dart';
-import 'package:rune/model/animate.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
@@ -71,6 +69,142 @@ main() {
           jsr(Label('InitVRAMAndCRAM').l),
           jsr(Label('Pal_FadeIn').l),
           // show panel
+        ]));
+  });
+
+  test('fade during cutscene then panel fades in automatically', () {
+    var scene = Scene([
+      FadeOut(),
+      ShowPanel(PrincipalPanel.shayAndAlys),
+      FadeOut(),
+      ShowPanel(PrincipalPanel.alysGrabsPrincipal),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().trim().head(10),
+        Asm([
+          jsr(Label('InitVRAMAndCRAM').l),
+          jsr(Label('Pal_FadeIn').l),
+          move.w(0x1.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          dmaPlanesVInt(),
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          jsr(Label('Panel_DestroyAll').l),
+          jsr(Label('Pal_FadeIn').l),
+          move.w(0x6.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+        ]));
+  });
+
+  test('fade during cutscene then dialog fades in automatically with cram init',
+      () {
+    var scene = Scene([
+      FadeOut(),
+      ShowPanel(PrincipalPanel.shayAndAlys),
+      FadeOut(),
+      Dialog.parse('Hi', speaker: alys),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().trim().head(12),
+        Asm([
+          jsr(Label('InitVRAMAndCRAM').l),
+          jsr(Label('Pal_FadeIn').l),
+          move.w(0x1.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          dmaPlanesVInt(),
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          jsr(Label('Panel_DestroyAll').l),
+          jsr(Label('InitVRAMAndCRAMAfterFadeOut').l),
+          jsr(Label('Pal_FadeIn').l),
+          move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
+          moveq(0.toByte.i, d0),
+          jsr(Label('Event_GetAndRunDialogue3').l),
+        ]));
+  });
+
+  test('fade during cutscene then panel then dialog adjusts palette', () {
+    var scene = Scene([
+      FadeOut(),
+      ShowPanel(PrincipalPanel.shayAndAlys),
+      FadeOut(),
+      ShowPanel(PrincipalPanel.alysGrabsPrincipal),
+      Dialog.parse('Hi', speaker: alys),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().trim().head(18),
+        Asm([
+          jsr(Label('InitVRAMAndCRAM').l),
+          jsr(Label('Pal_FadeIn').l),
+          move.w(0x1.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          dmaPlanesVInt(),
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          jsr(Label('Panel_DestroyAll').l),
+          jsr(Label('Pal_FadeIn').l),
+          move.w(0x6.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          dmaPlanesVInt(),
+          lea(Label('Pal_Init_Line_3').l, a0),
+          lea(Label('Palette_Line_3').w, a1),
+          move.w(0xf.i, d7),
+          trap(1.i),
+          move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
+          moveq(0.toByte.i, d0),
+          jsr(Label('Event_GetAndRunDialogue3').l),
+        ]));
+  });
+
+  test('fade during cutscene then panel then dialog adjusts palette only once',
+      () {
+    var scene = Scene([
+      FadeOut(),
+      ShowPanel(PrincipalPanel.shayAndAlys),
+      FadeOut(),
+      ShowPanel(PrincipalPanel.alysGrabsPrincipal),
+      Dialog.parse('Hi', speaker: alys),
+      Pause(1.second),
+      Dialog.parse('Bye', speaker: alys),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().trim().head(23),
+        Asm([
+          jsr(Label('InitVRAMAndCRAM').l),
+          jsr(Label('Pal_FadeIn').l),
+          move.w(0x1.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          dmaPlanesVInt(),
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          jsr(Label('Panel_DestroyAll').l),
+          jsr(Label('Pal_FadeIn').l),
+          move.w(0x6.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          dmaPlanesVInt(),
+          lea(Label('Pal_Init_Line_3').l, a0),
+          lea(Label('Palette_Line_3').w, a1),
+          move.w(0xf.i, d7),
+          trap(1.i),
+          move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
+          moveq(0.toByte.i, d0),
+          jsr(Label('Event_GetAndRunDialogue3').l),
+          vIntPrepareLoop(60.toWord),
+          move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
+          popdlg,
+          jsr(Label('Event_RunDialogue3').l),
         ]));
   });
 

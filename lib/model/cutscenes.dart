@@ -32,8 +32,11 @@ class ShowPanel extends Event {
 
 class HideTopPanels extends Event {
   final int panelsToHide;
+  final bool instantly;
 
-  const HideTopPanels([this.panelsToHide = 1]);
+  const HideTopPanels([this.panelsToHide = 1]) : instantly = false;
+
+  const HideTopPanels.instantly([this.panelsToHide = 1]) : instantly = true;
 
   @override
   void visit(EventVisitor visitor) {
@@ -57,7 +60,9 @@ class HideTopPanels extends Event {
 }
 
 class HideAllPanels extends Event {
-  const HideAllPanels();
+  final bool instantly;
+
+  const HideAllPanels({this.instantly = false});
 
   @override
   void visit(EventVisitor visitor) {

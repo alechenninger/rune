@@ -36,6 +36,7 @@ class SystemState {
   DialogTree? _loadedDialogTree;
   bool? _isMapInVram = true;
   bool? _isMapInCram = true;
+  bool? _isDialogInCram = true;
   bool? _displayEnabled = true;
 
   void _refreshMap(MapId map, DialogTrees trees) {
@@ -55,6 +56,7 @@ class SystemState {
     .._inAddress.addAll(_inAddress)
     .._hasSavedDialogPosition = _hasSavedDialogPosition
     .._loadedDialogTree = _loadedDialogTree
+    .._isDialogInCram = _isDialogInCram
     .._isMapInCram = _isMapInCram
     .._isMapInVram = _isMapInVram
     .._displayEnabled = _displayEnabled;
@@ -110,6 +112,12 @@ class Memory implements EventState {
   set isMapInCram(bool? flag) {
     _apply(SetValue<bool>(flag, (mem) => mem._sysState._isMapInCram,
         (val, mem) => mem._sysState._isMapInCram = val));
+  }
+
+  bool? get isDialogInCram => _sysState._isDialogInCram;
+  set isDialogInCram(bool? flag) {
+    _apply(SetValue<bool>(flag, (mem) => mem._sysState._isDialogInCram,
+        (val, mem) => mem._sysState._isDialogInCram = val));
   }
 
   bool? get isMapInVram => _sysState._isMapInVram;
