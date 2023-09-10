@@ -963,7 +963,10 @@ class SceneAsmGenerator implements EventVisitor {
         // so no need to reload secondary objects
         // LoadMap events take care of that
         if (needsRefresh) refreshMap(refreshObjects: false),
-        jsr(Label('Pal_FadeIn').l)
+        if (fadeIn.instantly)
+          jsr(Label('VDP_EnableDisplay').l)
+        else
+          jsr(Label('Pal_FadeIn').l)
       ]);
     });
   }

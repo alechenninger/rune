@@ -106,7 +106,9 @@ class FadeOut extends Event {
 }
 
 class FadeInField extends Event {
-  const FadeInField();
+  final bool instantly;
+
+  const FadeInField({this.instantly = false});
 
   @override
   void visit(EventVisitor visitor) {
@@ -121,10 +123,12 @@ class FadeInField extends Event {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FadeInField && runtimeType == other.runtimeType;
+      other is FadeInField &&
+          runtimeType == other.runtimeType &&
+          instantly == other.instantly;
 
   @override
-  int get hashCode => 0;
+  int get hashCode => instantly.hashCode ^ runtimeType.hashCode;
 }
 
 sealed class Panel {}
