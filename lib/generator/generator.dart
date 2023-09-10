@@ -942,6 +942,7 @@ class SceneAsmGenerator implements EventVisitor {
           _memory.isDialogInCram != true;
       var panelsShown = _memory.panelsShown;
 
+      _memory.isDisplayEnabled = true;
       _memory.isFieldShown = true;
       _memory.isMapInVram = true;
       _memory.isMapInCram = true;
@@ -1363,6 +1364,9 @@ class SceneAsmGenerator implements EventVisitor {
         _terminateDialog();
         if (_memory.isFieldShown != true) {
           fadeInField(FadeInField());
+        } else if ((_memory.panelsShown ?? 0) > 0) {
+          // unfortunately this will produce unwanted interrupt
+          hideAllPanels(HideAllPanels());
         }
       }
     } else {

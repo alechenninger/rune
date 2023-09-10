@@ -383,6 +383,42 @@ main() {
         ]));
   });
 
+  test('does not fade in again after fade in', () {
+    var scene = Scene([
+      FadeOut(),
+      LoadMap(
+          map: map2,
+          startingPosition: Position(0x200, 0x200),
+          facing: Direction.down),
+      FadeInField(instantly: true),
+      ShowPanel(PanelByIndex(0x2b)),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().trim(),
+        Asm([
+          // this clears palette
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
+          move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
+          move.w(0x40.i, (Map_Start_X_Pos).w),
+          move.w(0x40.i, (Map_Start_Y_Pos).w),
+          move.w(Constant('FacingDir_Down').i, (Map_Start_Facing_Dir).w),
+          move.w(0.i, (Map_Start_Char_Align).w),
+          bclr(3.i, (Map_Load_Flags).w),
+          // this loads the map palette
+          jsr(Label('RefreshMap').l),
+          jsr(Label('VDP_EnableDisplay').l),
+          move.w(0x2b.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          dmaPlanesVInt(),
+          jsr(Label('Panel_DestroyAll').l),
+        ]));
+  });
+
   test('fade out destroys panels', () {
     var scene = Scene([
       ShowPanel(PrincipalPanel.shayAndAlys),
