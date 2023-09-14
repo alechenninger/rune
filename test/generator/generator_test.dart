@@ -609,7 +609,8 @@ EventFlag_Test001 = $01'''));
           move.b(Sound.megid.sfxId.i, Constant('Sound_Index').l),
           move.w(MolcumPanel.alysSurprised.panelIndex.toWord.i, d0),
           jsr(Label('Panel_Create').l),
-          dmaPlanesVInt()
+          dmaPlanesVInt(),
+          jsr(Label('Panel_DestroyAll').l),
         ]));
   });
 
