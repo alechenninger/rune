@@ -559,57 +559,6 @@ class SetFlag extends Event {
   int get hashCode => flag.hashCode;
 }
 
-class IfExpression extends Event {
-  final BooleanExpression expression;
-  final List<Event> isTrue;
-  final List<Event> isFalse;
-
-  IfExpression(this.expression,
-      {this.isTrue = const [], this.isFalse = const []});
-
-  @override
-  void visit(EventVisitor visitor) {
-    // TODO: implement visit
-  }
-
-  @override
-  String toString() {
-    return 'IfExpression{$expression, \n'
-        'isTrue:\n'
-        '${toIndentedString(isTrue, '         ')}\n'
-        'isFalse:\n'
-        '${toIndentedString(isFalse, '         ')}\n'
-        '}';
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is IfExpression &&
-          runtimeType == other.runtimeType &&
-          expression == other.expression &&
-          const ListEquality<Event>().equals(isTrue, other.isTrue) &&
-          const ListEquality<Event>().equals(isFalse, other.isFalse);
-
-  @override
-  int get hashCode =>
-      expression.hashCode ^
-      const ListEquality<Event>().hash(isTrue) ^
-      const ListEquality<Event>().hash(isFalse);
-
-  IfExpression withoutSetContextInBranches() {
-    return IfExpression(expression,
-        isTrue: isTrue
-            .whereNot((e) => e is SetContext)
-            .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e)
-            .toList(),
-        isFalse: isFalse
-            .whereNot((e) => e is SetContext)
-            .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e)
-            .toList());
-  }
-}
-
 final class IfValue<T extends ModelExpression> extends Event {
   final T op1, op2;
 
