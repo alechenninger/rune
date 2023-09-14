@@ -454,11 +454,16 @@ class Scene extends IterableBase<Event> {
     }, Condition.empty(), condition);
   }
 
-  /// Find the first branch, including top-level,
-  /// that satisfies the [matching] Condition.
-  /// Add [event] to that branch.
-  /// If the branch is not top-level,
+  /// Find all branches recursively, including [events],
+  /// that satisfy the [matching] Condition with [current].
+  /// Visit each branch with [visitor].
+  ///
+  /// A branch is not recursed further once it matches the [matching] condition.
+  ///
+  /// If the branch is not top-level (`events`),
   /// the corresponding [IfFlag] event will be replaced.
+  ///
+  /// Returns `true` if any branches were visited.
   ///
   /// See [Condition.isSatisfiedBy].
   bool _visitBranch(List<Event> events, Function(List<Event> events) visitor,
