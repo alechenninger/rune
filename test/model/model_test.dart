@@ -905,6 +905,164 @@ void main() {
             ])
           ]));
     });
+
+    group('condense', () {
+      test('top level', () {
+        var scene = Scene([
+          Dialog.parse('test'),
+          Dialog.parse('test2'),
+        ]);
+
+        scene.condense(dialogTo: Span('x'));
+
+        expect(scene, Scene([Dialog.parse('x')]));
+      });
+
+      test('in if flag branches', () {
+        var scene = Scene([
+          Dialog.parse('test'),
+          Dialog.parse('test2'),
+          IfFlag(EventFlag('test'), isSet: [
+            Dialog.parse('test3'),
+            Dialog.parse('test4'),
+            IfFlag(EventFlag('test2'), isSet: [
+              Dialog.parse('test5'),
+              Dialog.parse('test6'),
+            ], isUnset: [
+              Dialog.parse('test7'),
+              Dialog.parse('test8'),
+            ])
+          ], isUnset: [
+            Dialog.parse('test5'),
+            Dialog.parse('test6'),
+          ])
+        ]);
+
+        scene.condense(dialogTo: Span('x'));
+
+        expect(
+            scene,
+            Scene([
+              Dialog.parse('x'),
+              IfFlag(EventFlag('test'), isSet: [
+                Dialog.parse('x'),
+                IfFlag(EventFlag('test2'), isSet: [
+                  Dialog.parse('x'),
+                ], isUnset: [
+                  Dialog.parse('x'),
+                ])
+              ], isUnset: [
+                Dialog.parse('x'),
+              ])
+            ]));
+      });
+
+      test('removes pauses', () {
+        var scene = Scene([
+          Dialog.parse('test'),
+          Dialog.parse('test2'),
+          Pause(Duration(seconds: 1)),
+          Dialog.parse('test3'),
+          Dialog.parse('test4'),
+          Pause(Duration(seconds: 1)),
+          Dialog.parse('test5'),
+          Dialog.parse('test6'),
+        ]);
+
+        scene.condense(dialogTo: Span('x'));
+
+        expect(
+            scene,
+            Scene([
+              Dialog.parse('x'),
+            ]));
+      });
+
+      test('removes pauses from dialog spans', () {
+        var scene = Scene([
+          Dialog.parse('test'),
+          Dialog.parse('test2'),
+          Dialog(spans: [
+            DialogSpan('test3', pause: 1.seconds),
+            DialogSpan('test4', pause: 1.seconds),
+            DialogSpan('test5', pause: 1.seconds),
+            DialogSpan('test6', pause: 1.seconds),
+          ]),
+          Dialog.parse('test4'),
+          Dialog(spans: [
+            DialogSpan('test3', pause: 1.seconds),
+            DialogSpan('test4', pause: 1.seconds),
+            DialogSpan('test5', pause: 1.seconds),
+            DialogSpan('test6', pause: 1.seconds),
+          ]),
+          Dialog.parse('test6'),
+        ]);
+
+        scene.condense(dialogTo: Span('x'));
+
+        expect(
+            scene,
+            Scene([
+              Dialog.parse('x'),
+            ]));
+      });
+
+      test('maintains panels in dialog', () {
+        var scene = Scene([
+          Dialog.parse('test'),
+          Dialog.parse('test2'),
+          Dialog(spans: [
+            DialogSpan('test3', panel: PrincipalPanel.principal),
+            DialogSpan('test4', panel: PrincipalPanel.alysGrabsPrincipal),
+            DialogSpan('test5', panel: PrincipalPanel.manTurnedToStone),
+          ]),
+          Dialog.parse('test4'),
+          Dialog(spans: [
+            DialogSpan('test3', panel: PrincipalPanel.principal),
+            DialogSpan('test4', panel: PrincipalPanel.principalScared),
+            DialogSpan('test5', panel: PrincipalPanel.alysWhispersToHahn),
+          ]),
+          Dialog.parse('test6'),
+        ]);
+
+        scene.condense(dialogTo: Span('x'));
+
+        expect(
+            scene,
+            Scene([
+              Dialog(spans: [
+                DialogSpan('x', panel: PrincipalPanel.principal),
+                DialogSpan('', panel: PrincipalPanel.alysGrabsPrincipal),
+                DialogSpan('', panel: PrincipalPanel.manTurnedToStone),
+                DialogSpan('', panel: PrincipalPanel.principal),
+                DialogSpan('', panel: PrincipalPanel.principalScared),
+                DialogSpan('', panel: PrincipalPanel.alysWhispersToHahn),
+              ]),
+            ]));
+      });
+
+      test('up to event index', () {
+        var scene = Scene([
+          Dialog.parse('test'),
+          Dialog.parse('test2'),
+          Dialog.parse('test3'),
+          Dialog.parse('test4'),
+          Dialog.parse('test5'),
+          Dialog.parse('test6'),
+        ]);
+
+        scene.condense(dialogTo: Span('x'), upTo: 3);
+
+        expect(
+            scene,
+            Scene([
+              Dialog.parse('x'),
+              Dialog.parse('test4'),
+              Dialog.parse('test5'),
+              Dialog.parse('test6'),
+            ]));
+      });
+    });
   });
 
   group('condition', () {

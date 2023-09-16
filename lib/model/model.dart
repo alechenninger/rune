@@ -418,6 +418,7 @@ class Scene extends IterableBase<Event> {
     }
   }
 
+  // TODO: these flags checks are not used and don't check branches
   Set<EventFlag> flagsSet() {
     return _events.whereType<SetFlag>().map((e) => e.flag).toSet();
   }
@@ -452,6 +453,67 @@ class Scene extends IterableBase<Event> {
       branch.clear();
       branch.addAll(events);
     }, Condition.empty(), condition);
+  }
+
+  /// Recurses through all branches and collapses consecutive dialog events
+  /// to a single dialog event provided by [dialogTo] (or the first dialog event).
+  void condense({required Span dialogTo, int? upTo}) {
+    condenseRecursively(List<Event> events) {
+      for (var i = 0; i < events.length; i++) {
+        var e = events[i];
+
+        switch (e) {
+          case Pause _:
+            events.removeAt(i);
+            i--;
+            break;
+          case Dialog d:
+            var spans = <DialogSpan>[..._justPanels(d)];
+            var j = i + 1;
+
+            loop:
+            for (; j < events.length; j++) {
+              switch (events[j]) {
+                case Pause _:
+                  events.removeAt(j);
+                  j--;
+                  break;
+                case Dialog d:
+                  spans.addAll(_justPanels(d));
+                  break;
+                default:
+                  break loop;
+              }
+            }
+
+            events.replaceRange(i, j, [
+              Dialog(
+                spans: [
+                  DialogSpan.fromSpan(dialogTo,
+                      panel: spans.firstOrNull?.panel),
+                  ...spans.skip(1)
+                ],
+              )
+            ]);
+            break;
+          case IfFlag e:
+            var isSet = [...e.isSet];
+            var isUnset = [...e.isUnset];
+            condenseRecursively(isSet);
+            condenseRecursively(isUnset);
+            events[i] = IfFlag(e.flag, isSet: isSet, isUnset: isUnset);
+            break;
+        }
+      }
+    }
+
+    if (upTo == null) {
+      condenseRecursively(_events);
+    } else {
+      var events = _events.sublist(0, upTo);
+      condenseRecursively(events);
+      _events.replaceRange(0, upTo, events);
+    }
   }
 
   /// Find all branches recursively, including [events],
@@ -629,6 +691,44 @@ bool _isIfFlagWithEmptyBranches(Event e) {
   if (e is! IfFlag) return false;
   return Scene(e.isSet).isEffectivelyEmpty &
       Scene(e.isUnset).isEffectivelyEmpty;
+}
+
+extension CollapseDialog on List<Event> {
+  /// Remove all [Dialog] text and pauses.
+  /// Each consecutive block of dialog will be replaced with the text in [to].
+  /// Any panels will be consolidated as spans in a single [Dialog] event.
+  void collapseDialog({required Span to}) {
+    for (var i = 0; i < length; i++) {
+      var e = this[i];
+
+      if (e is! Dialog) continue;
+
+      var spans = <DialogSpan>[..._justPanels(e)];
+      var j = i + 1;
+
+      for (; j < length; j++) {
+        e = this[j];
+        if (e is! Dialog) break;
+        spans.addAll(_justPanels(e));
+      }
+
+      replaceRange(i, j, [
+        Dialog(
+          spans: [
+            DialogSpan.fromSpan(to, panel: spans.firstOrNull?.panel),
+            ...spans.skip(1)
+          ],
+        )
+      ]);
+    }
+  }
+}
+
+Iterable<DialogSpan> _justPanels(Dialog d) {
+  return d.spans
+      .map((s) => s.panel)
+      .whereNotNull()
+      .map((p) => DialogSpan('', panel: p));
 }
 
 final onlyWordCharacters = RegExp(r'^\w+$');
