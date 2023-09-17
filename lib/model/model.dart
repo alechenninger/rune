@@ -455,8 +455,15 @@ class Scene extends IterableBase<Event> {
     }, Condition.empty(), condition);
   }
 
-  /// Recurses through all branches and collapses consecutive dialog events
-  /// to a single dialog event provided by [dialogTo] (or the first dialog event).
+  /// Recurses through all branches and hastens the scene by...
+  ///
+  /// - Removing pauses
+  /// - Replacing dialog with [dialogTo] (but maintaining panels)
+  ///
+  /// Further alterations to the scene may be added in the future.
+  ///
+  /// The intent is to speed up the scene
+  /// while keeping meaningful state changes.
   void condense({required Span dialogTo, int? upTo}) {
     condenseRecursively(List<Event> events) {
       for (var i = 0; i < events.length; i++) {
@@ -467,6 +474,7 @@ class Scene extends IterableBase<Event> {
             events.removeAt(i);
             i--;
             break;
+
           case Dialog d:
             var spans = <DialogSpan>[..._justPanels(d)];
             var j = i + 1;
@@ -496,6 +504,7 @@ class Scene extends IterableBase<Event> {
               )
             ]);
             break;
+
           case IfFlag e:
             var isSet = [...e.isSet];
             var isUnset = [...e.isUnset];
