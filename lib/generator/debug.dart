@@ -1,9 +1,7 @@
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/generator.dart';
-import 'package:rune/generator/map.dart';
 
 import '../model/model.dart' as model;
-import '../asm/asm.dart';
 import 'event.dart';
 import 'movement.dart';
 

@@ -913,7 +913,7 @@ void main() {
           Dialog.parse('test2'),
         ]);
 
-        scene.condense(dialogTo: Span('x'));
+        scene.fastForward(dialogTo: Span('x'));
 
         expect(scene, Scene([Dialog.parse('x')]));
       });
@@ -938,7 +938,7 @@ void main() {
           ])
         ]);
 
-        scene.condense(dialogTo: Span('x'));
+        scene.fastForward(dialogTo: Span('x'));
 
         expect(
             scene,
@@ -969,7 +969,7 @@ void main() {
           Dialog.parse('test6'),
         ]);
 
-        scene.condense(dialogTo: Span('x'));
+        scene.fastForward(dialogTo: Span('x'));
 
         expect(
             scene,
@@ -998,7 +998,7 @@ void main() {
           Dialog.parse('test6'),
         ]);
 
-        scene.condense(dialogTo: Span('x'));
+        scene.fastForward(dialogTo: Span('x'));
 
         expect(
             scene,
@@ -1025,7 +1025,7 @@ void main() {
           Dialog.parse('test6'),
         ]);
 
-        scene.condense(dialogTo: Span('x'));
+        scene.fastForward(dialogTo: Span('x'));
 
         expect(
             scene,
@@ -1051,7 +1051,7 @@ void main() {
           Dialog.parse('test6'),
         ]);
 
-        scene.condense(dialogTo: Span('x'), upTo: 3);
+        scene.fastForward(dialogTo: Span('x'), upTo: 3);
 
         expect(
             scene,

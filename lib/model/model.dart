@@ -464,7 +464,7 @@ class Scene extends IterableBase<Event> {
   ///
   /// The intent is to speed up the scene
   /// while keeping meaningful state changes.
-  void condense({required Span dialogTo, int? upTo}) {
+  void fastForward({required Span dialogTo, int? upTo}) {
     condenseRecursively(List<Event> events) {
       for (var i = 0; i < events.length; i++) {
         var e = events[i];
