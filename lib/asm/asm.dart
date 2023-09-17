@@ -67,6 +67,17 @@ Asm comment(String comment) => Asm.fromInstructions(LineSplitter.split(comment)
 
 Asm lea(Address src, Address dst) => cmd('lea', [src, dst]);
 Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
+
+/// Optimize using moveq if possible.
+/// Assumes src is *unsigned* and therefore limits moveq to 0-127,
+/// as otherwise 128 would be sign extended to -128.
+Asm unsignedMoveL(Address src, Address dst) {
+  if (src is Immediate && src.value <= 127) {
+    return moveq(src, dst);
+  }
+  return move.l(src, dst);
+}
+
 Asm jsr(Address to) => cmd('jsr', [to]);
 Asm jmp(Address to) => cmd('jmp', [to]);
 Asm bset(Address src, Address dst) => cmd('bset', [src, dst]);

@@ -415,7 +415,8 @@ main() {
           move.w(0x2b.toWord.i, d0),
           jsr(Label('Panel_Create').l),
           dmaPlanesVInt(),
-          jsr(Label('Panel_DestroyAll').l),
+          jsr(Label('Panel_Destroy').l),
+          dmaPlanesVInt(),
         ]));
   });
 
@@ -571,7 +572,8 @@ EventFlag_Test001 = $01'''));
           moveq(Byte.zero.i, d0),
           jsr(Label('Event_GetAndRunDialogue3').l),
           move.b(Constant('SFXID_Surprise').i, (Sound_Index).l),
-          jsr(Label('Panel_DestroyAll').l),
+          jsr(Label('Panel_Destroy').l),
+          dmaPlanesVInt(),
           doMapUpdateLoop(Word(0x3c)),
           popAndRunDialog3
         ]));
@@ -610,7 +612,8 @@ EventFlag_Test001 = $01'''));
           move.w(MolcumPanel.alysSurprised.panelIndex.toWord.i, d0),
           jsr(Label('Panel_Create').l),
           dmaPlanesVInt(),
-          jsr(Label('Panel_DestroyAll').l),
+          jsr(Label('Panel_Destroy').l),
+          dmaPlanesVInt(),
         ]));
   });
 
@@ -1224,6 +1227,71 @@ EventFlag_Test001 = $01'''));
           label(Label('testscene_testflag_unset6')),
         ]),
       );
+    });
+  });
+
+  group('hide panels', () {
+    group('all', () {
+      test('generates nothing if there are no panels', () {
+        var scene = Scene([
+          HideAllPanels(),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(asm, Asm.empty());
+      });
+
+      test('in event calls subroutine', () {});
+
+      test('in instantly, in event, if number of panels is known', () {
+        var scene = Scene([
+          ShowPanel(PanelByIndex(1)),
+          ShowPanel(PanelByIndex(2)),
+          Pause(1.second),
+          HideAllPanels(instantly: true),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+        /*
+  ; Remove all panels instantly
+	moveq	#0, d0
+	move.b	(Panel_Num).w, d0
+	subq.b	#1, d0
+loc_742A4:
+	jsr	(Panel_Destroy).l
+	dbf	d0, loc_742A4
+	jsr	(DMAPlanes_VInt).l
+  */
+        expect(
+            asm,
+            Asm([
+              move.w(Word(1).i, d0),
+              jsr(Label('Panel_Create').l),
+              jsr(Label('DMAPlanes_VInt').l),
+              move.w(Word(2).i, d0),
+              jsr(Label('Panel_Create').l),
+              jsr(Label('DMAPlanes_VInt').l),
+              move.w(Word(0x3c).i, d0),
+              // Don't run map updates while panels shown
+              jsr(Label('VInt_PrepareLoop').l),
+              moveq(1.i, d0),
+              label(Label('.4_nextPanel')),
+              jsr(Label('Panel_Destroy').l),
+              dbf(d0, Label('.4_nextPanel')),
+              jsr(Label('DMAPlanes_VInt').l),
+            ]));
+      });
+    });
+
+    group('top N', () {
+      test('instantly', () {});
     });
   });
 }

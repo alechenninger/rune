@@ -1,5 +1,4 @@
 import 'package:collection/collection.dart';
-import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/cutscenes.dart';

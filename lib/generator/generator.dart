@@ -1107,21 +1107,28 @@ class SceneAsmGenerator implements EventVisitor {
     var panelsShown = _memory.panelsShown;
     if (panelsShown == 0) return;
 
+    if (panelsShown == 1) {
+      hideTopPanels(HideTopPanels(1));
+      return;
+    }
+
     if (hidePanels.instantly) {
       _addToEvent(
           hidePanels,
           (i) => Asm([
-                moveq(0.i, d0),
-                if (panelsShown == null)
-                  move.b(Constant('Panel_Num').w, d0)
-                else
-                  move.b(panelsShown.i, d0),
-                subq.b(1.i, d0),
+                if (panelsShown == null) ...[
+                  moveq(0.i, d0),
+                  move.b(Constant('Panel_Num').w, d0),
+                  subq.b(1.i, d0),
+                ] else
+                  unsignedMoveL((panelsShown - 1).i, d0),
                 label(Label('.${i}_nextPanel')),
                 jsr(Label('Panel_Destroy').l),
                 dbf(d0, Label('.${i}_nextPanel')),
                 jsr(Label('DMAPlanes_VInt').l),
               ]));
+
+      _memory.panelsShown = 0;
     } else {
       _addToEventOrDialog(hidePanels, inDialog: () {
         _addToDialog(dc.b([Byte(0xf2), Byte.two]));
@@ -1147,6 +1154,9 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     // todo(hide top panels): support instantly
+    if (hidePanels.instantly) {
+      throw UnimplementedError('HideTopPanels.instantly');
+    }
 
     _addToEventOrDialog(hidePanels, inDialog: () {
       _memory.removePanels(panels);

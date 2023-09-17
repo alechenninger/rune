@@ -1,4 +1,3 @@
-import 'package:rune/asm/asm.dart';
 import 'package:rune/generator/generator.dart';
 
 class TestEventRoutines extends EventRoutines {
