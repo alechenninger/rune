@@ -1294,4 +1294,138 @@ loc_742A4:
       test('instantly', () {});
     });
   });
+
+  group('change party', () {
+    test('1 slot', () {
+      var scene = Scene([
+        ChangeParty([rune], saveCurrentParty: false),
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            Instruction.parse(
+                r'	move.l #((CharID_Rune<<24)|$FFFFFF), (Current_Party_Slots).w'),
+            move.b(Byte.max.i, Current_Party_Slot_5.w)
+          ]));
+    });
+
+    test('2 slots', () {
+      var scene = Scene([
+        ChangeParty([rune, alys], saveCurrentParty: false),
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            Instruction.parse(
+                r'	move.l #(((CharID_Rune<<24)|(CharID_Alys<<16))|$FFFF), (Current_Party_Slots).w'),
+            move.b(Byte.max.i, Current_Party_Slot_5.w)
+          ]));
+    });
+
+    test('3 slots', () {
+      var scene = Scene([
+        ChangeParty([rune, alys, hahn], saveCurrentParty: false),
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            Instruction.parse(
+                r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|$FF), (Current_Party_Slots).w'),
+            move.b(Byte.max.i, Current_Party_Slot_5.w)
+          ]));
+    });
+
+    test('4 slots', () {
+      var scene = Scene([
+        ChangeParty([rune, alys, hahn, wren], saveCurrentParty: false),
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            Instruction.parse(
+                r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+            move.b(Byte.max.i, Current_Party_Slot_5.w)
+          ]));
+    });
+
+    test('5th slot requires another byte beyond longword', () {
+      var scene = Scene([
+        ChangeParty([rune, alys, hahn, wren, raja], saveCurrentParty: false),
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            Instruction.parse(
+                r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+            move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
+          ]));
+    });
+
+    test('saves before changing if requested', () {
+      var scene = Scene([
+        ChangeParty([rune, alys, hahn, wren, raja], saveCurrentParty: true),
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            move.l(Current_Party_Slots.w, Constant('Saved_Char_ID_Mem_1').w),
+            move.b(Current_Party_Slot_5.w, Constant('Saved_Char_ID_Mem_5').w),
+            Instruction.parse(
+                r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+            move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
+          ]));
+    });
+
+    test('restore saved party', () {
+      var scene = Scene([RestoreSavedParty()]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            move.l(Constant('Saved_Char_ID_Mem_1').w, Current_Party_Slots.w),
+            move.b(Constant('Saved_Char_ID_Mem_5').w, Current_Party_Slot_5.w)
+          ]));
+    });
+  });
 }

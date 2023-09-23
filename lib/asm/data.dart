@@ -190,6 +190,7 @@ abstract class Expression {
   }
 
   Expression operator <<(Expression other) {
+    if (other.isKnownZero) return this;
     return ArithmaticExpression('<<', this, other);
   }
 
@@ -427,7 +428,9 @@ class Value extends Expression implements Comparable<Value> {
   }
 
   @override
-  String toString() => value.toString();
+  String toString() => value > 128
+      ? '\$${value.toRadixString(16).toUpperCase()}'
+      : value.toString();
 
   @override
   bool operator ==(Object other) =>

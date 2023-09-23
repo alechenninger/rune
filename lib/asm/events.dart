@@ -61,6 +61,9 @@ const Map_Start_X_Pos = Constant('Map_Start_X_Pos');
 const Map_Start_Y_Pos = Constant('Map_Start_Y_Pos');
 const Map_Start_Facing_Dir = Constant('Map_Start_Facing_Dir');
 
+const Current_Party_Slots = Constant('Current_Party_Slots');
+const Current_Party_Slot_5 = Constant('Current_Party_Slot_5');
+
 /// alignment of the characters relative to the lead character
 /// 0 = Characters overlap
 /// 4 = Characters below lead character
@@ -606,6 +609,22 @@ Asm addCharacterToParty({
     jsr(charRoutine),
     moveq(charId, d0),
     jsr('Event_AddMacro'.toLabel.l)
+  ]);
+}
+
+Asm saveCurrentPartySlots() {
+  return Asm([
+    move.l(Current_Party_Slots.w, Constant('Saved_Char_ID_Mem_1').w),
+    move.b(Current_Party_Slot_5.w, Constant('Saved_Char_ID_Mem_5').w)
+  ]);
+}
+
+Asm restoreSavedPartySlots() {
+  return Asm([
+    move.l(
+        Constant('Saved_Char_ID_Mem_1').w, Constant('Current_Party_Slots').w),
+    move.b(
+        Constant('Saved_Char_ID_Mem_5').w, Constant('Current_Party_Slot_5').w),
   ]);
 }
 

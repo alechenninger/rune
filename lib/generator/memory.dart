@@ -2,7 +2,6 @@ import 'package:collection/collection.dart';
 
 import '../model/model.dart';
 import 'generator.dart';
-import 'registers.dart';
 
 abstract class StateChange<T> {
   T apply(Memory memory);

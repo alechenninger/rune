@@ -18,6 +18,7 @@ import 'events.dart';
 import 'expressions.dart';
 import 'map.dart';
 import 'movement.dart';
+import 'party.dart';
 import 'sound.dart';
 import 'text.dart';
 
@@ -31,6 +32,7 @@ export 'events.dart';
 export 'expressions.dart';
 export 'map.dart';
 export 'movement.dart';
+export 'party.dart';
 export 'sound.dart';
 export 'text.dart';
 
@@ -196,6 +198,8 @@ abstract class EventVisitor {
   void stopMusic(StopMusic stopMusic);
   void addMoney(AddMoney addMoney);
   void resetObjectRoutine(ResetObjectRoutine resetRoutine);
+  void changeParty(ChangeParty changeParty);
+  void restoreSavedParty(RestoreSavedParty restoreParty);
 }
 
 class EventState {

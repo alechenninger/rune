@@ -1315,6 +1315,46 @@ class SceneAsmGenerator implements EventVisitor {
     });
   }
 
+  @override
+  void changeParty(ChangeParty changeParty) {
+    _checkNotFinished();
+
+    _addToEvent(changeParty, (_) {
+      if (changeParty.saveCurrentParty) {
+        _eventAsm.add(saveCurrentPartySlots());
+      }
+
+      var newParty = changeParty.party;
+
+      Expression firstFourSlots = newParty.first.charId << 24.toValue;
+      Expression fifthSlot = 0xFF.toByte;
+
+      for (var i = 1; i < newParty.length; i++) {
+        if (i < 4) {
+          firstFourSlots =
+              firstFourSlots | (newParty[i].charId << (24 - (i * 8)).toValue);
+        } else {
+          fifthSlot = newParty[i].charId;
+        }
+      }
+
+      if (newParty.length < 4) {
+        // Fill remaining slots with bytes (8 bits each)
+        var shift = (newParty.length - 1) * 8;
+        firstFourSlots = firstFourSlots | (0xFFFFFF >> shift).toValue;
+      }
+
+      _eventAsm.add(move.l(firstFourSlots.i, Current_Party_Slots.w));
+      _eventAsm.add(move.b(fifthSlot.i, Current_Party_Slot_5.w));
+    });
+  }
+
+  @override
+  void restoreSavedParty(RestoreSavedParty restoreParty) {
+    _checkNotFinished();
+    _addToEvent(restoreParty, (_) => restoreSavedPartySlots());
+  }
+
   void finish({bool appendNewline = false}) {
     // todo: also apply all changes for current mem across graph
     // not sure if still need to do this
