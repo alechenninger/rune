@@ -254,6 +254,7 @@ MapAsm compileMap(
     throw 'too many objects';
   }
 
+  spriteVramOffset = _addBuiltInSpriteData(map, spriteVramOffset, spritesAsm);
   var objectsTileNumbers =
       _compileMapSpriteData(objects, spritesAsm, spriteVramOffset?.value);
 
@@ -290,6 +291,33 @@ MapAsm compileMap(
       areas: areasAsm,
       dialog: trees.forMap(map.id).toAsm(),
       events: eventsAsm);
+}
+
+// TODO(map compiler): this should be externalized to Program API for testing
+final _builtInSprites = {
+  MapId.BirthValley_B1: [(Label('loc_1379A8'), 0x39)]
+};
+
+/// Some maps utilize sprites outside of objects, in event routines.
+///
+/// This assumes that this sprite data will always be first in VRAM.
+/// This may not always be the case.
+Word? _addBuiltInSpriteData(
+    GameMap map, Word? spriteVramOffset, Asm spritesAsm) {
+  if (_builtInSprites[map.id] case var s when s != null && s.isNotEmpty) {
+    if (spriteVramOffset == null) {
+      throw Exception('no vram offsets defined but map has sprites. '
+          'builtIn=$s');
+    }
+
+    for (var (lbl, tiles) in s) {
+      spritesAsm.add(dc.w([spriteVramOffset!]));
+      spritesAsm.add(dc.l([lbl]));
+
+      spriteVramOffset = (spriteVramOffset + tiles.toValue) as Word;
+    }
+  }
+  return spriteVramOffset;
 }
 
 Map<MapObjectId, Word> _compileMapSpriteData(
