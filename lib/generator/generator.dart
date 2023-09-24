@@ -1436,6 +1436,7 @@ class SceneAsmGenerator implements EventVisitor {
         _terminateDialog();
 
         // clears z bit so we don't reload the map from cutscene
+        _eventAsm.add(comment('Finish'));
         _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
         _eventAsm.add(rts);
 
@@ -1450,6 +1451,7 @@ class SceneAsmGenerator implements EventVisitor {
           hideAllPanels(HideAllPanels());
         }
 
+        _eventAsm.add(comment('Finish'));
         _eventAsm.add(returnFromDialogEvent());
 
         break;
@@ -1466,6 +1468,7 @@ class SceneAsmGenerator implements EventVisitor {
 
         if (_eventType == EventType.cutscene) {
           // clears z bit so we don't reload the map from cutscene
+          _eventAsm.add(comment('Finish'));
           _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
         }
 
