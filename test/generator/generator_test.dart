@@ -57,6 +57,40 @@ main() {
         ]));
   });
 
+  test('cutscene scene sets z bit before return when map needs reload', () {
+    var scene = Scene([
+      FadeOut(),
+      Dialog(speaker: alys, spans: [DialogSpan('Hi')])
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().tail(1),
+        Asm([
+          moveq(0.i, d0),
+        ]));
+  });
+
+  test('cutscene scene unsets z bit before return when map should not reload',
+      () {
+    var scene = Scene([
+      FadeOut(),
+      Dialog(speaker: alys, spans: [DialogSpan('Hi')]),
+      FadeInField()
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().tail(1),
+        Asm([
+          moveq(1.i, d0),
+        ]));
+  });
+
   test('after fading out, fades in automatically before panel', () {
     var scene = Scene([FadeOut(), ShowPanel(PrincipalPanel.shayAndAlys)]);
 

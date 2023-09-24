@@ -129,8 +129,11 @@ class Program {
 
   SceneAsm addScene(SceneId id, Scene scene, {GameMap? startingMap}) {
     var eventAsm = EventAsm.empty();
+
     var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
-        startingMap: startingMap, eventFlags: _eventFlags);
+        startingMap: startingMap,
+        eventFlags: _eventFlags,
+        eventType: sceneEventType(scene.events));
 
     for (var event in scene.events) {
       event.visit(generator);
@@ -238,6 +241,101 @@ class _ProgramEventRoutines extends EventRoutines {
   Word addCutscene(Label routine) => _program._addCutscenePointer(routine);
 }
 
+/// Returns true if an event routine is needed in code generated for [events].
+///
+/// Reproduces logic in Interaction_ProcessDialogueTree to see if the events
+/// can be processed soley through dialog loop.
+///
+/// Returns `null` if events occur in the following order:
+/// - A single [IfFlag] (i.e. `$FA` control code) event
+/// and nothing else.
+/// This is because if there are other events,
+/// they are common to both branches,
+/// and therefore must be added to both dialog trees
+/// OR resulting events
+/// if the individual branches end up running events themselves.
+/// To avoid this complexity we resort to event code
+/// which already deals with subsequent unconditional events.
+///
+/// OR
+///
+/// - Zero or one [FacePlayer] where `object` is [obj]
+/// (i.e. `$F3` control code)
+/// - Zero or more [Dialog]
+///
+/// See also: [SceneAsmGenerator.runEventFromInteraction]
+/*
+todo: can also support all of this action control code stuff as events:
+$F2 = Determines actions during dialogues. The byte after this has the following values:
+  0 = Loads Panel; the word after this is the Panel index
+  1 = Destroys panel loaded last
+  2 = Destroys all panels
+  3 = Loads sound; the byte after this is the Sound index
+  4 = Loads sound; the byte after this is the Sound index
+  6 = Updates palettes
+  7 = Zio's eyes turn red in one of his panels (before the battle)
+  8 = Pauses music
+  9 = Resumes music
+  $A = For the spaceship sabotage, plays alarm sound and turns the screen red
+  $B = Sets event flag
+  $C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
+  */
+EventType? sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
+  // SetContext is not a perceivable event, so ignore
+  events = events.whereNot((e) => e is SetContext).toList(growable: false);
+
+  if (events.length == 1 && events[0] is IfFlag) return null;
+
+  bool hasDialogAfter(int i) => events.sublist(i + 1).any((e) => e is Dialog);
+
+  var dialogCheck = 0;
+  var dialogChecks = <bool Function(Event, int)>[
+    (event, i) => event is FacePlayer && event.object == interactingWith,
+    (event, i) =>
+        // Events need dialog after, otherwise their order
+        // creates unwanted dialog windows.
+        (event is Dialog && !event.hidePanelsOnClose) ||
+        (event is PlaySound && hasDialogAfter(i)) ||
+        (event is PlayMusic && hasDialogAfter(i)) ||
+        (event is ShowPanel && event.showDialogBox && hasDialogAfter(i)) ||
+        (event is SetFlag && hasDialogAfter(i)) ||
+        (event is HideTopPanels && hasDialogAfter(i)) ||
+        (event is HideAllPanels && hasDialogAfter(i)),
+    (event, i) =>
+        event is Dialog && event.hidePanelsOnClose && i == events.length - 1,
+  ];
+
+  var faded = false;
+  var needsEvent = false;
+
+  event:
+  for (int i = 0; i < events.length; i++) {
+    var event = events[i];
+    for (var cIdx = dialogCheck;
+        cIdx < dialogChecks.length && !needsEvent;
+        cIdx++) {
+      if (dialogChecks[cIdx](event, i)) {
+        dialogCheck = cIdx;
+        continue event;
+      }
+    }
+
+    needsEvent = true;
+
+    if (event is FadeOut) {
+      faded = true;
+    } else if (event is FadeInField || (event is LoadMap && event.showField)) {
+      faded = false;
+    } else if (event is Dialog && faded) {
+      return EventType.cutscene;
+    }
+  }
+
+  if (needsEvent) return EventType.event;
+
+  return null;
+}
+
 class SceneAsmGenerator implements EventVisitor {
   final SceneId id;
 
@@ -314,12 +412,11 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   SceneAsmGenerator.forEvent(this.id, this._dialogTrees, this._eventAsm,
-      {GameMap? startingMap, EventFlags? eventFlags})
+      {GameMap? startingMap, EventFlags? eventFlags, EventType? eventType})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = null,
         _isProcessingInteraction = false,
-        // FIXME: also parameterize eventtype so finish() does the right thing
-        _eventType = EventType.event,
+        _eventType = eventType ?? EventType.event,
         _eventFlags = eventFlags ?? EventFlags() {
     _memory.currentMap = startingMap;
     if (startingMap != null) {
@@ -335,100 +432,9 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  /// Returns true if an event routine is needed in code generated for [events].
-  ///
-  /// Reproduces logic in Interaction_ProcessDialogueTree to see if the events
-  /// can be processed soley through dialog loop.
-  ///
-  /// Returns `null` if events occur in the following order:
-  /// - A single [IfFlag] (i.e. `$FA` control code) event
-  /// and nothing else.
-  /// This is because if there are other events,
-  /// they are common to both branches,
-  /// and therefore must be added to both dialog trees
-  /// OR resulting events
-  /// if the individual branches end up running events themselves.
-  /// To avoid this complexity we resort to event code
-  /// which already deals with subsequent unconditional events.
-  ///
-  /// OR
-  ///
-  /// - Zero or one [FacePlayer] where `object` is [obj]
-  /// (i.e. `$F3` control code)
-  /// - Zero or more [Dialog]
-  ///
-  /// See also: [runEventFromInteraction]
-  /*
-  todo: can also support all of this action control code stuff as events:
-  $F2 = Determines actions during dialogues. The byte after this has the following values:
-		0 = Loads Panel; the word after this is the Panel index
-		1 = Destroys panel loaded last
-		2 = Destroys all panels
-		3 = Loads sound; the byte after this is the Sound index
-		4 = Loads sound; the byte after this is the Sound index
-		6 = Updates palettes
-		7 = Zio's eyes turn red in one of his panels (before the battle)
-		8 = Pauses music
-		9 = Resumes music
-		$A = For the spaceship sabotage, plays alarm sound and turns the screen red
-		$B = Sets event flag
-		$C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
-   */
+  /// See [sceneEventType].
   EventType? needsEvent(List<Event> events) {
-    // SetContext is not a perceivable event, so ignore
-    events = events.whereNot((e) => e is SetContext).toList(growable: false);
-
-    if (events.length == 1 && events[0] is IfFlag) return null;
-
-    bool hasDialogAfter(int i) => events.sublist(i + 1).any((e) => e is Dialog);
-
-    var dialogCheck = 0;
-    var dialogChecks = <bool Function(Event, int)>[
-      (event, i) => event is FacePlayer && event.object == _interactingWith,
-      (event, i) =>
-          // Events need dialog after, otherwise their order
-          // creates unwanted dialog windows.
-          (event is Dialog && !event.hidePanelsOnClose) ||
-          (event is PlaySound && hasDialogAfter(i)) ||
-          (event is PlayMusic && hasDialogAfter(i)) ||
-          (event is ShowPanel && event.showDialogBox && hasDialogAfter(i)) ||
-          (event is SetFlag && hasDialogAfter(i)) ||
-          (event is HideTopPanels && hasDialogAfter(i)) ||
-          (event is HideAllPanels && hasDialogAfter(i)),
-      (event, i) =>
-          event is Dialog && event.hidePanelsOnClose && i == events.length - 1,
-    ];
-
-    var faded = false;
-    var needsEvent = false;
-
-    event:
-    for (int i = 0; i < events.length; i++) {
-      var event = events[i];
-      for (var cIdx = dialogCheck;
-          cIdx < dialogChecks.length && !needsEvent;
-          cIdx++) {
-        if (dialogChecks[cIdx](event, i)) {
-          dialogCheck = cIdx;
-          continue event;
-        }
-      }
-
-      needsEvent = true;
-
-      if (event is FadeOut) {
-        faded = true;
-      } else if (event is FadeInField ||
-          (event is LoadMap && event.showField)) {
-        faded = false;
-      } else if (event is Dialog && faded) {
-        return EventType.cutscene;
-      }
-    }
-
-    if (needsEvent) return EventType.event;
-
-    return null;
+    return sceneEventType(events, interactingWith: _interactingWith);
   }
 
   void runEventFromInteractionIfNeeded(List<Event> events,
@@ -1377,56 +1383,80 @@ class SceneAsmGenerator implements EventVisitor {
     // we don't want to generate
     // because that would cause an unwanted interrupt
 
-    if (_inEvent) {
-      if (_isProcessingInteraction) {
-        if (_eventType == EventType.cutscene) {
-          var reload = _memory.isFieldShown != true;
-          if (reload) {
-            if (_replaceDialogRoutine != null) {
-              // dialog 5 will fade out the whole screen
-              // before map reload happens
-              // (destroy window -> fade out -> destroy panels)
-              _replaceDialogRoutine!(5);
-            } else {
-              // todo: but what if there isn't dialog?
-              //  do we need to do palfadout?
-              // doesn't usually happen
-              // but might i think depending on conditional logic
-              throw UnimplementedError('need to reload during cutscene '
-                  'but no dialog');
-            }
+    var needToShowField = _memory.isFieldShown != true;
+
+    switch ((_isProcessingInteraction, _eventType)) {
+      case (true, EventType.cutscene):
+        if (needToShowField) {
+          if (_replaceDialogRoutine != null) {
+            // dialog 5 will fade out the whole screen
+            // before map reload happens
+            // (destroy window -> fade out -> destroy panels)
+            _replaceDialogRoutine!(5);
+          } else {
+            // todo: but what if there isn't dialog?
+            //  do we need to do palfadout?
+            // doesn't usually happen
+            // but might i think depending on conditional logic
+            throw UnimplementedError('need to reload during cutscene '
+                'but no dialog');
           }
-          _terminateDialog();
-          // clears z bit so we don't reload the map from cutscene
-          _eventAsm.add(moveq(reload ? 0.i : 1.i, d0));
-          _eventAsm.add(rts);
-        } else {
-          _terminateDialog();
-          // TODO: should this synthetic event logic be in the model instead?
-          if (_memory.isFieldShown != true) {
-            fadeInField(FadeInField());
-          } else if ((_memory.panelsShown ?? 0) > 0) {
-            hideAllPanels(HideAllPanels());
-          }
-          _eventAsm.add(returnFromDialogEvent());
         }
-      } else {
+
         _terminateDialog();
-        if (_memory.isFieldShown != true) {
+
+        // clears z bit so we don't reload the map from cutscene
+        _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
+        _eventAsm.add(rts);
+
+        break;
+
+      case (true, EventType.event):
+        _terminateDialog();
+
+        // TODO: should this synthetic event logic be in the model instead?
+        if (needToShowField) {
+          fadeInField(FadeInField());
+        } else if ((_memory.panelsShown ?? 0) > 0) {
+          hideAllPanels(HideAllPanels());
+        }
+
+        _eventAsm.add(returnFromDialogEvent());
+
+        break;
+
+      case (false, EventType _):
+        _terminateDialog();
+
+        if (needToShowField) {
           fadeInField(FadeInField());
         } else if ((_memory.panelsShown ?? 0) > 0) {
           // unfortunately this will produce unwanted interrupt
           hideAllPanels(HideAllPanels());
         }
-      }
-    } else {
-      // todo: not sure about this. might want to do this after terminating
-      // dialog only?
-      if ((_memory.panelsShown ?? 0) > 0) {
-        // unfortunately this will produce unwanted interrupt
-        hideAllPanels(HideAllPanels());
-      }
-      _terminateDialog();
+
+        if (_eventType == EventType.cutscene) {
+          // clears z bit so we don't reload the map from cutscene
+          _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
+        }
+
+        // TODO(refactor); this doesn't return
+        // this is expected to be hand added,
+        // but that makes this method more complicated due to inconsistency
+
+        break;
+
+      case (_, null):
+        // todo: not sure about this. might want to do this after terminating
+        // dialog only?
+        if ((_memory.panelsShown ?? 0) > 0) {
+          // unfortunately this will produce unwanted interrupt
+          hideAllPanels(HideAllPanels());
+        }
+
+        _terminateDialog();
+
+        break;
     }
 
     if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
