@@ -79,7 +79,7 @@ ${dialog2.toAsm()}
 
   group('events', () {
     test('play sounds', () {
-      var scene = Scene([(PlaySound(Sound.selection))]);
+      var scene = Scene([(PlaySound(SoundEffect.selection))]);
       var program = Program();
       var asm = program.addScene(SceneId('test'), scene);
       expect(asm.event.withoutComments(),

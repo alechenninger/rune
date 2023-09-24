@@ -1,7 +1,7 @@
 import 'model.dart';
 
 class PlaySound extends Event {
-  final Sound sound;
+  final SoundEffect sound;
 
   PlaySound(this.sound);
 
@@ -72,9 +72,11 @@ class StopMusic extends Event {
   }
 }
 
+sealed class Sound {}
+
 // generated using
 // cat sound_ids | gsed -E 's/[^_]*_(\S+).*/\1,/' | gsed -E 's/\w/\L&/'
-enum Sound {
+enum SoundEffect implements Sound {
   rod,
   shot,
   slasher,
@@ -155,7 +157,7 @@ enum Sound {
 
 // generated using
 // cat musicids | gsed -E 's/MusicID_(\S+).*/\1,/' | gsed -E 's/\w/\L&/'
-enum Music {
+enum Music implements Sound {
   tonoeDePon,
   inn,
   motaviaVillage,

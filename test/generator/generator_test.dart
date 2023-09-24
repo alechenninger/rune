@@ -5,6 +5,7 @@ import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/memory.dart';
 import 'package:rune/generator/movement.dart';
+import 'package:rune/model/battle.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
@@ -593,7 +594,7 @@ EventFlag_Test001 = $01'''));
     var scene = Scene([
       Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),
       ShowPanel(MolcumPanel.alysSurprised, showDialogBox: true),
-      PlaySound(Sound.surprise),
+      PlaySound(SoundEffect.surprise),
       HideAllPanels(),
       Pause(Duration(seconds: 1)),
       Dialog(speaker: alys, spans: DialogSpan.parse('Bye')),
@@ -620,10 +621,10 @@ EventFlag_Test001 = $01'''));
     var scene = Scene([
       PlayMusic(Music.motaviaTown),
       Pause(1.second),
-      PlaySound(Sound.stopAll),
+      PlaySound(SoundEffect.stopAll),
       PlayMusic(Music.suspicion),
-      PlaySound(Sound.surprise),
-      PlaySound(Sound.megid),
+      PlaySound(SoundEffect.surprise),
+      PlaySound(SoundEffect.megid),
       ShowPanel(MolcumPanel.alysSurprised)
     ]);
 
@@ -635,14 +636,14 @@ EventFlag_Test001 = $01'''));
           move.b(Music.motaviaTown.musicId.i, Constant('Sound_Index').l),
           move.b(Music.motaviaTown.musicId.i, Constant('Saved_Sound_Index').w),
           doMapUpdateLoop(Word(0x3c)),
-          move.b(Sound.stopAll.sfxId.i, Constant('Sound_Index').l),
+          move.b(SoundEffect.stopAll.sfxId.i, Constant('Sound_Index').l),
           vIntPrepare(),
           move.b(Music.suspicion.musicId.i, Constant('Sound_Index').l),
           move.b(Music.suspicion.musicId.i, Constant('Saved_Sound_Index').w),
           vIntPrepare(),
-          move.b(Sound.surprise.sfxId.i, Constant('Sound_Index').l),
+          move.b(SoundEffect.surprise.sfxId.i, Constant('Sound_Index').l),
           vIntPrepare(),
-          move.b(Sound.megid.sfxId.i, Constant('Sound_Index').l),
+          move.b(SoundEffect.megid.sfxId.i, Constant('Sound_Index').l),
           move.w(MolcumPanel.alysSurprised.panelIndex.toWord.i, d0),
           jsr(Label('Panel_Create').l),
           dmaPlanesVInt(),
@@ -1459,6 +1460,83 @@ loc_742A4:
           Asm([
             move.l(Constant('Saved_Char_ID_Mem_1').w, Current_Party_Slots.w),
             move.b(Constant('Saved_Char_ID_Mem_5').w, Current_Party_Slot_5.w)
+          ]));
+    });
+  });
+
+  group('run battle on exit', () {
+    test('run battle then exit to cutscene with music', () {
+      var scene = Scene([
+        OnExitRunBattle(
+            battleIndex: 0x10,
+            postBattleFadeInMap: false,
+            postBattleSound: Music.redAlert,
+            postBattleReloadObjects: false)
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            move.b(Constant('MusicID_RedAlert').i,
+                Constant('Saved_Sound_Index').w),
+            bset(7.i, Map_Load_Flags.w),
+            bset(3.i, Map_Load_Flags.w),
+            move.b(0x10.toByte.i, Constant('Event_Battle_Index').w),
+            bset(3.i, Constant('Routine_Exit_Flags').w),
+          ]));
+    });
+
+    test('run battle then exit to map but cut sound', () {
+      var scene = Scene([
+        OnExitRunBattle(
+            battleIndex: 0x11,
+            postBattleFadeInMap: true,
+            postBattleSound: SoundEffect.stopAll,
+            postBattleReloadObjects: false)
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            move.b(
+                Constant('Sound_StopAll').i, Constant('Saved_Sound_Index').w),
+            bclr(7.i, Map_Load_Flags.w),
+            bset(3.i, Map_Load_Flags.w),
+            move.b(0x11.toByte.i, Constant('Event_Battle_Index').w),
+            bset(3.i, Constant('Routine_Exit_Flags').w),
+          ]));
+    });
+
+    test('run battle then exit to map but refresh objects', () {
+      var scene = Scene([
+        OnExitRunBattle(
+            battleIndex: 0x12,
+            postBattleFadeInMap: true,
+            postBattleReloadObjects: true)
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            bclr(7.i, Map_Load_Flags.w),
+            bclr(3.i, Map_Load_Flags.w),
+            move.b(0x12.toByte.i, Constant('Event_Battle_Index').w),
+            bset(3.i, Constant('Routine_Exit_Flags').w),
           ]));
     });
   });

@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
+import 'package:rune/model/battle.dart';
 
 import '../generator/generator.dart';
 import '../src/iterables.dart';
@@ -200,6 +201,7 @@ abstract class EventVisitor {
   void resetObjectRoutine(ResetObjectRoutine resetRoutine);
   void changeParty(ChangeParty changeParty);
   void restoreSavedParty(RestoreSavedParty restoreParty);
+  void onExitRunBattle(OnExitRunBattle setExit);
 }
 
 class EventState {

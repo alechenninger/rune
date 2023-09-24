@@ -25,6 +25,7 @@ import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
+import 'package:rune/model/battle.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -1361,6 +1362,30 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(restoreParty, (_) => restoreSavedPartySlots());
   }
 
+  @override
+  void onExitRunBattle(OnExitRunBattle onExit) {
+    _checkNotFinished();
+
+    _addToEvent(onExit, (_) {
+      if (onExit.postBattleSound case Sound s) {
+        _eventAsm.add(move.b(s.soundId.i, Constant('Saved_Sound_Index').w));
+      }
+
+      var controlFadeInBit = onExit.postBattleFadeInMap ? bclr : bset;
+      _eventAsm.add(controlFadeInBit(7.i, Map_Load_Flags.w));
+
+      var controlObjectsBit = onExit.postBattleReloadObjects ? bclr : bset;
+      _eventAsm.add(controlObjectsBit(3.i, Map_Load_Flags.w));
+
+      _eventAsm.add(Asm([
+        move.b(onExit.battleIndex.toByte.i, Constant('Event_Battle_Index').w),
+        bset(3.i, Constant('Routine_Exit_Flags').w),
+      ]));
+
+      return null;
+    });
+  }
+
   void finish({bool appendNewline = false}) {
     // todo: also apply all changes for current mem across graph
     // not sure if still need to do this
@@ -2081,21 +2106,33 @@ extension FramesPerSecond on Duration {
   }
 }
 
-extension SfxId on Sound {
+extension SoundId on Sound {
+  Expression get soundId {
+    return switch (this) {
+      // Analyzer seems to be bugged here.
+      // ignore: pattern_never_matches_value_type
+      SoundEffect s => s.sfxId,
+      // ignore: pattern_never_matches_value_type
+      Music m => m.musicId,
+    };
+  }
+}
+
+extension SfxId on SoundEffect {
   Expression get sfxId {
     var s = this;
     var first = s.name.substring(0, 1);
     var rest = s.name.substring(1);
     var capitalized = '${first.toUpperCase()}$rest';
     return switch (s) {
-      Sound.spaceshipRadar ||
-      Sound.landRover ||
-      Sound.hydrofoil =>
+      SoundEffect.spaceshipRadar ||
+      SoundEffect.landRover ||
+      SoundEffect.hydrofoil =>
         Constant('SpcSFXID_$capitalized'),
-      Sound.stopMusic ||
-      Sound.stopSFX ||
-      Sound.stopSpcSFX ||
-      Sound.stopAll =>
+      SoundEffect.stopMusic ||
+      SoundEffect.stopSFX ||
+      SoundEffect.stopSpcSFX ||
+      SoundEffect.stopAll =>
         Constant('Sound_$capitalized'),
       _ => Constant('SFXID_$capitalized')
     };

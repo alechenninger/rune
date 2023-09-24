@@ -538,7 +538,7 @@ void main() {
             startPosition: Position('1e0'.hex, '2e0'.hex),
             spec: Npc(Sprite.PalmanMan1, FaceDown()),
             onInteract: Scene([
-              PlaySound(Sound.surprise),
+              PlaySound(SoundEffect.surprise),
               Dialog(spans: [DialogSpan('Hiyo!')])
             ]));
         testMap.addObject(obj);
@@ -587,7 +587,7 @@ void main() {
             spec: Npc(Sprite.PalmanMan1, FaceDown()),
             onInteract: Scene([
               Dialog(spans: [DialogSpan('Hiyo!')]),
-              PlaySound(Sound.surprise),
+              PlaySound(SoundEffect.surprise),
             ]));
         testMap.addObject(obj);
 
@@ -600,7 +600,9 @@ void main() {
                 .skipWhile((i) => !'$i'.contains('RunDialog'))
                 .skip(1)
                 .take(1),
-            Asm([move.b(Sound.surprise.sfxId.i, Constant('Sound_Index').l)]));
+            Asm([
+              move.b(SoundEffect.surprise.sfxId.i, Constant('Sound_Index').l)
+            ]));
       });
     });
 
