@@ -239,6 +239,8 @@ class EventState {
 
   bool? isFieldShown = true;
 
+  bool? onExitRunBattle = false;
+
   Portrait? dialogPortrait;
 
   GameMap? currentMap;

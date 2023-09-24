@@ -1539,5 +1539,29 @@ loc_742A4:
             bset(3.i, Constant('Routine_Exit_Flags').w),
           ]));
     });
+
+    test('does not hide panels when exiting to battle', () {
+      var scene = Scene([
+        ShowPanel(PanelByIndex(1)),
+        OnExitRunBattle(battleIndex: 0x10),
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      expect(
+          asm,
+          Asm([
+            move.w(Word(1).i, d0),
+            jsr(Label('Panel_Create').l),
+            dmaPlanesVInt(),
+            bclr(7.i, Map_Load_Flags.w),
+            bset(3.i, Map_Load_Flags.w),
+            move.b(0x10.toByte.i, Constant('Event_Battle_Index').w),
+            bset(3.i, Constant('Routine_Exit_Flags').w),
+          ]));
+    });
   });
 }

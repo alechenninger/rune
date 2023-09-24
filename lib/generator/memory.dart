@@ -132,6 +132,18 @@ class Memory implements EventState {
   }
 
   @override
+  bool? get onExitRunBattle => _eventState.onExitRunBattle;
+
+  @override
+  set onExitRunBattle(bool? flag) {
+    _apply(SetValue<bool>(
+      flag,
+      (mem) => mem._eventState.onExitRunBattle,
+      (val, mem) => mem._eventState.onExitRunBattle = val,
+    ));
+  }
+
+  @override
   Positions get positions => _Positions(this);
 
   @override

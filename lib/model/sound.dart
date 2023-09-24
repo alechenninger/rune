@@ -1,3 +1,5 @@
+import 'package:quiver/iterables.dart';
+
 import 'model.dart';
 
 class PlaySound extends Event {
@@ -72,7 +74,11 @@ class StopMusic extends Event {
   }
 }
 
-sealed class Sound {}
+sealed class Sound implements Enum {
+  // todo: another analyzer bug; this is a compile error without cast
+  static final List<Sound> values =
+      concat([SoundEffect.values, Music.values]).cast<Sound>().toList();
+}
 
 // generated using
 // cat sound_ids | gsed -E 's/[^_]*_(\S+).*/\1,/' | gsed -E 's/\w/\L&/'

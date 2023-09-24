@@ -1382,6 +1382,8 @@ class SceneAsmGenerator implements EventVisitor {
         bset(3.i, Constant('Routine_Exit_Flags').w),
       ]));
 
+      _memory.onExitRunBattle = true;
+
       return null;
     });
   }
@@ -1408,7 +1410,10 @@ class SceneAsmGenerator implements EventVisitor {
     // we don't want to generate
     // because that would cause an unwanted interrupt
 
-    var needToShowField = _memory.isFieldShown != true;
+    var needToShowField =
+        _memory.onExitRunBattle != true && _memory.isFieldShown != true;
+    var needToHidePanels =
+        _memory.onExitRunBattle != true && (_memory.panelsShown ?? 0) > 0;
 
     switch ((_isProcessingInteraction, _eventType)) {
       case (true, EventType.cutscene):
@@ -1439,10 +1444,9 @@ class SceneAsmGenerator implements EventVisitor {
       case (true, EventType.event):
         _terminateDialog();
 
-        // TODO: should this synthetic event logic be in the model instead?
         if (needToShowField) {
           fadeInField(FadeInField());
-        } else if ((_memory.panelsShown ?? 0) > 0) {
+        } else if (needToHidePanels) {
           hideAllPanels(HideAllPanels());
         }
 
@@ -1455,7 +1459,7 @@ class SceneAsmGenerator implements EventVisitor {
 
         if (needToShowField) {
           fadeInField(FadeInField());
-        } else if ((_memory.panelsShown ?? 0) > 0) {
+        } else if (needToHidePanels) {
           // unfortunately this will produce unwanted interrupt
           hideAllPanels(HideAllPanels());
         }
@@ -1474,7 +1478,7 @@ class SceneAsmGenerator implements EventVisitor {
       case (_, null):
         // todo: not sure about this. might want to do this after terminating
         // dialog only?
-        if ((_memory.panelsShown ?? 0) > 0) {
+        if (needToHidePanels) {
           // unfortunately this will produce unwanted interrupt
           hideAllPanels(HideAllPanels());
         }
