@@ -403,10 +403,13 @@ class _Instruction extends Instruction {
             if (operands is Data) operands else operands.join(', '),
           if (comment != null) '; $comment'
         ].join('\t').trimRight() {
-    if (line.length > 255) {
-      throw ArgumentError(
-          'Instructions cannot be longer than 255 characters but was: $line');
-    }
+    // TODO: This causes false positives.
+    // Perhaps it with constants? (i.e. 255 is limit of data but not
+    // considering constant names)
+    // if (line.length > 255) {
+    //   throw ArgumentError(
+    //       'Instructions cannot be longer than 255 characters but was: $line');
+    // }
 
     var l = label;
     if (l != null && !_validLabelPattern.hasMatch(l)) {
