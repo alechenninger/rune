@@ -102,6 +102,33 @@ class Pause extends Event {
   int get hashCode => duration.hashCode;
 }
 
+/// Resets palettes and other state for showing the map.
+class PrepareMap extends Event {
+  final bool resetObjects;
+
+  PrepareMap({this.resetObjects = false});
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.prepareMap(this);
+  }
+
+  @override
+  String toString() {
+    return 'PrepareMap{resetObjects: $resetObjects}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PrepareMap &&
+          runtimeType == other.runtimeType &&
+          resetObjects == other.resetObjects;
+
+  @override
+  int get hashCode => resetObjects.hashCode;
+}
+
 class LoadMap extends Event {
   // todo: should not be map, should be map id
   //   map might not actually even be in the same game model

@@ -946,7 +946,9 @@ class SceneAsmGenerator implements EventVisitor {
       var wasFieldShown = _memory.isFieldShown;
       var needsRefresh = _memory.isMapInCram != true ||
           _memory.isMapInVram != true ||
-          _memory.isDialogInCram != true;
+          _memory.isDialogInCram !=
+              true; // todo: not sure if this one is needed
+      // i think pal init is only loaded on palfadeout
       var panelsShown = _memory.panelsShown;
 
       _memory.isDisplayEnabled = true;
@@ -1013,6 +1015,13 @@ class SceneAsmGenerator implements EventVisitor {
 
       return null;
     });
+  }
+
+  @override
+  void prepareMap(PrepareMap prepareMap) {
+    _checkNotFinished();
+    _addToEvent(prepareMap,
+        (eventIndex) => refreshMap(refreshObjects: prepareMap.resetObjects));
   }
 
   @override

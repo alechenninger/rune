@@ -417,6 +417,8 @@ class _MovementGenerator {
   }
 
   bool scriptable(FieldObject obj) {
+    // TODO(movement generator): character routines can be used on map objects
+    //  and these are scriptable.
     return obj.resolve(_mem) is! MapObject ||
         _mem.getRoutine(obj) == scriptableObjectRoutine;
   }

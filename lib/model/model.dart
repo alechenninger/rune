@@ -193,6 +193,7 @@ abstract class EventVisitor {
   void hideAllPanels(HideAllPanels hidePanels);
   void fadeOut(FadeOut fadeOut);
   void fadeInField(FadeInField fadeIn);
+  void prepareMap(PrepareMap prepareMap);
   void loadMap(LoadMap changeMap);
   void playSound(PlaySound playSound);
   void playMusic(PlayMusic playMusic);
