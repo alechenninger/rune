@@ -536,7 +536,16 @@ class IfFlag extends Event {
 class SetFlag extends Event {
   final EventFlag flag;
 
-  SetFlag(this.flag);
+  /// Whether or not it precisely matters when the flag is set in the scene.
+  ///
+  /// Most flags are set for the entirety of a scene or branch, and therefore
+  /// order doesn't matter.
+  ///
+  /// Some flags, however, trigger a change in visible state through the
+  /// duration of the scene and so cannot be set at any time.
+  final bool anyTime;
+
+  SetFlag(this.flag, {this.anyTime = true});
 
   @override
   void visit(EventVisitor visitor) {
@@ -545,7 +554,7 @@ class SetFlag extends Event {
 
   @override
   String toString() {
-    return 'SetFlag{$flag}';
+    return anyTime ? 'SetFlag{$flag}' : 'SetFlag{$flag, anyTime: $anyTime}';
   }
 
   @override
@@ -553,10 +562,11 @@ class SetFlag extends Event {
       identical(this, other) ||
       other is SetFlag &&
           runtimeType == other.runtimeType &&
-          flag == other.flag;
+          flag == other.flag &&
+          anyTime == other.anyTime;
 
   @override
-  int get hashCode => flag.hashCode;
+  int get hashCode => flag.hashCode ^ anyTime.hashCode;
 }
 
 final class IfValue<T extends ModelExpression> extends Event {

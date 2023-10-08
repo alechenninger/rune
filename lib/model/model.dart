@@ -426,7 +426,7 @@ class Scene extends IterableBase<Event> {
     }
   }
 
-  // TODO: these flags checks are not used and don't check branches
+  /// Returns flags which are set unconditionally anywhere in this scene.
   Set<EventFlag> flagsSet() {
     return _events.whereType<SetFlag>().map((e) => e.flag).toSet();
   }
@@ -663,7 +663,7 @@ class Scene extends IterableBase<Event> {
       // set context is still a little different,
       // since order changes semantics
       // however face player must always be first
-      // and set flag doesn't matter where it is in a branch
+      // and set 'anytime' flag doesn't matter where it is in a branch
       // so those are more properties of branches, than events per se
       // or we can consider handling in generator
       // for now we are sort of treating it as a property of the scene by
@@ -675,13 +675,17 @@ class Scene extends IterableBase<Event> {
         return;
       }
 
-      // This reordering results in an optimization.
-      // Setting the flag shouldn't matter where it is.
-      // But if we do it last, we have to generate in event code.
-      if (events.firstOrNull == InteractionObject.facePlayer()) {
-        events.insert(1, event);
+      if (event.anyTime) {
+        // This reordering results in an optimization.
+        // Setting the 'anyTime' flag doesn't matter where it is.
+        // But if we do it last, we have to generate in event code.
+        if (events.firstOrNull == InteractionObject.facePlayer()) {
+          events.insert(1, event);
+        } else {
+          events.insert(0, event);
+        }
       } else {
-        events.insert(0, event);
+        events.add(event);
       }
     } else {
       events.add(event);
