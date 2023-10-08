@@ -1020,8 +1020,12 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void prepareMap(PrepareMap prepareMap) {
     _checkNotFinished();
+
     _addToEvent(prepareMap,
         (eventIndex) => refreshMap(refreshObjects: prepareMap.resetObjects));
+
+    _memory.isMapInCram = true;
+    _memory.isMapInVram = true;
   }
 
   @override
