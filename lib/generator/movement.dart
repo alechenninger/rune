@@ -301,6 +301,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
 Asm instantMovesToAsm(InstantMoves moves, Memory memory,
     {required int eventIndex, DirectAddressRegister load = a4}) {
   var asm = EventAsm.empty();
+  var generator = _MovementGenerator(asm, memory);
   var adjustCamera = false;
 
   for (var MapEntry(key: obj, value: (position, facing))
@@ -318,8 +319,14 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
             asm: (x, y) {
               load = memory.addressRegisterFor(obj) ?? load;
 
+              var scriptable = generator.scriptable(obj);
+              if (!scriptable) {
+                memory.setRoutine(obj, scriptableObjectRoutine);
+              }
+
               return Asm([
                 obj.toA(load, memory),
+                if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
                 move.w(x, curr_x_pos(load)),
                 move.w(y, curr_y_pos(load)),
                 move.w(x, dest_x_pos(load)),
@@ -341,10 +348,18 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
             memory: memory,
             load1: load == a4 ? a3 : a4,
             load2: load == a4 ? a2 : a3,
-            asm: (d) => Asm([
-                  obj.toA(load, memory),
-                  move.w(d, facing_dir(load)),
-                ])),
+            asm: (d) {
+              var scriptable = generator.scriptable(obj);
+              if (!scriptable) {
+                memory.setRoutine(obj, scriptableObjectRoutine);
+              }
+
+              return Asm([
+                obj.toA(load, memory),
+                if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
+                move.w(d, facing_dir(load)),
+              ]);
+            }),
       );
 
       switch (facing.known(memory)) {
@@ -477,7 +492,10 @@ String _labelSafeString(FieldObject obj) {
 extension FieldObjectAsm on FieldObject {
   /// NOTE! May overwrite data registers.
   Asm toA4(Memory ctx) {
-    if (ctx.inAddress(a4)?.obj == resolve(ctx)) {
+    var current = ctx.inAddress(a4)?.obj;
+    // TODO(movement generator): should we resolve when putting into address
+    //  memory?
+    if (current == this || current == resolve(ctx)) {
       return Asm.empty();
     }
 

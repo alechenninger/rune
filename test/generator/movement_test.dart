@@ -1462,6 +1462,76 @@ void main() {
           ]));
     });
 
+    group('npcs', () {
+      late GameMap map;
+      late Memory testMemory;
+      late MapObject testnpc;
+      late MapObject scriptableNpc;
+
+      setUp(() {
+        map = GameMap(MapId.Test);
+        testMemory = Memory()..currentMap = map;
+        map.addObject(testnpc = MapObject(
+            id: 'testnpc',
+            startPosition: Position(0x200, 0x100),
+            spec: Npc(Sprite.PalmanMan1, WanderAround(down))));
+        map.addObject(scriptableNpc = MapObject(
+            id: 'scriptableNpc',
+            startPosition: Position(0x100, 0x200),
+            spec: AsmSpec(
+                routine: scriptableObjectRoutine.index, startFacing: down)));
+      });
+
+      test('one scriptable object position and facing', () {
+        var moves = InstantMoves()
+          ..move(MapObjectById(scriptableNpc.id),
+              to: Position(0x100, 0x50), face: down);
+        var asm = generate([moves], inMap: map);
+        expect(
+            asm,
+            Asm([
+              scriptableNpc.toA4(testMemory),
+              move.w(0x100.toWord.i, curr_x_pos(a4)),
+              move.w(0x50.toWord.i, curr_y_pos(a4)),
+              move.w(0x100.toWord.i, dest_x_pos(a4)),
+              move.w(0x50.toWord.i, dest_y_pos(a4)),
+              move.w(FacingDir_Down.i, facing_dir(a4)),
+              move.l(a4, -sp),
+              jsr(Label('Field_UpdateObjects').l),
+              jsr(Label('UpdateCameraXPosFG').l),
+              jsr(Label('UpdateCameraYPosFG').l),
+              jsr(Label('UpdateCameraXPosBG').l),
+              jsr(Label('UpdateCameraYPosBG').l),
+              move.l(sp.postInc(), a4),
+            ]));
+      }, skip: 'not optimized yet; will redundantly load script routine');
+
+      test('one unscriptable object position and facing', () {
+        var moves = InstantMoves()
+          ..move(MapObjectById(testnpc.id),
+              to: Position(0x100, 0x50), face: down);
+        var asm = generate([moves], inMap: map);
+        expect(
+            asm,
+            Asm([
+              testnpc.toA4(testMemory),
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(0x100.toWord.i, curr_x_pos(a4)),
+              move.w(0x50.toWord.i, curr_y_pos(a4)),
+              move.w(0x100.toWord.i, dest_x_pos(a4)),
+              move.w(0x50.toWord.i, dest_y_pos(a4)),
+              move.w(FacingDir_Down.i, facing_dir(a4)),
+              move.l(a4, -sp),
+              jsr(Label('Field_UpdateObjects').l),
+              jsr(Label('UpdateCameraXPosFG').l),
+              jsr(Label('UpdateCameraYPosFG').l),
+              jsr(Label('UpdateCameraXPosBG').l),
+              jsr(Label('UpdateCameraYPosBG').l),
+              move.l(sp.postInc(), a4),
+            ]));
+      });
+    });
+
     test('multiple object positions', () {
       var moves = InstantMoves()
         ..move(alys, to: Position(0x100, 0x50))

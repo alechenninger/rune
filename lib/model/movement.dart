@@ -424,7 +424,7 @@ class MapObjectById extends FieldObject {
   MapObject resolve(EventState state) {
     var map = state.currentMap;
     if (map == null) {
-      throw ResolveException('got field obj in map, but map was null');
+      throw ResolveException('got field obj in map, but current map was null');
     }
     var obj = inMap(map);
     if (obj == null) {
