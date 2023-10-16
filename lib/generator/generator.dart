@@ -592,6 +592,8 @@ class SceneAsmGenerator implements EventVisitor {
         else
           jsr(Label('Event_StepObjectNoAnimate').l),
         if (step.onTop) clr.b(5(a4)),
+        move.w(curr_x_pos(a4), dest_x_pos(a4)),
+        move.w(curr_y_pos(a4), dest_y_pos(a4)),
       ]);
     });
   }
@@ -946,9 +948,7 @@ class SceneAsmGenerator implements EventVisitor {
       var wasFieldShown = _memory.isFieldShown;
       var needsRefresh = _memory.isMapInCram != true ||
           _memory.isMapInVram != true ||
-          _memory.isDialogInCram !=
-              true; // todo: not sure if this one is needed
-      // i think pal init is only loaded on palfadeout
+          _memory.isDialogInCram != true;
       var panelsShown = _memory.panelsShown;
 
       _memory.isDisplayEnabled = true;
@@ -1026,6 +1026,7 @@ class SceneAsmGenerator implements EventVisitor {
 
     _memory.isMapInCram = true;
     _memory.isMapInVram = true;
+    _memory.isDialogInCram = true;
   }
 
   @override
