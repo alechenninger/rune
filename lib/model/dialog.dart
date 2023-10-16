@@ -246,6 +246,7 @@ abstract mixin class Speaker {
     Baker,
     Pana,
     Dorin,
+    Seed,
   ];
 
   static final Map<String, Speaker> _byName = allSpeakers.groupFoldBy(
@@ -263,6 +264,7 @@ abstract mixin class Speaker {
   static final Baker = NpcSpeaker(Portrait.Baker, "Baker");
   static final Pana = NpcSpeaker(Portrait.Pana, "Pana");
   static final Dorin = NpcSpeaker(Portrait.Dorin, "Dorin");
+  static final Seed = NoPortraitSpeaker('Seed');
 
   @override
   String toString() => name;
@@ -285,6 +287,15 @@ class UnnamedSpeaker with Speaker {
 
   @override
   int get hashCode => name.hashCode;
+}
+
+class NoPortraitSpeaker with Speaker {
+  @override
+  final portrait = null;
+  @override
+  final String name;
+
+  NoPortraitSpeaker(this.name);
 }
 
 class NpcSpeaker with Speaker {
