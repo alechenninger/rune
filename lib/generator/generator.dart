@@ -566,10 +566,11 @@ class SceneAsmGenerator implements EventVisitor {
       var x = (step.stepPerFrame.x * (1 << 4 * 4)).truncate();
       var y = (step.stepPerFrame.y * (1 << 4 * 4)).truncate();
 
-      var current = _memory.positions[alys];
+      var current = _memory.positions[step.object];
       if (current != null) {
         var totalSteps = (step.stepPerFrame * step.frames).truncate();
-        _memory.positions[alys] = current + Position.fromPoint(totalSteps);
+        _memory.positions[step.object] =
+            current + Position.fromPoint(totalSteps);
       }
 
       return Asm([

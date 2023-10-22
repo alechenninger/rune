@@ -668,6 +668,8 @@ EventFlag_Test001 = $01'''));
             move.l(0xffff8000.toLongword.i, d1),
             moveq(7.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
+            move.w(curr_x_pos(a4), dest_x_pos(a4)),
+            move.w(curr_y_pos(a4), dest_y_pos(a4)),
           ]));
     });
 
@@ -686,6 +688,8 @@ EventFlag_Test001 = $01'''));
             move.l(0x00008000.toLongword.i, d1),
             moveq(7.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
+            move.w(curr_x_pos(a4), dest_x_pos(a4)),
+            move.w(curr_y_pos(a4), dest_y_pos(a4)),
           ]));
     });
 
@@ -704,17 +708,19 @@ EventFlag_Test001 = $01'''));
             move.l(0x00010000.toLongword.i, d1),
             moveq(7.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
+            move.w(curr_x_pos(a4), dest_x_pos(a4)),
+            move.w(curr_y_pos(a4), dest_y_pos(a4)),
           ]));
     });
 
     test('sets new position of object if known', () {
       var scene = Scene([
-        SetContext((ctx) => ctx.positions[alys] = Position(0x100, 0x100)),
-        StepObject(alys, stepPerFrame: Point(0x1, 0), frames: 0x10),
-        // Alys should now be at 0x110, 0x100
+        SetContext((ctx) => ctx.positions[shay] = Position(0x100, 0x100)),
+        StepObject(shay, stepPerFrame: Point(0x1, 0), frames: 0x10),
+        // Shay should now be at 0x110, 0x100
         IndividualMoves()
-          ..moves[alys] = (StepPath()
-            ..distance = 1.step
+          ..moves[shay] = (StepPath()
+            ..distance = 2.step
             ..direction = down)
       ]);
 
@@ -722,7 +728,7 @@ EventFlag_Test001 = $01'''));
       var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
 
       expect(asm.event.withoutComments().tail(3).head(2),
-          Asm([move.w(0x110.toWord.i, d0), move.w(0x110.toWord.i, d1)]));
+          Asm([move.w(0x110.toWord.i, d0), move.w(0x120.toWord.i, d1)]));
     });
 
     test('does not set position for object if not known', () {
