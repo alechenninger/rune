@@ -294,6 +294,11 @@ class _Positions implements Positions {
   void forEach(Function(FieldObject obj, Position pos) func) {
     _memory._eventState.positions.forEach(func);
   }
+
+  @override
+  void clear() {
+    _memory._eventState.positions.clear();
+  }
 }
 
 class _Slots implements Slots {

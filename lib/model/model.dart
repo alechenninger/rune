@@ -293,6 +293,10 @@ class Positions {
 
   Positions._(this._ctx);
 
+  void clear() {
+    _positions.clear();
+  }
+
   void addAll(Positions p) {
     _positions.addAll(p._positions);
   }
@@ -322,6 +326,8 @@ class Positions {
 class Slots {
   /// 1-indexed (first is 1; 0 is invalid)
   final _slots = BiMap<int, Character>();
+
+  static const all = [1, 2, 3, 4, 5];
 
   Slots._();
 

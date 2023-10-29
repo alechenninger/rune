@@ -1036,13 +1036,15 @@ class SceneAsmGenerator implements EventVisitor {
 
     var currentMap = _memory.currentMap;
     var newMap = loadMap.map;
+    var startPos = loadMap.startingPosition;
+    var arrangement = loadMap.arrangement;
+    var facing = loadMap.facing;
 
     var currentId = currentMap?.map((m) => mapIdToAsm(m.id));
     var newId = mapIdToAsm(newMap.id);
-    var x = loadMap.startingPosition.x ~/ 8;
-    var y = loadMap.startingPosition.y ~/ 8;
-    var facing = loadMap.facing.constant;
-    var alignByte = loadMap.arrangement.toAsm;
+    var x = startPos.x ~/ 8;
+    var y = startPos.y ~/ 8;
+    var alignByte = arrangement.toAsm;
 
     _addToEvent(loadMap, (eventIndex) {
       if (loadMap.showField) {
@@ -1063,7 +1065,7 @@ class SceneAsmGenerator implements EventVisitor {
           from: currentId?.i,
           startX: x.i,
           startY: y.i,
-          facingDir: facing.i,
+          facingDir: facing.constant.i,
           partyArrangement: alignByte.i);
     });
 
@@ -1079,6 +1081,18 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.isMapInCram = true;
     _memory.isDialogInCram = true;
     _memory.isMapInVram = true;
+
+    // Due to new map, clear known positions.
+    //TODO: _memory.clearAllFacing();
+    _memory.positions.clear();
+
+    // If party slots are known, reposition party in memory using
+    // the new position and arrangement.
+    for (var i = 1; i < 5; i++) {
+      if (_memory.slots[i] case Character c) {
+        _memory.positions[c] = arrangement.offsets[i - 1] + startPos;
+      }
+    }
   }
 
   @override
@@ -1347,16 +1361,20 @@ class SceneAsmGenerator implements EventVisitor {
       }
 
       var newParty = changeParty.party;
+      _memory.setSlot(1, newParty.first);
 
       Expression firstFourSlots = newParty.first.charId << 24.toValue;
       Expression fifthSlot = 0xFF.toByte;
 
       for (var i = 1; i < newParty.length; i++) {
+        var member = newParty[i];
+        // TODO: technically this doesn't take affect right away i don't think
+        _memory.setSlot(i, member);
         if (i < 4) {
           firstFourSlots =
-              firstFourSlots | (newParty[i].charId << (24 - (i * 8)).toValue);
+              firstFourSlots | (member.charId << (24 - (i * 8)).toValue);
         } else {
-          fifthSlot = newParty[i].charId;
+          fifthSlot = member.charId;
         }
       }
 
@@ -1374,7 +1392,14 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void restoreSavedParty(RestoreSavedParty restoreParty) {
     _checkNotFinished();
-    _addToEvent(restoreParty, (_) => restoreSavedPartySlots());
+    _addToEvent(restoreParty, (_) {
+      _memory.clearSlot(1);
+      _memory.clearSlot(2);
+      _memory.clearSlot(3);
+      _memory.clearSlot(4);
+      _memory.clearSlot(5);
+      return restoreSavedPartySlots();
+    });
   }
 
   @override
