@@ -450,6 +450,44 @@ void main() {
 
       print(moves.generateAsm(AsmGenerator(), AsmContext.forEvent(ctx)));
     });
+
+    test('all party members', () {
+      var move = RelativePartyMove(StepPaths()
+        ..step(StepPath()
+          ..direction = up
+          ..distance = 9.steps));
+
+      var ctx = EventState()
+        ..addCharacter(alys,
+            slot: 1, position: Position(10 * 16, 10 * 16), facing: up)
+        ..addCharacter(shay,
+            slot: 2, position: Position(10 * 16, 11 * 16), facing: up)
+        ..addCharacter(hahn,
+            slot: 3, position: Position(10 * 16, 12 * 16), facing: up)
+        ..addCharacter(gryz,
+            slot: 4, position: Position(10 * 16, 13 * 16), facing: up)
+        ..addCharacter(rune,
+            slot: 5, position: Position(10 * 16, 14 * 16), facing: up);
+
+      expect(
+          move.toIndividualMoves(ctx),
+          IndividualMoves()
+            ..moves[Slot(1)] = (StepPath()
+              ..direction = up
+              ..distance = 9.steps)
+            ..moves[Slot(2)] = (StepPath()
+              ..direction = up
+              ..distance = 9.steps)
+            ..moves[Slot(3)] = (StepPath()
+              ..direction = up
+              ..distance = 9.steps)
+            ..moves[Slot(4)] = (StepPath()
+              ..direction = up
+              ..distance = 9.steps)
+            ..moves[Slot(5)] = (StepPath()
+              ..direction = up
+              ..distance = 9.steps));
+    });
   });
 
   group('animation', () {

@@ -641,7 +641,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void partyMove(RelativePartyMove move) {
-    _addToEvent(move, (i) => move.toIndividualMoves(_memory).toAsm(_memory));
+    _addToEvent(move,
+        (i) => move.toIndividualMoves(_memory).toAsm(_memory, eventIndex: i));
   }
 
   @override
@@ -1369,7 +1370,7 @@ class SceneAsmGenerator implements EventVisitor {
       for (var i = 1; i < newParty.length; i++) {
         var member = newParty[i];
         // TODO: technically this doesn't take affect right away i don't think
-        _memory.setSlot(i, member);
+        _memory.setSlot(i + 1, member);
         if (i < 4) {
           firstFourSlots =
               firstFourSlots | (member.charId << (24 - (i * 8)).toValue);

@@ -1432,6 +1432,60 @@ loc_742A4:
           ]));
     });
 
+    test('sets slot memory', () {
+      var scene = Scene([
+        ChangeParty([rune, alys, hahn, wren, raja], saveCurrentParty: false),
+        SetContext((ctx) {
+          ctx.positions[rune] = Position(0x100, 0x110);
+          ctx.positions[alys] = Position(0x100, 0x120);
+          ctx.positions[hahn] = Position(0x100, 0x130);
+          ctx.positions[wren] = Position(0x100, 0x140);
+          ctx.positions[raja] = Position(0x100, 0x150);
+        }),
+        RelativePartyMove(StepPath()
+          ..distance = 1.step
+          ..direction = up),
+      ]);
+
+      var asm = Program()
+          .addScene(SceneId('testscene'), scene, startingMap: map)
+          .event
+          .withoutComments();
+
+      var expected = Program()
+          .addScene(
+              SceneId('testscene'),
+              Scene([
+                SetContext((ctx) {
+                  ctx.positions[Slot(1)] = Position(0x100, 0x110);
+                  ctx.positions[Slot(2)] = Position(0x100, 0x120);
+                  ctx.positions[Slot(3)] = Position(0x100, 0x130);
+                  ctx.positions[Slot(4)] = Position(0x100, 0x140);
+                  ctx.positions[Slot(5)] = Position(0x100, 0x150);
+                }),
+                IndividualMoves()
+                  ..moves[Slot(1)] = (StepPath()
+                    ..distance = 1.step
+                    ..direction = up)
+                  ..moves[Slot(2)] = (StepPath()
+                    ..distance = 1.step
+                    ..direction = up)
+                  ..moves[Slot(3)] = (StepPath()
+                    ..distance = 1.step
+                    ..direction = up)
+                  ..moves[Slot(4)] = (StepPath()
+                    ..distance = 1.step
+                    ..direction = up)
+                  ..moves[Slot(5)] = (StepPath()
+                    ..distance = 1.step
+                    ..direction = up)
+              ]))
+          .event
+          .withoutComments();
+
+      expect(asm.tail(expected.length), expected);
+    });
+
     test('saves before changing if requested', () {
       var scene = Scene([
         ChangeParty([rune, alys, hahn, wren, raja], saveCurrentParty: true),
