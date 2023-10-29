@@ -153,12 +153,16 @@ class FacePlayer extends Event {
 /// The party follows the leader
 class RelativePartyMove extends Event {
   RelativeMovement movement;
+  StepSpeed? speed;
   Axis startingAxis = Axis.x;
 
   RelativePartyMove(this.movement);
 
   IndividualMoves toIndividualMoves(EventState ctx) {
     var individual = IndividualMoves();
+    if (speed case StepSpeed s) {
+      individual.speed = s;
+    }
     individual.moves[Slot(1)] = movement;
 
     var positions = <int, Position>{};
@@ -236,6 +240,19 @@ class RelativePartyMove extends Event {
   String toString() {
     return 'PartyMove{movement: $movement, startingAxis: $startingAxis}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RelativePartyMove &&
+          runtimeType == other.runtimeType &&
+          movement == other.movement &&
+          speed == other.speed &&
+          startingAxis == other.startingAxis;
+
+  @override
+  int get hashCode =>
+      movement.hashCode ^ speed.hashCode ^ startingAxis.hashCode;
 }
 
 /// A group of parallel, relative movements
@@ -981,11 +998,41 @@ enum StepSpeed {
 }
 
 enum PartyArrangement {
-  overlapping,
-  belowLead,
-  aboveLead,
-  leftOfLead,
-  rightOfLead;
+  overlapping([
+    Position(0, 0),
+    Position(0, 0),
+    Position(0, 0),
+    Position(0, 0),
+    Position(0, 0)
+  ]),
+  belowLead([
+    Position(0, 0),
+    Position(0, 1 * unitsPerStep),
+    Position(0, 2 * unitsPerStep),
+    Position(0, 3 * unitsPerStep),
+    Position(0, 4 * unitsPerStep)
+  ]),
+  aboveLead([
+    Position(0, 0),
+    Position(0, -1 * unitsPerStep),
+    Position(0, -2 * unitsPerStep),
+    Position(0, -3 * unitsPerStep),
+    Position(0, -4 * unitsPerStep)
+  ]),
+  leftOfLead([
+    Position(0, 0),
+    Position(-1 * unitsPerStep, 0),
+    Position(-2 * unitsPerStep, 0),
+    Position(-3 * unitsPerStep, 0),
+    Position(-4 * unitsPerStep, 0)
+  ]),
+  rightOfLead([
+    Position(0, 0),
+    Position(1 * unitsPerStep, 0),
+    Position(2 * unitsPerStep, 0),
+    Position(3 * unitsPerStep, 0),
+    Position(4 * unitsPerStep, 0)
+  ]);
 
   static PartyArrangement behind(Direction facing) {
     switch (facing) {
@@ -999,6 +1046,10 @@ enum PartyArrangement {
         return leftOfLead;
     }
   }
+
+  final List<Position> offsets;
+
+  const PartyArrangement(this.offsets);
 }
 
 class Face extends RelativeMovement {

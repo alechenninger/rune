@@ -257,6 +257,34 @@ void main() {
               ..distance = 3.steps));
     });
 
+    test('characters follow leader with move speed', () {
+      var ctx = EventState()
+        ..addCharacter(alys,
+            slot: 1,
+            position: Position(1.steps.toPixels, 2.steps.toPixels),
+            facing: right)
+        ..addCharacter(shay,
+            slot: 2, position: Position(0, 2.steps.toPixels), facing: right);
+
+      var move = RelativePartyMove(StepPath()
+        ..direction = right
+        ..distance = 3.steps)
+        ..speed = StepSpeed.walk;
+
+      var moves = move.toIndividualMoves(ctx);
+
+      expect(
+          moves,
+          IndividualMoves()
+            ..speed = StepSpeed.walk
+            ..moves[Slot(1)] = (StepPath()
+              ..direction = right
+              ..distance = 3.steps)
+            ..moves[Slot(2)] = (StepPath()
+              ..direction = right
+              ..distance = 3.steps));
+    });
+
     test('characters follow leader in multiple directions', () {
       var ctx = EventState()
         ..addCharacter(alys,
