@@ -531,6 +531,60 @@ void main() {
               jsr(Label('Event_UpdateObjFacing').l),
             ]));
       });
+
+      test('mix of move, delay, facing single object', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[rune] = Position(0x100, 0x100);
+          }),
+          IndividualMoves()
+            ..moves[rune] = (StepPaths()
+              ..step(StepPath()
+                ..distance = 2.steps
+                ..direction = Direction.right)
+              ..face(Direction.up)
+              ..step(StepPath()
+                ..delay = 2.steps
+                ..distance = 3.steps
+                ..direction = Direction.left)
+              ..face(Direction.up)
+              ..step(StepPath()
+                ..delay = 2.steps
+                ..distance = 1.step
+                ..direction = Direction.right)
+              ..face(Direction.up))
+        ]);
+
+        var asm =
+            Program().addScene(SceneId('test'), scene).event.withoutComments();
+
+        expect(
+            asm,
+            Asm([
+              bset(0.toByte.i, Char_Move_Flags.w),
+              moveq(rune.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(0x120.toWord.i, d0),
+              move.w(0x100.toWord.i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              moveq(FacingDir_Up.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+              move.w(0x10.toWord.i, d0),
+              jsr(Label('DoMapUpdateLoop').l),
+              move.w(0x0F0.toWord.i, d0),
+              move.w(0x100.toWord.i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              moveq(FacingDir_Up.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+              move.w(0x10.toWord.i, d0),
+              jsr(Label('DoMapUpdateLoop').l),
+              move.w(0x100.toWord.i, d0),
+              move.w(0x100.toWord.i, d1),
+              jsr(Label('Event_MoveCharacter').l),
+              moveq(FacingDir_Up.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+            ]));
+      });
     });
 
     group('npcs', () {

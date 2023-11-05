@@ -143,9 +143,9 @@ extension IndividualMovesToAsm on IndividualMoves {
                     mem: ctx)));
           } else {
             var facing = movement.facing;
-            if (movement.distance == 0.steps &&
-                facing != null &&
-                facing != ctx.getFacing(moveable)) {
+            if (facing != null &&
+                facing != ctx.getFacing(moveable) &&
+                movement.continuousPaths.first.length == 0.steps) {
               generator.updateFacing(moveable, facing, i);
             }
           }
