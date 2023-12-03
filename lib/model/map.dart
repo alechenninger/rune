@@ -1099,7 +1099,7 @@ abstract class InteractiveMapObjectSpec extends MapObjectSpec
     with Interactive<InteractiveMapObjectSpec> {}
 
 /// Spec for class of behaviors with interchangeable sprites.
-class Npc extends MapObjectSpec {
+class Npc<T extends NpcBehavior> extends MapObjectSpec {
   final Sprite sprite;
   final NpcBehavior behavior;
 
@@ -1127,7 +1127,7 @@ class Npc extends MapObjectSpec {
   int get hashCode => sprite.hashCode ^ behavior.hashCode;
 }
 
-class InteractiveNpc extends Npc implements InteractiveMapObjectSpec {
+class InteractiveNpc<T extends NpcBehavior> extends Npc<T> implements InteractiveMapObjectSpec {
   @override
   InteractiveNpcBehavior get behavior =>
       super.behavior as InteractiveNpcBehavior;

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' as iterables;
 import 'package:rune/generator/movement.dart';
@@ -110,133 +111,6 @@ final _objectIndexOffsets = <MapId, int>{};
 final _spriteArtLabels = BiMap<Sprite, Label>()
   ..addAll(Sprite.wellKnown.groupFoldBy(
       (sprite) => sprite, (previous, sprite) => Label('Art_${sprite.name}')));
-
-// todo: can use field objects jmp tbl in objects.dart now
-final _mapObjectSpecRoutines = {
-  AlysWaiting: FieldRoutine(Word('68'.hex), Label('FieldObj_NPCAlysPiata'),
-      SpecFactory((_) => AlysWaiting())),
-  AiedoShopperWithBags: FieldRoutine(Word(0x138), Label('loc_490B8'),
-      SpecFactory((d) => AiedoShopperWithBags(d))),
-  AiedoShopperMom: FieldRoutine(
-      Word(0x13C), Label('loc_49128'), SpecFactory((_) => AiedoShopperMom())),
-  Elevator: FieldRoutine(
-      Word(0x120), Label('FieldObj_Elevator'), SpecFactory((d) => Elevator(d))),
-  InvisibleBlock: FieldRoutine(Word(0x74), Label('FieldObj_InvisibleBlock'),
-      SpecFactory((_) => InvisibleBlock())),
-};
-
-// TODO(generation): it would be nice if we could describe mapping needs
-//  for routines without having to create model objects
-// After creating the parser, the high level model is less useful.
-// Kinda just boilerplate.
-final _npcBehaviorRoutines = {
-  FaceDown: FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDown()))),
-  FaceDownSimpleSprite: FieldRoutine(
-      Word(0x134),
-      Label('FieldObj_Pana'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDownSimpleSprite()),
-          spriteMappingTiles: 18)),
-  WanderAround: FieldRoutine(Word('3C'.hex), Label('FieldObj_NPCType2'),
-      SpecFactory.npc((s, d) => Npc(s, WanderAround(d)))),
-  SlowlyWanderAround: FieldRoutine(Word('40'.hex), Label('FieldObj_NPCType3'),
-      SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)))),
-  FaceDownLegsHiddenNonInteractive: FieldRoutine(
-      Word(0x140),
-      Label('loc_49502'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNonInteractive()),
-          spriteMappingTiles: 8)),
-  FaceDownOrUpLegsHidden: FieldRoutine(
-      Word(0x108),
-      Label('FieldObj_NPCType32'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDownOrUpLegsHidden()),
-          spriteMappingTiles: 0x38)),
-  FixedFaceRight: FieldRoutine(
-      Word(0x14C),
-      Label('loc_49502'),
-      SpecFactory.npc((s, _) => Npc(s, FixedFaceRight()),
-          spriteMappingTiles: 8)),
-};
-
-abstract class SpecFactory {
-  bool get requiresSprite;
-
-  /// How many VRAM tiles are needed by this routine, if [requiresSprite].
-  ///
-  /// If [requiresSprite] is [false], returns null.
-  int? get spriteMappingTiles;
-  MapObjectSpec call(Sprite? sprite, Direction facing);
-
-  factory SpecFactory.npc(
-      MapObjectSpec Function(Sprite sprite, Direction facing) factory,
-      {int spriteMappingTiles = _defaultVramTilesPerSprite}) {
-    return _NpcFactory(factory, spriteMappingTiles);
-  }
-
-  factory SpecFactory(MapObjectSpec Function(Direction facing) factory) {
-    return _SpecFactory(factory);
-  }
-}
-
-class _NpcFactory implements SpecFactory {
-  @override
-  final requiresSprite = true;
-  @override
-  final int spriteMappingTiles;
-  final MapObjectSpec Function(Sprite sprite, Direction facing) _factory;
-  _NpcFactory(this._factory, this.spriteMappingTiles);
-  @override
-  MapObjectSpec call(Sprite? sprite, Direction facing) =>
-      _factory(sprite!, facing);
-}
-
-class _SpecFactory implements SpecFactory {
-  @override
-  final requiresSprite = false;
-  @override
-  final spriteMappingTiles = null;
-  final MapObjectSpec Function(Direction facing) _factory;
-  _SpecFactory(this._factory);
-  @override
-  MapObjectSpec call(Sprite? sprite, Direction facing) => _factory(facing);
-}
-
-final _specFactories = _buildSpecFactories();
-
-Map<Word, SpecFactory> _buildSpecFactories() {
-  var factories = <Word, SpecFactory>{};
-  for (var routine in [
-    ..._mapObjectSpecRoutines.values,
-    ..._npcBehaviorRoutines.values
-  ]) {
-    factories[routine.index] = routine.factory;
-  }
-  return factories;
-}
-
-class FieldRoutine {
-  final Word index;
-  final Label label;
-  final SpecFactory factory;
-
-  const FieldRoutine(this.index, this.label, this.factory);
-
-  @override
-  String toString() {
-    return 'FieldRoutine{index: $index, label: $label}';
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FieldRoutine &&
-          runtimeType == other.runtimeType &&
-          index == other.index &&
-          label == other.label;
-
-  @override
-  int get hashCode => index.hashCode ^ label.hashCode;
-}
 
 MapAsm compileMap(
     GameMap map, EventRoutines eventRoutines, Word? spriteVramOffset,
@@ -349,6 +223,8 @@ Map<MapObjectId, Word> _compileMapSpriteData(
     mappings
   - Sprites may be loaded into RAM first (VRAM lazily), and objects still need
     to pick a VRAM tile for when the graphics are loaded
+  - Mappings are loaded separately from sprites, but sprites are only 
+    compatible with certain mappings. Many are compatible, though.
   
   This also assumes lazily loaded sprites are not configurable.
   If they were, we'd need to know:
@@ -364,7 +240,7 @@ Map<MapObjectId, Word> _compileMapSpriteData(
     switch (spec) {
       case Npc spec:
         // todo: factor this into function
-        var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
+        var routine = _fieldRoutines.bySpec(spec);
         if (routine == null) {
           throw Exception(
               'no routine configured for npc behavior ${spec.behavior}');
@@ -373,7 +249,7 @@ Map<MapObjectId, Word> _compileMapSpriteData(
         // try the sprite name as a label itself if not preconfigured
         maybeLbl = _spriteArtLabels[spec.sprite] ?? Label(spec.sprite.name);
 
-        var tiles = routine.factory.spriteMappingTiles!;
+        var tiles = routine.spriteMappingTiles;
 
         // Bit of a hack for this one sprite;
         // can clean it up if it turns out other sprites need similar treatment
@@ -390,11 +266,11 @@ Map<MapObjectId, Word> _compileMapSpriteData(
         if (maybeLbl != null) {
           // Get custom vram tile width if known for this routine,
           // even though it's not specified in the model.
-          var factory = _specFactories[spec.routine];
-          var tiles = factory?.spriteMappingTiles;
-          var spriteMapping = tiles == null
-              ? _SpriteVramMapping.defaults()
-              : _SpriteVramMapping(tiles);
+
+          var spriteMapping = switch (_fieldRoutines.bySpec(spec)) {
+            null => _SpriteVramMapping.defaults(),
+            var r => _SpriteVramMapping(r.spriteMappingTiles),
+          };
 
           vramMapping.update(
               maybeLbl, (current) => current.merge(spriteMapping),
@@ -558,7 +434,7 @@ void _compileMapObjectData(
     // (rather than using these maps)
     // input spec, output is routine. same is true for asmspec too actually
     case Npc():
-      var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
+      var routine = _fieldRoutines.bySpec(spec);
 
       if (routine == null) {
         throw Exception(
@@ -573,7 +449,7 @@ void _compileMapObjectData(
 
       break;
     default:
-      var routine = _mapObjectSpecRoutines[spec.runtimeType];
+      var routine = _fieldRoutines.bySpec(spec);
 
       if (routine == null) {
         throw Exception('no routine configured for spec $spec');
@@ -631,7 +507,7 @@ void _compileMapAreaData(Asm asm, MapArea area, EventFlags eventFlags,
         Byte(7), // Interaction_DisplayDialogueGrandCross
         dialogId,
       ]));
-      
+
       break;
   }
 
@@ -642,24 +518,28 @@ extension ObjectRoutine on MapObject {
   FieldRoutine get routine {
     var spec = this.spec;
 
-    if (spec is AsmSpec) {
-      var index = spec.routine;
-      var label = labelOfFieldObjectRoutine(index);
-      if (label == null) {
-        throw Exception('invalid field object routine index: $index');
-      }
-      var factory = SpecFactory((d) =>
-          AsmSpec(artLabel: spec.artLabel, routine: index, startFacing: d));
-      return FieldRoutine(index, label, factory);
-    } else {
-      var routine = spec is Npc
-          ? _npcBehaviorRoutines[spec.behavior.runtimeType]
-          : _mapObjectSpecRoutines[spec.runtimeType];
-      if (routine == null) {
-        throw Exception('no routine configured for spec $spec');
-      }
-      return routine;
+    var routine = _fieldRoutines.bySpec(spec);
+    if (routine == null) {
+      throw Exception('no routine configured for spec $spec');
     }
+    return routine;
+
+    // if (spec is AsmSpec) {
+    //   var index = spec.routine;
+    //   var label = labelOfFieldObjectRoutine(index);
+    //   if (label == null) {
+    //     throw Exception('invalid field object routine index: $index');
+    //   }
+    //   var factory = SpecFactory((d) =>
+    //       AsmSpec(artLabel: spec.artLabel, routine: index, startFacing: d));
+    //   return FieldRoutine(index, label, factory);
+    // } else {
+    //   var routine = _fieldRoutines.bySpec(spec);
+    //   if (routine == null) {
+    //     throw Exception('no routine configured for spec $spec');
+    //   }
+    //   return routine;
+    // }
   }
 }
 
@@ -1012,16 +892,18 @@ List<_AsmObject> _readObjects(ConstantReader reader, Map<Word, Label> sprites) {
     var x = reader.readWord();
     var y = reader.readWord();
 
-    var spec = _specFactories[routineOrTerminate];
+    // var spec = _specFactories[routineOrTerminate];
+    var spec = _fieldRoutines.byOffset(routineOrTerminate)?.factory;
 
     if (spec == null) {
       // In this case, we don't have this routine incorporated in the model
       // So populate the model with an escape hatch: raw ASM
       // We can decide to model in later if needed
 
-      var spriteLbl = sprites[vramTile];
-      spec = SpecFactory((d) => AsmSpec(
-          artLabel: spriteLbl, routine: routineOrTerminate, startFacing: d));
+      // var spriteLbl = sprites[vramTile];
+      // spec = SpecFactory((d) => AsmSpec(
+      //     artLabel: spriteLbl, routine: routineOrTerminate, startFacing: d));
+      throw 'todo?';
     }
 
     var position = Position(x.value * 8, y.value * 8);
@@ -1080,14 +962,14 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
     var object = MapObject(
         id: '${mapId.name}_$i', startPosition: asm.position, spec: spec);
 
-    if (spec is Interactive) {
+    if (spec case Interactive s) {
       var scene = scenesById.putIfAbsent(
           asm.dialogId,
           // todo: if shared scene, default speaker may be misleading
           // but maybe better than nothing
           () => toScene(asm.dialogId.value, dialogTree,
               defaultSpeaker: object, isObjectInteraction: true));
-      (spec as Interactive).onInteract = scene;
+      s.onInteract = scene;
     }
 
     return object;
@@ -1208,3 +1090,264 @@ final _fallbackMapIdsByLabel = {
   Label('Map_AcademyBasement_B1'): MapId.PiataAcademyBasementB1,
   Label('Map_AcademyBasement_B2'): MapId.PiataAcademyBasementB2,
 };
+
+// TODO: make injectable in Program API for testing
+// TODO(generation): it would be nice if we could describe mapping needs
+//  for routines without having to create model objects
+// After creating the parser, the high level model is less useful.
+// Kinda just boilerplate.
+final _fieldRoutines = _FieldRoutineRepository([
+  FieldRoutine(Word('68'.hex), Label('FieldObj_NPCAlysPiata'),
+      SpecFactory((_) => AlysWaiting(), forSpec: AlysWaiting)),
+  FieldRoutine(
+      Word(0x138),
+      Label('loc_490B8'),
+      SpecFactory((d) => AiedoShopperWithBags(d),
+          forSpec: AiedoShopperWithBags)),
+  FieldRoutine(Word(0x13C), Label('loc_49128'),
+      SpecFactory((_) => AiedoShopperMom(), forSpec: AiedoShopperMom)),
+  FieldRoutine(Word(0x120), Label('FieldObj_Elevator'),
+      SpecFactory((d) => Elevator(d), forSpec: Elevator)),
+  FieldRoutine(
+      Word(0x74),
+      Label('FieldObj_InvisibleBlock'),
+      spriteMappingTiles: 0,
+      SpecFactory((_) => InvisibleBlock(), forSpec: InvisibleBlock)),
+  FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1'),
+      SpecFactory.npc((s, _) => Npc(s, FaceDown()), forBehavior: FaceDown)),
+  FieldRoutine(
+      Word(0x134),
+      Label('FieldObj_Pana'),
+      spriteMappingTiles: 18,
+      SpecFactory.npc((s, _) => Npc(s, FaceDownSimpleSprite()),
+          forBehavior: FaceDownSimpleSprite)),
+  FieldRoutine(
+      Word('3C'.hex),
+      Label('FieldObj_NPCType2'),
+      SpecFactory.npc((s, d) => Npc(s, WanderAround(d)),
+          forBehavior: WanderAround)),
+  FieldRoutine(
+      Word('40'.hex),
+      Label('FieldObj_NPCType3'),
+      SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)),
+          forBehavior: SlowlyWanderAround)),
+  FieldRoutine(
+      Word(0x140),
+      Label('loc_49502'),
+      spriteMappingTiles: 8,
+      SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNonInteractive()),
+          forBehavior: FaceDownLegsHiddenNonInteractive)),
+  FieldRoutine(
+      Word(0x108),
+      Label('FieldObj_NPCType32'),
+      spriteMappingTiles: 0x38,
+      SpecFactory.npc((s, _) => Npc(s, FaceDownOrUpLegsHidden()),
+          forBehavior: FaceDownOrUpLegsHidden)),
+  FieldRoutine(
+      Word(0x14C),
+      Label('loc_49502'),
+      spriteMappingTiles: 8,
+      SpecFactory.npc((s, _) => Npc(s, FixedFaceRight()),
+          forBehavior: FixedFaceRight)),
+]);
+
+class _FieldRoutineRepository {
+  final Map<Word, FieldRoutine> _byIndex;
+  final Map<Label, FieldRoutine> _byLabel;
+  final Map<SpecModel, FieldRoutine> _byModel;
+
+  _FieldRoutineRepository(Iterable<FieldRoutine> routines)
+      : _byIndex = {for (var r in routines) r.index: r},
+        _byLabel = {for (var r in routines) r.label: r},
+        _byModel = {for (var r in routines) r.factory.routineModel: r};
+
+  FieldRoutine? byOffset(Word offset) {
+    return _byIndex[offset] ??
+        FieldRoutine(
+            offset,
+            labelOfFieldObjectRoutine(offset)!,
+            SpecFactory.asm((s, d) =>
+                AsmSpec(artLabel: s, routine: offset, startFacing: d)));
+  }
+
+  FieldRoutine? byLabel(Label label) {
+    var index = indexOfFieldObjectRoutine(label)!;
+    return _byLabel[label] ??
+        FieldRoutine(
+            index,
+            label,
+            SpecFactory.asm((s, d) =>
+                AsmSpec(artLabel: s, routine: index, startFacing: d)));
+  }
+
+  FieldRoutine? bySpec(MapObjectSpec spec) {
+    switch (spec) {
+      case AsmSpec():
+        return byOffset(spec.routine);
+      case Npc():
+        return _byModel[NpcRoutineModel(spec.behavior.runtimeType)];
+      default:
+        return _byModel[SpecRoutineModel(spec.runtimeType)];
+    }
+  }
+}
+
+sealed class SpecModel {}
+
+class NpcRoutineModel extends SpecModel {
+  final Type behaviorType;
+
+  NpcRoutineModel(this.behaviorType);
+
+  @override
+  String toString() {
+    return 'NpcRoutineModel{$behaviorType}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NpcRoutineModel &&
+          runtimeType == other.runtimeType &&
+          behaviorType == other.behaviorType;
+
+  @override
+  int get hashCode => behaviorType.hashCode;
+}
+
+class SpecRoutineModel extends SpecModel {
+  final Type specType;
+
+  SpecRoutineModel(this.specType);
+
+  @override
+  String toString() {
+    return 'SpecRoutineModel{$specType}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SpecRoutineModel &&
+          runtimeType == other.runtimeType &&
+          specType == other.specType;
+
+  @override
+  int get hashCode => specType.hashCode;
+}
+
+class AsmRoutineModel extends SpecModel {
+  AsmRoutineModel();
+
+  @override
+  String toString() {
+    return 'AsmRoutineModel{}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsmRoutineModel && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+}
+
+/// Used to parse the ASM into the model
+/// as well as store necessary information for generation.
+abstract class SpecFactory {
+  bool get requiresSprite;
+
+  SpecModel get routineModel;
+
+  MapObjectSpec call(Sprite? sprite, Direction facing);
+
+  static SpecFactory npc<T extends NpcBehavior>(
+      Npc<T> Function(Sprite sprite, Direction facing) factory,
+      {required Type forBehavior}) {
+    return _NpcFactory(factory, forBehavior);
+  }
+
+  factory SpecFactory(MapObjectSpec Function(Direction facing) factory,
+      {required Type forSpec}) {
+    return _SpecFactory(factory, forSpec);
+  }
+
+  factory SpecFactory.asm(
+      AsmSpec Function(Label? sprite, Direction facing) factory) {
+    return _AsmSpecFactory(factory);
+  }
+}
+
+class _NpcFactory<T extends NpcBehavior> implements SpecFactory {
+  @override
+  final requiresSprite = true;
+  @override
+  final SpecModel routineModel;
+  final Npc<T> Function(Sprite sprite, Direction facing) _factory;
+  _NpcFactory(this._factory, Type behaviorType)
+      : routineModel = NpcRoutineModel(behaviorType);
+  @override
+  Npc<T> call(Sprite? sprite, Direction facing) => _factory(sprite!, facing);
+}
+
+class _SpecFactory<T extends MapObjectSpec> implements SpecFactory {
+  @override
+  final requiresSprite = false;
+  @override
+  final SpecModel routineModel;
+  final T Function(Direction facing) _factory;
+  _SpecFactory(this._factory, Type specType)
+      : routineModel = SpecRoutineModel(specType);
+  @override
+  T call(Sprite? sprite, Direction facing) => _factory(facing);
+}
+
+class _AsmSpecFactory implements SpecFactory {
+  @override
+  final requiresSprite = false;
+  @override
+  final SpecModel routineModel = AsmRoutineModel();
+  final AsmSpec Function(Label? sprite, Direction facing) _factory;
+  _AsmSpecFactory(this._factory);
+  @override
+  AsmSpec call(Sprite? sprite, Direction facing) {
+    var label = switch (sprite) {
+      Sprite() => _spriteArtLabels[sprite] ?? Label(sprite.name),
+      null => null,
+    };
+    return _factory(label, facing);
+  }
+}
+
+class FieldRoutine<T extends MapObjectSpec> {
+  final Word index;
+  final Label label;
+
+  /// How many VRAM tiles are needed by this routine's sprite mappings.
+  ///
+  /// 0 if no sprite is used.
+  final int spriteMappingTiles;
+
+  final SpecFactory factory;
+
+  const FieldRoutine(this.index, this.label, this.factory,
+      {this.spriteMappingTiles = _defaultVramTilesPerSprite});
+
+  @override
+  String toString() {
+    return 'FieldRoutine{index: $index, label: $label, '
+        'spriteMappingTiles: $spriteMappingTiles, factory: $factory}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FieldRoutine &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          label == other.label;
+
+  @override
+  int get hashCode => index.hashCode ^ label.hashCode;
+}
