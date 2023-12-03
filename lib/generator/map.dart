@@ -8,7 +8,6 @@ import 'package:rune/generator/movement.dart';
 import 'package:rune/numbers.dart';
 import 'package:rune/src/null.dart';
 
-import '../asm/asm.dart';
 import '../model/model.dart';
 import 'dialog.dart';
 import 'event.dart';
@@ -300,7 +299,7 @@ final _builtInSprites = {
 
 /// Some maps utilize sprites outside of objects, in event routines.
 ///
-/// This assumes that this sprite data will always be first in VRAM.
+/// TODO: This assumes that this sprite data will always be first in VRAM.
 /// This may not always be the case.
 Word? _addBuiltInSpriteData(
     GameMap map, Word? spriteVramOffset, Asm spritesAsm) {
@@ -320,6 +319,12 @@ Word? _addBuiltInSpriteData(
   return spriteVramOffset;
 }
 
+/// Writes all sprite pointer and VRAM tile pairs for objects in the map.
+///
+/// Returns a map of object IDs to their VRAM tile number.
+/// This is useful for compiling object data,
+/// which refers back to each objects' intended VRAM tile number
+/// (in order to use the correct sprite for that object).
 Map<MapObjectId, Word> _compileMapSpriteData(
     List<MapObject> objects, Asm asm, int? spriteVramOffset) {
   // aggregate all sprites and their vram tiles needed
@@ -331,46 +336,71 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   // and objects may have differing vram tiles needed.
   var objectSprites = Multimap<Label, MapObjectId>();
 
+  /*
+  It may be time to clean some of this up.
+
+  Given all objects,
+  - determine the preloaded sprites needed
+  - figure out VRAM tiles to use (regardless of whether sprites are preloaded!)
+
+  There are various edge cases that complicate this:
+  - Sprites have variable tile width
+  - Sprites may need to be duplicated depending on the sprite and the routine's
+    mappings
+  - Sprites may be loaded into RAM first (VRAM lazily), and objects still need
+    to pick a VRAM tile for when the graphics are loaded
+  
+  This also assumes lazily loaded sprites are not configurable.
+  If they were, we'd need to know:
+
+  - Why/when to lazily load sprites at all? Why not just preload them?
+  - Track RAM used like we track VRAM tiles to place them sequentially
+  */
+
   for (var obj in objects) {
     var spec = obj.spec;
     Label? maybeLbl;
 
-    if (spec is Npc) {
-      // todo: factor this into function
-      var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
-      if (routine == null) {
-        throw Exception(
-            'no routine configured for npc behavior ${spec.behavior}');
-      }
+    switch (spec) {
+      case Npc spec:
+        // todo: factor this into function
+        var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
+        if (routine == null) {
+          throw Exception(
+              'no routine configured for npc behavior ${spec.behavior}');
+        }
 
-      // try the sprite name as a label itself if not preconfigured
-      maybeLbl = _spriteArtLabels[spec.sprite] ?? Label(spec.sprite.name);
+        // try the sprite name as a label itself if not preconfigured
+        maybeLbl = _spriteArtLabels[spec.sprite] ?? Label(spec.sprite.name);
 
-      var tiles = routine.factory.spriteMappingTiles!;
+        var tiles = routine.factory.spriteMappingTiles!;
 
-      // Bit of a hack for this one sprite;
-      // can clean it up if it turns out other sprites need similar treatment
-      var mapping = (maybeLbl == Label('Art_GuildReceptionist') &&
-              tiles >= 0x38 /* 0x28 offset + 16 tile width in sprite */)
-          ? _SpriteVramMapping(tiles, [0x28])
-          : _SpriteVramMapping(tiles);
-
-      vramMapping.update(maybeLbl, (current) => current.merge(mapping),
-          ifAbsent: () => mapping);
-    } else if (spec is AsmSpec) {
-      maybeLbl = spec.artLabel;
-      if (maybeLbl != null) {
-        // Get custom vram tile width if known for this routine,
-        // even though it's not specified in the model.
-        var factory = _specFactories[spec.routine];
-        var tiles = factory?.spriteMappingTiles;
-        var spriteMapping = tiles == null
-            ? _SpriteVramMapping.defaults()
+        // Bit of a hack for this one sprite;
+        // can clean it up if it turns out other sprites need similar treatment
+        var mapping = (maybeLbl == Label('Art_GuildReceptionist') &&
+                tiles >= 0x38 /* 0x28 offset + 16 tile width in sprite */)
+            ? _SpriteVramMapping(tiles, [0x28])
             : _SpriteVramMapping(tiles);
 
-        vramMapping.update(maybeLbl, (current) => current.merge(spriteMapping),
-            ifAbsent: () => spriteMapping);
-      }
+        vramMapping.update(maybeLbl, (current) => current.merge(mapping),
+            ifAbsent: () => mapping);
+        break;
+      case AsmSpec spec:
+        maybeLbl = spec.artLabel;
+        if (maybeLbl != null) {
+          // Get custom vram tile width if known for this routine,
+          // even though it's not specified in the model.
+          var factory = _specFactories[spec.routine];
+          var tiles = factory?.spriteMappingTiles;
+          var spriteMapping = tiles == null
+              ? _SpriteVramMapping.defaults()
+              : _SpriteVramMapping(tiles);
+
+          vramMapping.update(
+              maybeLbl, (current) => current.merge(spriteMapping),
+              ifAbsent: () => spriteMapping);
+        }
+        break;
     }
 
     if (maybeLbl != null) {
@@ -523,43 +553,37 @@ void _compileMapObjectData(
   asm.add(comment(obj.id.toString()));
 
   // hacky?
-  if (spec is Npc || spec is AsmSpec) {
-    Word routineIndex;
-    if (spec is Npc) {
+  switch (spec) {
+    // TODO: can we make Npc and non-AsmSpec behave the same?
+    // (rather than using these maps)
+    // input spec, output is routine. same is true for asmspec too actually
+    case Npc():
       var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
 
       if (routine == null) {
         throw Exception(
             'no routine configured for npc behavior ${spec.behavior}');
       }
-      routineIndex = routine.index;
-    } else {
-      // analyzer should be smart enough to know spec is AsmSpec?
-      // but its not :(
-      spec = spec as AsmSpec;
-      routineIndex = spec.routine;
-    }
 
-    asm.add(dc.w([routineIndex]));
-    asm.add(facingAndDialog);
-    asm.add(dc.w([tileNumber]));
-  } else {
-    var routine = _mapObjectSpecRoutines[spec.runtimeType];
+      asm.add(dc.w([(routine.index)]));
 
-    if (routine == null) {
-      throw Exception('no routine configured for spec $spec');
-    }
+      break;
+    case AsmSpec():
+      asm.add(dc.w([spec.routine]));
 
-    asm.add(dc.w([routine.index]));
-    asm.add(facingAndDialog);
-    // in this case we assume the vram tile does not matter?
-    // TODO: if it does we need to track so do not reuse same
-    // todo: is 0 okay?
-    asm.add(
-        // dc.w([vramTileNumbers.values.max() + Word(_vramOffsetPerSprite)]));
-        dc.w([0.toWord]));
+      break;
+    default:
+      var routine = _mapObjectSpecRoutines[spec.runtimeType];
+
+      if (routine == null) {
+        throw Exception('no routine configured for spec $spec');
+      }
+
+      asm.add(dc.w([routine.index]));
   }
 
+  asm.add(facingAndDialog);
+  asm.add(dc.w([tileNumber]));
   asm.add(
       dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]));
 
@@ -575,37 +599,40 @@ void _compileMapAreaData(Asm asm, MapArea area, EventFlags eventFlags,
       comment: area.position.toString()));
   asm.add(dc.w([_rangeTypeId(area.range)], comment: area.range.name));
 
-  if (spec is AsmArea) {
-    asm.add(dc.b([
-      spec.eventType,
-      spec.eventFlag,
-      spec.interactionRoutine,
-      spec.interactionParameter
-    ]));
-  } else if (spec is InteractiveAreaSpec) {
-    var dialogId = compileScene(spec.onInteract);
+  switch (spec) {
+    case AsmArea():
+      asm.add(dc.b([
+        spec.eventType,
+        spec.eventFlag,
+        spec.interactionRoutine,
+        spec.interactionParameter
+      ]));
 
-    Expression flag;
-    var doNotInteractIf = spec.doNotInteractIf;
-    if (doNotInteractIf != null) {
-      var value = eventFlags.toConstantValue(doNotInteractIf);
-      if (value.value >= Byte.max) {
-        throw Exception('extended event flags not supported for interaction '
-            'area check. eventFlag=$value');
+      break;
+    case InteractiveAreaSpec():
+      var dialogId = compileScene(spec.onInteract);
+
+      Expression flag;
+      var doNotInteractIf = spec.doNotInteractIf;
+      if (doNotInteractIf != null) {
+        var value = eventFlags.toConstantValue(doNotInteractIf);
+        if (value.value >= Byte.max) {
+          throw Exception('extended event flags not supported for interaction '
+              'area check. eventFlag=$value');
+        }
+        flag = value.constant;
+      } else {
+        flag = Byte.zero;
       }
-      flag = value.constant;
-    } else {
-      flag = Byte.zero;
-    }
 
-    asm.add(dc.b([
-      Byte.zero, // always a story event
-      flag,
-      Byte(7), // Interaction_DisplayDialogueGrandCross
-      dialogId,
-    ]));
-  } else {
-    throw UnsupportedError('unsupported area spec: $spec');
+      asm.add(dc.b([
+        Byte.zero, // always a story event
+        flag,
+        Byte(7), // Interaction_DisplayDialogueGrandCross
+        dialogId,
+      ]));
+      
+      break;
   }
 
   asm.addNewline();
