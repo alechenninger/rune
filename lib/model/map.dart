@@ -1087,6 +1087,8 @@ abstract class MapObjectSpec {
 
   const MapObjectSpec.constant();
 
+  Sprite? get sprite => null;
+
   Direction get startFacing;
 }
 
@@ -1100,6 +1102,7 @@ abstract class InteractiveMapObjectSpec extends MapObjectSpec
 
 /// Spec for class of behaviors with interchangeable sprites.
 class Npc<T extends NpcBehavior> extends MapObjectSpec {
+  @override
   final Sprite sprite;
   final NpcBehavior behavior;
 
@@ -1127,7 +1130,8 @@ class Npc<T extends NpcBehavior> extends MapObjectSpec {
   int get hashCode => sprite.hashCode ^ behavior.hashCode;
 }
 
-class InteractiveNpc<T extends NpcBehavior> extends Npc<T> implements InteractiveMapObjectSpec {
+class InteractiveNpc<T extends NpcBehavior> extends Npc<T>
+    implements InteractiveMapObjectSpec {
   @override
   InteractiveNpcBehavior get behavior =>
       super.behavior as InteractiveNpcBehavior;
@@ -1621,7 +1625,13 @@ class FixedFaceRight extends InteractiveNpcBehavior {
 
 class AsmSpec extends MapObjectSpec {
   final Label? artLabel;
+
+  @override
+  Sprite? get sprite =>
+      switch (artLabel) { Label l => Sprite(l.name), null => null };
+
   final Word routine;
+
   @override
   final Direction startFacing;
 
