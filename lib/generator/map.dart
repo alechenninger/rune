@@ -251,20 +251,6 @@ Map<MapObjectId, Word> _compileMapSpriteData(
           'objects=${vramTileByObject.keys}');
     }
 
-    // TODO: looks like max vram tile should be 28, 21 (x, y) = ~0x55c
-    // >= 0x522~ seems to be weird
-    // there are none defined past 4e2 which is one of the weird ones
-    // loaded from ram
-    // greatest one loaded normally is 4b8
-    // is 0x500 right?
-    if (spriteVramOffset > 0x500) {
-      throw Exception('possibly too many sprites? '
-          'only remove this exception after testing. '
-          'tile number: $spriteVramOffset '
-          'art: $pointer '
-          'asm: $asm');
-    }
-
     var tile = Word(spriteVramOffset);
 
     // if (requiredMappings.isNotEmpty) {
@@ -277,6 +263,14 @@ Map<MapObjectId, Word> _compileMapSpriteData(
     // }
 
     spriteVramOffset += mapping.tiles;
+
+    if (spriteVramOffset >= 0x534) {
+      throw Exception('sprite data extends into character sprites. '
+          'tile number: $tile '
+          'width: ${mapping.tiles} '
+          'art: $pointer '
+          'asm: $asm');
+    }
 
     for (var obj in objectsByArt[pointer]) {
       vramTileByObject[obj] = tile;
@@ -310,8 +304,6 @@ class _SpriteVramMapping {
   // final Word? requiredVramTile;
 
   const _SpriteVramMapping(this.tiles, [this.duplicateOffsets = const []]);
-
-  const _SpriteVramMapping.defaults() : this(_defaultVramTilesPerSprite);
 
   _SpriteVramMapping merge(_SpriteVramMapping other) {
     if (other.duplicateOffsets != duplicateOffsets) {
@@ -375,41 +367,15 @@ Byte _compileInteractionScene(
 void _compileMapObjectData(
     Asm asm, MapObject obj, Word tileNumber, Byte dialogId) {
   var spec = obj.spec;
-  var facingAndDialog = dc.b([spec.startFacing.constant, dialogId]);
+  var routine = _fieldRoutines.bySpec(spec);
 
-  asm.add(comment(obj.id.toString()));
-
-  // hacky?
-  switch (spec) {
-    // TODO: can we make Npc and non-AsmSpec behave the same?
-    // (rather than using these maps)
-    // input spec, output is routine. same is true for asmspec too actually
-    case Npc():
-      var routine = _fieldRoutines.bySpec(spec);
-
-      if (routine == null) {
-        throw Exception(
-            'no routine configured for npc behavior ${spec.behavior}');
-      }
-
-      asm.add(dc.w([(routine.index)]));
-
-      break;
-    case AsmSpec():
-      asm.add(dc.w([spec.routine]));
-
-      break;
-    default:
-      var routine = _fieldRoutines.bySpec(spec);
-
-      if (routine == null) {
-        throw Exception('no routine configured for spec $spec');
-      }
-
-      asm.add(dc.w([routine.index]));
+  if (routine == null) {
+    throw Exception('no routine known for spec $spec');
   }
 
-  asm.add(facingAndDialog);
+  asm.add(comment(obj.id.toString()));
+  asm.add(dc.w([routine.index]));
+  asm.add(dc.b([spec.startFacing.constant, dialogId]));
   asm.add(dc.w([tileNumber]));
   asm.add(
       dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]));
@@ -473,24 +439,8 @@ extension ObjectRoutine on MapObject {
     if (routine == null) {
       throw Exception('no routine configured for spec $spec');
     }
-    return routine;
 
-    // if (spec is AsmSpec) {
-    //   var index = spec.routine;
-    //   var label = labelOfFieldObjectRoutine(index);
-    //   if (label == null) {
-    //     throw Exception('invalid field object routine index: $index');
-    //   }
-    //   var factory = SpecFactory((d) =>
-    //       AsmSpec(artLabel: spec.artLabel, routine: index, startFacing: d));
-    //   return FieldRoutine(index, label, factory);
-    // } else {
-    //   var routine = _fieldRoutines.bySpec(spec);
-    //   if (routine == null) {
-    //     throw Exception('no routine configured for spec $spec');
-    //   }
-    //   return routine;
-    // }
+    return routine;
   }
 }
 
@@ -843,18 +793,10 @@ List<_AsmObject> _readObjects(ConstantReader reader, Map<Word, Label> sprites) {
     var x = reader.readWord();
     var y = reader.readWord();
 
-    // var spec = _specFactories[routineOrTerminate];
     var spec = _fieldRoutines.byIndex(routineOrTerminate)?.factory;
-
     if (spec == null) {
-      // In this case, we don't have this routine incorporated in the model
-      // So populate the model with an escape hatch: raw ASM
-      // We can decide to model in later if needed
-
-      // var spriteLbl = sprites[vramTile];
-      // spec = SpecFactory((d) => AsmSpec(
-      //     artLabel: spriteLbl, routine: routineOrTerminate, startFacing: d));
-      throw 'todo?';
+      throw Exception('unknown field routine: $routineOrTerminate '
+          'objectIndex=${objects.length}');
     }
 
     var position = Position(x.value * 8, y.value * 8);
@@ -907,8 +849,8 @@ List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
           'but art label was null for tile number ${asm.vramTile}');
     }
 
-    var sprite =
-        _spriteArtLabels.inverse[artLbl] ?? artLbl?.map((l) => Sprite(l.name));
+    var sprite = _spriteArtLabels.inverse[artLbl] ??
+        switch (artLbl) { Label l => Sprite(l.name), null => null };
     var spec = asm.spec(sprite, asm.facing);
     var object = MapObject(
         id: '${mapId.name}_$i', startPosition: asm.position, spec: spec);
@@ -1115,15 +1057,19 @@ class _FieldRoutineRepository {
         _byModel = {for (var r in routines) r.factory.routineModel: r};
 
   FieldRoutine? byIndex(Word index) {
-    return _byIndex[index] ??
-        FieldRoutine(
-            index, labelOfFieldObjectRoutine(index)!, SpecFactory.asm(index));
+    var byIndex = _byIndex[index];
+    if (byIndex != null) return byIndex;
+    var label = labelOfFieldObjectRoutine(index);
+    if (label == null) return null;
+    return FieldRoutine(index, label, SpecFactory.asm(index));
   }
 
   FieldRoutine? byLabel(Label label) {
-    var index = indexOfFieldObjectRoutine(label)!;
-    return _byLabel[label] ??
-        FieldRoutine(index, label, SpecFactory.asm(index));
+    var byLabel = _byLabel[label];
+    if (byLabel != null) return byLabel;
+    var index = indexOfFieldObjectRoutine(label);
+    if (index == null) return null;
+    return FieldRoutine(index, label, SpecFactory.asm(index));
   }
 
   FieldRoutine? bySpec(MapObjectSpec spec) {
@@ -1313,10 +1259,18 @@ class FieldRoutine<T extends MapObjectSpec> {
       other is FieldRoutine &&
           runtimeType == other.runtimeType &&
           index == other.index &&
-          label == other.label;
+          label == other.label &&
+          spriteMappingTiles == other.spriteMappingTiles &&
+          ramArt == other.ramArt &&
+          factory == other.factory;
 
   @override
-  int get hashCode => index.hashCode ^ label.hashCode;
+  int get hashCode =>
+      index.hashCode ^
+      label.hashCode ^
+      spriteMappingTiles.hashCode ^
+      ramArt.hashCode ^
+      factory.hashCode;
 }
 
 sealed class ArtPointer {}
