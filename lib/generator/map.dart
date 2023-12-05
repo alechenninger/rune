@@ -1083,7 +1083,21 @@ final _fieldRoutines = _FieldRoutineRepository([
       spriteMappingTiles: 6,
       ramArt: RamArt(address: Word(0)),
       vramAnimated: true,
-      SpecFactory.asm(Word(0xF8)))
+      SpecFactory.asm(Word(0xF8))),
+  FieldRoutine(
+      Word(0x138),
+      Label('loc_490B8'),
+      spriteMappingTiles: 8,
+      ramArt: RamArt(address: Word(0)),
+      vramAnimated: true,
+      SpecFactory.asm(Word(0x138))),
+  FieldRoutine(
+      Word(0x13C),
+      Label('loc_49128'),
+      spriteMappingTiles: 8,
+      ramArt: RamArt(address: Word(0x0900)),
+      vramAnimated: true,
+      SpecFactory.asm(Word(0x13C)))
 ]);
 
 class _FieldRoutineRepository {
@@ -1270,6 +1284,8 @@ class FieldRoutine<T extends MapObjectSpec> {
   /// If mappings rely on animating the sprite in place in VRAM.
   ///
   /// In this case, VRAM cannot be shared between objects.
+  // TODO: this might go hand in hand with ram art?
+  // look into render flag $6 usage?
   final bool vramAnimated;
 
   final SpecFactory factory;
