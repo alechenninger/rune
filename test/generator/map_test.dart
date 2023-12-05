@@ -349,9 +349,110 @@ void main() {
 
     // todo: this is kind of brittle
     var objectsAsm = mapAsm.objects.withoutComments();
-    expect(objectsAsm[2], dc.w(['2d0'.hex.toWord]));
-    expect(objectsAsm[7], dc.w(['318'.hex.toWord]));
-    expect(objectsAsm[12], dc.w(['320'.hex.toWord]));
+    expect(objectsAsm[2], dc.w([0x2d0.toWord]));
+    expect(objectsAsm[7], dc.w([0x318.toWord]));
+    expect(objectsAsm[12], dc.w([0x320.toWord]));
+  });
+
+  group('routines which use ram art', () {
+    test('set a vram tile but not a sprite', () {
+      testMap.addObject(MapObject(
+          startPosition: Position('1f0'.hex, '2e0'.hex),
+          spec: Npc(Sprite.PalmanMan1, FaceDown())));
+
+      testMap.addObject(MapObject(
+          startPosition: Position('200'.hex, '2e0'.hex),
+          spec: Npc(Sprite.PalmanMan2, FaceDown())));
+
+      testMap.addObject(MapObject(
+          startPosition: Position('1e0'.hex, '2e0'.hex),
+          spec: AsmSpec(routine: Word(0xf8), startFacing: down)));
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w(['2d0'.hex.toWord]),
+            dc.l([Constant('Art_PalmanMan1')]),
+            dc.w(['318'.hex.toWord]),
+            dc.l([Constant('Art_PalmanMan2')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[2], dc.w([0x2d0.toWord]));
+      expect(objectsAsm[7], dc.w([0x318.toWord]));
+      expect(objectsAsm[12], dc.w([0x360.toWord]));
+    });
+
+    test('only use as much vram as needed', () {
+      testMap.addObject(MapObject(
+          startPosition: Position('1f0'.hex, '2e0'.hex),
+          spec: Npc(Sprite.PalmanMan1, FaceDown())));
+
+      testMap.addObject(MapObject(
+          startPosition: Position('1e0'.hex, '2e0'.hex),
+          spec: AsmSpec(routine: Word(0xf8), startFacing: down)));
+
+      testMap.addObject(MapObject(
+          startPosition: Position('200'.hex, '2e0'.hex),
+          spec: Npc(Sprite.PalmanMan2, FaceDown())));
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w([0x2d0.toWord]),
+            dc.l([Constant('Art_PalmanMan1')]),
+            dc.w([0x31E.toWord]),
+            dc.l([Constant('Art_PalmanMan2')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[2], dc.w([0x2d0.toWord]));
+      expect(objectsAsm[7], dc.w([0x318.toWord]));
+      expect(objectsAsm[12], dc.w([0x31E.toWord]));
+    });
+
+    test(
+        'do not share the same vram tile if using the same art but animated in vram',
+        () {
+      // vram tiles are animated based on the object state.
+      // so two objects cant share the same vram.
+      testMap.addObject(MapObject(
+          startPosition: Position('1f0'.hex, '2e0'.hex),
+          spec: Npc(Sprite.PalmanMan1, FaceDown())));
+
+      testMap.addObject(MapObject(
+          startPosition: Position('1e0'.hex, '2e0'.hex),
+          spec: AsmSpec(routine: Word(0xf8), startFacing: down)));
+
+      testMap.addObject(MapObject(
+          startPosition: Position('200'.hex, '2e0'.hex),
+          spec: AsmSpec(routine: Word(0xf8), startFacing: down)));
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w([0x2d0.toWord]),
+            dc.l([Constant('Art_PalmanMan1')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[2], dc.w([0x2d0.toWord]));
+      expect(objectsAsm[7], dc.w([0x318.toWord]));
+      expect(objectsAsm[12], dc.w([0x31E.toWord]));
+    });
+
+    test('share the same vram tile if using the same art not animated in vram',
+        () {},
+        skip: "don't have routines like this yet");
+
+    test('do not share the same vram tile if not using the same art', () {},
+        skip: "don't have routines like this yet");
   });
 
   test('objects use position divided by 8', () {}, skip: 'todo');
