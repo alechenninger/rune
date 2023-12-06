@@ -213,7 +213,7 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   // This is a multimap because art can be reused by multiple objects.
   // However those objects can use the same art with different mappings.
   var artPointers =
-      Multimap<ArtPointer, (_SpriteVramMapping, List<MapObjectId>)>();
+      Multimap<ArtPointer?, (SpriteVramMapping, List<MapObjectId>)>();
 
   for (var obj in objects) {
     var spec = obj.spec;
@@ -224,7 +224,8 @@ Map<MapObjectId, Word> _compileMapSpriteData(
     }
 
     switch (routine.spriteLayoutForSpec(spec)) {
-      case (var art, var vram):
+      case var vram when vram != null:
+        var art = vram.art;
         var current = artPointers[art];
 
         if (current.isEmpty) {
@@ -234,7 +235,7 @@ Map<MapObjectId, Word> _compileMapSpriteData(
           // and replace that mapping with the merged one.
           // Else, add a new mapping.
           var merged = false;
-          var updated = <(_SpriteVramMapping, List<MapObjectId>)>[];
+          var updated = <(SpriteVramMapping, List<MapObjectId>)>[];
 
           for (var (mapping, objects) in current) {
             if (!merged) {
@@ -327,7 +328,10 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   return vramTileByObject;
 }
 
-class _SpriteVramMapping {
+class SpriteVramMapping {
+  /// The art used for this mapping, if known.
+  final ArtPointer? art;
+
   /// The total tiles required by the sprite
   final int tiles;
 
@@ -335,20 +339,30 @@ class _SpriteVramMapping {
   ///
   /// This is used for sprites where the sprite data
   /// does not alone account for all facing directions needed.
-  final List<int> duplicateOffsets;
+  final Iterable<int> duplicateOffsets;
 
   final bool animated;
 
   // See notes in _compileMapSpriteData
   // final Word? requiredVramTile;
 
-  const _SpriteVramMapping(this.tiles,
-      {this.duplicateOffsets = const [], this.animated = false});
+  const SpriteVramMapping._(
+      {required this.tiles,
+      this.art,
+      this.duplicateOffsets = const [],
+      this.animated = false});
 
-  _SpriteVramMapping? merge(_SpriteVramMapping other) {
-    if (other.duplicateOffsets != duplicateOffsets) return null;
+  bool get mergable => art != null && !animated;
+
+  SpriteVramMapping? merge(SpriteVramMapping other) {
+    if (!const IterableEquality<int>()
+        .equals(duplicateOffsets, other.duplicateOffsets)) return null;
     if (animated || other.animated) return null;
-    return _SpriteVramMapping(max(tiles, other.tiles),
+    if (art != other.art) return null;
+    if (art == null || other.art == null) return null;
+    return SpriteVramMapping._(
+        tiles: max(tiles, other.tiles),
+        art: art,
         duplicateOffsets: duplicateOffsets);
   }
 
@@ -360,7 +374,7 @@ class _SpriteVramMapping {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is _SpriteVramMapping &&
+      other is SpriteVramMapping &&
           runtimeType == other.runtimeType &&
           tiles == other.tiles &&
           duplicateOffsets == other.duplicateOffsets;
@@ -1025,23 +1039,37 @@ final _fallbackMapIdsByLabel = {
 
 // TODO: make injectable in Program API for testing
 final _fieldRoutines = _FieldRoutineRepository([
-  FieldRoutine(Word('68'.hex), Label('FieldObj_NPCAlysPiata'),
+  FieldRoutine(
+      Word(0x68),
+      Label('FieldObj_NPCAlysPiata'),
+      spriteMappingTiles: 8,
       SpecFactory((_) => AlysWaiting(), forSpec: AlysWaiting)),
   FieldRoutine(
       Word(0x138),
       Label('loc_490B8'),
+      spriteMappingTiles: 8,
+      ramArt: RamArt(address: Word(0)),
+      vramAnimated: true,
       SpecFactory((d) => AiedoShopperWithBags(d),
           forSpec: AiedoShopperWithBags)),
-  FieldRoutine(Word(0x13C), Label('loc_49128'),
+  FieldRoutine(
+      Word(0x13C),
+      Label('loc_49128'),
+      spriteMappingTiles: 8,
+      ramArt: RamArt(address: Word(0x0900)),
+      vramAnimated: true,
       SpecFactory((_) => AiedoShopperMom(), forSpec: AiedoShopperMom)),
-  FieldRoutine(Word(0x120), Label('FieldObj_Elevator'),
+  FieldRoutine(
+      Word(0x120),
+      Label('FieldObj_Elevator'),
+      spriteMappingTiles: 0,
       SpecFactory((d) => Elevator(d), forSpec: Elevator)),
   FieldRoutine(
       Word(0x74),
       Label('FieldObj_InvisibleBlock'),
       spriteMappingTiles: 0,
       SpecFactory((_) => InvisibleBlock(), forSpec: InvisibleBlock)),
-  FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1'),
+  FieldRoutine(Word(0x38), Label('FieldObj_NPCType1'),
       SpecFactory.npc((s, _) => Npc(s, FaceDown()), forBehavior: FaceDown)),
   FieldRoutine(
       Word(0x134),
@@ -1050,12 +1078,12 @@ final _fieldRoutines = _FieldRoutineRepository([
       SpecFactory.npc((s, _) => Npc(s, FaceDownSimpleSprite()),
           forBehavior: FaceDownSimpleSprite)),
   FieldRoutine(
-      Word('3C'.hex),
+      Word(0x3C),
       Label('FieldObj_NPCType2'),
       SpecFactory.npc((s, d) => Npc(s, WanderAround(d)),
           forBehavior: WanderAround)),
   FieldRoutine(
-      Word('40'.hex),
+      Word(0x40),
       Label('FieldObj_NPCType3'),
       SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)),
           forBehavior: SlowlyWanderAround)),
@@ -1084,20 +1112,6 @@ final _fieldRoutines = _FieldRoutineRepository([
       ramArt: RamArt(address: Word(0)),
       vramAnimated: true,
       SpecFactory.asm(Word(0xF8))),
-  FieldRoutine(
-      Word(0x138),
-      Label('loc_490B8'),
-      spriteMappingTiles: 8,
-      ramArt: RamArt(address: Word(0)),
-      vramAnimated: true,
-      SpecFactory.asm(Word(0x138))),
-  FieldRoutine(
-      Word(0x13C),
-      Label('loc_49128'),
-      spriteMappingTiles: 8,
-      ramArt: RamArt(address: Word(0x0900)),
-      vramAnimated: true,
-      SpecFactory.asm(Word(0x13C)))
 ]);
 
 class _FieldRoutineRepository {
@@ -1278,7 +1292,8 @@ class FieldRoutine<T extends MapObjectSpec> {
 
   /// Address field routine expects art to be loaded into.
   ///
-  /// If null, art is configurable via map data.
+  /// If null, art may be configurable via map data
+  /// (if not otherwise hard coded into the routine).
   final RamArt? ramArt;
 
   /// If mappings rely on animating the sprite in place in VRAM.
@@ -1290,22 +1305,40 @@ class FieldRoutine<T extends MapObjectSpec> {
 
   final SpecFactory factory;
 
-  (ArtPointer, _SpriteVramMapping)? spriteLayoutForSpec(MapObjectSpec spec) {
-    var maybeLbl = spec.sprite?.label;
-    var artPointer = maybeLbl == null ? ramArt : RomArt(label: maybeLbl);
+  SpriteVramMapping? spriteLayoutForSpec(MapObjectSpec spec) {
+    // What do we need to know?
+    // - how the sprite is defined: routine->rom, map->rom, map->ram
+    // - this varies based on the spec. we don't know why each option is used.
+    // So we do this:
+    // - assume there is a sprite, unless tiles are set to 0.
+    // - if a sprite is configured, assume the routine allows it to be
+    //   configured via rom pointers. (map->rom)
+    // - if a sprite is not configured, fall back to routine's ramart.
+    //   if present, this uses map->ram.
+    //   if not, we assume routine->rom (indicated via null art pointer, but
+    //   non-zero tiles).
+    // This can be wrong in the future (e.g. if we add configurable sprites
+    // for routines which use ram) but for now it should work.
 
-    if (artPointer == null) return null;
+    if (spriteMappingTiles == 0) return null;
+
+    var maybeLbl =
+        switch (spec) { MayConfigureSprite s => s.sprite?.label, _ => null };
+    var artPointer = maybeLbl == null ? ramArt : RomArt(label: maybeLbl);
 
     // Bit of a hack for this one sprite;
     // can clean it up if it turns out other sprites need similar treatment
-    var mapping = (maybeLbl == Label('Art_GuildReceptionist') &&
+    var duplicateOffsets = (maybeLbl == Label('Art_GuildReceptionist') &&
             spriteMappingTiles >=
                 0x38 /* 0x28 offset + 16 tile width in sprite */)
-        ? _SpriteVramMapping(spriteMappingTiles,
-            duplicateOffsets: [0x28], animated: vramAnimated)
-        : _SpriteVramMapping(spriteMappingTiles, animated: vramAnimated);
+        ? const [0x28]
+        : const <int>[];
 
-    return (artPointer, mapping);
+    return SpriteVramMapping._(
+        tiles: spriteMappingTiles,
+        art: artPointer,
+        duplicateOffsets: duplicateOffsets,
+        animated: vramAnimated);
   }
 
   const FieldRoutine(this.index, this.label, this.factory,

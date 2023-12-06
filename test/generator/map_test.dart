@@ -1,10 +1,8 @@
-import 'package:rune/asm/asm.dart';
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/text.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
-import 'package:rune/generator/map.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
@@ -453,6 +451,66 @@ void main() {
 
     test('do not share the same vram tile if not using the same art', () {},
         skip: "don't have routines like this yet");
+  });
+
+  group('routines which use hard coded rom art', () {
+    test('set a vram tile but not a sprite', () {
+      testMap.addObject(MapObject(
+          startPosition: Position(0x1f0, 0x2e0),
+          spec: Npc(Sprite.PalmanMan1, FaceDown())));
+
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0),
+          spec: Npc(Sprite.PalmanMan2, FaceDown())));
+
+      testMap.addObject(MapObject(
+          startPosition: Position(0x1e0, 0x2e0), spec: AlysWaiting()));
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w([0x2d0.toWord]),
+            dc.l([Constant('Art_PalmanMan1')]),
+            dc.w([0x318.toWord]),
+            dc.l([Constant('Art_PalmanMan2')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[2], dc.w([0x2d0.toWord]));
+      expect(objectsAsm[7], dc.w([0x318.toWord]));
+      expect(objectsAsm[12], dc.w([0x360.toWord]));
+    });
+
+    test('only use as much vram as needed', () {
+      testMap.addObject(MapObject(
+          startPosition: Position(0x1f0, 0x2e0),
+          spec: Npc(Sprite.PalmanMan1, FaceDown())));
+
+      testMap.addObject(MapObject(
+          startPosition: Position(0x1e0, 0x2e0), spec: AlysWaiting()));
+
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0),
+          spec: Npc(Sprite.PalmanMan2, FaceDown())));
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w([0x2d0.toWord]),
+            dc.l([Constant('Art_PalmanMan1')]),
+            dc.w([0x320.toWord]),
+            dc.l([Constant('Art_PalmanMan2')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[2], dc.w([0x2d0.toWord]));
+      expect(objectsAsm[7], dc.w([0x318.toWord]));
+      expect(objectsAsm[12], dc.w([0x320.toWord]));
+    });
   });
 
   test('objects use position divided by 8', () {}, skip: 'todo');
