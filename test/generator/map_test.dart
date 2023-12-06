@@ -1503,8 +1503,20 @@ class MapAsmFixture {
   Asm toAsm() => Asm.fromRaw('''Map_$mapName:
 	dc.b	\$08
 	dc.b	MusicID_TonoeDePon
-	dc.l	\$FFFF
+	dc.w	\$0010
+	dc.l	loc_129864
+	dc.w	\$0110
+	dc.l	loc_12AAF4
+	dc.w	\$0210
+	dc.l	loc_12BE54
+	dc.w	\$0310
+	dc.l	loc_12D344
+	dc.w	\$FFFF
 	${_spritesAsm()}
+  dc.l	\$FFFE0000
+	dc.l	Art_PalmanShopper1
+	dc.l	\$FFFE0048
+	dc.l	Art_PalmanShopper2
 	dc.w	\$FFFF
 	dc.b	\$FF, \$FF, \$1F, \$1F, \$1F, \$1F, \$01, \$00, \$00, \$01, \$00, \$01
 	dc.l	loc_122A90

@@ -523,7 +523,11 @@ FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
   // skip general var, music, something else
   _skipToSprites(reader);
   var sprites = _readSprites(reader);
-  return sprites.keys.sorted((a, b) => a.compareTo(b)).firstOrNull;
+  return sprites.keys
+      .whereType<_VramSprite>()
+      .map((v) => v.tile)
+      .sorted((a, b) => a.compareTo(b))
+      .firstOrNull;
 }
 
 List<(MapId, Position, Direction, PartyArrangement)> mapTransitions(Asm asm) {
@@ -599,20 +603,29 @@ List<String> preprocessMapToRaw(Asm original,
     processed.add(comment(c).toString());
   }
 
-  addComment('General variable / Music');
+  addComment('General variable, music, tilesets');
   defineConstants(_skipToSprites(reader));
 
   // ignore & replace real sprite data
-  _readSprites(reader);
-  addComment('Sprites');
+  var spritesData = _readSprites(reader);
+  addComment('ROM sprites');
   processed.add(sprites);
+  addComment('RAM sprites');
+  defineConstants([
+    for (var MapEntry(key: loc, value: label) in spritesData.entries)
+      if (loc case _RamSprite(address: var address)) ...[
+        Word(0xfffe),
+        address,
+        label
+      ]
+  ]);
   defineConstants([Word(0xffff)]);
 
-  addComment('Secondary sprites, map updates, transition data');
+  addComment('RAM sprites (alt compression), map updates, transition data');
   defineConstants(_skipAfterSpritesToObjects(reader));
 
   // ignore & replace real object data
-  _readObjects(reader, {});
+  _readObjects(reader);
   addComment('Objects');
   processed.add(objects);
   defineConstants([Word(0xffff)]);
@@ -679,7 +692,7 @@ Future<GameMap> asmToMap(
 
   _skipAfterSpritesToObjects(reader);
 
-  var asmObjects = _readObjects(reader, sprites);
+  var asmObjects = _readObjects(reader);
 
   _skipAfterObjectsToLabels(reader);
 
@@ -785,9 +798,65 @@ Label _dialogLabelForAreaDialogue(bool isWorldMotavia, Byte param) {
   }
 }
 
-Iterable<Sized> _skipAfterObjectsToLabels(ConstantReader reader) {
-  // skip treasure and tile animations
-  return reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+Iterable<Sized> _skipToSprites(ConstantReader reader) {
+  // skip general var, music, tilesets
+  return reader.skipThrough(times: 1, value: Size.w.maxValueSized);
+}
+
+Map<_SpriteLoc, Label> _readSprites(ConstantReader reader) {
+  var sprites = <_SpriteLoc, Label>{};
+
+  while (true) {
+    var control = reader.readWord();
+    if (control == Word(0xfffe)) {
+      var address = reader.readWord();
+      var sprite = reader.readLabel();
+      sprites[_RamSprite(address)] = sprite;
+    } else if (control.isNegative) {
+      return sprites;
+    } else {
+      var sprite = reader.readLabel();
+      sprites[_VramSprite(control)] = sprite;
+    }
+  }
+}
+
+sealed class _SpriteLoc {}
+
+class _VramSprite implements _SpriteLoc {
+  final Word tile;
+  _VramSprite(this.tile);
+  @override
+  String toString() {
+    return '_VramSprite{tile: $tile}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _VramSprite &&
+          runtimeType == other.runtimeType &&
+          tile == other.tile;
+  @override
+  int get hashCode => tile.hashCode;
+}
+
+class _RamSprite implements _SpriteLoc {
+  final Word address;
+  _RamSprite(this.address);
+  @override
+  String toString() {
+    return '_RamSprite{address: $address}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _RamSprite &&
+          runtimeType == other.runtimeType &&
+          address == other.address;
+  @override
+  int get hashCode => address.hashCode;
 }
 
 Iterable<Sized> _skipAfterSpritesToObjects(ConstantReader reader) {
@@ -804,33 +873,7 @@ Iterable<Sized> _skipAfterSpritesToObjects(ConstantReader reader) {
   return iterables.concat([sprite, updates, transition]);
 }
 
-Iterable<Sized> _skipToSprites(ConstantReader reader) {
-  // skip general var, music, something else
-  return reader.skipThrough(times: 1, value: Size.w.maxValueSized);
-}
-
-Map<Word, Label> _readSprites(ConstantReader reader) {
-  var sprites = <Word, Label>{};
-
-  while (true) {
-    var vramTile = reader.readWord();
-    //loc_519D2:
-    // 	tst.w	(a0)
-    // 	bmi.w	loc_51A14
-    if (vramTile.isNegative) {
-      // skip over secondary sprites for now
-      if (vramTile == Word(0xfffe)) {
-        reader.skipThrough(value: Size.w.maxValueSized, times: 1);
-      }
-
-      return sprites;
-    }
-    var sprite = reader.readLabel();
-    sprites[vramTile] = sprite;
-  }
-}
-
-List<_AsmObject> _readObjects(ConstantReader reader, Map<Word, Label> sprites) {
+List<_AsmObject> _readObjects(ConstantReader reader) {
   var objects = <_AsmObject>[];
 
   while (true) {
@@ -864,6 +907,11 @@ List<_AsmObject> _readObjects(ConstantReader reader, Map<Word, Label> sprites) {
   }
 }
 
+Iterable<Sized> _skipAfterObjectsToLabels(ConstantReader reader) {
+  // skip treasure and tile animations
+  return reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+}
+
 Direction _byteToFacingDirection(Byte w) {
   if (w == Byte(0)) return Direction.down;
   if (w == Byte(4)) return Direction.up;
@@ -889,13 +937,13 @@ class _AsmObject {
       required this.position});
 }
 
-List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
+List<MapObject> _buildObjects(MapId mapId, Map<_SpriteLoc, Label> sprites,
     List<_AsmObject> asmObjects, DialogTree dialogTree) {
   // The same scene must reuse same object in memory
   var scenesById = <Byte, Scene>{};
 
   return asmObjects.mapIndexed((i, asm) {
-    var artLbl = sprites[asm.vramTile];
+    var artLbl = sprites[_VramSprite(asm.vramTile)];
 
     if (asm.spec.requiresSprite && artLbl == null) {
       throw StateError('field object routine ${asm.routine} requires sprite '
