@@ -2309,6 +2309,7 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_PiataAcademy'): Word(0x27f),
   Label('Map_PiataAcademy_F1'): Word(0x27f),
   Label('Map_AcademyPrincipalOffice'): Word(0x27f),
+  Label('Map_PiataAcademyNearBasement'): Word(0x27f),
   Label('Map_AcademyBasement'): Word(0x27f),
   Label('Map_AcademyBasement_B2'): Word(0x27f),
   Label('Map_PiataDorm'): Word(0x372),
