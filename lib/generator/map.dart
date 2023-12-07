@@ -97,15 +97,6 @@ extension MapIdAsm on MapId {
 
 const _defaultVramTilesPerSprite = 0x48;
 
-// These offsets are used to account for assembly specifics, which allows for
-// variances in maps to be coded manually (such as objects).
-// todo: it might be nice to manage these with the assembly or the compiler
-//  itself rather than hard coding here.
-//  Program API would be the right place now that we have that.
-
-// todo: now that we automatically boostrap maps, maybe remove this
-final _objectIndexOffsets = <MapId, int>{};
-
 // todo: default to convention & allow override
 final _spriteArtLabels = BiMap<Sprite, Label>()
   ..addAll(Sprite.wellKnown.groupFoldBy(
@@ -511,9 +502,8 @@ extension ObjectAddress on GameMap {
       throw StateError('map object not found in map. obj=$obj map=$this');
     }
 
-    var offset = _objectIndexOffsets[id] ?? 0;
     // field object secondary address + object size * index
-    var address = 0xFFFFC300 + 0x40 * (index + offset);
+    var address = 0xFFFFC300 + 0x40 * index;
     return Longword(address);
   }
 }
