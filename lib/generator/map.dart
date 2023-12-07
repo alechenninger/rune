@@ -97,145 +97,13 @@ extension MapIdAsm on MapId {
 
 const _defaultVramTilesPerSprite = 0x48;
 
-// These offsets are used to account for assembly specifics, which allows for
-// variances in maps to be coded manually (such as objects).
-// todo: it might be nice to manage these with the assembly or the compiler
-//  itself rather than hard coding here.
-//  Program API would be the right place now that we have that.
-
-// todo: now that we automatically boostrap maps, maybe remove this
-final _objectIndexOffsets = <MapId, int>{};
-
 // todo: default to convention & allow override
 final _spriteArtLabels = BiMap<Sprite, Label>()
   ..addAll(Sprite.wellKnown.groupFoldBy(
       (sprite) => sprite, (previous, sprite) => Label('Art_${sprite.name}')));
 
-// todo: can use field objects jmp tbl in objects.dart now
-final _mapObjectSpecRoutines = {
-  AlysWaiting: FieldRoutine(Word('68'.hex), Label('FieldObj_NPCAlysPiata'),
-      SpecFactory((_) => AlysWaiting())),
-  AiedoShopperWithBags: FieldRoutine(Word(0x138), Label('loc_490B8'),
-      SpecFactory((d) => AiedoShopperWithBags(d))),
-  AiedoShopperMom: FieldRoutine(
-      Word(0x13C), Label('loc_49128'), SpecFactory((_) => AiedoShopperMom())),
-  Elevator: FieldRoutine(
-      Word(0x120), Label('FieldObj_Elevator'), SpecFactory((d) => Elevator(d))),
-  InvisibleBlock: FieldRoutine(Word(0x74), Label('FieldObj_InvisibleBlock'),
-      SpecFactory((_) => InvisibleBlock())),
-};
-
-// TODO(generation): it would be nice if we could describe mapping needs
-//  for routines without having to create model objects
-// After creating the parser, the high level model is less useful.
-// Kinda just boilerplate.
-final _npcBehaviorRoutines = {
-  FaceDown: FieldRoutine(Word('38'.hex), Label('FieldObj_NPCType1'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDown()))),
-  FaceDownSimpleSprite: FieldRoutine(
-      Word(0x134),
-      Label('FieldObj_Pana'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDownSimpleSprite()),
-          spriteMappingTiles: 18)),
-  WanderAround: FieldRoutine(Word('3C'.hex), Label('FieldObj_NPCType2'),
-      SpecFactory.npc((s, d) => Npc(s, WanderAround(d)))),
-  SlowlyWanderAround: FieldRoutine(Word('40'.hex), Label('FieldObj_NPCType3'),
-      SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)))),
-  FaceDownLegsHiddenNonInteractive: FieldRoutine(
-      Word(0x140),
-      Label('loc_49502'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNonInteractive()),
-          spriteMappingTiles: 8)),
-  FaceDownOrUpLegsHidden: FieldRoutine(
-      Word(0x108),
-      Label('FieldObj_NPCType32'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDownOrUpLegsHidden()),
-          spriteMappingTiles: 0x38)),
-  FixedFaceRight: FieldRoutine(
-      Word(0x14C),
-      Label('loc_49502'),
-      SpecFactory.npc((s, _) => Npc(s, FixedFaceRight()),
-          spriteMappingTiles: 8)),
-};
-
-abstract class SpecFactory {
-  bool get requiresSprite;
-
-  /// How many VRAM tiles are needed by this routine, if [requiresSprite].
-  ///
-  /// If [requiresSprite] is [false], returns null.
-  int? get spriteMappingTiles;
-  MapObjectSpec call(Sprite? sprite, Direction facing);
-
-  factory SpecFactory.npc(
-      MapObjectSpec Function(Sprite sprite, Direction facing) factory,
-      {int spriteMappingTiles = _defaultVramTilesPerSprite}) {
-    return _NpcFactory(factory, spriteMappingTiles);
-  }
-
-  factory SpecFactory(MapObjectSpec Function(Direction facing) factory) {
-    return _SpecFactory(factory);
-  }
-}
-
-class _NpcFactory implements SpecFactory {
-  @override
-  final requiresSprite = true;
-  @override
-  final int spriteMappingTiles;
-  final MapObjectSpec Function(Sprite sprite, Direction facing) _factory;
-  _NpcFactory(this._factory, this.spriteMappingTiles);
-  @override
-  MapObjectSpec call(Sprite? sprite, Direction facing) =>
-      _factory(sprite!, facing);
-}
-
-class _SpecFactory implements SpecFactory {
-  @override
-  final requiresSprite = false;
-  @override
-  final spriteMappingTiles = null;
-  final MapObjectSpec Function(Direction facing) _factory;
-  _SpecFactory(this._factory);
-  @override
-  MapObjectSpec call(Sprite? sprite, Direction facing) => _factory(facing);
-}
-
-final _specFactories = _buildSpecFactories();
-
-Map<Word, SpecFactory> _buildSpecFactories() {
-  var factories = <Word, SpecFactory>{};
-  for (var routine in [
-    ..._mapObjectSpecRoutines.values,
-    ..._npcBehaviorRoutines.values
-  ]) {
-    factories[routine.index] = routine.factory;
-  }
-  return factories;
-}
-
-class FieldRoutine {
-  final Word index;
-  final Label label;
-  final SpecFactory factory;
-
-  const FieldRoutine(this.index, this.label, this.factory);
-
-  @override
-  String toString() {
-    return 'FieldRoutine{index: $index, label: $label}';
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FieldRoutine &&
-          runtimeType == other.runtimeType &&
-          index == other.index &&
-          label == other.label;
-
-  @override
-  int get hashCode => index.hashCode ^ label.hashCode;
+extension SpriteLabel on Sprite {
+  Label get label => _spriteArtLabels[this] ?? Label(name);
 }
 
 MapAsm compileMap(
@@ -327,88 +195,72 @@ Word? _addBuiltInSpriteData(
 /// (in order to use the correct sprite for that object).
 Map<MapObjectId, Word> _compileMapSpriteData(
     List<MapObject> objects, Asm asm, int? spriteVramOffset) {
-  // aggregate all sprites and their vram tiles needed
-  // aggregate all objects and their sprites
-  // then assign vram tile numbers to objects.
-  var vramMapping = <Label, _SpriteVramMapping>{};
-  // The use of 'multimap' here is exactly why we need an aggregation:
-  // a sprite maybe used by multiple objects,
-  // and objects may have differing vram tiles needed.
-  var objectSprites = Multimap<Label, MapObjectId>();
+  // 1. Aggregate all art pointers and their vram tile layouts
+  // 2. Aggregate all objects and their art pointers
+  // 3. Assign vram tile numbers to objects,
+  //    considering what art is reused,
+  //    and the vram tile layout of each art pointer.
 
-  /*
-  It may be time to clean some of this up.
-
-  Given all objects,
-  - determine the preloaded sprites needed
-  - figure out VRAM tiles to use (regardless of whether sprites are preloaded!)
-
-  There are various edge cases that complicate this:
-  - Sprites have variable tile width
-  - Sprites may need to be duplicated depending on the sprite and the routine's
-    mappings
-  - Sprites may be loaded into RAM first (VRAM lazily), and objects still need
-    to pick a VRAM tile for when the graphics are loaded
-  
-  This also assumes lazily loaded sprites are not configurable.
-  If they were, we'd need to know:
-
-  - Why/when to lazily load sprites at all? Why not just preload them?
-  - Track RAM used like we track VRAM tiles to place them sequentially
-  */
+  // This is a multimap because art can be reused by multiple objects.
+  // However those objects can use the same art with different mappings.
+  var artPointers =
+      Multimap<ArtPointer?, (SpriteVramMapping, List<MapObjectId>)>();
 
   for (var obj in objects) {
     var spec = obj.spec;
-    Label? maybeLbl;
+    var routine = _fieldRoutines.bySpec(spec);
 
-    switch (spec) {
-      case Npc spec:
-        // todo: factor this into function
-        var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
-        if (routine == null) {
-          throw Exception(
-              'no routine configured for npc behavior ${spec.behavior}');
-        }
-
-        // try the sprite name as a label itself if not preconfigured
-        maybeLbl = _spriteArtLabels[spec.sprite] ?? Label(spec.sprite.name);
-
-        var tiles = routine.factory.spriteMappingTiles!;
-
-        // Bit of a hack for this one sprite;
-        // can clean it up if it turns out other sprites need similar treatment
-        var mapping = (maybeLbl == Label('Art_GuildReceptionist') &&
-                tiles >= 0x38 /* 0x28 offset + 16 tile width in sprite */)
-            ? _SpriteVramMapping(tiles, [0x28])
-            : _SpriteVramMapping(tiles);
-
-        vramMapping.update(maybeLbl, (current) => current.merge(mapping),
-            ifAbsent: () => mapping);
-        break;
-      case AsmSpec spec:
-        maybeLbl = spec.artLabel;
-        if (maybeLbl != null) {
-          // Get custom vram tile width if known for this routine,
-          // even though it's not specified in the model.
-          var factory = _specFactories[spec.routine];
-          var tiles = factory?.spriteMappingTiles;
-          var spriteMapping = tiles == null
-              ? _SpriteVramMapping.defaults()
-              : _SpriteVramMapping(tiles);
-
-          vramMapping.update(
-              maybeLbl, (current) => current.merge(spriteMapping),
-              ifAbsent: () => spriteMapping);
-        }
-        break;
+    if (routine == null) {
+      throw Exception('unknown field routine for spec $spec');
     }
 
-    if (maybeLbl != null) {
-      objectSprites.add(maybeLbl, obj.id);
+    switch (routine.spriteLayoutForSpec(spec)) {
+      case var vram when vram != null:
+        var art = vram.art;
+        var current = artPointers[art];
+
+        if (current.isEmpty) {
+          artPointers.add(art, (vram, [obj.id]));
+        } else {
+          // If any of the current vram mappings can be merged, merge
+          // and replace that mapping with the merged one.
+          // Else, add a new mapping.
+          var merged = false;
+          var updated = <(SpriteVramMapping, List<MapObjectId>)>[];
+
+          for (var (mapping, objects) in current) {
+            if (!merged) {
+              // Try merging.
+              var mergedMapping = mapping.merge(vram);
+              if (mergedMapping != null) {
+                updated.add((mergedMapping, [...objects, obj.id]));
+                merged = true;
+              } else {
+                // Couldn't merge. Keep this set and continue.
+                updated.add((mapping, objects));
+              }
+            } else {
+              // Already merged. Keep this set and continue.
+              updated.add((mapping, objects));
+            }
+          }
+
+          if (!merged) {
+            // Never merged. Add additional.
+            updated.add((vram, [obj.id]));
+          }
+
+          // Replace current mappings with updated mappings.
+          artPointers.removeAll(art);
+          artPointers.addValues(art, updated);
+        }
+
+        break;
+      // else, no sprite. just use vram tile 0.
     }
   }
 
-  var objectTiles = <MapObjectId, Word>{};
+  var vramTileByObject = <MapObjectId, Word>{};
   // If need to support required mappings...
   // This happens when hard coded in routine, but where the sprite
   // is still variable.
@@ -417,59 +269,60 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   // var requiredMappings = PriorityQueue<_SpriteVramMapping>(
   //     (a, b) => a.requiredVramTile!.compareTo(b.requiredVramTile!));
 
-  for (var entry in vramMapping.entries) {
-    if (spriteVramOffset == null) {
-      throw Exception('no vram offsets defined but map has sprites. '
-          'objects=${objectTiles.keys}');
-    }
+  for (var MapEntry(key: pointer, value: mappings)
+      in artPointers.asMap().entries) {
+    for (var (mapping, objects) in mappings) {
+      if (mapping.tiles == 0) continue;
 
-    var artLbl = entry.key;
-    var mapping = entry.value;
+      if (spriteVramOffset == null) {
+        throw Exception('no vram offsets defined but map has sprites. '
+            'objects=${vramTileByObject.keys}');
+      }
 
-    // TODO: looks like max vram tile should be 28, 21 (x, y) = ~0x55c
-    // >= 0x522~ seems to be weird
-    // there are none defined past 4e2 which is one of the weird ones
-    // loaded from ram
-    // greatest one loaded normally is 4b8
-    // is 0x500 right?
-    if (spriteVramOffset > 0x500) {
-      throw Exception('possibly too many sprites? '
-          'only remove this exception after testing. '
-          'tile number: $spriteVramOffset '
-          'art label: ${artLbl.name} '
-          'asm: $asm');
-    }
+      var tile = Word(spriteVramOffset);
 
-    var tile = Word(spriteVramOffset);
+      // if (requiredMappings.isNotEmpty) {
+      //   var required = requiredMappings.first;
+      //   if (required.requiredVramTile! <= tile) {
+      //     tile = required.requiredVramTile!;
+      //     mapping = required;
+      //     requiredMappings.removeFirst();
+      //   }
+      // }
 
-    // if (requiredMappings.isNotEmpty) {
-    //   var required = requiredMappings.first;
-    //   if (required.requiredVramTile! <= tile) {
-    //     tile = required.requiredVramTile!;
-    //     mapping = required;
-    //     requiredMappings.removeFirst();
-    //   }
-    // }
+      spriteVramOffset += mapping.tiles;
 
-    spriteVramOffset += mapping.tiles;
+      if (spriteVramOffset >= 0x534) {
+        throw Exception('sprite data extends into character sprites. '
+            'tile number: $tile '
+            'width: ${mapping.tiles} '
+            'art: $pointer '
+            'asm: $asm');
+      }
 
-    for (var obj in objectSprites[artLbl]) {
-      objectTiles[obj] = tile;
-    }
+      for (var obj in objects) {
+        vramTileByObject[obj] = tile;
+      }
 
-    asm.add(dc.w([tile]));
-    asm.add(dc.l([artLbl]));
+      if (pointer case RomArt(label: var lbl)) {
+        asm.add(dc.w([tile]));
+        asm.add(dc.l([lbl]));
 
-    for (var offset in mapping.duplicateOffsets) {
-      asm.add(dc.w([Word(tile.value + offset)]));
-      asm.add(dc.l([artLbl]));
+        for (var offset in mapping.duplicateOffsets) {
+          asm.add(dc.w([Word(tile.value + offset)]));
+          asm.add(dc.l([lbl]));
+        }
+      }
     }
   }
 
-  return objectTiles;
+  return vramTileByObject;
 }
 
-class _SpriteVramMapping {
+class SpriteVramMapping {
+  /// The art used for this mapping, if known.
+  final ArtPointer? art;
+
   /// The total tiles required by the sprite
   final int tiles;
 
@@ -477,21 +330,31 @@ class _SpriteVramMapping {
   ///
   /// This is used for sprites where the sprite data
   /// does not alone account for all facing directions needed.
-  final List<int> duplicateOffsets;
+  final Iterable<int> duplicateOffsets;
+
+  final bool animated;
 
   // See notes in _compileMapSpriteData
   // final Word? requiredVramTile;
 
-  const _SpriteVramMapping(this.tiles, [this.duplicateOffsets = const []]);
+  const SpriteVramMapping._(
+      {required this.tiles,
+      this.art,
+      this.duplicateOffsets = const [],
+      this.animated = false});
 
-  const _SpriteVramMapping.defaults() : this(_defaultVramTilesPerSprite);
+  bool get mergable => art != null && !animated;
 
-  _SpriteVramMapping merge(_SpriteVramMapping other) {
-    if (other.duplicateOffsets != duplicateOffsets) {
-      throw ArgumentError.value(other, 'other',
-          'cannot merge different duplicate offsets. this=$this');
-    }
-    return _SpriteVramMapping(max(tiles, other.tiles), duplicateOffsets);
+  SpriteVramMapping? merge(SpriteVramMapping other) {
+    if (!const IterableEquality<int>()
+        .equals(duplicateOffsets, other.duplicateOffsets)) return null;
+    if (animated || other.animated) return null;
+    if (art != other.art) return null;
+    if (art == null || other.art == null) return null;
+    return SpriteVramMapping._(
+        tiles: max(tiles, other.tiles),
+        art: art,
+        duplicateOffsets: duplicateOffsets);
   }
 
   @override
@@ -502,7 +365,7 @@ class _SpriteVramMapping {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is _SpriteVramMapping &&
+      other is SpriteVramMapping &&
           runtimeType == other.runtimeType &&
           tiles == other.tiles &&
           duplicateOffsets == other.duplicateOffsets;
@@ -548,41 +411,15 @@ Byte _compileInteractionScene(
 void _compileMapObjectData(
     Asm asm, MapObject obj, Word tileNumber, Byte dialogId) {
   var spec = obj.spec;
-  var facingAndDialog = dc.b([spec.startFacing.constant, dialogId]);
+  var routine = _fieldRoutines.bySpec(spec);
 
-  asm.add(comment(obj.id.toString()));
-
-  // hacky?
-  switch (spec) {
-    // TODO: can we make Npc and non-AsmSpec behave the same?
-    // (rather than using these maps)
-    // input spec, output is routine. same is true for asmspec too actually
-    case Npc():
-      var routine = _npcBehaviorRoutines[spec.behavior.runtimeType];
-
-      if (routine == null) {
-        throw Exception(
-            'no routine configured for npc behavior ${spec.behavior}');
-      }
-
-      asm.add(dc.w([(routine.index)]));
-
-      break;
-    case AsmSpec():
-      asm.add(dc.w([spec.routine]));
-
-      break;
-    default:
-      var routine = _mapObjectSpecRoutines[spec.runtimeType];
-
-      if (routine == null) {
-        throw Exception('no routine configured for spec $spec');
-      }
-
-      asm.add(dc.w([routine.index]));
+  if (routine == null) {
+    throw Exception('no routine known for spec $spec');
   }
 
-  asm.add(facingAndDialog);
+  asm.add(comment(obj.id.toString()));
+  asm.add(dc.w([routine.index]));
+  asm.add(dc.b([spec.startFacing.constant, dialogId]));
   asm.add(dc.w([tileNumber]));
   asm.add(
       dc.w([Word(obj.startPosition.x ~/ 8), Word(obj.startPosition.y ~/ 8)]));
@@ -631,7 +468,7 @@ void _compileMapAreaData(Asm asm, MapArea area, EventFlags eventFlags,
         Byte(7), // Interaction_DisplayDialogueGrandCross
         dialogId,
       ]));
-      
+
       break;
   }
 
@@ -642,24 +479,12 @@ extension ObjectRoutine on MapObject {
   FieldRoutine get routine {
     var spec = this.spec;
 
-    if (spec is AsmSpec) {
-      var index = spec.routine;
-      var label = labelOfFieldObjectRoutine(index);
-      if (label == null) {
-        throw Exception('invalid field object routine index: $index');
-      }
-      var factory = SpecFactory((d) =>
-          AsmSpec(artLabel: spec.artLabel, routine: index, startFacing: d));
-      return FieldRoutine(index, label, factory);
-    } else {
-      var routine = spec is Npc
-          ? _npcBehaviorRoutines[spec.behavior.runtimeType]
-          : _mapObjectSpecRoutines[spec.runtimeType];
-      if (routine == null) {
-        throw Exception('no routine configured for spec $spec');
-      }
-      return routine;
+    var routine = _fieldRoutines.bySpec(spec);
+    if (routine == null) {
+      throw Exception('no routine configured for spec $spec');
     }
+
+    return routine;
   }
 }
 
@@ -677,9 +502,8 @@ extension ObjectAddress on GameMap {
       throw StateError('map object not found in map. obj=$obj map=$this');
     }
 
-    var offset = _objectIndexOffsets[id] ?? 0;
     // field object secondary address + object size * index
-    var address = 0xFFFFC300 + 0x40 * (index + offset);
+    var address = 0xFFFFC300 + 0x40 * index;
     return Longword(address);
   }
 }
@@ -689,7 +513,11 @@ FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
   // skip general var, music, something else
   _skipToSprites(reader);
   var sprites = _readSprites(reader);
-  return sprites.keys.sorted((a, b) => a.compareTo(b)).firstOrNull;
+  return sprites.keys
+      .whereType<_VramSprite>()
+      .map((v) => v.tile)
+      .sorted((a, b) => a.compareTo(b))
+      .firstOrNull;
 }
 
 List<(MapId, Position, Direction, PartyArrangement)> mapTransitions(Asm asm) {
@@ -765,20 +593,29 @@ List<String> preprocessMapToRaw(Asm original,
     processed.add(comment(c).toString());
   }
 
-  addComment('General variable / Music');
+  addComment('General variable, music, tilesets');
   defineConstants(_skipToSprites(reader));
 
   // ignore & replace real sprite data
-  _readSprites(reader);
-  addComment('Sprites');
+  var spritesData = _readSprites(reader);
+  addComment('ROM sprites');
   processed.add(sprites);
+  addComment('RAM sprites');
+  defineConstants([
+    for (var MapEntry(key: loc, value: label) in spritesData.entries)
+      if (loc case _RamSprite(address: var address)) ...[
+        Word(0xfffe),
+        address,
+        label
+      ]
+  ]);
   defineConstants([Word(0xffff)]);
 
-  addComment('Secondary sprites, map updates, transition data');
+  addComment('RAM sprites (alt compression), map updates, transition data');
   defineConstants(_skipAfterSpritesToObjects(reader));
 
   // ignore & replace real object data
-  _readObjects(reader, {});
+  _readObjects(reader);
   addComment('Objects');
   processed.add(objects);
   defineConstants([Word(0xffff)]);
@@ -845,7 +682,7 @@ Future<GameMap> asmToMap(
 
   _skipAfterSpritesToObjects(reader);
 
-  var asmObjects = _readObjects(reader, sprites);
+  var asmObjects = _readObjects(reader);
 
   _skipAfterObjectsToLabels(reader);
 
@@ -951,9 +788,65 @@ Label _dialogLabelForAreaDialogue(bool isWorldMotavia, Byte param) {
   }
 }
 
-Iterable<Sized> _skipAfterObjectsToLabels(ConstantReader reader) {
-  // skip treasure and tile animations
-  return reader.skipThrough(value: Size.w.maxValueSized, times: 2);
+Iterable<Sized> _skipToSprites(ConstantReader reader) {
+  // skip general var, music, tilesets
+  return reader.skipThrough(times: 1, value: Size.w.maxValueSized);
+}
+
+Map<_SpriteLoc, Label> _readSprites(ConstantReader reader) {
+  var sprites = <_SpriteLoc, Label>{};
+
+  while (true) {
+    var control = reader.readWord();
+    if (control == Word(0xfffe)) {
+      var address = reader.readWord();
+      var sprite = reader.readLabel();
+      sprites[_RamSprite(address)] = sprite;
+    } else if (control.isNegative) {
+      return sprites;
+    } else {
+      var sprite = reader.readLabel();
+      sprites[_VramSprite(control)] = sprite;
+    }
+  }
+}
+
+sealed class _SpriteLoc {}
+
+class _VramSprite implements _SpriteLoc {
+  final Word tile;
+  _VramSprite(this.tile);
+  @override
+  String toString() {
+    return '_VramSprite{tile: $tile}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _VramSprite &&
+          runtimeType == other.runtimeType &&
+          tile == other.tile;
+  @override
+  int get hashCode => tile.hashCode;
+}
+
+class _RamSprite implements _SpriteLoc {
+  final Word address;
+  _RamSprite(this.address);
+  @override
+  String toString() {
+    return '_RamSprite{address: $address}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _RamSprite &&
+          runtimeType == other.runtimeType &&
+          address == other.address;
+  @override
+  int get hashCode => address.hashCode;
 }
 
 Iterable<Sized> _skipAfterSpritesToObjects(ConstantReader reader) {
@@ -970,33 +863,7 @@ Iterable<Sized> _skipAfterSpritesToObjects(ConstantReader reader) {
   return iterables.concat([sprite, updates, transition]);
 }
 
-Iterable<Sized> _skipToSprites(ConstantReader reader) {
-  // skip general var, music, something else
-  return reader.skipThrough(times: 1, value: Size.w.maxValueSized);
-}
-
-Map<Word, Label> _readSprites(ConstantReader reader) {
-  var sprites = <Word, Label>{};
-
-  while (true) {
-    var vramTile = reader.readWord();
-    //loc_519D2:
-    // 	tst.w	(a0)
-    // 	bmi.w	loc_51A14
-    if (vramTile.isNegative) {
-      // skip over secondary sprites for now
-      if (vramTile == Word(0xfffe)) {
-        reader.skipThrough(value: Size.w.maxValueSized, times: 1);
-      }
-
-      return sprites;
-    }
-    var sprite = reader.readLabel();
-    sprites[vramTile] = sprite;
-  }
-}
-
-List<_AsmObject> _readObjects(ConstantReader reader, Map<Word, Label> sprites) {
+List<_AsmObject> _readObjects(ConstantReader reader) {
   var objects = <_AsmObject>[];
 
   while (true) {
@@ -1012,16 +879,10 @@ List<_AsmObject> _readObjects(ConstantReader reader, Map<Word, Label> sprites) {
     var x = reader.readWord();
     var y = reader.readWord();
 
-    var spec = _specFactories[routineOrTerminate];
-
+    var spec = _fieldRoutines.byIndex(routineOrTerminate)?.factory;
     if (spec == null) {
-      // In this case, we don't have this routine incorporated in the model
-      // So populate the model with an escape hatch: raw ASM
-      // We can decide to model in later if needed
-
-      var spriteLbl = sprites[vramTile];
-      spec = SpecFactory((d) => AsmSpec(
-          artLabel: spriteLbl, routine: routineOrTerminate, startFacing: d));
+      throw Exception('unknown field routine: $routineOrTerminate '
+          'objectIndex=${objects.length}');
     }
 
     var position = Position(x.value * 8, y.value * 8);
@@ -1034,6 +895,11 @@ List<_AsmObject> _readObjects(ConstantReader reader, Map<Word, Label> sprites) {
         vramTile: vramTile,
         position: position));
   }
+}
+
+Iterable<Sized> _skipAfterObjectsToLabels(ConstantReader reader) {
+  // skip treasure and tile animations
+  return reader.skipThrough(value: Size.w.maxValueSized, times: 2);
 }
 
 Direction _byteToFacingDirection(Byte w) {
@@ -1061,33 +927,33 @@ class _AsmObject {
       required this.position});
 }
 
-List<MapObject> _buildObjects(MapId mapId, Map<Word, Label> sprites,
+List<MapObject> _buildObjects(MapId mapId, Map<_SpriteLoc, Label> sprites,
     List<_AsmObject> asmObjects, DialogTree dialogTree) {
   // The same scene must reuse same object in memory
   var scenesById = <Byte, Scene>{};
 
   return asmObjects.mapIndexed((i, asm) {
-    var artLbl = sprites[asm.vramTile];
+    var artLbl = sprites[_VramSprite(asm.vramTile)];
 
     if (asm.spec.requiresSprite && artLbl == null) {
       throw StateError('field object routine ${asm.routine} requires sprite '
           'but art label was null for tile number ${asm.vramTile}');
     }
 
-    var sprite =
-        _spriteArtLabels.inverse[artLbl] ?? artLbl?.map((l) => Sprite(l.name));
+    var sprite = _spriteArtLabels.inverse[artLbl] ??
+        switch (artLbl) { Label l => Sprite(l.name), null => null };
     var spec = asm.spec(sprite, asm.facing);
     var object = MapObject(
         id: '${mapId.name}_$i', startPosition: asm.position, spec: spec);
 
-    if (spec is Interactive) {
+    if (spec case Interactive s) {
       var scene = scenesById.putIfAbsent(
           asm.dialogId,
           // todo: if shared scene, default speaker may be misleading
           // but maybe better than nothing
           () => toScene(asm.dialogId.value, dialogTree,
               defaultSpeaker: object, isObjectInteraction: true));
-      (spec as Interactive).onInteract = scene;
+      s.onInteract = scene;
     }
 
     return object;
@@ -1208,3 +1074,382 @@ final _fallbackMapIdsByLabel = {
   Label('Map_AcademyBasement_B1'): MapId.PiataAcademyBasementB1,
   Label('Map_AcademyBasement_B2'): MapId.PiataAcademyBasementB2,
 };
+
+// TODO: make injectable in Program API for testing
+final _fieldRoutines = _FieldRoutineRepository([
+  FieldRoutine(
+      Word(0x68),
+      Label('FieldObj_NPCAlysPiata'),
+      spriteMappingTiles: 8,
+      SpecFactory((_) => AlysWaiting(), forSpec: AlysWaiting)),
+  FieldRoutine(
+      Word(0x138),
+      Label('loc_490B8'),
+      spriteMappingTiles: 8,
+      ramArt: RamArt(address: Word(0)),
+      vramAnimated: true,
+      SpecFactory((d) => AiedoShopperWithBags(d),
+          forSpec: AiedoShopperWithBags)),
+  FieldRoutine(
+      Word(0x13C),
+      Label('loc_49128'),
+      spriteMappingTiles: 8,
+      ramArt: RamArt(address: Word(0x0900)),
+      vramAnimated: true,
+      SpecFactory((_) => AiedoShopperMom(), forSpec: AiedoShopperMom)),
+  FieldRoutine(
+      Word(0x120),
+      Label('FieldObj_Elevator'),
+      spriteMappingTiles: 0,
+      SpecFactory((d) => Elevator(d), forSpec: Elevator)),
+  FieldRoutine(
+      Word(0x74),
+      Label('FieldObj_InvisibleBlock'),
+      spriteMappingTiles: 0,
+      SpecFactory((_) => InvisibleBlock(), forSpec: InvisibleBlock)),
+  FieldRoutine(Word(0x38), Label('FieldObj_NPCType1'),
+      SpecFactory.npc((s, _) => Npc(s, FaceDown()), forBehavior: FaceDown)),
+  FieldRoutine(
+      Word(0x134),
+      Label('FieldObj_Pana'),
+      spriteMappingTiles: 18,
+      SpecFactory.npc((s, _) => Npc(s, FaceDownSimpleSprite()),
+          forBehavior: FaceDownSimpleSprite)),
+  FieldRoutine(
+      Word(0x3C),
+      Label('FieldObj_NPCType2'),
+      SpecFactory.npc((s, d) => Npc(s, WanderAround(d)),
+          forBehavior: WanderAround)),
+  FieldRoutine(
+      Word(0x40),
+      Label('FieldObj_NPCType3'),
+      SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)),
+          forBehavior: SlowlyWanderAround)),
+  FieldRoutine(
+      Word(0x140),
+      Label('loc_49502'),
+      spriteMappingTiles: 8,
+      SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNonInteractive()),
+          forBehavior: FaceDownLegsHiddenNonInteractive)),
+  FieldRoutine(
+      Word(0x108),
+      Label('FieldObj_NPCType32'),
+      spriteMappingTiles: 0x38,
+      SpecFactory.npc((s, _) => Npc(s, FaceDownOrUpLegsHidden()),
+          forBehavior: FaceDownOrUpLegsHidden)),
+  FieldRoutine(
+      Word(0x14C),
+      Label('loc_49502'),
+      spriteMappingTiles: 8,
+      SpecFactory.npc((s, _) => Npc(s, FixedFaceRight()),
+          forBehavior: FixedFaceRight)),
+  FieldRoutine(
+      Word(0xF8),
+      Label('FieldObj_NPCType28'),
+      spriteMappingTiles: 6,
+      ramArt: RamArt(address: Word(0)),
+      vramAnimated: true,
+      SpecFactory.asm(Word(0xF8))),
+]);
+
+class _FieldRoutineRepository {
+  final Map<Word, FieldRoutine> _byIndex;
+  final Map<Label, FieldRoutine> _byLabel;
+  final Map<SpecModel, FieldRoutine> _byModel;
+
+  _FieldRoutineRepository(Iterable<FieldRoutine> routines)
+      : _byIndex = {for (var r in routines) r.index: r},
+        _byLabel = {for (var r in routines) r.label: r},
+        _byModel = {for (var r in routines) r.factory.routineModel: r};
+
+  FieldRoutine? byIndex(Word index) {
+    var byIndex = _byIndex[index];
+    if (byIndex != null) return byIndex;
+    var label = labelOfFieldObjectRoutine(index);
+    if (label == null) return null;
+    return FieldRoutine(index, label, SpecFactory.asm(index));
+  }
+
+  FieldRoutine? byLabel(Label label) {
+    var byLabel = _byLabel[label];
+    if (byLabel != null) return byLabel;
+    var index = indexOfFieldObjectRoutine(label);
+    if (index == null) return null;
+    return FieldRoutine(index, label, SpecFactory.asm(index));
+  }
+
+  FieldRoutine? bySpec(MapObjectSpec spec) {
+    switch (spec) {
+      // TODO: this may not be symmetrical
+      // it's possible the found routine constructs specs of a different type
+      case AsmSpec():
+        return byIndex(spec.routine);
+      case Npc():
+        return _byModel[NpcRoutineModel(spec.behavior.runtimeType)];
+      default:
+        return _byModel[SpecRoutineModel(spec.runtimeType)];
+    }
+  }
+}
+
+sealed class SpecModel {}
+
+class NpcRoutineModel extends SpecModel {
+  final Type behaviorType;
+
+  NpcRoutineModel(this.behaviorType);
+
+  @override
+  String toString() {
+    return 'NpcRoutineModel{$behaviorType}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NpcRoutineModel &&
+          runtimeType == other.runtimeType &&
+          behaviorType == other.behaviorType;
+
+  @override
+  int get hashCode => behaviorType.hashCode;
+}
+
+class SpecRoutineModel extends SpecModel {
+  final Type specType;
+
+  SpecRoutineModel(this.specType);
+
+  @override
+  String toString() {
+    return 'SpecRoutineModel{$specType}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SpecRoutineModel &&
+          runtimeType == other.runtimeType &&
+          specType == other.specType;
+
+  @override
+  int get hashCode => specType.hashCode;
+}
+
+class AsmRoutineModel extends SpecModel {
+  AsmRoutineModel();
+
+  @override
+  String toString() {
+    return 'AsmRoutineModel{}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsmRoutineModel && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+}
+
+/// Used to parse the ASM into the model
+/// as well as store necessary information for generation.
+abstract class SpecFactory {
+  bool get requiresSprite;
+
+  SpecModel get routineModel;
+
+  MapObjectSpec call(Sprite? sprite, Direction facing);
+
+  static SpecFactory npc<T extends NpcBehavior>(
+      Npc<T> Function(Sprite sprite, Direction facing) factory,
+      {required Type forBehavior}) {
+    return _NpcFactory(factory, forBehavior);
+  }
+
+  factory SpecFactory(MapObjectSpec Function(Direction facing) factory,
+      {required Type forSpec}) {
+    return _SpecFactory(factory, forSpec);
+  }
+
+  factory SpecFactory.asm(Word routine) {
+    return _AsmSpecFactory(routine);
+  }
+}
+
+class _NpcFactory<T extends NpcBehavior> implements SpecFactory {
+  @override
+  final requiresSprite = true;
+  @override
+  final SpecModel routineModel;
+  final Npc<T> Function(Sprite sprite, Direction facing) _factory;
+  _NpcFactory(this._factory, Type behaviorType)
+      : routineModel = NpcRoutineModel(behaviorType);
+  @override
+  Npc<T> call(Sprite? sprite, Direction facing) => _factory(sprite!, facing);
+}
+
+class _SpecFactory<T extends MapObjectSpec> implements SpecFactory {
+  @override
+  final requiresSprite = false;
+  @override
+  final SpecModel routineModel;
+  final T Function(Direction facing) _factory;
+  _SpecFactory(this._factory, Type specType)
+      : routineModel = SpecRoutineModel(specType);
+  @override
+  T call(Sprite? sprite, Direction facing) => _factory(facing);
+}
+
+class _AsmSpecFactory implements SpecFactory {
+  @override
+  final requiresSprite = false;
+  @override
+  final SpecModel routineModel = AsmRoutineModel();
+  final Word routine;
+  _AsmSpecFactory(this.routine);
+  @override
+  AsmSpec call(Sprite? sprite, Direction facing) {
+    var label = switch (sprite) {
+      Sprite() => _spriteArtLabels[sprite] ?? Label(sprite.name),
+      null => null,
+    };
+    return AsmSpec(artLabel: label, routine: routine, startFacing: facing);
+  }
+}
+
+class FieldRoutine<T extends MapObjectSpec> {
+  final Word index;
+  final Label label;
+
+  /// How many VRAM tiles are needed by this routine's sprite mappings.
+  ///
+  /// 0 if no sprite is used.
+  final int spriteMappingTiles;
+
+  /// Address field routine expects art to be loaded into.
+  ///
+  /// If null, art may be configurable via map data
+  /// (if not otherwise hard coded into the routine).
+  final RamArt? ramArt;
+
+  /// If mappings rely on animating the sprite in place in VRAM.
+  ///
+  /// In this case, VRAM cannot be shared between objects.
+  // TODO: this might go hand in hand with ram art?
+  // look into render flag $6 usage?
+  final bool vramAnimated;
+
+  final SpecFactory factory;
+
+  SpriteVramMapping? spriteLayoutForSpec(MapObjectSpec spec) {
+    // What do we need to know?
+    // - how the sprite is defined: routine->rom, map->rom, map->ram
+    // - this varies based on the spec. we don't know why each option is used.
+    // So we do this:
+    // - assume there is a sprite, unless tiles are set to 0.
+    // - if a sprite is configured, assume the routine allows it to be
+    //   configured via rom pointers. (map->rom)
+    // - if a sprite is not configured, fall back to routine's ramart.
+    //   if present, this uses map->ram.
+    //   if not, we assume routine->rom (indicated via null art pointer, but
+    //   non-zero tiles).
+    // This can be wrong in the future (e.g. if we add configurable sprites
+    // for routines which use ram) but for now it should work.
+
+    if (spriteMappingTiles == 0) return null;
+
+    var maybeLbl =
+        switch (spec) { MayConfigureSprite s => s.sprite?.label, _ => null };
+    var artPointer = maybeLbl == null ? ramArt : RomArt(label: maybeLbl);
+
+    // Bit of a hack for this one sprite;
+    // can clean it up if it turns out other sprites need similar treatment
+    var duplicateOffsets = (maybeLbl == Label('Art_GuildReceptionist') &&
+            spriteMappingTiles >=
+                0x38 /* 0x28 offset + 16 tile width in sprite */)
+        ? const [0x28]
+        : const <int>[];
+
+    return SpriteVramMapping._(
+        tiles: spriteMappingTiles,
+        art: artPointer,
+        duplicateOffsets: duplicateOffsets,
+        animated: vramAnimated);
+  }
+
+  const FieldRoutine(this.index, this.label, this.factory,
+      {this.spriteMappingTiles = _defaultVramTilesPerSprite,
+      this.ramArt,
+      this.vramAnimated = false});
+
+  @override
+  String toString() {
+    return 'FieldRoutine{index: $index, label: $label, '
+        'spriteMappingTiles: $spriteMappingTiles, factory: $factory}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FieldRoutine &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          label == other.label &&
+          spriteMappingTiles == other.spriteMappingTiles &&
+          ramArt == other.ramArt &&
+          factory == other.factory;
+
+  @override
+  int get hashCode =>
+      index.hashCode ^
+      label.hashCode ^
+      spriteMappingTiles.hashCode ^
+      ramArt.hashCode ^
+      factory.hashCode;
+}
+
+sealed class ArtPointer {}
+
+class RomArt extends ArtPointer {
+  final Label label;
+
+  RomArt({required this.label});
+
+  @override
+  String toString() {
+    return 'RomArt{label: $label}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RomArt &&
+          runtimeType == other.runtimeType &&
+          label == other.label;
+
+  @override
+  int get hashCode => label.hashCode;
+}
+
+class RamArt extends ArtPointer {
+  final Word address;
+
+  RamArt({required this.address});
+
+  @override
+  String toString() {
+    return 'RamArt{address: $address}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RamArt &&
+          runtimeType == other.runtimeType &&
+          address == other.address;
+
+  @override
+  int get hashCode => address.hashCode;
+}

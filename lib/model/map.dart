@@ -1090,6 +1090,10 @@ abstract class MapObjectSpec {
   Direction get startFacing;
 }
 
+abstract class MayConfigureSprite {
+  Sprite? get sprite => null;
+}
+
 abstract mixin class Interactive<T extends Interactive<T>> {
   Scene onInteract = Scene.none();
   T withNewInteraction();
@@ -1099,7 +1103,9 @@ abstract class InteractiveMapObjectSpec extends MapObjectSpec
     with Interactive<InteractiveMapObjectSpec> {}
 
 /// Spec for class of behaviors with interchangeable sprites.
-class Npc extends MapObjectSpec {
+class Npc<T extends NpcBehavior> extends MapObjectSpec
+    implements MayConfigureSprite {
+  @override
   final Sprite sprite;
   final NpcBehavior behavior;
 
@@ -1127,7 +1133,8 @@ class Npc extends MapObjectSpec {
   int get hashCode => sprite.hashCode ^ behavior.hashCode;
 }
 
-class InteractiveNpc extends Npc implements InteractiveMapObjectSpec {
+class InteractiveNpc<T extends NpcBehavior> extends Npc<T>
+    implements InteractiveMapObjectSpec {
   @override
   InteractiveNpcBehavior get behavior =>
       super.behavior as InteractiveNpcBehavior;
@@ -1619,9 +1626,15 @@ class FixedFaceRight extends InteractiveNpcBehavior {
   }
 }
 
-class AsmSpec extends MapObjectSpec {
+class AsmSpec extends MapObjectSpec implements MayConfigureSprite {
   final Label? artLabel;
+
+  @override
+  Sprite? get sprite =>
+      switch (artLabel) { Label l => Sprite(l.name), null => null };
+
   final Word routine;
+
   @override
   final Direction startFacing;
 
