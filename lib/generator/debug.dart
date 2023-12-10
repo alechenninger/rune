@@ -1,3 +1,4 @@
+import 'package:quiver/check.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/generator.dart';
 
@@ -48,18 +49,19 @@ EventAsm debugStart({
 }
 
 Asm _loadParty(List<model.Character> party) {
+  checkArgument(party.isNotEmpty, message: 'Party must not be empty');
+
   var asm = Asm.empty();
 
-  asm.add(move.l((model.shay.charId << 24.toValue | 0xffffff.toLongword).i,
+  asm.add(move.l((party[0].charId << 24.toValue | 0xffffff.toLongword).i,
       Constant('Current_Party_Slots').w));
 
-  for (int i = 0; i < party.length; i++) {
+  for (int i = 1; i < party.length; i++) {
     var c = party[i];
-    if (c == model.shay) continue;
     asm.addNewline();
     asm.add(Asm([
-      // + 2 (starts at second character; first is Shay)
-      move.b(c.charIdAddress, Constant('Current_Party_Slot_${i + 2}').w),
+      // + 1 because slots start at 1, not 0
+      move.b(c.charIdAddress, Constant('Current_Party_Slot_${i + 1}').w),
       moveq(c.charIdAddress, d0),
       jsr(Label('Event_AddMacro').l)
     ]));
