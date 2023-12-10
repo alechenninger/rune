@@ -165,6 +165,8 @@ class Span {
   final String text;
   final bool italic;
 
+  // TODO: process / validate text
+  // e.g. newlines don't really make sense (yet?).
   Span(this.text, {this.italic = false});
 
   Span.italic(String text) : this(text, italic: true);
