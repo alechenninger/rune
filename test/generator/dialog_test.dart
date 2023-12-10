@@ -34,6 +34,28 @@ void main() {
 	dc.b	"Test 1 2 3"''');
   });
 
+  test('newlines are converted to spaces', () {
+    var dialog = Dialog(speaker: alys, spans: DialogSpan.parse('Test\n1 2 3'));
+
+    print(dialog);
+
+    var asm = dialog.toAsm();
+
+    expect(asm.toString(), r'''	dc.b	$F4, $02
+	dc.b	"Test 1 2 3"''');
+  });
+
+  test('repeat newlines are converted to a single space', () {
+    var dialog = Dialog(speaker: alys, spans: DialogSpan.parse('Test\n\n1 2 3'));
+
+    print(dialog);
+
+    var asm = dialog.toAsm();
+
+    expect(asm.toString(), r'''	dc.b	$F4, $02
+	dc.b	"Test 1 2 3"''');
+  });
+
   test('all italics uses ascii for non-italics characters', () {
     var dialog = Dialog(spans: [
       DialogSpan("Alys peered out over the Motavian wilds, as the rising",

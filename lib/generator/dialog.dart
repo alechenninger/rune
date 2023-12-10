@@ -573,7 +573,11 @@ final _transforms = {
   'é': 'e',
 };
 
-final _replacements = {RegExp('  +'): ' '};
+final _replacements = {
+  RegExp('  +'): ' ',
+  RegExp('\n+'): ' ',
+  RegExp('\r+'): ' ',
+};
 
 // TODO: this is a bit of a mess, clean it up
 
