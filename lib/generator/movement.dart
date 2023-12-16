@@ -130,6 +130,9 @@ extension IndividualMovesToAsm on IndividualMoves {
           var afterSteps = movement.lookahead(stepsToTake);
 
           if (afterSteps.relativeDistance > 0.steps) {
+            // TODO: may need to wait to be done moving
+            // However, if this is a relative movement, we must already
+            // know where the object is to prevent collision problems.
             generator.ensureScriptable(moveable);
 
             asm.add(moveable.position().withPosition(
@@ -276,6 +279,10 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
     var pos = dest.value;
 
     generator.asm.add(obj.toA4(generator._mem));
+    // TODO: may need to wait for object to be done moving
+    // might be okay because this is moving them to a valid position.
+    // also, if we're moving them, we likely know the path to avoid collisions,
+    // so we probably know they're not otherwise moving randomly.
     generator.ensureScriptable(obj);
 
     if (length == 1) {
@@ -356,6 +363,8 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
 
               return Asm([
                 obj.toA(load, memory),
+                // TODO: if only facing,
+                //  we may need to wait for movements to finish.
                 if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
                 move.w(d, facing_dir(load)),
               ]);
@@ -439,29 +448,36 @@ class _MovementGenerator {
   }
 
   void updateFacing(FieldObject obj, DirectionExpression dir, int moveIndex) {
-    asm.add(dir.withDirection(
-        labelSuffix: '_${[
-          _eventIndex,
-          _labelSafeString(obj),
-          moveIndex
-        ].whereNotNull().join('_')}',
-        memory: _mem,
-        asm: (d) {
-          return Asm([
-            obj.toA4(_mem),
-            // This ensures facing doesn't change during subsequent movements.
-            if (!scriptable(obj)) ...[
-              asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect),
-              // Destination attributes are not always set,
-              // resulting in odd character movements with this routine.
-              PositionOfObject(obj).withPosition(
-                  memory: _mem, asm: (x, y) => setDestination(x: x, y: y)),
-            ],
-            updateObjFacing(d)
-          ]);
-        }));
+    var labelSuffix = '_${[
+      _eventIndex,
+      _labelSafeString(obj),
+      moveIndex
+    ].whereNotNull().join('_')}';
 
-    _mem.setRoutine(obj, scriptableObjectRoutine);
+    // This ensures facing doesn't change during subsequent movements.
+    if (!scriptable(obj)) {
+      asm.add(Asm([
+        // If we don't know the current position,
+        // we have to be careful because the object may be mid-movement
+        // TODO: this can be optimized out if object doesn't move.
+        if (obj.position().known(_mem) == null)
+          _waitForMovement(obj: obj, labelSuffix: labelSuffix, memory: _mem),
+        obj.toA4(_mem),
+        asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect),
+        // Destination attributes are not always set,
+        // resulting in odd character movements with this routine.
+        PositionOfObject(obj).withPosition(
+            memory: _mem, asm: (x, y) => setDestination(x: x, y: y)),
+      ]));
+
+      _mem.setRoutine(obj, scriptableObjectRoutine);
+    }
+
+    asm.add(dir.withDirection(
+        labelSuffix: labelSuffix,
+        memory: _mem,
+        asm: (d) => Asm([obj.toA4(_mem), updateObjFacing(d)])));
+
     _mem.putInAddress(a3, null);
 
     var known = dir.known(_mem);
@@ -474,28 +490,54 @@ class _MovementGenerator {
   }
 }
 
-int minOf(int? i1, int other) {
-  return i1 == null ? other : math.min(i1, other);
-}
-
-extension Cap on int? {
-  int min(int other) {
-    var self = this;
-    return self == null ? other : math.min(self, other);
-  }
-}
-
 String _labelSafeString(FieldObject obj) {
   return obj.toString().replaceAll(RegExp(r'[{}:,]'), '');
 }
 
+Asm _waitForMovement(
+    {required FieldObject obj,
+    required String labelSuffix,
+    required Memory memory}) {
+  var startOfLoop =
+      Label('.wait_for_movement_${_labelSafeString(obj)}$labelSuffix');
+  return Asm([
+    label(startOfLoop),
+    obj.toA4(memory, force: true),
+    jsr(obj.routine),
+    jsr(Label('Field_LoadSprites').l),
+    jsr(Label('Field_BuildSprites').l),
+    jsr(Label('VInt_Prepare').l),
+    obj.toA4(memory, force: true), // force because we know a4 is overwritten
+    moveq(0.i, d0),
+    move.w(x_step_duration(a4), d0),
+    or.w(y_step_duration(a4), d0),
+    bne.s(startOfLoop),
+  ]);
+}
+
 extension FieldObjectAsm on FieldObject {
+  Address get routine {
+    return switch (this) {
+      Character c => c.routineAddress,
+      MapObject m => m.routine.label.l,
+      // Slot could be loaded from memory and field obj jump think
+      _ => throw UnsupportedError('routine for $this')
+    };
+  }
+
   /// NOTE! May overwrite data registers.
-  Asm toA4(Memory ctx) {
+  ///
+  /// By default, will avoid a redundant load if the object is already in a4.
+  /// If [force] is true, the load will happen regardless.
+  /// This is useful in situations when the instruction may be reached
+  /// from multiple source points (e.g. loops).
+  /// It can also be useful if you know the register was overwritten
+  /// and need to reload it.
+  Asm toA4(Memory ctx, {bool force = false}) {
     var current = ctx.inAddress(a4)?.obj;
     // TODO(movement generator): should we resolve when putting into address
     //  memory?
-    if (current == this || current == resolve(ctx)) {
+    if (!force && (current == this || current == resolve(ctx))) {
       return Asm.empty();
     }
 
@@ -633,7 +675,7 @@ extension CharacterData on Character {
 
   Address get charIdAddress => charId.i;
 
-  Address get fieldObjectRoutine {
+  Address get routineAddress {
     switch (runtimeType) {
       case Shay:
         return Label('FieldObj_Chaz').l;

@@ -789,7 +789,19 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              lea(0xFFFFC300.toLongword.l, a4),
+              label(Label(
+                  '.wait_for_movement_MapObjecttestnpc_1_MapObjecttestnpc_0')),
+              lea(0xFFFFC300.l, a4),
+              jsr(Label('FieldObj_NPCType2').l),
+              jsr(Label('Field_LoadSprites').l),
+              jsr(Label('Field_BuildSprites').l),
+              jsr(Label('VInt_Prepare').l),
+              lea(0xFFFFC300.l, a4),
+              moveq(0.i, d0),
+              move.w(x_step_duration(a4), d0),
+              or.w(y_step_duration(a4), d0),
+              bne.s(Label(
+                  '.wait_for_movement_MapObjecttestnpc_1_MapObjecttestnpc_0')),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(curr_x_pos(a4), dest_x_pos(a4)),
               move.w(curr_y_pos(a4), dest_y_pos(a4)),

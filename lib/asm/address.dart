@@ -63,6 +63,11 @@ class Absolute extends _Address {
   Absolute get l => size.isL ? this : Absolute._(exp: exp, size: long);
 }
 
+extension ToAbsolute on int {
+  Absolute get w => Absolute.word(toValue);
+  Absolute get l => Absolute.long(toValue);
+}
+
 /// A fixed value
 class Immediate extends _Address {
   const Immediate(Expression e) : super('#$e');

@@ -22,6 +22,7 @@ const MoveMnemonic move = MoveMnemonic();
 const MoveaMnemonic movea = MoveaMnemonic();
 const ClrMnemonic clr = ClrMnemonic();
 const AndiMnemonic andi = AndiMnemonic();
+const OrMnemonic or = OrMnemonic();
 const DivuMnemonic divu = DivuMnemonic();
 const BranchMnemonic bra = BranchMnemonic('bra');
 const BranchMnemonic bsr = BranchMnemonic('bsr');
@@ -195,6 +196,14 @@ class CmpiMnemonic {
   Asm b(Address from, Address to) => cmd('cmpi.b', [from, to]);
   Asm w(Address from, Address to) => cmd('cmpi.w', [from, to]);
   Asm l(Address from, Address to) => cmd('cmpi.l', [from, to]);
+}
+
+class OrMnemonic {
+  const OrMnemonic();
+
+  Asm b(Address from, Address to) => cmd('or.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('or.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('or.l', [from, to]);
 }
 
 class AsmError extends ArgumentError {
