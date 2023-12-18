@@ -516,12 +516,19 @@ Asm _waitForMovement(
 }
 
 extension FieldObjectAsm on FieldObject {
-  int compactId(Memory mem) {
+  int? compactId(Memory mem) {
     return switch (resolve(mem)) {
       Character c => c.charIdValue.value,
       Slot s => s.index | 0x80,
       MapObject m => (mem.currentMap!.indexOf(m.id)! + 12) | 0x80,
-      _ => throw UnimplementedError(),
+      _ => null,
+    };
+  }
+
+  bool get hasCompactIdRepresentation {
+    return switch (this) {
+      Character() || Slot() || MapObject() || MapObjectById() => true,
+      _ => false,
     };
   }
 

@@ -134,7 +134,7 @@ class Program {
     var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
         startingMap: startingMap,
         eventFlags: _eventFlags,
-        eventType: sceneEventType(scene.events));
+        eventType: _sceneEventType(scene.events));
 
     for (var event in scene.events) {
       event.visit(generator);
@@ -281,7 +281,7 @@ $F2 = Determines actions during dialogues. The byte after this has the following
   $B = Sets event flag
   $C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
   */
-EventType? sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
+EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
   // SetContext is not a perceivable event, so ignore
   events = events.whereNot((e) => e is SetContext).toList(growable: false);
 
@@ -296,6 +296,11 @@ EventType? sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
         // Events need dialog after, otherwise their order
         // creates unwanted dialog windows.
         (event is Dialog && !event.hidePanelsOnClose) ||
+        (event is IndividualMoves &&
+            switch (event.justFacing()) {
+              var f? => _canFaceInDialog(f),
+              null => false
+            }) ||
         (event is PlaySound && hasDialogAfter(i)) ||
         (event is PlayMusic && hasDialogAfter(i)) ||
         (event is ShowPanel && event.showDialogBox && hasDialogAfter(i)) ||
@@ -433,9 +438,9 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  /// See [sceneEventType].
+  /// See [_sceneEventType].
   EventType? needsEvent(List<Event> events) {
-    return sceneEventType(events, interactingWith: _interactingWith);
+    return _sceneEventType(events, interactingWith: _interactingWith);
   }
 
   void runEventFromInteractionIfNeeded(List<Event> events,
@@ -539,46 +544,16 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void individualMoves(IndividualMoves moves) {
     var facing = moves.justFacing();
-    if (facing != null) {
-      // Try to calculate to determine if we can do this in dialog
-      var faceInDialog = Asm.empty();
-      var dialog = true;
+    Asm? dialogAsm;
 
-      for (var MapEntry(key: obj, value: dir) in facing.entries) {
-        var id = obj.compactId(_memory);
-        var face = switch (dir) {
-          Direction d => d.constant,
-          DirectionOfVector(
-            from: PositionOfObject from,
-            to: PositionOfObject to
-          )
-              when (from.obj == obj) =>
-            Word(to.obj.compactId(_memory) | 0x100),
-          _ => null,
-        };
-
-        if (face == null) {
-          dialog = false;
-          break;
-        }
-
-        faceInDialog.add(Asm([
-          dc.b([Byte(0xf2), Byte(0xE), Byte(id)]),
-          dc.w([face])
-        ]));
-      }
-
-      if (dialog) {
-        _addToEventOrDialog(moves,
-            inDialog: () => _addToDialog(faceInDialog),
-            inEvent: (i) => moves.toAsm(_memory, eventIndex: i));
-        return;
-      }
-
-      // fall through
+    if (facing != null &&
+        (dialogAsm = _faceInDialog(facing, memory: _memory)) != null) {
+      _addToEventOrDialog(moves,
+          inDialog: () => _addToDialog(dialogAsm!),
+          inEvent: (i) => moves.toAsm(_memory, eventIndex: i));
+    } else {
+      _addToEvent(moves, (i) => moves.toAsm(_memory, eventIndex: i));
     }
-
-    _addToEvent(moves, (i) => moves.toAsm(_memory, eventIndex: i));
   }
 
   @override
@@ -2050,6 +2025,53 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.isDialogInCram = true;
   }
 }
+
+Asm? _faceInDialog(Map<FieldObject, DirectionExpression> facing,
+    {required Memory memory}) {
+  var asm = Asm.empty();
+
+  for (var MapEntry(key: obj, value: dir) in facing.entries) {
+    var id = obj.compactId(memory);
+    var face = switch (dir) {
+      Direction d => d.constant,
+      DirectionOfVector(from: PositionOfObject from, to: PositionOfObject to)
+          when (from.obj == obj) =>
+        switch (to.obj.compactId(memory)) {
+          int id => Word(id | 0x100),
+          _ => null
+        },
+      _ => null,
+    };
+
+    if (face == null || id == null) {
+      return null;
+    }
+
+    asm.add(Asm([
+      dc.b([Byte(0xf2), Byte(0xE), Byte(id)]),
+      dc.w([face])
+    ]));
+  }
+
+  return asm;
+}
+
+bool _canFaceInDialog(Map<FieldObject, DirectionExpression> facing) =>
+    facing.entries.every((entry) {
+      var MapEntry(key: obj, value: dir) = entry;
+      if (!obj.hasCompactIdRepresentation) return false;
+      switch (dir) {
+        case Direction():
+        case DirectionOfVector(
+              from: PositionOfObject from,
+              to: PositionOfObject to
+            )
+            when (from.obj == obj && to.obj.hasCompactIdRepresentation):
+          return true;
+        case _:
+          return false;
+      }
+    });
 
 int? _lastLineIfFadeOut(Asm asm) {
   for (var i = asm.lines.length - 1; i >= 0; --i) {
