@@ -381,9 +381,20 @@ class _VramTiles {
     if (_afterChest.claim(mapping)) return true;
 
     if (mapping.lazilyLoaded) {
+      // TODO: we can technically try to claim overrun in main region first
+      // this would require pushing out chest region
+      // it may push it out past its end, and then also push out after chest
+      // if (_main.claim(mapping, allowOverrunUpTo: 0x534)) {
+      //   var dropped = _chest.offsetBy(_main.overrun, allowOverrunUpTo: 0x534);
+      //   if (dropped.isNotEmpty) {
+      //     return false;
+      //   }
+      //   _afterChest.offsetBy(_chest.overrun);
+      // }
+
       if (_chest.claim(mapping, allowOverrunUpTo: 0x534)) {
         var overrun = _chest.overrun;
-        var dropped = _afterChest.bumpBy(overrun);
+        var dropped = _afterChest.offsetBy(overrun);
         return reclaim(dropped);
       }
     }
@@ -391,7 +402,8 @@ class _VramTiles {
     var dropped = _main.dropLazy(untilFree: mapping.tiles);
 
     if (dropped != null) {
-      assert(_main.claim(mapping));
+      var claimed = _main.claim(mapping);
+      assert(claimed);
       for (var d in dropped) {
         if (!claim(d)) return false;
       }
@@ -421,7 +433,8 @@ class _VramTiles {
 }
 
 class _VramRegion {
-  int _offset = 0;
+  final start;
+  int _offset;
   final int end;
   int get free => end - occupiedEnd;
   int get occupiedEnd => _offset + width;
@@ -433,10 +446,7 @@ class _VramRegion {
   // Smallest first
   final _mappings = <_SpriteVramMapping>[];
 
-  _VramRegion({required int start, required this.end}) {
-    _offset = start;
-    _next = 0;
-  }
+  _VramRegion({required this.start, required this.end}) : _offset = start;
 
   Word? tileFor(_SpriteVramMapping mapping) {
     var tile = _offset;
@@ -471,11 +481,12 @@ class _VramRegion {
     return dropped;
   }
 
-  /// Increases the [_offset] by [amount], dropping the smallest mappings
-  /// which exceed the [end] after the bump.
+  /// Sets the offset to [start] plus [amount],
+  /// dropping the smallest mappings which exceed the [end]
+  /// after the adjustment, if any.
   /// These dropped mappings are returned.
-  Iterable<_SpriteVramMapping> bumpBy(int amount) {
-    _offset += amount;
+  Iterable<_SpriteVramMapping> offsetBy(int amount) {
+    _offset = start + amount;
     var dropped = <_SpriteVramMapping>[];
     while (overrun > 0) {
       var smallest =
@@ -531,7 +542,7 @@ class _SpriteVramMapping {
   // See notes in _compileMapSpriteData
   // final Word? requiredVramTile;
 
-  const _SpriteVramMapping._(
+  _SpriteVramMapping._(
       {required this.tiles,
       this.art,
       this.duplicateOffsets = const [],
@@ -1283,7 +1294,14 @@ final _fieldRoutines = _FieldRoutineRepository([
       Word(0x68),
       Label('FieldObj_NPCAlysPiata'),
       spriteMappingTiles: 8,
+      vramAnimated: true,
       SpecFactory((_) => AlysWaiting(), forSpec: AlysWaiting)),
+  FieldRoutine(
+      Word(0xF0),
+      Label('FieldObj_NPCGryz'),
+      spriteMappingTiles: 8,
+      vramAnimated: true,
+      SpecFactory.asm(Word(0xF0))),
   FieldRoutine(
       Word(0x138),
       Label('loc_490B8'),
@@ -1383,6 +1401,11 @@ final _fieldRoutines = _FieldRoutineRepository([
       // TODO(field routines): this can probably be less
       spriteMappingTiles: 0x40,
       SpecFactory.asm(Word(0x2F4))),
+  FieldRoutine(
+      Word(0x1B0),
+      Label('FieldObj_DorinChair'),
+      spriteMappingTiles: 0x15,
+      SpecFactory.asm(Word(0x1B0))),
 ]);
 
 class _FieldRoutineRepository {

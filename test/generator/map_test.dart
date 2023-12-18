@@ -467,7 +467,7 @@ void main() {
 
       expect(
           mapAsm.sprites,
-          Asm([
+            Asm([
             dc.w([0x2d0.toWord]),
             dc.l([Constant('Art_PalmanMan1')]),
             dc.w([0x31E.toWord]),
