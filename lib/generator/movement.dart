@@ -519,7 +519,7 @@ extension FieldObjectAsm on FieldObject {
   int? compactId(Memory mem) {
     return switch (resolve(mem)) {
       Character c => c.charIdValue.value,
-      Slot s => s.index | 0x80,
+      Slot s => (s.index - 1) | 0x80,
       MapObject m => (mem.currentMap!.indexOf(m.id)! + 12) | 0x80,
       _ => null,
     };
