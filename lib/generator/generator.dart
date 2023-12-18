@@ -800,6 +800,9 @@ class SceneAsmGenerator implements EventVisitor {
         // off of for unset branch
         var parent = _memory;
 
+        // If we came here from dialog, terminate it.
+        _terminateDialog();
+
         // run isSet events unless there are none
         if (ifFlag.isSet.isEmpty) {
           _eventAsm.add(branchIfExtendableFlagSet(

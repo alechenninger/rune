@@ -495,7 +495,7 @@ main() {
     expect(
         asm.event.withoutComments().withoutEmptyLines().trim(),
         Asm([
-          getAndRunDialog3(Byte.zero.i),
+          getAndRunDialog3LowDialogId(Byte.zero.i),
           // this clears palette
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
@@ -509,7 +509,7 @@ main() {
           jsr(Label('RefreshMap').l),
           // this fades it in somehow
           jsr(Label('Pal_FadeIn').l),
-          getAndRunDialog3(Byte.zero.i),
+          getAndRunDialog3LowDialogId(Byte.zero.i),
         ]));
 
     var expectedTrees = DialogTrees();
@@ -1070,12 +1070,12 @@ EventFlag_Test001 = $01'''));
             bhi.w(Label('.1_gt')),
 
             // lt branch
-            getAndRunDialog3(Byte.zero.i),
+            getAndRunDialog3LowDialogId(Byte.zero.i),
             bra.w(Label('.1_continue')),
 
             label(Label('.1_gt')),
             // gt branch
-            getAndRunDialog3(Byte.one.i),
+            getAndRunDialog3LowDialogId(Byte.one.i),
 
             // continue
             label(Label('.1_continue')),

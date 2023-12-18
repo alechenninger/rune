@@ -447,8 +447,7 @@ Asm getAndRunDialog(Address dialogId) {
   ]);
 }
 
-@Deprecated('uses moveq - broken where dialogId > 127 (0x7f)')
-Asm getAndRunDialog3(Address dialogId) {
+Asm getAndRunDialog3LowDialogId(Address dialogId) {
   return Asm([
     moveq(dialogId, d0),
     jsr(Label('Event_GetAndRunDialogue3').l),

@@ -138,7 +138,7 @@ ${dialog2.toAsm()}
           mapAsm.events.withoutComments().trim(),
           Asm([
             setLabel('Event_GrandCross_Test_testObj'),
-            getAndRunDialog3(Byte.one.i),
+            getAndRunDialog3LowDialogId(Byte.one.i),
             generateEventAsm([moves], origState).withoutComments(),
             returnFromDialogEvent()
           ]));
@@ -178,7 +178,7 @@ ${dialog2.toAsm()}
             Asm([
               setLabel('Event_GrandCross_Test_0'),
               jsr(Label('Interaction_UpdateObj').l),
-              getAndRunDialog3(Byte.one.i),
+              getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([
                 IndividualMoves()..moves[alys] = (StepPath()..distance = 1.step)
               ], origState)
@@ -267,7 +267,7 @@ ${dialog2.toAsm()}
             Asm([
               setLabel('Event_GrandCross_Test_0'),
               jsr(Label('Interaction_UpdateObj').l),
-              getAndRunDialog3(Byte.one.i),
+              getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([moves], origState).withoutComments(),
               popAndRunDialog3,
               returnFromDialogEvent()
@@ -328,7 +328,7 @@ ${dialog2.toAsm()}
             Asm([
               setLabel('Event_GrandCross_Test_0'),
               jsr(Label('Interaction_UpdateObj').l),
-              getAndRunDialog3(Byte.one.i),
+              getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([move1], origState).withoutComments(),
               popAndRunDialog3,
               generateEventAsm([move2], origState..followLead = false)
@@ -375,7 +375,7 @@ ${dialog2.toAsm()}
             mapAsm.events.withoutComments().trim(),
             Asm([
               setLabel('Event_GrandCross_Test_0'),
-              getAndRunDialog3(Byte.one.i),
+              getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([pause]).withoutComments(),
               returnFromDialogEvent()
             ]));
@@ -512,7 +512,7 @@ ${dialog2.toAsm()}
             jsr(Label('Event_MoveCharacter').l),
             lea(Constant('Character_1').w, a4), // todo: can optimize this out
             updateObjFacing(Direction.right.address),
-            getAndRunDialog3(Byte.zero.i),
+            getAndRunDialog3LowDialogId(Byte.zero.i),
           ]));
     }, skip: 'TODO: impl functionality');
 
@@ -536,7 +536,7 @@ ${dialog2.toAsm()}
           Asm([
             lea(Constant('Character_1').w, a4), // todo: can optimize this out
             updateObjFacing(Direction.right.address),
-            getAndRunDialog3(Byte.zero.i),
+            getAndRunDialog3LowDialogId(Byte.zero.i),
           ]));
     });
 
@@ -568,7 +568,7 @@ ${dialog2.toAsm()}
             move.w(Word(0x50).i, d1),
             jsr(Label('Event_MoveCharacter').l),
             updateObjFacing(Direction.down.address),
-            getAndRunDialog3(Byte.zero.i),
+            getAndRunDialog3LowDialogId(Byte.zero.i),
           ]));
     });
 
@@ -784,9 +784,9 @@ ${dialog2.toAsm()}
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
             beq.w(Label('test_Test_unset1')),
-            getAndRunDialog3(0.toByte.i),
+            getAndRunDialog3LowDialogId(0.toByte.i),
             setLabel('test_Test_unset1'),
-            getAndRunDialog3(1.toByte.i),
+            getAndRunDialog3LowDialogId(1.toByte.i),
           ]).withoutComments());
 
       expect(
@@ -797,6 +797,100 @@ ${dialog2.toAsm()}
             dc.b(greetings[0].toAscii()),
             terminateDialog()
           ])));
+    });
+
+    test('dialog in both branches terminates and clears saved dialog state',
+        () {
+      var eventAsm = EventAsm.empty();
+      var dialog = DialogTrees();
+
+      var hello = DialogSpan.parse('Hello!');
+      var hello2 = DialogSpan.parse('hello 2');
+      var greetings = DialogSpan.parse('Greetings!');
+
+      SceneAsmGenerator.forEvent(sceneId, dialog, eventAsm, startingMap: map)
+        ..ifFlag(IfFlag(EventFlag('Test'),
+            isSet: [Dialog(spans: hello)], isUnset: [Dialog(spans: hello2)]))
+        ..dialog(Dialog(spans: greetings))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset1')),
+            getAndRunDialog3LowDialogId(0.toByte.i),
+            bra.w(Label('test_Test_cont1')),
+            setLabel('test_Test_unset1'),
+            getAndRunDialog3LowDialogId(1.toByte.i),
+            setLabel('test_Test_cont1'),
+            getAndRunDialog3LowDialogId(2.toByte.i),
+          ]).withoutComments());
+
+      expect(
+          dialog.forMap(map.id).toAsm(),
+          containsAllInOrder(Asm([
+            dc.b(hello[0].toAscii()),
+            terminateDialog(),
+            dc.b(hello2[0].toAscii()),
+            terminateDialog(),
+            dc.b(greetings[0].toAscii()),
+            terminateDialog()
+          ])));
+    });
+
+    test(
+        'dialog in both branches terminates and clears saved dialog state with prior dialog',
+        () {
+      var prior = DialogSpan.parse('Prior');
+      var hello = DialogSpan.parse('Hello!');
+      var hello2 = DialogSpan.parse('hello 2');
+      var greetings = DialogSpan.parse('Greetings!');
+
+      var program = Program();
+      var asm = program.addScene(
+          sceneId,
+          Scene([
+            Dialog(spans: prior),
+            IfFlag(EventFlag('Test'),
+                isSet: [Dialog(spans: hello)],
+                isUnset: [Dialog(spans: hello2)]),
+            Dialog(spans: greetings)
+          ]),
+          startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          EventAsm([
+            getAndRunDialog3LowDialogId(0.toByte.i),
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('test_Test_unset2')),
+            getAndRunDialog3LowDialogId(1.toByte.i),
+            bra.w(Label('test_Test_cont2')),
+            setLabel('test_Test_unset2'),
+            getAndRunDialog3LowDialogId(2.toByte.i),
+            setLabel('test_Test_cont2'),
+            getAndRunDialog3LowDialogId(3.toByte.i),
+          ]).withoutComments());
+
+      expect(
+          program.dialogTrees
+              .forMap(map.id)
+              .toAsm()
+              .withoutComments()
+              .withoutEmptyLines(),
+          Asm([
+            dc.b(prior[0].toAscii()),
+            terminateDialog(),
+            dc.b(hello[0].toAscii()),
+            terminateDialog(),
+            dc.b(hello2[0].toAscii()),
+            terminateDialog(),
+            dc.b(greetings[0].toAscii()),
+            terminateDialog()
+          ]));
     });
 
     test('events which use context cannot when context is ambiguous', () {
