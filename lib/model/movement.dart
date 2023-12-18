@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/src/iterables.dart';
 
 import 'model.dart';
 
@@ -260,6 +261,19 @@ class IndividualMoves extends Event {
   // TODO: what if Slot and Character moveables refer to same Character?
   Map<FieldObject, RelativeMovement> moves = {};
   StepSpeed speed = StepSpeed.fast;
+
+  Map<FieldObject, DirectionExpression>? justFacing() {
+    var result = <FieldObject, DirectionExpression>{};
+    for (var MapEntry(key: obj, value: move) in moves.entries) {
+      var direction = move.facing;
+      if (move.distance == 0.steps && direction != null) {
+        result[obj] = direction;
+      } else {
+        return null;
+      }
+    }
+    return result;
+  }
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {

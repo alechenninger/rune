@@ -538,6 +538,46 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void individualMoves(IndividualMoves moves) {
+    var facing = moves.justFacing();
+    if (facing != null) {
+      // Try to calculate to determine if we can do this in dialog
+      var faceInDialog = Asm.empty();
+      var dialog = true;
+
+      for (var MapEntry(key: obj, value: dir) in facing.entries) {
+        var id = obj.compactId(_memory);
+        var face = switch (dir) {
+          Direction d => d.constant,
+          DirectionOfVector(
+            from: PositionOfObject from,
+            to: PositionOfObject to
+          )
+              when (from.obj == obj) =>
+            Word(to.obj.compactId(_memory) | 0x100),
+          _ => null,
+        };
+
+        if (face == null) {
+          dialog = false;
+          break;
+        }
+
+        faceInDialog.add(Asm([
+          dc.b([Byte(0xf2), Byte(0xE), Byte(id)]),
+          dc.w([face])
+        ]));
+      }
+
+      if (dialog) {
+        _addToEventOrDialog(moves,
+            inDialog: () => _addToDialog(faceInDialog),
+            inEvent: (i) => moves.toAsm(_memory, eventIndex: i));
+        return;
+      }
+
+      // fall through
+    }
+
     _addToEvent(moves, (i) => moves.toAsm(_memory, eventIndex: i));
   }
 

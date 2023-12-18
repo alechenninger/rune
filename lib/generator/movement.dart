@@ -516,6 +516,15 @@ Asm _waitForMovement(
 }
 
 extension FieldObjectAsm on FieldObject {
+  int compactId(Memory mem) {
+    return switch (resolve(mem)) {
+      Character c => c.charIdValue.value,
+      Slot s => s.index | 0x80,
+      MapObject m => (mem.currentMap!.indexOf(m.id)! + 12) | 0x80,
+      _ => throw UnimplementedError(),
+    };
+  }
+
   Address get routine {
     return switch (this) {
       Character c => c.routineAddress,
@@ -648,8 +657,7 @@ extension AddressOfMapObject on MapObject {
   }
 }
 
-const _characterJumpTable = [
-  null,
+const _charIds = [
   Shay,
   Alys,
   Hahn,
@@ -684,8 +692,8 @@ extension CharacterData on Character {
     }
   }
 
-  Value get fieldObjectIndex {
-    return (_characterJumpTable.indexOf(runtimeType) * 4).toValue;
+  Value get charIdValue {
+    return _charIds.indexOf(runtimeType).toValue;
   }
 }
 
