@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
@@ -195,70 +196,10 @@ Word? _addBuiltInSpriteData(
 /// (in order to use the correct sprite for that object).
 Map<MapObjectId, Word> _compileMapSpriteData(
     List<MapObject> objects, Asm asm, int? spriteVramOffset) {
-  // 1. Aggregate all art pointers and their vram tile layouts
-  // 2. Aggregate all objects and their art pointers
-  // 3. Assign vram tile numbers to objects,
-  //    considering what art is reused,
-  //    and the vram tile layout of each art pointer.
-
-  // This is a multimap because art can be reused by multiple objects.
-  // However those objects can use the same art with different mappings.
-  var artPointers =
-      Multimap<ArtPointer?, (SpriteVramMapping, List<MapObjectId>)>();
-
-  for (var obj in objects) {
-    var spec = obj.spec;
-    var routine = _fieldRoutines.bySpec(spec);
-
-    if (routine == null) {
-      throw Exception('unknown field routine for spec $spec');
-    }
-
-    switch (routine.spriteLayoutForSpec(spec)) {
-      case var vram when vram != null:
-        var art = vram.art;
-        var current = artPointers[art];
-
-        if (current.isEmpty) {
-          artPointers.add(art, (vram, [obj.id]));
-        } else {
-          // If any of the current vram mappings can be merged, merge
-          // and replace that mapping with the merged one.
-          // Else, add a new mapping.
-          var merged = false;
-          var updated = <(SpriteVramMapping, List<MapObjectId>)>[];
-
-          for (var (mapping, objects) in current) {
-            if (!merged) {
-              // Try merging.
-              var mergedMapping = mapping.merge(vram);
-              if (mergedMapping != null) {
-                updated.add((mergedMapping, [...objects, obj.id]));
-                merged = true;
-              } else {
-                // Couldn't merge. Keep this set and continue.
-                updated.add((mapping, objects));
-              }
-            } else {
-              // Already merged. Keep this set and continue.
-              updated.add((mapping, objects));
-            }
-          }
-
-          if (!merged) {
-            // Never merged. Add additional.
-            updated.add((vram, [obj.id]));
-          }
-
-          // Replace current mappings with updated mappings.
-          artPointers.removeAll(art);
-          artPointers.addValues(art, updated);
-        }
-
-        break;
-      // else, no sprite. just use vram tile 0.
-    }
-  }
+  // First we need to figure out what sprites can
+  // share what VRAM mappings, and which must be unique.
+  var sprites = _ObjectSprites(_fieldRoutines);
+  sprites.mergeSpriteMappings(objects);
 
   var vramTileByObject = <MapObjectId, Word>{};
   // If need to support required mappings...
@@ -269,49 +210,62 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   // var requiredMappings = PriorityQueue<_SpriteVramMapping>(
   //     (a, b) => a.requiredVramTile!.compareTo(b.requiredVramTile!));
 
-  for (var MapEntry(key: pointer, value: mappings)
-      in artPointers.asMap().entries) {
-    for (var (mapping, objects) in mappings) {
-      if (mapping.tiles == 0) continue;
+  // Now we figure out where we can place the deduplicated mappings
+  // in VRAM.
+  _VramTiles? vram;
 
-      if (spriteVramOffset == null) {
-        throw Exception('no vram offsets defined but map has sprites. '
-            'objects=${vramTileByObject.keys}');
-      }
+  for (var (mapping, _) in sprites.mappings()) {
+    if (mapping.tiles == 0) continue;
 
-      var tile = Word(spriteVramOffset);
+    if (spriteVramOffset == null) {
+      throw Exception('no vram offsets defined but map has sprites. '
+          'objects=${vramTileByObject.keys}');
+    } else {
+      vram ??= _VramTiles(start: spriteVramOffset);
+    }
 
-      // if (requiredMappings.isNotEmpty) {
-      //   var required = requiredMappings.first;
-      //   if (required.requiredVramTile! <= tile) {
-      //     tile = required.requiredVramTile!;
-      //     mapping = required;
-      //     requiredMappings.removeFirst();
-      //   }
-      // }
+    // xxx Might need to delay tile until end
+    // aggregate all mappings & pointers
+    // figure out ideal vram layout
+    // then come back and get the tile for each mapping
+    // set that for each object
+    // and for the map loaded romart if any
+    if (!vram.claim(mapping)) {
+      throw Exception('cannot fit sprite in vram: too much sprite data. '
+          'width: ${mapping.tiles} '
+          'art: ${mapping.art} '
+          'vram: $vram');
+    }
 
-      spriteVramOffset += mapping.tiles;
+    // if (requiredMappings.isNotEmpty) {
+    //   var required = requiredMappings.first;
+    //   if (required.requiredVramTile! <= tile) {
+    //     tile = required.requiredVramTile!;
+    //     mapping = required;
+    //     requiredMappings.removeFirst();
+    //   }
+    // }
+  }
 
-      if (spriteVramOffset >= 0x534) {
-        throw Exception('sprite data extends into character sprites. '
-            'tile number: $tile '
-            'width: ${mapping.tiles} '
-            'art: $pointer '
-            'asm: $asm');
-      }
+  for (var (mapping, objects) in sprites.mappings()) {
+    var pointer = mapping.art;
+    var tile = vram!.tileFor(mapping);
 
-      for (var obj in objects) {
-        vramTileByObject[obj] = tile;
-      }
+    if (tile == null) {
+      throw 'no tile for mapping: $mapping';
+    }
 
-      if (pointer case RomArt(label: var lbl)) {
-        asm.add(dc.w([tile]));
+    for (var obj in objects) {
+      vramTileByObject[obj] = tile;
+    }
+
+    if (pointer case RomArt(label: var lbl)) {
+      asm.add(dc.w([tile]));
+      asm.add(dc.l([lbl]));
+
+      for (var offset in mapping.duplicateOffsets) {
+        asm.add(dc.w([Word(tile.value + offset)]));
         asm.add(dc.l([lbl]));
-
-        for (var offset in mapping.duplicateOffsets) {
-          asm.add(dc.w([Word(tile.value + offset)]));
-          asm.add(dc.l([lbl]));
-        }
       }
     }
   }
@@ -319,7 +273,245 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   return vramTileByObject;
 }
 
-class SpriteVramMapping {
+class _ObjectSprites {
+  // This is a multimap because art can be reused by multiple objects.
+  // However those objects can use the same art with different mappings.
+  final _pointers =
+      Multimap<ArtPointer?, (_SpriteVramMapping, List<MapObjectId>)>();
+
+  final _FieldRoutineRepository _fieldRoutines;
+
+  _ObjectSprites(this._fieldRoutines);
+
+  Iterable<(_SpriteVramMapping, List<MapObjectId>)> mappings() =>
+      _pointers.values;
+
+  void mergeSpriteMappings(Iterable<MapObject> objects) {
+    for (var obj in objects) {
+      var spec = obj.spec;
+      var routine = _fieldRoutines.bySpec(spec);
+
+      if (routine == null) {
+        throw Exception('unknown field routine for spec $spec');
+      }
+
+      switch (routine.spriteLayoutForSpec(spec)) {
+        case _SpriteVramMapping vram:
+          var art = vram.art;
+          var current = _pointers[art];
+
+          if (current.isEmpty) {
+            _pointers.add(art, (vram, [obj.id]));
+          } else {
+            // If any of the current vram mappings can be merged, merge
+            // and replace that mapping with the merged one.
+            // Else, add a new mapping.
+            var merged = false;
+            var updated = <(_SpriteVramMapping, List<MapObjectId>)>[];
+
+            for (var (mapping, objects) in current) {
+              if (!merged) {
+                // Try merging.
+                var mergedMapping = mapping.merge(vram);
+                if (mergedMapping != null) {
+                  updated.add((mergedMapping, [...objects, obj.id]));
+                  merged = true;
+                } else {
+                  // Couldn't merge. Keep this set and continue.
+                  updated.add((mapping, objects));
+                }
+              } else {
+                // Already merged. Keep this set and continue.
+                updated.add((mapping, objects));
+              }
+            }
+
+            if (!merged) {
+              // Never merged. Add additional.
+              updated.add((vram, [obj.id]));
+            }
+
+            // Replace current mappings with updated mappings.
+            _pointers.removeAll(art);
+            _pointers.addValues(art, updated);
+          }
+
+          break;
+        // else, no sprite. just use vram tile 0.
+      }
+    }
+  }
+}
+
+class _VramTiles {
+  final _VramRegion _main;
+  final _chest = _VramRegion(start: 0x4dc, end: 0x4ed);
+  final _afterChest = _VramRegion(start: 0x4ed, end: 0x534);
+
+  _VramTiles({required int start})
+      : _main = _VramRegion(start: start, end: 0x4dc);
+
+  Word? tileFor(_SpriteVramMapping mapping) {
+    for (var region in [_main, _afterChest, _chest]) {
+      var tile = region.tileFor(mapping);
+      if (tile != null) return tile;
+    }
+    return null;
+  }
+
+  bool claim(_SpriteVramMapping mapping) {
+    // This algorithm works by first trying to claim free, safe VRAM.
+    // If it cannot be claimed, and the mapping is lazily loaded,
+    // chest sprites will be overriden.
+    // If it cannot be claimed, and the mapping is not lazily loaded,
+    // it tries to drop mappings to free space,
+    // reording the mappings to try again for a more efficient packing.
+    // When the chest region is utilized, it may extend past the chest graphics.
+    // In this case, the after chest region is pushed back.
+    // If this causes overrun in the after chest region,
+    // the overrun is dropped and reordering is attempted.
+    bool reclaim(Iterable<_SpriteVramMapping> mappings) {
+      for (var m in mappings) {
+        if (!claim(m)) return false;
+      }
+      return true;
+    }
+
+    if (_main.claim(mapping)) return true;
+    if (_afterChest.claim(mapping)) return true;
+
+    if (mapping.lazilyLoaded) {
+      if (_chest.claim(mapping, allowOverrunUpTo: 0x534)) {
+        var overrun = _chest.overrun;
+        var dropped = _afterChest.bumpBy(overrun);
+        return reclaim(dropped);
+      }
+    }
+
+    var dropped = _main.dropLazy(untilFree: mapping.tiles);
+
+    if (dropped != null) {
+      assert(_main.claim(mapping));
+      for (var d in dropped) {
+        if (!claim(d)) return false;
+      }
+      return true;
+    }
+
+    dropped = _afterChest.dropLazy(untilFree: mapping.tiles);
+    if (dropped != null) {
+      assert(_afterChest.claim(mapping));
+      for (var d in dropped) {
+        if (!claim(d)) return false;
+      }
+      return true;
+    }
+
+    // todo: could start trying to reorder
+    // but we need some way to stop the process.
+
+    return false;
+  }
+
+  @override
+  String toString() {
+    return '_VramTiles{_main: $_main, _chest: $_chest, '
+        '_afterChest: $_afterChest}';
+  }
+}
+
+class _VramRegion {
+  int _offset = 0;
+  final int end;
+  int get free => end - occupiedEnd;
+  int get occupiedEnd => _offset + width;
+  int get overrun => occupiedEnd > end ? occupiedEnd - end : 0;
+  int _next = 0;
+  int get width => _next;
+  int get nextTile => _offset + _next;
+
+  // Smallest first
+  final _mappings = <_SpriteVramMapping>[];
+
+  _VramRegion({required int start, required this.end}) {
+    _offset = start;
+    _next = 0;
+  }
+
+  Word? tileFor(_SpriteVramMapping mapping) {
+    var tile = _offset;
+    for (var m in _mappings.toList()) {
+      if (identical(mapping, m)) return Word(tile);
+      tile += m.tiles;
+    }
+    return null;
+  }
+
+  Iterable<_SpriteVramMapping>? dropLazy({required int untilFree}) {
+    // This algorithm tries to drop the smallest lazily loaded mappings first.
+    // This isn't necessarily the most efficient
+    var dropped = <_SpriteVramMapping>[];
+    var sorted = _mappings.sorted((a, b) => b.tiles.compareTo(a.tiles));
+    for (var i = 0; i < _mappings.length && free < untilFree; i++) {
+      var m = sorted[i];
+
+      if (m.lazilyLoaded) {
+        _mappings.removeWhere((e) => identical(e, m));
+        dropped.add(m);
+        _next -= m.tiles;
+      }
+    }
+
+    if (free < untilFree) {
+      _mappings.addAll(dropped);
+      _next += dropped.fold<int>(0, (total, m) => total + m.tiles);
+      return null;
+    }
+
+    return dropped;
+  }
+
+  /// Increases the [_offset] by [amount], dropping the smallest mappings
+  /// which exceed the [end] after the bump.
+  /// These dropped mappings are returned.
+  Iterable<_SpriteVramMapping> bumpBy(int amount) {
+    _offset += amount;
+    var dropped = <_SpriteVramMapping>[];
+    while (overrun > 0) {
+      var smallest =
+          _mappings.sorted((a, b) => a.tiles.compareTo(b.tiles)).last;
+      _mappings.removeWhere((e) => identical(e, smallest));
+      dropped.add(smallest);
+      _next -= smallest.tiles;
+    }
+    return dropped;
+  }
+
+  /// Return false if cannot be claimed in this region.
+  ///
+  /// Normally overrun beyond [end] is not allowed.
+  /// However, if [allowOverrunUpTo] is specified,
+  /// overrun is allowed up to that value
+  /// (overrun < allowOverrunUpTo - end).
+  bool claim(_SpriteVramMapping mapping, {int? allowOverrunUpTo}) {
+    allowOverrunUpTo ??= end;
+
+    if (nextTile + mapping.tiles >= allowOverrunUpTo) return false;
+
+    _mappings.add(mapping);
+    _next += mapping.tiles;
+
+    return true;
+  }
+
+  @override
+  String toString() {
+    return '_VramRegion{_offset: $_offset, end: $end, '
+        '_next: $_next, _mappings: $_mappings}';
+  }
+}
+
+class _SpriteVramMapping {
   /// The art used for this mapping, if known.
   final ArtPointer? art;
 
@@ -334,10 +526,12 @@ class SpriteVramMapping {
 
   final bool animated;
 
+  bool get lazilyLoaded => art == null || art is RamArt;
+
   // See notes in _compileMapSpriteData
   // final Word? requiredVramTile;
 
-  const SpriteVramMapping._(
+  const _SpriteVramMapping._(
       {required this.tiles,
       this.art,
       this.duplicateOffsets = const [],
@@ -345,13 +539,13 @@ class SpriteVramMapping {
 
   bool get mergable => art != null && !animated;
 
-  SpriteVramMapping? merge(SpriteVramMapping other) {
+  _SpriteVramMapping? merge(_SpriteVramMapping other) {
     if (!const IterableEquality<int>()
         .equals(duplicateOffsets, other.duplicateOffsets)) return null;
     if (animated || other.animated) return null;
     if (art != other.art) return null;
     if (art == null || other.art == null) return null;
-    return SpriteVramMapping._(
+    return _SpriteVramMapping._(
         tiles: max(tiles, other.tiles),
         art: art,
         duplicateOffsets: duplicateOffsets);
@@ -359,19 +553,27 @@ class SpriteVramMapping {
 
   @override
   String toString() {
-    return '_SpriteVramMapping{tiles: $tiles, offsets: $duplicateOffsets}';
+    return '_SpriteVramMapping{art: $art, tiles: $tiles, '
+        'duplicateOffsets: $duplicateOffsets, animated: $animated}';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SpriteVramMapping &&
+      other is _SpriteVramMapping &&
           runtimeType == other.runtimeType &&
+          art == other.art &&
           tiles == other.tiles &&
-          duplicateOffsets == other.duplicateOffsets;
+          const IterableEquality<int>()
+              .equals(duplicateOffsets, other.duplicateOffsets) &&
+          animated == other.animated;
 
   @override
-  int get hashCode => tiles.hashCode ^ duplicateOffsets.hashCode;
+  int get hashCode =>
+      art.hashCode ^
+      tiles.hashCode ^
+      const IterableEquality<int>().hash(duplicateOffsets) ^
+      animated.hashCode;
 }
 
 Byte _compileInteractionScene(
@@ -1150,6 +1352,37 @@ final _fieldRoutines = _FieldRoutineRepository([
       ramArt: RamArt(address: Word(0)),
       vramAnimated: true,
       SpecFactory.asm(Word(0xF8))),
+  FieldRoutine(
+      Word(0x174),
+      Label('FieldObj_BigDuck'),
+      spriteMappingTiles: 0x20,
+      SpecFactory.asm(Word(0x174))),
+  FieldRoutine(
+      Word(0x178),
+      Label('FieldObj_SmallWhiteDuck'),
+      spriteMappingTiles: 0x20,
+      SpecFactory.asm(Word(0x178))),
+  FieldRoutine(
+      Word(0x17c),
+      Label('FieldObj_SmallBrownDuck'),
+      spriteMappingTiles: 0x20,
+      SpecFactory.asm(Word(0x17c))),
+  FieldRoutine(
+      Word(0x144),
+      Label('loc_49192'),
+      spriteMappingTiles: 0x36,
+      SpecFactory.asm(Word(0x144))),
+  FieldRoutine(
+      Word(0x170),
+      Label('FieldObj_Butterfly'),
+      spriteMappingTiles: 2,
+      SpecFactory.asm(Word(0x170))),
+  FieldRoutine(
+      Word(0x2F4),
+      Label('FieldObj_StrayRocky'),
+      // TODO(field routines): this can probably be less
+      spriteMappingTiles: 0x40,
+      SpecFactory.asm(Word(0x2F4))),
 ]);
 
 class _FieldRoutineRepository {
@@ -1343,7 +1576,7 @@ class FieldRoutine<T extends MapObjectSpec> {
 
   final SpecFactory factory;
 
-  SpriteVramMapping? spriteLayoutForSpec(MapObjectSpec spec) {
+  _SpriteVramMapping? spriteLayoutForSpec(MapObjectSpec spec) {
     // What do we need to know?
     // - how the sprite is defined: routine->rom, map->rom, map->ram
     // - this varies based on the spec. we don't know why each option is used.
@@ -1372,7 +1605,7 @@ class FieldRoutine<T extends MapObjectSpec> {
         ? const [0x28]
         : const <int>[];
 
-    return SpriteVramMapping._(
+    return _SpriteVramMapping._(
         tiles: spriteMappingTiles,
         art: artPointer,
         duplicateOffsets: duplicateOffsets,

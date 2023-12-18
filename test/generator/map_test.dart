@@ -352,6 +352,73 @@ void main() {
     expect(objectsAsm[12], dc.w([0x320.toWord]));
   });
 
+  test('treasure chest vram is skipped', () {
+    // Need at least 8 full sprites to collide with chest tiles
+    testMap.addObject(MapObject(
+      startPosition: Position(0x1e0, 0x2e0),
+      spec: Npc(Sprite.PalmanMan1, FaceDown()),
+    ));
+    testMap.addObject(MapObject(
+      startPosition: Position(0x1f0, 0x2e0),
+      spec: Npc(Sprite.PalmanMan2, FaceDown()),
+    ));
+    testMap.addObject(MapObject(
+      startPosition: Position(0x200, 0x2e0),
+      spec: Npc(Sprite.PalmanMan3, FaceDown()),
+    ));
+    testMap.addObject(MapObject(
+      startPosition: Position(0x1e0, 0x2e0),
+      spec: Npc(Sprite.PalmanFighter1, FaceDown()),
+    ));
+    testMap.addObject(MapObject(
+      startPosition: Position(0x1f0, 0x2e0),
+      spec: Npc(Sprite.PalmanFighter2, FaceDown()),
+    ));
+    testMap.addObject(MapObject(
+      startPosition: Position(0x200, 0x2e0),
+      spec: Npc(Sprite.PalmanFighter3, FaceDown()),
+    ));
+    testMap.addObject(MapObject(
+      startPosition: Position(0x1e0, 0x2e0),
+      spec: Npc(Sprite.PalmanWoman1, FaceDown()),
+    ));
+    testMap.addObject(MapObject(
+      startPosition: Position(0x1f0, 0x2e0),
+      spec: Npc(Sprite.PalmanWoman2, FaceDownOrUpLegsHidden()),
+    ));
+    testMap.addObject(MapObject(
+      startPosition: Position(0x200, 0x2e0),
+      spec: Npc(Sprite.Motavian1, FaceDownSimpleSprite()),
+    ));
+
+    var mapAsm = program.addMap(testMap);
+
+    expect(
+        mapAsm.sprites,
+        Asm([
+          dc.w([0x2d0.toWord]),
+          dc.l([Constant('Art_PalmanMan1')]),
+          dc.w([0x318.toWord]),
+          dc.l([Constant('Art_PalmanMan2')]),
+          dc.w([0x360.toWord]),
+          dc.l([Constant('Art_PalmanMan3')]),
+          dc.w([0x3a8.toWord]),
+          dc.l([Constant('Art_PalmanFighter1')]),
+          dc.w([0x3f0.toWord]),
+          dc.l([Constant('Art_PalmanFighter2')]),
+          dc.w([0x438.toWord]),
+          dc.l([Constant('Art_PalmanFighter3')]),
+          dc.w([0x480.toWord]),
+          dc.l([Constant('Art_PalmanWoman1')]),
+          // Goes after chests
+          dc.w([0x4ed.toWord]),
+          dc.l([Constant('Art_PalmanWoman2')]),
+          // Goes at end of main region
+          dc.w([0x4c8.toWord]),
+          dc.l([Constant('Art_Motavian1')]),
+        ]));
+  });
+
   group('routines which use ram art', () {
     test('set a vram tile but not a sprite', () {
       testMap.addObject(MapObject(
@@ -451,6 +518,8 @@ void main() {
 
     test('do not share the same vram tile if not using the same art', () {},
         skip: "don't have routines like this yet");
+
+    test('may overwrite treasure chest vram if out of space', () {});
   });
 
   group('routines which use hard coded rom art', () {
