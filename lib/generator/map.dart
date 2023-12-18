@@ -384,12 +384,18 @@ class _VramTiles {
       // TODO: we can technically try to claim overrun in main region first
       // this would require pushing out chest region
       // it may push it out past its end, and then also push out after chest
+      // trick is that order now matters:
+      // any overrun mappings must be the lazily loaded ones
       // if (_main.claim(mapping, allowOverrunUpTo: 0x534)) {
-      //   var dropped = _chest.offsetBy(_main.overrun, allowOverrunUpTo: 0x534);
-      //   if (dropped.isNotEmpty) {
+      //   if (_chest
+      //       .offsetBy(_main.overrun, allowOverrunUpTo: 0x534)
+      //       .isNotEmpty) {
       //     return false;
       //   }
-      //   _afterChest.offsetBy(_chest.overrun);
+      //   if (_afterChest.offsetBy(_chest.overrun).isNotEmpty) {
+      //     return false;
+      //   }
+      //   return true;
       // }
 
       if (_chest.claim(mapping, allowOverrunUpTo: 0x534)) {
@@ -412,7 +418,8 @@ class _VramTiles {
 
     dropped = _afterChest.dropLazy(untilFree: mapping.tiles);
     if (dropped != null) {
-      assert(_afterChest.claim(mapping));
+      var claimed = _afterChest.claim(mapping);
+      assert(claimed);
       for (var d in dropped) {
         if (!claim(d)) return false;
       }

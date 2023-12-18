@@ -467,7 +467,7 @@ void main() {
 
       expect(
           mapAsm.sprites,
-            Asm([
+          Asm([
             dc.w([0x2d0.toWord]),
             dc.l([Constant('Art_PalmanMan1')]),
             dc.w([0x31E.toWord]),
@@ -519,7 +519,93 @@ void main() {
     test('do not share the same vram tile if not using the same art', () {},
         skip: "don't have routines like this yet");
 
-    test('may overwrite treasure chest vram if out of space', () {});
+    test('may overwrite treasure chest vram if out of space', () {
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1e0, 0x2e0),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1f0, 0x2e0),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()),
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.PalmanMan3, FaceDown()),
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1e0, 0x2e0),
+        spec: Npc(Sprite.PalmanFighter1, FaceDown()),
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1f0, 0x2e0),
+        spec: Npc(Sprite.PalmanFighter2, FaceDown()),
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.PalmanFighter3, FaceDown()),
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1e0, 0x2e0),
+        spec: Npc(Sprite.PalmanWoman1, FaceDown()),
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.Motavian1, FaceDownSimpleSprite()),
+      ));
+      // Use after chest
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1f0, 0x2e0),
+        spec: Npc(Sprite.PalmanWoman2, FaceDownOrUpLegsHidden()),
+      ));
+      // Use after chest
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0), spec: AlysWaiting()));
+      // Use chest
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0),
+          spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w([0x2d0.toWord]),
+            dc.l([Constant('Art_PalmanMan1')]),
+            dc.w([0x318.toWord]),
+            dc.l([Constant('Art_PalmanMan2')]),
+            dc.w([0x360.toWord]),
+            dc.l([Constant('Art_PalmanMan3')]),
+            dc.w([0x3a8.toWord]),
+            dc.l([Constant('Art_PalmanFighter1')]),
+            dc.w([0x3f0.toWord]),
+            dc.l([Constant('Art_PalmanFighter2')]),
+            dc.w([0x438.toWord]),
+            dc.l([Constant('Art_PalmanFighter3')]),
+            dc.w([0x480.toWord]),
+            dc.l([Constant('Art_PalmanWoman1')]),
+            dc.w([0x4c8.toWord]),
+            dc.l([Constant('Art_Motavian1')]),
+            dc.w([0x4ed.toWord]),
+            dc.l([Constant('Art_PalmanWoman2')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[0 * 5 + 2], dc.w([0x2d0.toWord]));
+      expect(objectsAsm[1 * 5 + 2], dc.w([0x318.toWord]));
+      expect(objectsAsm[2 * 5 + 2], dc.w([0x360.toWord]));
+      expect(objectsAsm[3 * 5 + 2], dc.w([0x3a8.toWord]));
+      expect(objectsAsm[4 * 5 + 2], dc.w([0x3f0.toWord]));
+      expect(objectsAsm[5 * 5 + 2], dc.w([0x438.toWord]));
+      expect(objectsAsm[6 * 5 + 2], dc.w([0x480.toWord]));
+      expect(objectsAsm[7 * 5 + 2], dc.w([0x4c8.toWord]));
+      // After chest
+      expect(objectsAsm[8 * 5 + 2], dc.w([0x4ed.toWord]));
+      // Runs into chest area
+      expect(objectsAsm[9 * 5 + 2], dc.w([0x525.toWord]));
+      // Starts at chest area
+      expect(objectsAsm[10 * 5 + 2], dc.w([0x4dc.toWord]));
+    });
   });
 
   group('routines which use hard coded rom art', () {
