@@ -2580,6 +2580,8 @@ Queue<Word> freeEventFlags() {
     next = used.value + 1;
   }
   // 1ff with extension
+  // we can free up more from other flag type ram if needed
+  // (chest and town flags have plenty of headroom)
   q.addAll([for (; next <= 0x1ff; next++) Word(next)]);
   return q;
 }
