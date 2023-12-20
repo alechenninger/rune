@@ -163,7 +163,8 @@ MapAsm compileMap(
 
 // TODO(map compiler): this should be externalized to Program API for testing
 final _builtInSprites = {
-  MapId.BirthValley_B1: [(Label('loc_1379A8'), 0x39)]
+  MapId.BirthValley_B1: [(Label('loc_1379A8'), 0x39)],
+  MapId.StripClub: [(Label('loc_14960C'), 0x3BA)] // width 0x100
 };
 
 /// Some maps utilize sprites outside of objects, in event routines.
@@ -195,26 +196,20 @@ Word? _addBuiltInSpriteData(
 /// which refers back to each objects' intended VRAM tile number
 /// (in order to use the correct sprite for that object).
 Map<MapObjectId, Word> _compileMapSpriteData(
-    List<MapObject> objects, Asm asm, int? spriteVramOffset) {
+    List<MapObject> objects, Asm asm, int? spriteVramOffset,
+    {Iterable<_SpriteVramMapping> builtIns = const []}) {
   // First we need to figure out what sprites can
   // share what VRAM mappings, and which must be unique.
   var sprites = _ObjectSprites(_fieldRoutines);
   sprites.mergeSpriteMappings(objects);
 
   var vramTileByObject = <MapObjectId, Word>{};
-  // If need to support required mappings...
-  // This happens when hard coded in routine, but where the sprite
-  // is still variable.
-  // Maybe if the sprite isn't really variable, we just define it
-  // in the map data? (past normal vram mappings)
-  // var requiredMappings = PriorityQueue<_SpriteVramMapping>(
-  //     (a, b) => a.requiredVramTile!.compareTo(b.requiredVramTile!));
 
   // Now we figure out where we can place the deduplicated mappings
   // in VRAM.
   _VramTiles? vram;
 
-  for (var (mapping, _) in sprites.mappings()) {
+  for (var mapping in [for (var (m, _) in sprites.mappings()) m, ...builtIns]) {
     if (mapping.tiles == 0) continue;
 
     if (spriteVramOffset == null) {
@@ -224,27 +219,12 @@ Map<MapObjectId, Word> _compileMapSpriteData(
       vram ??= _VramTiles(start: spriteVramOffset);
     }
 
-    // xxx Might need to delay tile until end
-    // aggregate all mappings & pointers
-    // figure out ideal vram layout
-    // then come back and get the tile for each mapping
-    // set that for each object
-    // and for the map loaded romart if any
     if (!vram.claim(mapping)) {
       throw Exception('cannot fit sprite in vram: too much sprite data. '
           'width: ${mapping.tiles} '
           'art: ${mapping.art} '
           'vram: $vram');
     }
-
-    // if (requiredMappings.isNotEmpty) {
-    //   var required = requiredMappings.first;
-    //   if (required.requiredVramTile! <= tile) {
-    //     tile = required.requiredVramTile!;
-    //     mapping = required;
-    //     requiredMappings.removeFirst();
-    //   }
-    // }
   }
 
   for (var (mapping, objects) in sprites.mappings()) {
@@ -345,11 +325,15 @@ class _ObjectSprites {
 
 class _VramTiles {
   final _VramRegion _main;
-  final _chest = _VramRegion(start: 0x4dc, end: 0x4ed);
+  final _chest = _VramRegion(start: 0x4dc, end: 0x4ed, onlyLazy: true);
   final _afterChest = _VramRegion(start: 0x4ed, end: 0x534);
+  final _fixed = <_VramRegion>[];
+  final _regions = <_VramRegion>[];
 
   _VramTiles({required int start})
-      : _main = _VramRegion(start: start, end: 0x4dc);
+      : _main = _VramRegion(start: start, end: 0x4dc) {
+    _regions.addAll([_main, _chest, _afterChest]);
+  }
 
   Word? tileFor(_SpriteVramMapping mapping) {
     for (var region in [_main, _afterChest, _chest]) {
@@ -376,6 +360,76 @@ class _VramTiles {
       }
       return true;
     }
+
+    // xxxxx experimenting with generic region list
+    // Regions must be ordered sequentially
+
+    // If requires a specific tile,
+    // treat it as its own distinct region which cannot be moved.
+    if (mapping.requiredVramTile case var t?) {}
+
+    for (var i = 0; i < _regions.length; i++) {
+      var region = _regions[i];
+
+      // Place in priority order if allowed
+      if (region.onlyLazy && !mapping.lazilyLoaded) continue;
+      if (region.claim(mapping)) return true;
+    }
+
+    // If couldn't claim and lazily loaded,
+    // try placing only in lazy regions by allowing overrun
+
+    if (mapping.lazilyLoaded) {
+      for (var i = 0; i < _regions.length; i++) {
+        var region = _regions[i];
+
+        if (!region.onlyLazy) continue;
+
+        var maxOverrun = _regions
+            .sublist(i + 1)
+            .fold(0x534, (max, r) => min(max, r.maxOffset));
+
+        if (region.claim(mapping, allowOverrunUpTo: maxOverrun)) {
+          // Have to push all subsequent regions out.
+          var overrun = region.overrun;
+          var dropped = <_SpriteVramMapping>[];
+
+          for (var j = i + 1; j < _regions.length; j++) {
+            var r = _regions[j];
+            dropped.addAll(r.offsetBy(overrun));
+            // Regions may not be contiguous.
+            // When not, a subsequent region may not need to be bumped.
+            overrun = r.overrun;
+          }
+
+          return reclaim(dropped);
+        }
+      }
+    }
+
+    // If that still didn't work, start dropping lazy mappings from non-lazy
+    // regions.
+    for (var i = 0; i < _regions.length; i++) {
+      var region = _regions[i];
+
+      if (region.onlyLazy) continue;
+
+      var dropped = region.dropLazy(untilFree: mapping.tiles);
+
+      if (dropped != null) {
+        var claimed = region.claim(mapping);
+        assert(claimed);
+        for (var d in dropped) {
+          if (!claim(d)) return false;
+        }
+        return true;
+      }
+    }
+
+    // Give up
+    return false;
+
+    // xxxx
 
     if (_main.claim(mapping)) return true;
     if (_afterChest.claim(mapping)) return true;
@@ -440,8 +494,9 @@ class _VramTiles {
 }
 
 class _VramRegion {
-  final start;
+  final int start;
   int _offset;
+  final int maxOffset;
   final int end;
   int get free => end - occupiedEnd;
   int get occupiedEnd => _offset + width;
@@ -449,19 +504,32 @@ class _VramRegion {
   int _next = 0;
   int get width => _next;
   int get nextTile => _offset + _next;
+  final bool onlyLazy;
 
-  // Smallest first
   final _mappings = <_SpriteVramMapping>[];
 
-  _VramRegion({required this.start, required this.end}) : _offset = start;
+  _VramRegion({required this.start, required this.end, this.onlyLazy = false})
+      : _offset = start,
+        maxOffset = 0x534 - 1;
+
+  _VramRegion.fixed(
+      {required this.start, required this.end, this.onlyLazy = false})
+      : _offset = start,
+        maxOffset = start;
 
   Word? tileFor(_SpriteVramMapping mapping) {
-    var tile = _offset;
-    for (var m in _mappings.toList()) {
-      if (identical(mapping, m)) return Word(tile);
-      tile += m.tiles;
+    for (var (t, m) in _tiles()) {
+      if (identical(mapping, m)) return t;
     }
     return null;
+  }
+
+  Iterable<(Word, _SpriteVramMapping)> _tiles() sync* {
+    var tile = _offset;
+    for (var m in _mappings) {
+      yield (Word(tile), m);
+      tile += m.tiles;
+    }
   }
 
   Iterable<_SpriteVramMapping>? dropLazy({required int untilFree}) {
@@ -493,6 +561,8 @@ class _VramRegion {
   /// after the adjustment, if any.
   /// These dropped mappings are returned.
   Iterable<_SpriteVramMapping> offsetBy(int amount) {
+    if (amount == 0) return const [];
+    if (start + amount > maxOffset) throw ArgumentError('offset out of range');
     _offset = start + amount;
     var dropped = <_SpriteVramMapping>[];
     while (overrun > 0) {
@@ -547,13 +617,14 @@ class _SpriteVramMapping {
   bool get lazilyLoaded => art == null || art is RamArt;
 
   // See notes in _compileMapSpriteData
-  // final Word? requiredVramTile;
+  final Word? requiredVramTile;
 
   _SpriteVramMapping._(
       {required this.tiles,
       this.art,
       this.duplicateOffsets = const [],
-      this.animated = false});
+      this.animated = false,
+      this.requiredVramTile});
 
   bool get mergable => art != null && !animated;
 
