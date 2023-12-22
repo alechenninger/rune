@@ -453,7 +453,7 @@ void main() {
     test('only use as much vram as needed', () {
       testMap.addObject(MapObject(
           startPosition: Position('1f0'.hex, '2e0'.hex),
-          spec: Npc(Sprite.PalmanMan1, FaceDown())));
+          spec: Npc(Sprite.PalmanMan1, FaceDownOrUpLegsHidden())));
 
       testMap.addObject(MapObject(
           startPosition: Position('1e0'.hex, '2e0'.hex),
@@ -464,20 +464,19 @@ void main() {
           spec: Npc(Sprite.PalmanMan2, FaceDown())));
 
       var mapAsm = program.addMap(testMap);
-
       expect(
           mapAsm.sprites,
           Asm([
             dc.w([0x2d0.toWord]),
             dc.l([Constant('Art_PalmanMan1')]),
-            dc.w([0x31E.toWord]),
+            dc.w([0x30e.toWord]),
             dc.l([Constant('Art_PalmanMan2')]),
           ]));
 
       var objectsAsm = mapAsm.objects.withoutComments();
       expect(objectsAsm[2], dc.w([0x2d0.toWord]));
-      expect(objectsAsm[7], dc.w([0x318.toWord]));
-      expect(objectsAsm[12], dc.w([0x31E.toWord]));
+      expect(objectsAsm[7], dc.w([0x308.toWord]));
+      expect(objectsAsm[12], dc.w([0x30e.toWord]));
     });
 
     test(
@@ -569,10 +568,6 @@ void main() {
           startPosition: Position(0x200, 0x2e0),
           spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
 
-      // testMap.addObject(MapObject(
-      //     startPosition: Position(0x200, 0x2e0),
-      //     spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
-
       var mapAsm = program.addMap(testMap);
 
       expect(
@@ -609,68 +604,64 @@ void main() {
       expect(objectsAsm[7 * 5 + 2], dc.w([0x4c8.toWord]));
       // Starts after chest
       expect(objectsAsm[8 * 5 + 2], dc.w([0x4ed.toWord]));
-      // Fits in chest
-      expect(objectsAsm[9 * 5 + 2], dc.w([0x4dc.toWord]));
-      // Fits in after chest area
-      expect(objectsAsm[10 * 5 + 2], dc.w([0x525.toWord]));
+      // Fits in after chest
+      expect(objectsAsm[9 * 5 + 2], dc.w([0x525.toWord]));
+      // Starts overlapping
+      expect(objectsAsm[10 * 5 + 2], dc.w([0x4da.toWord]));
     });
 
-    test('may overwrite treasure chest vram if out of space tighter', () {
+    test('may overrun treasure chest vram into after chest to make space', () {
       testMap.addObject(MapObject(
         startPosition: Position(0x1e0, 0x2e0),
-        spec: Npc(Sprite.PalmanMan1, FaceDown()),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()), // 0x2d0-0x318
       ));
       testMap.addObject(MapObject(
         startPosition: Position(0x1f0, 0x2e0),
-        spec: Npc(Sprite.PalmanMan2, FaceDown()),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()), // 0x318-0x360
       ));
       testMap.addObject(MapObject(
         startPosition: Position(0x200, 0x2e0),
-        spec: Npc(Sprite.PalmanMan3, FaceDown()),
+        spec: Npc(Sprite.PalmanMan3, FaceDown()), // 0x360-0x3a8
       ));
       testMap.addObject(MapObject(
         startPosition: Position(0x1e0, 0x2e0),
-        spec: Npc(Sprite.PalmanFighter1, FaceDown()),
+        spec: Npc(Sprite.PalmanFighter1, FaceDown()), // 0x3a8-0x3f0
       ));
       testMap.addObject(MapObject(
         startPosition: Position(0x1f0, 0x2e0),
-        spec: Npc(Sprite.PalmanFighter2, FaceDown()),
+        spec: Npc(Sprite.PalmanFighter2, FaceDown()), // 0x3f0-0x438
       ));
       testMap.addObject(MapObject(
         startPosition: Position(0x200, 0x2e0),
-        spec: Npc(Sprite.PalmanFighter3, FaceDown()),
+        spec: Npc(Sprite.PalmanFighter3, FaceDown()), // 0x438-0x480
       ));
       testMap.addObject(MapObject(
         startPosition: Position(0x1e0, 0x2e0),
-        spec: Npc(Sprite.PalmanWoman1, FaceDown()),
+        spec: Npc(Sprite.PalmanWoman1, FaceDown()), // 0x480-0x4c8
       ));
       testMap.addObject(MapObject(
         startPosition: Position(0x200, 0x2e0),
-        spec: Npc(Sprite.Motavian1, FaceDownSimpleSprite()),
+        spec: Npc(Sprite.Motavian1, FaceDownSimpleSprite()), // 0x4c8-4da
       ));
-      // Use up remaining main
+      // Should fit in at 4da-4e2
       testMap.addObject(MapObject(
           startPosition: Position(0x200, 0x2e0),
           spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
+      // 4e2-4ea
       testMap.addObject(MapObject(
           startPosition: Position(0x200, 0x2e0),
           spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
-      // Use chest
+      // 4ea-4f2
       testMap.addObject(MapObject(
           startPosition: Position(0x200, 0x2e0), spec: AlysWaiting()));
-      // Use chest
+      // 4f2-4fa
       testMap.addObject(MapObject(
           startPosition: Position(0x200, 0x2e0),
           spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
-      // Use chest
-      testMap.addObject(MapObject(
-          startPosition: Position(0x200, 0x2e0),
-          spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
-      // Use after chest + offset to account for overrun in chest region
-
+      // 4fa
       testMap.addObject(MapObject(
         startPosition: Position(0x200, 0x2e0),
-        spec: Npc(Sprite.PalmanWoman2, FaceDownSimpleSprite()),
+        spec: Npc(Sprite.PalmanWoman2, FaceDownOrUpLegsHidden()),
       ));
 
       var mapAsm = program.addMap(testMap);
@@ -694,7 +685,7 @@ void main() {
             dc.l([Constant('Art_PalmanWoman1')]),
             dc.w([0x4c8.toWord]),
             dc.l([Constant('Art_Motavian1')]),
-            dc.w([0x4f4.toWord]),
+            dc.w([0x4fa.toWord]),
             dc.l([Constant('Art_PalmanWoman2')]),
           ]));
 
@@ -707,16 +698,76 @@ void main() {
       expect(objectsAsm[5 * 5 + 2], dc.w([0x438.toWord]));
       expect(objectsAsm[6 * 5 + 2], dc.w([0x480.toWord]));
       expect(objectsAsm[7 * 5 + 2], dc.w([0x4c8.toWord]));
-      // Another in main so we have to use chest area
-      expect(objectsAsm[8 * 5 + 2], dc.w([0x4ed.toWord]));
-      expect(objectsAsm[9 * 5 + 2], dc.w([0x4f5.toWord]));
-      // Starts at chest area
-      expect(objectsAsm[10 * 5 + 2], dc.w([0x4dc.toWord]));
-      // May keep using chest area
-      expect(objectsAsm[11 * 5 + 2], dc.w([0x4e4.toWord]));
-      expect(objectsAsm[12 * 5 + 2], dc.w([0x4ec.toWord]));
+      // Start using up chest area into after chest
+      expect(objectsAsm[8 * 5 + 2], dc.w([0x4f2.toWord]));
+      expect(objectsAsm[9 * 5 + 2], dc.w([0x4e2.toWord]));
+      expect(objectsAsm[10 * 5 + 2], dc.w([0x4ea.toWord]));
+      expect(objectsAsm[11 * 5 + 2], dc.w([0x4da.toWord]));
       // Start later in after chest due to offset
-      expect(objectsAsm[13 * 5 + 2], dc.w([0x4f4.toWord]));
+      expect(objectsAsm[12 * 5 + 2], dc.w([0x4fa.toWord]));
+    });
+
+    test('detects when not enough room to place sprites', () {
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1e0, 0x2e0),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()), // 0x2d0-0x318
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1f0, 0x2e0),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()), // 0x318-0x360
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.PalmanMan3, FaceDown()), // 0x360-0x3a8
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1e0, 0x2e0),
+        spec: Npc(Sprite.PalmanFighter1, FaceDown()), // 0x3a8-0x3f0
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1f0, 0x2e0),
+        spec: Npc(Sprite.PalmanFighter2, FaceDown()), // 0x3f0-0x438
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.PalmanFighter3, FaceDown()), // 0x438-0x480
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1e0, 0x2e0),
+        spec: Npc(Sprite.PalmanWoman1, FaceDown()), // 0x480-0x4c8
+      ));
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.Motavian1, FaceDownSimpleSprite()), // 0x4c8-4da
+      ));
+      // Should fit in at 4da-4e2
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0),
+          spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
+      // 4e2-4ea
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0),
+          spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
+      // 4ea-4f2
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0), spec: AlysWaiting()));
+      // 4f2-4fa
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0),
+          spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
+      testMap.addObject(MapObject(
+          startPosition: Position(0x200, 0x2e0),
+          spec: AsmSpec(routine: Word(0xF0), startFacing: down)));
+      // 4fa
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.PalmanWoman2, FaceDownOrUpLegsHidden()),
+      ));
+
+      expect(
+          () => program.addMap(testMap),
+          throwsA(isA<Exception>().having((e) => e.toString(), 'toString',
+              contains('cannot fit sprite in vram'))));
     });
   });
 
@@ -759,6 +810,9 @@ void main() {
           startPosition: Position(0x1e0, 0x2e0), spec: AlysWaiting()));
 
       testMap.addObject(MapObject(
+          startPosition: Position(0x1e0, 0x2e0), spec: AlysWaiting()));
+
+      testMap.addObject(MapObject(
           startPosition: Position(0x200, 0x2e0),
           spec: Npc(Sprite.PalmanMan2, FaceDown())));
 
@@ -769,7 +823,7 @@ void main() {
           Asm([
             dc.w([0x2d0.toWord]),
             dc.l([Constant('Art_PalmanMan1')]),
-            dc.w([0x320.toWord]),
+            dc.w([0x328.toWord]),
             dc.l([Constant('Art_PalmanMan2')]),
           ]));
 
@@ -777,6 +831,7 @@ void main() {
       expect(objectsAsm[2], dc.w([0x2d0.toWord]));
       expect(objectsAsm[7], dc.w([0x318.toWord]));
       expect(objectsAsm[12], dc.w([0x320.toWord]));
+      expect(objectsAsm[17], dc.w([0x328.toWord]));
     });
   });
 

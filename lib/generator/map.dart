@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' as iterables;
 import 'package:rune/generator/movement.dart';
-import 'package:rune/numbers.dart';
 import 'package:rune/src/null.dart';
 
 import '../model/model.dart';
@@ -164,7 +162,7 @@ MapAsm compileMap(
 // TODO(map compiler): this should be externalized to Program API for testing
 final _builtInSprites = {
   MapId.BirthValley_B1: [(Label('loc_1379A8'), 0x39)],
-  MapId.StripClub: [(Label('loc_14960C'), 0x3BA)] // width 0x100
+  // MapId.StripClub: [(Label('loc_14960C'), 0x3BA)] // width 0x100
 };
 
 /// Some maps utilize sprites outside of objects, in event routines.
@@ -219,11 +217,13 @@ Map<MapObjectId, Word> _compileMapSpriteData(
       vram ??= _VramTiles(start: spriteVramOffset);
     }
 
-    if (!vram.claim(mapping)) {
-      throw Exception('cannot fit sprite in vram: too much sprite data. '
-          'width: ${mapping.tiles} '
-          'art: ${mapping.art} '
-          'vram: $vram');
+    switch (vram.place(mapping)) {
+      case (false, _):
+      case (true, var d) when d.isNotEmpty:
+        throw Exception('cannot fit sprite in vram: too much sprite data. '
+            'width: ${mapping.tiles} '
+            'art: ${mapping.art} '
+            'vram: $vram');
     }
   }
 
@@ -323,199 +323,292 @@ class _ObjectSprites {
   }
 }
 
+typedef PlacementResult = (bool, Iterable<_SpriteVramMapping>);
+
 class _VramTiles {
   final _VramRegion _main;
-  final _chest = _VramRegion(start: 0x4dc, end: 0x4ed, onlyLazy: true);
-  final _afterChest = _VramRegion(start: 0x4ed, end: 0x534);
-  final _fixed = <_VramRegion>[];
+  final _VramRegion _chest;
+  final _afterChest = _VramRegion(minStart: 0x4ed, maxEnd: 0x534);
+
+  // Priority ordered
   final _regions = <_VramRegion>[];
 
-  _VramTiles({required int start})
-      : _main = _VramRegion(start: start, end: 0x4dc) {
-    _regions.addAll([_main, _chest, _afterChest]);
+  // Set of rejected states (list of mappings for each region)
+  final _rejects = <(_SpriteVramMapping, _VramState)>[];
+
+  _VramTiles({required int start, List<_SpriteVramMapping> builtIns = const []})
+      : _main = _VramRegion(minStart: start, maxEnd: 0x4dc),
+        _chest = _VramRegion(
+            minStart: start,
+            maxEnd: 0x53c,
+            allowed: (m) => m.lazilyLoaded,
+            maxStart: 0x4dc) {
+    _regions.addAll([_main, _afterChest, _chest]);
+    // set up regions so they all start on 0 but allow movement
   }
 
   Word? tileFor(_SpriteVramMapping mapping) {
-    for (var region in [_main, _afterChest, _chest]) {
+    for (var region in _regions) {
       var tile = region.tileFor(mapping);
       if (tile != null) return tile;
     }
     return null;
   }
 
-  bool claim(_SpriteVramMapping mapping) {
-    // This algorithm works by first trying to claim free, safe VRAM.
-    // If it cannot be claimed, and the mapping is lazily loaded,
-    // chest sprites will be overriden.
-    // If it cannot be claimed, and the mapping is not lazily loaded,
-    // it tries to drop mappings to free space,
-    // reording the mappings to try again for a more efficient packing.
-    // When the chest region is utilized, it may extend past the chest graphics.
-    // In this case, the after chest region is pushed back.
-    // If this causes overrun in the after chest region,
-    // the overrun is dropped and reordering is attempted.
-    bool reclaim(Iterable<_SpriteVramMapping> mappings) {
+  /// Places the [mapping] in VRAM.
+  ///
+  /// Returns a [PlacementResult] indicating whether the mapping was placed,
+  /// and any mappings that were dropped in the process of placing it.
+  PlacementResult place(_SpriteVramMapping mapping) {
+    if (contains(mapping)) return (true, []);
+
+    // Don't try a state that has already been rejected
+    // might want to try instead an optional "frozen" set of mappings which cannot be dropped
+    if (_wasRejected(mapping)) {
+      return (false, []); // should this include the mapping?
+    }
+
+    var startState = _captureState();
+
+    PlacementResult replace(Iterable<_SpriteVramMapping> mappings) {
+      var notPlaced = mappings.toSet();
+
       for (var m in mappings) {
-        if (!claim(m)) return false;
-      }
-      return true;
-    }
+        var (placed, dropped) = place(m);
 
-    // xxxxx experimenting with generic region list
-    // Regions must be ordered sequentially
+        notPlaced.addAll(dropped);
 
-    // If requires a specific tile,
-    // treat it as its own distinct region which cannot be moved.
-    if (mapping.requiredVramTile case var t?) {}
-
-    for (var i = 0; i < _regions.length; i++) {
-      var region = _regions[i];
-
-      // Place in priority order if allowed
-      if (region.onlyLazy && !mapping.lazilyLoaded) continue;
-      if (region.claim(mapping)) return true;
-    }
-
-    // If couldn't claim and lazily loaded,
-    // try placing only in lazy regions by allowing overrun
-
-    if (mapping.lazilyLoaded) {
-      for (var i = 0; i < _regions.length; i++) {
-        var region = _regions[i];
-
-        if (!region.onlyLazy) continue;
-
-        var maxOverrun = _regions
-            .sublist(i + 1)
-            .fold(0x534, (max, r) => min(max, r.maxOffset));
-
-        if (region.claim(mapping, allowOverrunUpTo: maxOverrun)) {
-          // Have to push all subsequent regions out.
-          var overrun = region.overrun;
-          var dropped = <_SpriteVramMapping>[];
-
-          for (var j = i + 1; j < _regions.length; j++) {
-            var r = _regions[j];
-            dropped.addAll(r.offsetBy(overrun));
-            // Regions may not be contiguous.
-            // When not, a subsequent region may not need to be bumped.
-            overrun = r.overrun;
-          }
-
-          return reclaim(dropped);
+        if (placed) {
+          notPlaced.remove(m);
+        } else {
+          return (false, notPlaced.toList());
         }
       }
+
+      return (notPlaced.none((m) => mappings.contains(m)), notPlaced.toList());
     }
 
-    // If that still didn't work, start dropping lazy mappings from non-lazy
-    // regions.
+    // TODO: if we know regions ahead of time,
+    // their relative order should never change,
+    // despite start changing
+    var sorted = _regions.sorted((a, b) => a.start.compareTo(b.start));
+
+    PlacementResult placeInRegion(_SpriteVramMapping mapping, _VramRegion r) {
+      if (r.place(mapping)) {
+        // Claim, allowing extension up to the next regions' max allowed start
+        var orderedIndex = sorted.indexOf(r);
+
+        // Have to push all subsequent regions out.
+        var prior = r;
+        var dropped = <_SpriteVramMapping>{};
+
+        for (var j = orderedIndex + 1; j < sorted.length; j++) {
+          var r = sorted[j];
+          dropped.addAll(r.startAt(prior.occupiedEnd));
+          prior = r;
+        }
+
+        var (_, d) = replace(dropped);
+        return (true, d);
+      } else {
+        return (false, const []);
+      }
+    }
+
     for (var i = 0; i < _regions.length; i++) {
       var region = _regions[i];
 
-      if (region.onlyLazy) continue;
+      // Claim, allowing extension up to the next regions' max allowed start
+      switch (placeInRegion(mapping, region)) {
+        case (true, []):
+          return (true, const []);
+        case (true, var d):
+          // Placed but displaced some. Try to replace.
+          return replace(d);
+        // Could not place, did not displace any
+        case (false, []):
+          continue;
+        // Could not place, and also displaced some.
+        // should never happen?
+        case (false, var d):
+          throw StateError('did not place. expected none dropped, but got: $d');
+      }
+    }
 
-      var dropped = region.dropLazy(untilFree: mapping.tiles);
+    // If we couldn't claim, then try to swap regions.
+    // Mark this state as a failure so we don't try it again.
+    _failState(mapping, startState);
+
+    for (var i = 0; i < _regions.length; i++) {
+      var region = _regions[i];
+
+      if (!region.allowed(mapping)) continue;
+      var dropped = region.freeUp(mapping.tiles)?.toSet();
 
       if (dropped != null) {
-        var claimed = region.claim(mapping);
-        assert(claimed);
-        for (var d in dropped) {
-          if (!claim(d)) return false;
+        // We were able to free up space.
+        // So now try to replace this mapping.
+        // Then, try to replace the dropped ones.
+        switch (placeInRegion(mapping, region)) {
+          case (false, _):
+            throw 'should never happen, we just freed space';
+          case (true, []):
+            // Best case, able to place without dropping
+            break;
+          case (true, var d):
+            // We were able to place, but not without dropping some more
+            dropped.addAll(d);
         }
-        return true;
+
+        // Now try to reclaim the dropped mappings.
+        // If we can't, then we have to undo the placement,
+        // and we try the next region instead
+        switch (replace(dropped)) {
+          case (true, []):
+            return (true, []);
+          case (true, var d):
+            // Not sure about this branch,
+            // might just mean we know it is rejected
+            return replace(d);
+          case (false, var d):
+            // todo: this might result in duplicates in d and dropped?
+
+            // We need to undo and try the next region
+            // First, drop what might have been reclaimed already
+            dropped.forEach(_drop);
+            // Now drop the mapping we placed above
+            region.drop(mapping);
+            // Put the stuff back we know was in this region
+            for (var d in dropped) {
+              placeInRegion(d, region);
+            }
+            // Put the rest backed from failed reclaim
+            switch (replace(d)) {
+              case (false, var d):
+                // This might happen if tbis was rejected
+                // If we can't reclaim; we're done.
+                return (false, d);
+              case (true, var d):
+                assert(d.isEmpty);
+                continue;
+            }
+        }
       }
     }
 
-    // Give up
+    return (false, []);
+  }
+
+  bool _drop(_SpriteVramMapping mapping) {
+    for (var region in _regions) {
+      if (region.drop(mapping)) return true;
+    }
     return false;
+  }
 
-    // xxxx
-
-    if (_main.claim(mapping)) return true;
-    if (_afterChest.claim(mapping)) return true;
-
-    if (mapping.lazilyLoaded) {
-      // TODO: we can technically try to claim overrun in main region first
-      // this would require pushing out chest region
-      // it may push it out past its end, and then also push out after chest
-      // trick is that order now matters:
-      // any overrun mappings must be the lazily loaded ones
-      // if (_main.claim(mapping, allowOverrunUpTo: 0x534)) {
-      //   if (_chest
-      //       .offsetBy(_main.overrun, allowOverrunUpTo: 0x534)
-      //       .isNotEmpty) {
-      //     return false;
-      //   }
-      //   if (_afterChest.offsetBy(_chest.overrun).isNotEmpty) {
-      //     return false;
-      //   }
-      //   return true;
-      // }
-
-      if (_chest.claim(mapping, allowOverrunUpTo: 0x534)) {
-        var overrun = _chest.overrun;
-        var dropped = _afterChest.offsetBy(overrun);
-        return reclaim(dropped);
-      }
+  bool contains(_SpriteVramMapping mapping) {
+    for (var region in _regions) {
+      if (region._mappings.contains(mapping)) return true;
     }
-
-    var dropped = _main.dropLazy(untilFree: mapping.tiles);
-
-    if (dropped != null) {
-      var claimed = _main.claim(mapping);
-      assert(claimed);
-      for (var d in dropped) {
-        if (!claim(d)) return false;
-      }
-      return true;
-    }
-
-    dropped = _afterChest.dropLazy(untilFree: mapping.tiles);
-    if (dropped != null) {
-      var claimed = _afterChest.claim(mapping);
-      assert(claimed);
-      for (var d in dropped) {
-        if (!claim(d)) return false;
-      }
-      return true;
-    }
-
-    // todo: could start trying to reorder
-    // but we need some way to stop the process.
-
     return false;
+  }
+
+  bool _wasRejected(_SpriteVramMapping mapping) {
+    // Have we already tried to claim this mapping at this state and couldn't?
+    var rejected = false;
+
+    for (var (failMapping, failState) in _rejects) {
+      if (!identical(mapping, failMapping)) continue;
+
+      rejected = true;
+
+      // Same mapping as a previous failure.
+      // Check the state is not the same.
+      for (var i = 0; i < _regions.length; i++) {
+        var currentRegionMappings = _regions[i]._mappings;
+        var failedRegionMappings = failState[i];
+
+        if (!const UnorderedIterableEquality(IdentityEquality())
+            .equals(currentRegionMappings, failedRegionMappings)) {
+          rejected = false;
+          break;
+        }
+      }
+
+      if (rejected) return true;
+    }
+
+    return rejected;
+  }
+
+  bool _failState(_SpriteVramMapping mapping, _VramState state) {
+    _rejects.add((mapping, state));
+    return false;
+  }
+
+  _VramState _captureState() {
+    return [for (var r in _regions) r._mappings.toList(growable: false)];
   }
 
   @override
   String toString() {
-    return '_VramTiles{_main: $_main, _chest: $_chest, '
-        '_afterChest: $_afterChest}';
+    return '_VramTiles{_regions: $_regions}';
   }
 }
 
+typedef _VramState = List<List<_SpriteVramMapping>>;
+
+bool _anyMapping(_SpriteVramMapping mapping) => true;
+
 class _VramRegion {
-  final int start;
-  int _offset;
-  final int maxOffset;
-  final int end;
-  int get free => end - occupiedEnd;
-  int get occupiedEnd => _offset + width;
-  int get overrun => occupiedEnd > end ? occupiedEnd - end : 0;
+  /// The current, mutable start of the region
+  /// (the [_start], with configurable offset)
+  int _offsetStart;
+
+  /// The current start of the region (default + offset).
+  int get start => _offsetStart;
+
+  final int minStart;
+  final int maxStart;
+
+  /// The minimum the [end] may be pushed back to, regardless of unused space.
+  ///
+  /// Must be >= [maxStart]. (If ==, region is length 0 and can fit no mappings)
+  final int minEnd;
+  final int maxEnd;
+
+  int get free => maxEnd - occupiedEnd;
+
+  /// The end of where sprites currently occupy the region.
+  int get occupiedEnd => _offsetStart + width;
+
   int _next = 0;
+
+  /// How many tiles occupy the region.
   int get width => _next;
-  int get nextTile => _offset + _next;
-  final bool onlyLazy;
+  int get nextTile => _offsetStart + _next;
+  final bool Function(_SpriteVramMapping) allowed;
 
   final _mappings = <_SpriteVramMapping>[];
 
-  _VramRegion({required this.start, required this.end, this.onlyLazy = false})
-      : _offset = start,
-        maxOffset = 0x534 - 1;
+  _VramRegion(
+      {required this.minStart,
+      required this.maxEnd,
+      bool Function(_SpriteVramMapping) allowed = _anyMapping,
+      // todo
+      int? maxStart,
+      int? minEnd})
+      : _offsetStart = minStart,
+        allowed = allowed,
+        minEnd = minEnd ?? maxStart ?? minStart,
+        maxStart = maxStart ?? minEnd ?? maxEnd;
 
-  _VramRegion.fixed(
-      {required this.start, required this.end, this.onlyLazy = false})
-      : _offset = start,
-        maxOffset = start;
+  // _VramRegion.fixed(
+  //     {required int start, required int end, this.onlyLazy = false})
+  //     : _offsetStart = start,
+  //       _start = start,
+  //       minStart = start,
+  //       maxStart = start;
 
   Word? tileFor(_SpriteVramMapping mapping) {
     for (var (t, m) in _tiles()) {
@@ -525,66 +618,120 @@ class _VramRegion {
   }
 
   Iterable<(Word, _SpriteVramMapping)> _tiles() sync* {
-    var tile = _offset;
+    var tile = _offsetStart;
     for (var m in _mappings) {
       yield (Word(tile), m);
       tile += m.tiles;
     }
   }
 
-  Iterable<_SpriteVramMapping>? dropLazy({required int untilFree}) {
-    // This algorithm tries to drop the smallest lazily loaded mappings first.
-    // This isn't necessarily the most efficient
-    var dropped = <_SpriteVramMapping>[];
-    var sorted = _mappings.sorted((a, b) => b.tiles.compareTo(a.tiles));
-    for (var i = 0; i < _mappings.length && free < untilFree; i++) {
-      var m = sorted[i];
+  // TODO: these adjustments that drop sprites could be better
+  // Consider an implementation using "branch and bound" algorithm
+  // to find least amount to drop, any time we have to drop something
 
-      if (m.lazilyLoaded) {
-        _mappings.removeWhere((e) => identical(e, m));
-        dropped.add(m);
-        _next -= m.tiles;
+  /// Drops the mapping from the region.
+  /// Returns true if the mapping was found and dropped.
+  bool drop(_SpriteVramMapping mapping) {
+    var removed = _mappings.remove(mapping);
+    if (removed) _next -= mapping.tiles;
+    return removed;
+  }
+
+  /// Drop mappings, if needed, to accommodate [amount] space
+  /// within region limits.
+  ///
+  /// Returns `null` if the amount cannot be freed.`
+  Iterable<_SpriteVramMapping>? freeUp(int amount) {
+    var toFree = amount - free;
+
+    // Do we already have enough free?
+    if (toFree <= 0) return const [];
+
+    var goalSize = width - toFree;
+
+    // Would the goal size violate region constraints?
+    if (start + goalSize < minEnd || goalSize < 0) return null;
+
+    var bestSize = 0;
+    var bestSubset = <_SpriteVramMapping>[];
+
+    // Find the set of mappings which is closest to goal without going over
+    var sorted = _mappings.sorted((a, b) => b.tiles.compareTo(a.tiles));
+    var n = _mappings.length;
+
+    // Branch and bound
+    void backtrack(
+        int start, int currentSize, List<_SpriteVramMapping> subset) {
+      if (currentSize > goalSize || start == n) return;
+
+      if (currentSize > bestSize) {
+        bestSize = currentSize;
+        bestSubset = subset.toList();
+      }
+
+      var nextMapping = sorted[start];
+      subset.add(nextMapping);
+
+      backtrack(start + 1, currentSize + nextMapping.tiles, subset);
+
+      // Try the other branch, without the next mapping
+      subset.removeLast();
+      backtrack(start + 1, currentSize, subset);
+    }
+
+    backtrack(0, 0, []);
+
+    // Modify mappings and return the ones we dropped.
+    var dropped = <_SpriteVramMapping>[];
+
+    for (var i = 0; i < _mappings.length; i++) {
+      var mapping = _mappings[i];
+      if (!bestSubset.contains(mapping)) {
+        _mappings.removeAt(i);
+        dropped.add(mapping);
+        _next -= mapping.tiles;
+        i--;
       }
     }
 
-    if (free < untilFree) {
-      _mappings.addAll(dropped);
-      _next += dropped.fold<int>(0, (total, m) => total + m.tiles);
-      return null;
-    }
-
     return dropped;
   }
 
-  /// Sets the offset to [start] plus [amount],
-  /// dropping the smallest mappings which exceed the [end]
-  /// after the adjustment, if any.
-  /// These dropped mappings are returned.
-  Iterable<_SpriteVramMapping> offsetBy(int amount) {
-    if (amount == 0) return const [];
-    if (start + amount > maxOffset) throw ArgumentError('offset out of range');
-    _offset = start + amount;
-    var dropped = <_SpriteVramMapping>[];
-    while (overrun > 0) {
-      var smallest =
-          _mappings.sorted((a, b) => a.tiles.compareTo(b.tiles)).last;
-      _mappings.removeWhere((e) => identical(e, smallest));
-      dropped.add(smallest);
-      _next -= smallest.tiles;
-    }
-    return dropped;
-  }
-
-  /// Return false if cannot be claimed in this region.
+  /// Move the start address.
   ///
-  /// Normally overrun beyond [end] is not allowed.
-  /// However, if [allowOverrunUpTo] is specified,
-  /// overrun is allowed up to that value
-  /// (overrun < allowOverrunUpTo - end).
-  bool claim(_SpriteVramMapping mapping, {int? allowOverrunUpTo}) {
-    allowOverrunUpTo ??= end;
+  /// If the start address is less than the current start, the end position
+  /// stays.
+  ///
+  /// If the start is greater than the current start,
+  /// the end may move up to [maxEnd] to accommodate fitting existing mappings.
+  ///
+  /// If any cannot be fit, they are dropped and returned.
+  Iterable<_SpriteVramMapping> startAt(int address) {
+    Iterable<_SpriteVramMapping>? dropped;
+    address = max(minStart, address);
 
-    if (nextTile + mapping.tiles >= allowOverrunUpTo) return false;
+    if (address < _offsetStart) {
+      _offsetStart = address;
+      return const [];
+    } else {
+      var toFree = address - _offsetStart;
+      var free = this.free;
+      if (toFree > free) {
+        dropped = freeUp(toFree);
+      }
+      _offsetStart = address;
+      return dropped ?? const [];
+    }
+  }
+
+  /// Attempts to place the mapping in this region,
+  /// possibly extending the regions end up to [maxEnd].
+  ///
+  /// Return false if cannot be claimed in this region.
+  bool place(_SpriteVramMapping mapping) {
+    if (!allowed(mapping)) return false;
+
+    if (nextTile + mapping.tiles >= maxEnd) return false;
 
     _mappings.add(mapping);
     _next += mapping.tiles;
@@ -594,7 +741,7 @@ class _VramRegion {
 
   @override
   String toString() {
-    return '_VramRegion{_offset: $_offset, end: $end, '
+    return '_VramRegion{_offset: $_offsetStart, end: $occupiedEnd, '
         '_next: $_next, _mappings: $_mappings}';
   }
 }
@@ -645,24 +792,6 @@ class _SpriteVramMapping {
     return '_SpriteVramMapping{art: $art, tiles: $tiles, '
         'duplicateOffsets: $duplicateOffsets, animated: $animated}';
   }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is _SpriteVramMapping &&
-          runtimeType == other.runtimeType &&
-          art == other.art &&
-          tiles == other.tiles &&
-          const IterableEquality<int>()
-              .equals(duplicateOffsets, other.duplicateOffsets) &&
-          animated == other.animated;
-
-  @override
-  int get hashCode =>
-      art.hashCode ^
-      tiles.hashCode ^
-      const IterableEquality<int>().hash(duplicateOffsets) ^
-      animated.hashCode;
 }
 
 Byte _compileInteractionScene(
