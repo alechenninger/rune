@@ -218,11 +218,11 @@ Map<MapObjectId, Word> _compileMapSpriteData(
     }
 
     switch (vram.place(mapping)) {
-      case (false, _):
-      case (true, var d) when d.isNotEmpty:
+      case var d when d.isNotEmpty:
         throw Exception('cannot fit sprite in vram: too much sprite data. '
             'width: ${mapping.tiles} '
             'art: ${mapping.art} '
+            'not_placed: $d '
             'vram: $vram');
     }
   }
@@ -323,27 +323,24 @@ class _ObjectSprites {
   }
 }
 
-typedef PlacementResult = (bool, Iterable<_SpriteVramMapping>);
-
 class _VramTiles {
-  final _VramRegion _main;
-  final _VramRegion _chest;
-  final _afterChest = _VramRegion(minStart: 0x4ed, maxEnd: 0x534);
-
   // Priority ordered
   final _regions = <_VramRegion>[];
 
   // Set of rejected states (list of mappings for each region)
   final _rejects = <(_SpriteVramMapping, _VramState)>[];
 
-  _VramTiles({required int start, List<_SpriteVramMapping> builtIns = const []})
-      : _main = _VramRegion(minStart: start, maxEnd: 0x4dc),
-        _chest = _VramRegion(
-            minStart: start,
-            maxEnd: 0x53c,
-            allowed: (m) => m.lazilyLoaded,
-            maxStart: 0x4dc) {
-    _regions.addAll([_main, _afterChest, _chest]);
+  _VramTiles(
+      {required int start, List<_SpriteVramMapping> builtIns = const []}) {
+    _regions.addAll([
+      _VramRegion(minStart: start, maxEnd: 0x4dc),
+      _VramRegion(minStart: 0x4ed, maxEnd: 0x534),
+      _VramRegion(
+          minStart: start,
+          maxStart: 0x4dc,
+          maxEnd: 0x53c,
+          allowed: (m) => m.lazilyLoaded)
+    ]);
     // set up regions so they all start on 0 but allow movement
   }
 
@@ -357,35 +354,30 @@ class _VramTiles {
 
   /// Places the [mapping] in VRAM.
   ///
-  /// Returns a [PlacementResult] indicating whether the mapping was placed,
-  /// and any mappings that were dropped in the process of placing it.
-  PlacementResult place(_SpriteVramMapping mapping) {
-    if (contains(mapping)) return (true, []);
+  /// Returns any mappings that could not be placed.
+  Iterable<_SpriteVramMapping> place(_SpriteVramMapping mapping,
+      {bool rearrange = true}) {
+    if (contains(mapping)) return const [];
 
     // Don't try a state that has already been rejected
     // might want to try instead an optional "frozen" set of mappings which cannot be dropped
     if (_wasRejected(mapping)) {
-      return (false, []); // should this include the mapping?
+      return [mapping];
     }
 
     var startState = _captureState();
 
-    PlacementResult replace(Iterable<_SpriteVramMapping> mappings) {
-      var notPlaced = mappings.toSet();
+    Iterable<_SpriteVramMapping> replace(Iterable<_SpriteVramMapping> mappings,
+        {bool rearrange = true}) {
+      var remaining = <_SpriteVramMapping>[];
 
+      // Always go through all of them and collect what was misplaced.
       for (var m in mappings) {
-        var (placed, dropped) = place(m);
-
-        notPlaced.addAll(dropped);
-
-        if (placed) {
-          notPlaced.remove(m);
-        } else {
-          return (false, notPlaced.toList());
-        }
+        var r = place(m, rearrange: rearrange);
+        remaining.addAll(r);
       }
 
-      return (notPlaced.none((m) => mappings.contains(m)), notPlaced.toList());
+      return remaining;
     }
 
     // TODO: if we know regions ahead of time,
@@ -393,14 +385,15 @@ class _VramTiles {
     // despite start changing
     var sorted = _regions.sorted((a, b) => a.start.compareTo(b.start));
 
-    PlacementResult placeInRegion(_SpriteVramMapping mapping, _VramRegion r) {
+    Iterable<_SpriteVramMapping> placeInRegion(
+        _SpriteVramMapping mapping, _VramRegion r) {
       if (r.place(mapping)) {
         // Claim, allowing extension up to the next regions' max allowed start
         var orderedIndex = sorted.indexOf(r);
 
         // Have to push all subsequent regions out.
         var prior = r;
-        var dropped = <_SpriteVramMapping>{};
+        var dropped = <_SpriteVramMapping>[];
 
         for (var j = orderedIndex + 1; j < sorted.length; j++) {
           var r = sorted[j];
@@ -408,10 +401,9 @@ class _VramTiles {
           prior = r;
         }
 
-        var (_, d) = replace(dropped);
-        return (true, d);
+        return dropped;
       } else {
-        return (false, const []);
+        return [mapping];
       }
     }
 
@@ -420,18 +412,18 @@ class _VramTiles {
 
       // Claim, allowing extension up to the next regions' max allowed start
       switch (placeInRegion(mapping, region)) {
-        case (true, []):
-          return (true, const []);
-        case (true, var d):
-          // Placed but displaced some. Try to replace.
-          return replace(d);
-        // Could not place, did not displace any
-        case (false, []):
+        case []:
+          return const [];
+        case var d when d.length == 1 && d.first == mapping:
+          // Couldn't place this mapping, but nothing else was displaced.
+          // Just try the next region.
           continue;
-        // Could not place, and also displaced some.
-        // should never happen?
-        case (false, var d):
-          throw StateError('did not place. expected none dropped, but got: $d');
+        case var d:
+          // Placed, but displaced other mappings.
+          // Try to replace those.
+          // This may have to drop some things.
+          // should we fail this state?
+          return replace(d);
       }
     }
 
@@ -439,64 +431,48 @@ class _VramTiles {
     // Mark this state as a failure so we don't try it again.
     _failState(mapping, startState);
 
+    if (!rearrange) return [mapping];
+
+    var state = _regions.map((r) => r.copy()).toList(growable: false);
+
     for (var i = 0; i < _regions.length; i++) {
       var region = _regions[i];
 
       if (!region.allowed(mapping)) continue;
-      var dropped = region.freeUp(mapping.tiles)?.toSet();
 
-      if (dropped != null) {
+      var freed = region.freeUp(mapping.tiles);
+      Iterable<_SpriteVramMapping>? dropped;
+
+      if (freed != null) {
         // We were able to free up space.
         // So now try to replace this mapping.
         // Then, try to replace the dropped ones.
         switch (placeInRegion(mapping, region)) {
-          case (false, _):
-            throw 'should never happen, we just freed space';
-          case (true, []):
+          case []:
             // Best case, able to place without dropping
+            // Now try to replace what we freed up.
+            switch (replace(freed, rearrange: false)) {
+              case []:
+                return const [];
+              case var d:
+                dropped = d;
+            }
             break;
-          case (true, var d):
-            // We were able to place, but not without dropping some more
-            dropped.addAll(d);
+          case var d:
+            dropped = replace(d, rearrange: false);
         }
 
-        // Now try to reclaim the dropped mappings.
-        // If we can't, then we have to undo the placement,
-        // and we try the next region instead
-        switch (replace(dropped)) {
-          case (true, []):
-            return (true, []);
-          case (true, var d):
-            // Not sure about this branch,
-            // might just mean we know it is rejected
-            return replace(d);
-          case (false, var d):
-            // todo: this might result in duplicates in d and dropped?
+        if (dropped.isEmpty) return const [];
 
-            // We need to undo and try the next region
-            // First, drop what might have been reclaimed already
-            dropped.forEach(_drop);
-            // Now drop the mapping we placed above
-            region.drop(mapping);
-            // Put the stuff back we know was in this region
-            for (var d in dropped) {
-              placeInRegion(d, region);
-            }
-            // Put the rest backed from failed reclaim
-            switch (replace(d)) {
-              case (false, var d):
-                // This might happen if tbis was rejected
-                // If we can't reclaim; we're done.
-                return (false, d);
-              case (true, var d):
-                assert(d.isEmpty);
-                continue;
-            }
+        // If we got here, this region didn't work.
+        // Restore and try the next region.
+        for (var i = 0; i < _regions.length; i++) {
+          _regions[i].restore(state[i]);
         }
       }
     }
 
-    return (false, []);
+    return [mapping];
   }
 
   bool _drop(_SpriteVramMapping mapping) {
@@ -609,6 +585,26 @@ class _VramRegion {
   //       _start = start,
   //       minStart = start,
   //       maxStart = start;
+
+  _VramRegion copy() {
+    var copy = _VramRegion(
+        minStart: minStart,
+        maxEnd: maxEnd,
+        allowed: allowed,
+        maxStart: maxStart,
+        minEnd: minEnd);
+    copy._offsetStart = _offsetStart;
+    copy._next = _next;
+    copy._mappings.addAll(_mappings);
+    return copy;
+  }
+
+  void restore(_VramRegion region) {
+    _offsetStart = region._offsetStart;
+    _next = region._next;
+    _mappings.clear();
+    _mappings.addAll(region._mappings);
+  }
 
   Word? tileFor(_SpriteVramMapping mapping) {
     for (var (t, m) in _tiles()) {

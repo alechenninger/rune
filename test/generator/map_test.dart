@@ -700,9 +700,9 @@ void main() {
       expect(objectsAsm[7 * 5 + 2], dc.w([0x4c8.toWord]));
       // Start using up chest area into after chest
       expect(objectsAsm[8 * 5 + 2], dc.w([0x4f2.toWord]));
-      expect(objectsAsm[9 * 5 + 2], dc.w([0x4e2.toWord]));
-      expect(objectsAsm[10 * 5 + 2], dc.w([0x4ea.toWord]));
-      expect(objectsAsm[11 * 5 + 2], dc.w([0x4da.toWord]));
+      expect(objectsAsm[9 * 5 + 2], dc.w([0x4da.toWord]));
+      expect(objectsAsm[10 * 5 + 2], dc.w([0x4e2.toWord]));
+      expect(objectsAsm[11 * 5 + 2], dc.w([0x4ea.toWord]));
       // Start later in after chest due to offset
       expect(objectsAsm[12 * 5 + 2], dc.w([0x4fa.toWord]));
     });
