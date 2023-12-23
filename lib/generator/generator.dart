@@ -85,6 +85,7 @@ class Program {
   Word _cutsceneIndexOffset;
 
   final Map<MapId, Word> _vramTileOffsets = {};
+  final Map<MapId, List<SpriteVramMapping>> _builtInSprites = {};
 
   final _eventFlags = EventFlags();
 
@@ -92,9 +93,11 @@ class Program {
     Word? eventIndexOffset,
     Word? cutsceneIndexOffset,
     Map<MapId, Word>? vramTileOffsets,
+    Map<MapId, List<SpriteVramMapping>>? builtInSprites,
   })  : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord,
         _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord {
     _vramTileOffsets.addAll(vramTileOffsets ?? _defaultSpriteVramOffsets);
+    _builtInSprites.addAll(builtInSprites ?? _defaultBuiltInSprites);
   }
 
   /// Returns event index by which [routine] can be referenced.
@@ -154,9 +157,13 @@ class Program {
     }
 
     var spriteVramOffset = _vramTileOffsets[map.id];
+    var builtInSprites = _builtInSprites[map.id] ?? const [];
+
     return _maps[map.id] = compileMap(
         map, _ProgramEventRoutines(this), spriteVramOffset,
-        dialogTrees: dialogTrees, eventFlags: _eventFlags);
+        dialogTrees: dialogTrees,
+        eventFlags: _eventFlags,
+        builtInSprites: builtInSprites);
   }
 
   /// DialogTrees for maps which are not added to the game.
@@ -2569,6 +2576,21 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_Kuran_F3'): Word(0x3b9),
   Label('Map_GaruberkTower_Part7'): Word(0x252),
 }.map((l, o) => MapEntry(labelToMapId(l), o));
+
+final _defaultBuiltInSprites = {
+  MapId.BirthValley_B1: [
+    SpriteVramMapping(
+        tiles: 0x39,
+        art: RomArt(label: Label('loc_1379A8')),
+        requiredVramTile: Word(0x148))
+  ],
+  MapId.StripClub: [
+    SpriteVramMapping(
+        tiles: 0x100,
+        art: RomArt(label: Label('loc_14960C')),
+        requiredVramTile: Word(0x3BA))
+  ]
+};
 
 Queue<Word> freeEventFlags() {
   var q = Queue<Word>();

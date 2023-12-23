@@ -419,6 +419,104 @@ void main() {
         ]));
   });
 
+  group('arranges vram around fixed built in sprites', () {
+    test('which split regions', () {
+      program = Program(builtInSprites: {
+        MapId.Test: [
+          SpriteVramMapping(
+              tiles: 0x112,
+              art: RomArt(label: Label('Art_PalmanWoman1')),
+              requiredVramTile: Word(0x34d)) // 35f-34d
+        ]
+      });
+
+      // 2d0-318
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1e0, 0x2e0),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
+      ));
+      // would collide with built in, so goes after
+      // 45f-4a7
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1f0, 0x2e0),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()),
+      ));
+      // would collide with chest so goes after that
+      // 4ed
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.PalmanMan3, FaceDownOrUpLegsHidden()),
+      ));
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w([0x34d.toWord]),
+            dc.l([Constant('Art_PalmanWoman1')]),
+            dc.w([0x2d0.toWord]),
+            dc.l([Constant('Art_PalmanMan1')]),
+            dc.w([0x45f.toWord]),
+            dc.l([Constant('Art_PalmanMan2')]),
+            dc.w([0x4ed.toWord]),
+            dc.l([Constant('Art_PalmanMan3')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[2], dc.w([0x2d0.toWord]));
+      expect(objectsAsm[7], dc.w([0x45f.toWord]));
+      expect(objectsAsm[12], dc.w([0x4ed.toWord]));
+    });
+
+    test('at the start of sprite vram', () {
+      program = Program(builtInSprites: {
+        MapId.Test: [
+          SpriteVramMapping(
+              tiles: 0x100,
+              art: RomArt(label: Label('Art_PalmanWoman1')),
+              requiredVramTile: Word(0x2d0)) // 2d0-3d0
+        ]
+      });
+
+      // starts after built in, 3d0
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1e0, 0x2e0),
+        spec: Npc(Sprite.PalmanMan1, FaceDown()),
+      ));
+      // 3d0-418
+      testMap.addObject(MapObject(
+        startPosition: Position(0x1f0, 0x2e0),
+        spec: Npc(Sprite.PalmanMan2, FaceDown()),
+      ));
+      // 418-460
+      testMap.addObject(MapObject(
+        startPosition: Position(0x200, 0x2e0),
+        spec: Npc(Sprite.PalmanMan3, FaceDownOrUpLegsHidden()),
+      ));
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w([0x2d0.toWord]),
+            dc.l([Constant('Art_PalmanWoman1')]),
+            dc.w([0x3d0.toWord]),
+            dc.l([Constant('Art_PalmanMan1')]),
+            dc.w([0x418.toWord]),
+            dc.l([Constant('Art_PalmanMan2')]),
+            dc.w([0x460.toWord]),
+            dc.l([Constant('Art_PalmanMan3')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[2], dc.w([0x3d0.toWord]));
+      expect(objectsAsm[7], dc.w([0x418.toWord]));
+      expect(objectsAsm[12], dc.w([0x460.toWord]));
+    });
+  });
+
   group('routines which use ram art', () {
     test('set a vram tile but not a sprite', () {
       testMap.addObject(MapObject(
