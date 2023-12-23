@@ -217,13 +217,12 @@ Map<MapObjectId, Word> _compileMapSpriteData(
       vram ??= _VramTiles(start: spriteVramOffset);
     }
 
-    switch (vram.place(mapping)) {
-      case var d when d.isNotEmpty:
-        throw Exception('cannot fit sprite in vram: too much sprite data. '
-            'width: ${mapping.tiles} '
-            'art: ${mapping.art} '
-            'not_placed: $d '
-            'vram: $vram');
+    if (vram.place(mapping) case var d when d.isNotEmpty) {
+      throw Exception('cannot fit sprite in vram: too much sprite data. '
+          'width: ${mapping.tiles} '
+          'art: ${mapping.art} '
+          'not_placed: $d '
+          'vram: $vram');
     }
   }
 
@@ -326,9 +325,7 @@ class _ObjectSprites {
 class _VramTiles {
   // Priority ordered
   final _regions = <_VramRegion>[];
-
-  // Set of rejected states (list of mappings for each region)
-  final _rejects = <(_SpriteVramMapping, _VramState)>[];
+  late final List<_VramRegion> _regionsInOrder;
 
   _VramTiles(
       {required int start, List<_SpriteVramMapping> builtIns = const []}) {
@@ -341,7 +338,7 @@ class _VramTiles {
           maxEnd: 0x53c,
           allowed: (m) => m.lazilyLoaded)
     ]);
-    // set up regions so they all start on 0 but allow movement
+    _regionsInOrder = _regions.sorted((a, b) => a.start.compareTo(b.start));
   }
 
   Word? tileFor(_SpriteVramMapping mapping) {
@@ -359,59 +356,11 @@ class _VramTiles {
       {bool rearrange = true}) {
     if (contains(mapping)) return const [];
 
-    // Don't try a state that has already been rejected
-    // might want to try instead an optional "frozen" set of mappings which cannot be dropped
-    if (_wasRejected(mapping)) {
-      return [mapping];
-    }
-
-    var startState = _captureState();
-
-    Iterable<_SpriteVramMapping> replace(Iterable<_SpriteVramMapping> mappings,
-        {bool rearrange = true}) {
-      var remaining = <_SpriteVramMapping>[];
-
-      // Always go through all of them and collect what was misplaced.
-      for (var m in mappings) {
-        var r = place(m, rearrange: rearrange);
-        remaining.addAll(r);
-      }
-
-      return remaining;
-    }
-
-    // TODO: if we know regions ahead of time,
-    // their relative order should never change,
-    // despite start changing
-    var sorted = _regions.sorted((a, b) => a.start.compareTo(b.start));
-
-    Iterable<_SpriteVramMapping> placeInRegion(
-        _SpriteVramMapping mapping, _VramRegion r) {
-      if (r.place(mapping)) {
-        // Claim, allowing extension up to the next regions' max allowed start
-        var orderedIndex = sorted.indexOf(r);
-
-        // Have to push all subsequent regions out.
-        var prior = r;
-        var dropped = <_SpriteVramMapping>[];
-
-        for (var j = orderedIndex + 1; j < sorted.length; j++) {
-          var r = sorted[j];
-          dropped.addAll(r.startAt(prior.occupiedEnd));
-          prior = r;
-        }
-
-        return dropped;
-      } else {
-        return [mapping];
-      }
-    }
-
     for (var i = 0; i < _regions.length; i++) {
       var region = _regions[i];
 
       // Claim, allowing extension up to the next regions' max allowed start
-      switch (placeInRegion(mapping, region)) {
+      switch (_placeInRegion(mapping, region)) {
         case []:
           return const [];
         case var d when d.length == 1 && d.first == mapping:
@@ -421,15 +370,9 @@ class _VramTiles {
         case var d:
           // Placed, but displaced other mappings.
           // Try to replace those.
-          // This may have to drop some things.
-          // should we fail this state?
-          return replace(d);
+          return _placeAll(d, rearrange: rearrange);
       }
     }
-
-    // If we couldn't claim, then try to swap regions.
-    // Mark this state as a failure so we don't try it again.
-    _failState(mapping, startState);
 
     if (!rearrange) return [mapping];
 
@@ -441,31 +384,17 @@ class _VramTiles {
       if (!region.allowed(mapping)) continue;
 
       var freed = region.freeUp(mapping.tiles);
-      Iterable<_SpriteVramMapping>? dropped;
 
-      if (freed != null) {
-        // We were able to free up space.
-        // So now try to replace this mapping.
-        // Then, try to replace the dropped ones.
-        switch (placeInRegion(mapping, region)) {
-          case []:
-            // Best case, able to place without dropping
-            // Now try to replace what we freed up.
-            switch (replace(freed, rearrange: false)) {
-              case []:
-                return const [];
-              case var d:
-                dropped = d;
-            }
-            break;
-          case var d:
-            dropped = replace(d, rearrange: false);
-        }
+      if (freed == null) continue;
 
-        if (dropped.isEmpty) return const [];
+      // We were able to free up space.
+      // So now try to replace this mapping.
+      // Then, try to replace the freed ones.
+      var dropped = _placeInRegion(mapping, region);
 
-        // If we got here, this region didn't work.
-        // Restore and try the next region.
+      if (_placeAll([...dropped, ...freed], rearrange: false) case []) {
+        return const [];
+      } else {
         for (var i = 0; i < _regions.length; i++) {
           _regions[i].restore(state[i]);
         }
@@ -475,11 +404,39 @@ class _VramTiles {
     return [mapping];
   }
 
-  bool _drop(_SpriteVramMapping mapping) {
-    for (var region in _regions) {
-      if (region.drop(mapping)) return true;
+  Iterable<_SpriteVramMapping> _placeInRegion(
+      _SpriteVramMapping mapping, _VramRegion r) {
+    if (r.place(mapping)) {
+      // Claim, allowing extension up to the next regions' max allowed start
+      var orderedIndex = _regionsInOrder.indexOf(r);
+
+      // Have to push all subsequent regions out.
+      var prior = r;
+      var dropped = <_SpriteVramMapping>[];
+
+      for (var j = orderedIndex + 1; j < _regionsInOrder.length; j++) {
+        var r = _regionsInOrder[j];
+        dropped.addAll(r.startAt(prior.occupiedEnd));
+        prior = r;
+      }
+
+      return dropped;
+    } else {
+      return [mapping];
     }
-    return false;
+  }
+
+  Iterable<_SpriteVramMapping> _placeAll(Iterable<_SpriteVramMapping> mappings,
+      {required bool rearrange}) {
+    var remaining = <_SpriteVramMapping>[];
+
+    // Always go through all of them and collect what was misplaced.
+    for (var m in mappings) {
+      var r = place(m, rearrange: rearrange);
+      remaining.addAll(r);
+    }
+
+    return remaining;
   }
 
   bool contains(_SpriteVramMapping mapping) {
@@ -487,43 +444,6 @@ class _VramTiles {
       if (region._mappings.contains(mapping)) return true;
     }
     return false;
-  }
-
-  bool _wasRejected(_SpriteVramMapping mapping) {
-    // Have we already tried to claim this mapping at this state and couldn't?
-    var rejected = false;
-
-    for (var (failMapping, failState) in _rejects) {
-      if (!identical(mapping, failMapping)) continue;
-
-      rejected = true;
-
-      // Same mapping as a previous failure.
-      // Check the state is not the same.
-      for (var i = 0; i < _regions.length; i++) {
-        var currentRegionMappings = _regions[i]._mappings;
-        var failedRegionMappings = failState[i];
-
-        if (!const UnorderedIterableEquality(IdentityEquality())
-            .equals(currentRegionMappings, failedRegionMappings)) {
-          rejected = false;
-          break;
-        }
-      }
-
-      if (rejected) return true;
-    }
-
-    return rejected;
-  }
-
-  bool _failState(_SpriteVramMapping mapping, _VramState state) {
-    _rejects.add((mapping, state));
-    return false;
-  }
-
-  _VramState _captureState() {
-    return [for (var r in _regions) r._mappings.toList(growable: false)];
   }
 
   @override
@@ -703,7 +623,6 @@ class _VramRegion {
   ///
   /// If any cannot be fit, they are dropped and returned.
   Iterable<_SpriteVramMapping> startAt(int address) {
-    Iterable<_SpriteVramMapping>? dropped;
     address = max(minStart, address);
 
     if (address < _offsetStart) {
@@ -711,12 +630,9 @@ class _VramRegion {
       return const [];
     } else {
       var toFree = address - _offsetStart;
-      var free = this.free;
-      if (toFree > free) {
-        dropped = freeUp(toFree);
-      }
+      var dropped = freeUp(toFree);
       _offsetStart = address;
-      return dropped ?? const [];
+      return dropped!;
     }
   }
 
