@@ -720,6 +720,13 @@ final _portraits = const [
   Portrait.Tallas, // dc.l	ArtNem_TallasDialPortrait	; $25
   Portrait.DyingBoy, // dc.l	ArtNem_DyingBoyDialPortrait	; $26
   Portrait.Sekreas, // dc.l	ArtNem_SekreasDialPortrait	; $27
+  Portrait.Shopkeeper1,
+  Portrait.Shopkeeper2,
+  Portrait.Shopkeeper3,
+  Portrait.Shopkeeper4,
+  Portrait.Shopkeeper5,
+  Portrait.Shopkeeper6,
+  Portrait.Shopkeeper7
 ];
 
 Byte toPortraitCode(Portrait? p) {

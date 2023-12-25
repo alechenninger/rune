@@ -250,6 +250,14 @@ abstract mixin class Speaker {
     Dorin,
     Seed,
     Mito,
+    Shopkeeper1,
+    Shopkeeper2,
+    Shopkeeper3,
+    Shopkeeper4,
+    Shopkeeper5,
+    Shopkeeper6,
+    Shopkeeper7,
+    HuntersGuildBartender,
   ];
 
   static final Map<String, Speaker> _byName = allSpeakers.groupFoldBy(
@@ -269,6 +277,15 @@ abstract mixin class Speaker {
   static final Dorin = NpcSpeaker(Portrait.Dorin, "Dorin");
   static final Seed = NoPortraitSpeaker('Seed');
   static final Mito = NpcSpeaker(Portrait.FortuneTeller, 'Mito');
+  static final Shopkeeper1 = NpcSpeaker(Portrait.Shopkeeper1, 'Shopkeeper1');
+  static final Shopkeeper2 = NpcSpeaker(Portrait.Shopkeeper2, 'Shopkeeper2');
+  static final Shopkeeper3 = NpcSpeaker(Portrait.Shopkeeper3, 'Shopkeeper3');
+  static final Shopkeeper4 = NpcSpeaker(Portrait.Shopkeeper4, 'Shopkeeper4');
+  static final Shopkeeper5 = NpcSpeaker(Portrait.Shopkeeper5, 'Shopkeeper5');
+  static final Shopkeeper6 = NpcSpeaker(Portrait.Shopkeeper6, 'Shopkeeper6');
+  static final Shopkeeper7 = NpcSpeaker(Portrait.Shopkeeper7, 'Shopkeeper7');
+  static final HuntersGuildBartender =
+      NpcSpeaker(Portrait.Shopkeeper6, "Hunter's Guild bartender");
 
   @override
   String toString() => name;
@@ -347,7 +364,18 @@ enum Portrait {
   MissingStudent,
   Tallas,
   DyingBoy,
-  Sekreas;
+  Sekreas,
+  Shopkeeper1,
+  Shopkeeper2,
+  Shopkeeper3,
+  Shopkeeper4,
+  Shopkeeper5,
+
+  // Tough looking guy
+  Shopkeeper6,
+
+  /// Blue motavian, brown hood, green background
+  Shopkeeper7;
 
   /// Returns the portrait for the given [name].
   static Portrait? byName(String name) {
