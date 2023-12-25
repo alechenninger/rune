@@ -484,12 +484,12 @@ void main() {
         startPosition: Position(0x1e0, 0x2e0),
         spec: Npc(Sprite.PalmanMan1, FaceDown()),
       ));
-      // 3d0-418
+      // 418
       testMap.addObject(MapObject(
         startPosition: Position(0x1f0, 0x2e0),
         spec: Npc(Sprite.PalmanMan2, FaceDown()),
       ));
-      // 418-460
+      // 460
       testMap.addObject(MapObject(
         startPosition: Position(0x200, 0x2e0),
         spec: Npc(Sprite.PalmanMan3, FaceDownOrUpLegsHidden()),

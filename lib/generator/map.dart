@@ -263,11 +263,8 @@ class _ObjectSprites {
         throw Exception('unknown field routine for spec $spec');
       }
 
-      switch (routine.spriteLayoutForSpec(spec)) {
-        case SpriteVramMapping vram:
-          _mergeMapping(vram, obj.id);
-          break;
-        // else, no sprite. just use vram tile 0.
+      if (routine.spriteVramMapping(spec) case SpriteVramMapping m) {
+        _mergeMapping(m, obj.id);
       }
     }
   }
@@ -1795,7 +1792,7 @@ class FieldRoutine<T extends MapObjectSpec> {
 
   final SpecFactory factory;
 
-  SpriteVramMapping? spriteLayoutForSpec(MapObjectSpec spec) {
+  SpriteVramMapping? spriteVramMapping(MapObjectSpec spec) {
     // What do we need to know?
     // - how the sprite is defined: routine->rom, map->rom, map->ram
     // - this varies based on the spec. we don't know why each option is used.
