@@ -449,8 +449,8 @@ class _VramTiles {
 
   Iterable<SpriteVramMapping> _placeInRegion(
       SpriteVramMapping mapping, _VramRegion r) {
+    // Claim, allowing extension up to the next regions' max allowed start
     if (r.place(mapping)) {
-      // Claim, allowing extension up to the next regions' max allowed start
       var orderedIndex = _regionsInOrder.indexOf(r);
 
       // Have to push all subsequent regions out.
@@ -535,23 +535,15 @@ class _VramRegion {
   _VramRegion(
       {required int minStart,
       required int maxEnd,
-      bool Function(SpriteVramMapping) allowed = _anyMapping,
+      this.allowed = _anyMapping,
       // todo
       int? maxStart,
       int? minEnd})
       : _offsetStart = minStart,
-        allowed = allowed,
         _minStart = minStart,
         _maxEnd = maxEnd,
         _minEnd = minEnd ?? minStart,
         _maxStart = maxStart ?? minEnd ?? maxEnd;
-
-  // _VramRegion.fixed(
-  //     {required int start, required int end, this.onlyLazy = false})
-  //     : _offsetStart = start,
-  //       _start = start,
-  //       minStart = start,
-  //       maxStart = start;
 
   _VramRegion copy() {
     var copy = _VramRegion(
@@ -587,10 +579,6 @@ class _VramRegion {
       tile += m.tiles;
     }
   }
-
-  // TODO: these adjustments that drop sprites could be better
-  // Consider an implementation using "branch and bound" algorithm
-  // to find least amount to drop, any time we have to drop something
 
   /// Drops the mapping from the region.
   /// Returns true if the mapping was found and dropped.
@@ -762,17 +750,9 @@ class SpriteVramMapping {
 
   bool get lazilyLoaded => art == null || art is RamArt;
 
-  // See notes in _compileMapSpriteData
   final Word? requiredVramTile;
 
   SpriteVramMapping(
-      {required this.tiles,
-      this.art,
-      this.duplicateOffsets = const [],
-      this.animated = false,
-      this.requiredVramTile});
-
-  SpriteVramMapping._(
       {required this.tiles,
       this.art,
       this.duplicateOffsets = const [],
@@ -790,7 +770,7 @@ class SpriteVramMapping {
     if (requiredVramTile != null &&
         other.requiredVramTile != null &&
         requiredVramTile != other.requiredVramTile) return null;
-    return SpriteVramMapping._(
+    return SpriteVramMapping(
         tiles: max(tiles, other.tiles),
         art: art,
         duplicateOffsets: duplicateOffsets);
@@ -1844,7 +1824,7 @@ class FieldRoutine<T extends MapObjectSpec> {
         ? const [0x28]
         : const <int>[];
 
-    return SpriteVramMapping._(
+    return SpriteVramMapping(
         tiles: spriteMappingTiles,
         art: artPointer,
         duplicateOffsets: duplicateOffsets,
