@@ -326,7 +326,7 @@ class BooleanOperation extends Expression {
   }
 }
 
-class Constants {
+class Constants extends IterableBase<MapEntry<Constant, Expression>> {
   final Map<Constant, Expression> _map;
 
   const Constants.none() : _map = const {};
@@ -346,6 +346,10 @@ class Constants {
   // todo: eh
   bool containsConstantNamed(String constant) =>
       _map.keys.map((e) => e.constant).toSet().contains(constant);
+
+  @override
+  Iterator<MapEntry<Constant, Expression>> get iterator =>
+      _map.entries.iterator;
 }
 
 class UnknownExpression extends Expression {
