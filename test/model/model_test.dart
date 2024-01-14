@@ -1,9 +1,8 @@
 import 'package:rune/generator/generator.dart';
-import 'package:rune/model/animate.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
-import '../generator/scene_test.dart';
+import '../fixtures.dart';
 
 void main() {
   group('==', () {

@@ -532,7 +532,7 @@ class SceneAsmGenerator implements EventVisitor {
   void dialog(Dialog dialog) {
     _checkNotFinished();
     _generateQueueInCurrentMode();
-    _runOrInterruptDialog(dialog);
+    _runOrContinueDialog(dialog);
     _addToDialog(dialog.toAsm(_memory));
   }
 
@@ -996,7 +996,11 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
 
     _generateQueueInCurrentMode();
-    _runOrInterruptDialog(yesNo);
+
+    // We need to save this due to branching.
+    var priorEventInDialog = _lastEventInCurrentDialog;
+
+    _runOrContinueDialog(yesNo, interruptDialog: false);
 
     // We need to add the control code for yes-no choice.
     _addToDialog(dc.b(ControlCodes.yesNo));
@@ -1040,15 +1044,24 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     // Terminate no branch, run yes branch.
+    // Note inclusion of setting the last dialog event, also.
+    // Both branches must act as if the other never happened.
     _terminateDialog();
-    _resetCurrentDialog(id: ifYesId, asm: ifYes);
+    _resetCurrentDialog(
+        id: ifYesId, asm: ifYes, lastEventForDialog: priorEventInDialog);
 
     var yesBranch = _memory = parent.branch();
     for (var d in yesNo.ifYes) {
       dialog(d);
     }
 
-    _terminateDialog();
+    if (_inEvent) {
+      _terminateDialog();
+    } else {
+      // If we're in dialog loop, we cannot do anything else after this.
+      // Terminating both branches means we're done.
+      finish();
+    }
 
     // Pop current memory state back to parent.
     _memory = parent;
@@ -1234,7 +1247,7 @@ class SceneAsmGenerator implements EventVisitor {
       // because it HAS to run in dialog in this case.
       // It is like a Dialog event in that way.
       _generateQueueInCurrentMode();
-      _runOrInterruptDialog(showPanel);
+      _runOrContinueDialog(showPanel);
       _memory.addPanel();
 
       var p = showPanel.portrait;
@@ -1841,12 +1854,19 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  void _runOrInterruptDialog(Event event) {
+  /// Ensures the dialog mode is entered and tracks necessary state.
+  ///
+  /// Use before running any dialog event.
+  ///
+  /// Assumes consecutive events in dialog should wait for player input,
+  /// called an "interrupt." If this is not the case, set
+  /// [interruptDialog] to false.
+  void _runOrContinueDialog(Event event, {bool interruptDialog = true}) {
     _expectFacePlayerFirstIfInteraction();
 
     if (!inDialogLoop) {
       _runDialog();
-    } else if (_lastEventInCurrentDialog is Dialog) {
+    } else if (_lastEventInCurrentDialog is Dialog && interruptDialog) {
       // Add cursor for previous dialog
       // This is delayed because this interrupt may be a termination
       _lastInterrupt = _addToDialog(interrupt());
@@ -2102,7 +2122,7 @@ class SceneAsmGenerator implements EventVisitor {
     } else {
       // may go either way
       _queuedGeneration.add(_QueuedGeneration(() {
-        _runOrInterruptDialog(event);
+        _runOrContinueDialog(event);
         inDialog();
         after?.call();
       }, generateEvent));

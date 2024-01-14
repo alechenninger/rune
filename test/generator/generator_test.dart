@@ -9,7 +9,7 @@ import 'package:rune/model/battle.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
-import 'scene_test.dart';
+import '../fixtures.dart';
 
 main() {
   late GameMap map;

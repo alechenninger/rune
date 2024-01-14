@@ -1,11 +1,10 @@
-import 'package:rune/asm/asm.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
-import 'scene_test.dart';
+import '../fixtures.dart';
 
 void main() {
   test('generates asm from dialog', () {
@@ -46,7 +45,8 @@ void main() {
   });
 
   test('repeat newlines are converted to a single space', () {
-    var dialog = Dialog(speaker: alys, spans: DialogSpan.parse('Test\n\n1 2 3'));
+    var dialog =
+        Dialog(speaker: alys, spans: DialogSpan.parse('Test\n\n1 2 3'));
 
     print(dialog);
 

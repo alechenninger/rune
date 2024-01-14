@@ -1,4 +1,5 @@
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/model.dart';
 
 class TestEventRoutines extends EventRoutines {
   final eventRoutines = <Label>[];
@@ -15,4 +16,29 @@ class TestEventRoutines extends EventRoutines {
     cutsceneRoutines.add(name);
     return Word(cutsceneRoutines.length - 1);
   }
+}
+
+SetContext setContext(EventState? ctx) {
+  return SetContext((c) {
+    c.followLead = ctx?.followLead ?? c.followLead;
+    ctx?.positions.forEach((obj, pos) => c.positions[obj] = pos);
+  });
+}
+
+MapObject testObjectForScene(Scene scene, {String id = '0'}) {
+  return MapObject(
+      id: id,
+      startPosition: Position(0x200, 0x200),
+      spec: Npc(Sprite.PalmanWoman1,
+          WanderAround(Direction.down, onInteract: scene)));
+}
+
+extension EasyIntDuration on int {
+  Duration get second => Duration(seconds: this);
+  Duration get seconds => Duration(seconds: this);
+}
+
+extension EasyDoubleDuration on double {
+  Duration get second => Duration(milliseconds: (this * 1000).truncate());
+  Duration get seconds => Duration(milliseconds: (this * 1000).truncate());
 }
