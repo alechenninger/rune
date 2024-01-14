@@ -4,13 +4,13 @@ import 'package:charcode/ascii.dart';
 
 import 'asm.dart';
 
-class _ControlCodes {
+class ControlCodes {
   static final action = Byte(0xf2);
-  static final keepNpcFacingDirection = Bytes.hex('F3');
-  static final portrait = Bytes.hex('F4');
-  static final yesNo = Bytes.hex('F5');
-  static final event = Bytes.hex('F6');
-  static final eventBreak = Bytes.hex('F7'); // same as FE
+  static final keepNpcFacingDirection = Bytes.list(const [0xF3]);
+  static final portrait = Bytes.list(const [0xF4]);
+  static final yesNo = Bytes.list(const [0xF5]);
+  static final event = Bytes.list(const [0xF6]);
+  static final eventBreak = Bytes.list(const [0xF7]); // same as FE
   /*
 TextCtrlCode_Delay:
 	moveq	#0, d7
@@ -30,36 +30,36 @@ loc_6A39E:
 }
 
 Asm eventBreak() {
-  return dc.b(_ControlCodes.eventBreak);
+  return dc.b(ControlCodes.eventBreak);
 }
 
 Asm terminateDialog() {
-  return dc.b(_ControlCodes.terminate);
+  return dc.b(ControlCodes.terminate);
 }
 
 Asm interrupt() {
-  return dc.b(_ControlCodes.interrupt);
+  return dc.b(ControlCodes.interrupt);
 }
 
 Asm delay(Byte frames) {
-  return dc.b([..._ControlCodes.delay, frames]);
+  return dc.b([...ControlCodes.delay, frames]);
 }
 
 Asm runEvent(Word index) {
   return Asm([
-    dc.b(_ControlCodes.event),
+    dc.b(ControlCodes.event),
     dc.w([index])
   ]);
 }
 
 Asm portrait(Byte portrait) {
-  return dc.b([..._ControlCodes.portrait, portrait]);
+  return dc.b([...ControlCodes.portrait, portrait]);
 }
 
 Asm extendableEventCheck(KnownConstantValue flag, Byte dialogOffset) {
   if (flag.value > Byte.max) {
     return Asm([
-      dc.b(_ControlCodes.extendedEventCheck),
+      dc.b(ControlCodes.extendedEventCheck),
       dc.w([flag.constant]),
       dc.b([dialogOffset])
     ]);
@@ -70,14 +70,14 @@ Asm extendableEventCheck(KnownConstantValue flag, Byte dialogOffset) {
 
 Asm eventCheck(Expression flag, Byte dialogOffset) {
   return Asm([
-    dc.b(_ControlCodes.eventCheck),
+    dc.b(ControlCodes.eventCheck),
     dc.b([flag, dialogOffset])
   ]);
 }
 
 Asm panel(Word panelIndex) {
   return Asm([
-    dc.b([_ControlCodes.action, Byte.zero]),
+    dc.b([ControlCodes.action, Byte.zero]),
     dc.w([panelIndex]),
   ]);
 }
@@ -101,7 +101,7 @@ List<LineAsm> dialogLines(Bytes dialog,
           dialogId: dialogIdOffset,
           length: split.length,
           outputLineNumber: lineNum,
-          asm: Asm([dc.b(split), dc.b(_ControlCodes.terminate)])));
+          asm: Asm([dc.b(split), dc.b(ControlCodes.terminate)])));
       dialogIdOffset = (dialogIdOffset + 1.toByte) as Byte;
     }
 
@@ -197,9 +197,9 @@ Asm dialog(Bytes dialog, {List<List<ControlCode>?> codePoints = const []}) {
     // 2 lines per window.
     var lineOffset = (dialogLines) % 2;
     if (lineOffset == 1) {
-      asm.add(dc.b(_ControlCodes.newLine));
+      asm.add(dc.b(ControlCodes.newLine));
     } else if (lineOffset == 0 && dialogLines > 0) {
-      asm.add(dc.b(_ControlCodes.interrupt));
+      asm.add(dc.b(ControlCodes.interrupt));
     }
 
     // split line bytes up where there are pauses
