@@ -84,6 +84,10 @@ class Game {
     return interactions;
   }
 
+  bool containsMap(MapId id) {
+    return _maps.containsKey(id);
+  }
+
   GameMap? getMap(MapId id) {
     return _maps[id];
   }
@@ -188,6 +192,7 @@ abstract class EventVisitor {
   void ifFlag(IfFlag ifFlag);
   void setFlag(SetFlag setFlag);
   void ifValue(IfValue ifValue);
+  void yesOrNoChoice(YesOrNoChoice choice);
   void showPanel(ShowPanel showPanel);
   void hideTopPanels(HideTopPanels hidePanels);
   void hideAllPanels(HideAllPanels hidePanels);

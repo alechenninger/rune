@@ -25,7 +25,9 @@ import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
+import 'package:rune/generator/guild.dart';
 import 'package:rune/model/battle.dart';
+import 'package:rune/model/guild.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -88,6 +90,7 @@ class Program {
   final Map<MapId, List<SpriteVramMapping>> _builtInSprites = {};
 
   final _eventFlags = EventFlags();
+  final Constants _constants = Constants.wrap({});
 
   Program({
     Word? eventIndexOffset,
@@ -166,6 +169,17 @@ class Program {
         builtInSprites: builtInSprites);
   }
 
+  HuntersGuildAsm configureHuntersGuild(HuntersGuild guild,
+      {required GameMap inMap}) {
+    return compileHuntersGuild(
+        guild: guild,
+        map: inMap,
+        constants: _constants,
+        dialogTrees: dialogTrees,
+        eventFlags: _eventFlags,
+        eventRoutines: _ProgramEventRoutines(this));
+  }
+
   /// DialogTrees for maps which are not added to the game.
   Map<MapId?, DialogTree> extraDialogTrees() {
     var extras = dialogTrees.toMap();
@@ -174,12 +188,18 @@ class Program {
   }
 
   Asm extraConstants() {
-    return _eventFlags
+    var asm = _eventFlags
         .customEventFlags()
         .entries
         .sortedBy<num>((e) => e.key.value)
         .map((e) => Asm.fromRaw('${e.value.constant} = ${e.key}'))
         .reduceOr((a1, a2) => Asm([a1, a2]), ifEmpty: Asm.empty());
+
+    asm.add(_constants
+        .map((e) => Asm.fromRaw('${e.key.constant} = ${e.value}'))
+        .reduceOr((a1, a2) => Asm([a1, a2]), ifEmpty: Asm.empty()));
+
+    return asm;
   }
 }
 
@@ -292,8 +312,10 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
   // SetContext is not a perceivable event, so ignore
   events = events.whereNot((e) => e is SetContext).toList(growable: false);
 
+  // TODO: doesn't it matter what is in the branches?
   if (events.length == 1 && events[0] is IfFlag) return null;
 
+  bool isLast(int i) => i == events.length - 1;
   bool hasDialogAfter(int i) => events.sublist(i + 1).any((e) => e is Dialog);
 
   var dialogCheck = 0;
@@ -307,15 +329,17 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
             switch (event.justFacing()) {
               var f? => _canFaceInDialog(f),
               null => false
-            }) ||
+            } &&
+            hasDialogAfter(i)) ||
         (event is PlaySound && hasDialogAfter(i)) ||
         (event is PlayMusic && hasDialogAfter(i)) ||
         (event is ShowPanel && event.showDialogBox && hasDialogAfter(i)) ||
         (event is SetFlag && hasDialogAfter(i)) ||
         (event is HideTopPanels && hasDialogAfter(i)) ||
-        (event is HideAllPanels && hasDialogAfter(i)),
-    (event, i) =>
-        event is Dialog && event.hidePanelsOnClose && i == events.length - 1,
+        (event is HideAllPanels && hasDialogAfter(i)) ||
+        // Choices must NOT have any events after in order to fit in dialog
+        (event is YesOrNoChoice && isLast(i)),
+    (event, i) => event is Dialog && event.hidePanelsOnClose && isLast(i),
   ];
 
   var faded = false;
@@ -965,6 +989,86 @@ class SceneAsmGenerator implements EventVisitor {
 
       return null;
     });
+  }
+
+  @override
+  void yesOrNoChoice(YesOrNoChoice yesNo) {
+    _checkNotFinished();
+
+    _generateQueueInCurrentMode();
+    _runOrInterruptDialog(yesNo);
+
+    // We need to add the control code for yes-no choice.
+    _addToDialog(dc.b(ControlCodes.yesNo));
+
+    // Create the dialog for the "yes" condition
+    // and determine its offset.
+    var ifYes = DialogAsm.empty();
+    var currentDialogId = _currentDialogIdOrStart();
+    var ifYesId = _currentDialogTree().add(ifYes);
+    var ifYesOffset = ifYesId - currentDialogId as Byte;
+
+    // Tell the yes-no routine where to jump to
+    // for the different branches.
+    _addToDialog(dc.b([ifYesOffset, Byte.zero]));
+
+    // Before we run branches, and possibly refer to or modify states,
+    // ensure state graph is update to date.
+    _updateStateGraph();
+
+    // Save parent state to pop back to when done.
+    var parent = _memory;
+
+    /*
+    Notes on events here:
+
+    If this requires terminating dialog and running event...
+    the event code may be triggered by either branch.
+    So it needs its own check for what the choice was.
+      tst.b	(Yes_No_Option).w
+    It also means if yes no choices are nested
+    we'd need to first run an event to test the current choice
+    before it gets overridden.
+    So for now, only supporting dialog inside yes/no.
+    This is all we need for the guild jobs.
+    */
+
+    // Run no branch in current dialog tree (offset 0).
+    var noBranch = _memory = parent.branch();
+    for (var d in yesNo.ifNo) {
+      dialog(d);
+    }
+
+    // Terminate no branch, run yes branch.
+    _terminateDialog();
+    _resetCurrentDialog(id: ifYesId, asm: ifYes);
+
+    var yesBranch = _memory = parent.branch();
+    for (var d in yesNo.ifYes) {
+      dialog(d);
+    }
+
+    _terminateDialog();
+
+    // Pop current memory state back to parent.
+    _memory = parent;
+
+    // As for now we are not tracking these states in the graph,
+    // consider their events as possibly applied
+    // to the parent of these branches and
+    // any reachable state from this point in the graph.
+    // TODO(optimization): technically we could model these conditions
+    // in the graph, also, and avoid unnecessary calculations later on.
+    for (var state in [noBranch, yesBranch]) {
+      for (var change in state.changes) {
+        for (var reachable in concat([
+          [_memory],
+          _reachableStates()
+        ])) {
+          change.mayApply(reachable);
+        }
+      }
+    }
   }
 
   @override
