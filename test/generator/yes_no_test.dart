@@ -74,11 +74,7 @@ main() {
     });
 
     group('when following dialog', () {
-      test('does not generate interrupt before choice', () {
-        // This time, start the scene with dialog,
-        // then add the choice.
-        // When presenting the choice, we should not have
-        // an interrupt control code.
+      setUp(() {
         mapObject.onInteract = Scene([
           InteractionObject.facePlayer(),
           Dialog.parse('Are you great?'),
@@ -87,6 +83,13 @@ main() {
             ifNo: [Dialog.parse('Too bad.')],
           )
         ]);
+      });
+
+      test('does not generate interrupt before choice', () {
+        // This time, start the scene with dialog,
+        // then add the choice.
+        // When presenting the choice, we should not have
+        // an interrupt control code.
 
         program.addMap(map);
 
@@ -100,6 +103,22 @@ main() {
               dc.b([Byte(0xf5)]),
               dc.b([Byte(0x1), Byte(0)]),
               dc.b(Bytes.ascii('Too bad.')),
+              dc.b([Byte(0xff)]),
+            ]));
+      });
+
+      test('does not generate interrupt before yes branch', () {
+        program.addMap(map);
+
+        var dialogTree = program.dialogTrees.forMap(map.id);
+
+        // In the yes branch, just expect the yes branch dialog
+        // as before
+        expect(dialogTree, hasLength(2));
+        expect(
+            dialogTree[1],
+            DialogAsm([
+              dc.b(Bytes.ascii('Great!')),
               dc.b([Byte(0xff)]),
             ]));
       });

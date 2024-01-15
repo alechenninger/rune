@@ -997,9 +997,6 @@ class SceneAsmGenerator implements EventVisitor {
 
     _generateQueueInCurrentMode();
 
-    // We need to save this due to branching.
-    var priorEventInDialog = _lastEventInCurrentDialog;
-
     _runOrContinueDialog(yesNo, interruptDialog: false);
 
     // We need to add the control code for yes-no choice.
@@ -1045,10 +1042,12 @@ class SceneAsmGenerator implements EventVisitor {
 
     // Terminate no branch, run yes branch.
     // Note inclusion of setting the last dialog event, also.
-    // Both branches must act as if the other never happened.
+    // This is the same last event as the no branch had,
+    // and we must restore that for this branch.
+    // Both branches act as if the other never happened,
+    // since of course only one ever happens in-game.
     _terminateDialog();
-    _resetCurrentDialog(
-        id: ifYesId, asm: ifYes, lastEventForDialog: priorEventInDialog);
+    _resetCurrentDialog(id: ifYesId, asm: ifYes, lastEventForDialog: yesNo);
 
     var yesBranch = _memory = parent.branch();
     for (var d in yesNo.ifYes) {
