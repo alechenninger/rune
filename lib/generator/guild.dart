@@ -37,7 +37,7 @@ HuntersGuildAsm compileHuntersGuild(
   var guildJobs = Asm.empty();
   var titles = Asm.empty();
 
-  for (var job in guild.jobs) {
+  for (var job in guild.jobsByIndex) {
     _compileJob(job,
         jobsAsm: guildJobs,
         titlesAsm: titles,
@@ -51,7 +51,7 @@ HuntersGuildAsm compileHuntersGuild(
   titles.add(dc.b(Bytes.ascii(guild.pendingJob.value)));
   titles.add(dc.b([Byte(0xfe)]));
 
-  var moneyTable = _compileMoneyTable(guild.jobs);
+  var moneyTable = _compileMoneyTable(guild.jobsByIndex);
 
   return HuntersGuildAsm(
       guildJobs: guildJobs, moneyTable: moneyTable, guildText: titles);
@@ -144,7 +144,7 @@ void _compileJob(GuildJob job,
 
   jobsAsm.addNewline();
 
-  titlesAsm.add(label(Label(_jobGuildTextLabels[job.id])));
+  titlesAsm.add(label(Label(_jobGuildTextLabels[job.id.value])));
   titlesAsm.add(dc.b(Bytes.ascii(job.title.value)));
   titlesAsm.add(dc.b([Byte(0xfe)]));
   titlesAsm.addNewline();

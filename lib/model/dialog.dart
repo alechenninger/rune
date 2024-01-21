@@ -271,7 +271,7 @@ abstract mixin class Speaker {
   static final Holt = NpcSpeaker(Portrait.Holt, 'Holt');
   static final Zio = NpcSpeaker(Portrait.Zio, 'Zio');
   static final HuntersGuildClerk =
-      NpcSpeaker(Portrait.HuntersGuildReceptionist, "Hunter's Guild Clerk");
+      NpcSpeaker(Portrait.HuntersGuildClerk, "Hunter's Guild Clerk");
   static final Baker = NpcSpeaker(Portrait.Baker, "Baker");
   static final Pana = NpcSpeaker(Portrait.Pana, "Pana");
   static final Dorin = NpcSpeaker(Portrait.Dorin, "Dorin");
@@ -345,7 +345,7 @@ enum Portrait {
   PrincipalKroft,
   Dorin,
   Pana,
-  HuntersGuildReceptionist,
+  HuntersGuildClerk,
   Baker,
   Zio,
   Juza,

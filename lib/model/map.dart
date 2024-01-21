@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
+import 'package:rune/model/guild.dart';
 
 import '../asm/asm.dart';
 import 'model.dart';
@@ -1046,7 +1047,7 @@ MapObject placeholderMapObject(int index) {
 
 class MapObjectId extends MapElementId {
   static final _random = Random();
-  
+
   final String value;
 
   MapObjectId(this.value) {
@@ -1710,4 +1711,16 @@ class InteractiveAsmSpec extends AsmSpec
 
   @override
   int get hashCode => super.hashCode ^ onInteract.hashCode;
+}
+
+/// Models custom, event-based interactions.
+class EventInteraction
+    with Interactive<InteractiveMapElement>
+    implements InteractiveMapElement {
+  EventInteraction(Scene onInteract) {
+    onInteract = onInteract;
+  }
+
+  @override
+  InteractiveMapElement withNewInteraction() => EventInteraction(Scene.empty());
 }

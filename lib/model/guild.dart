@@ -5,50 +5,84 @@ import 'model.dart';
 class HuntersGuild {
   HuntersGuild();
 
-  // These scenes cannot run events.
+  var welcome = EventInteraction(
+      Scene([Dialog.parse('(welcome)', speaker: Speaker.HuntersGuildClerk)]));
 
-  Scene onWelcome =
-      Scene([Dialog.parse('(welcome)', speaker: Speaker.HuntersGuildClerk)]);
-  Scene onJobBoard =
-      Scene([Dialog.parse('(job board)', speaker: Speaker.HuntersGuildClerk)]);
-  Scene onAlreadyCompleted = Scene([
+  var jobBoard = EventInteraction(
+      Scene([Dialog.parse('(job board)', speaker: Speaker.HuntersGuildClerk)]));
+
+  var alreadyCompleted = EventInteraction(Scene([
     Dialog.parse('(already completed)', speaker: Speaker.HuntersGuildClerk)
-  ]);
-  Scene onNoJobsAvailable =
-      Scene([Dialog.parse('(no jobs)', speaker: Speaker.HuntersGuildClerk)]);
-  Scene onFarewell =
-      Scene([Dialog.parse('(farewell)', speaker: Speaker.HuntersGuildClerk)]);
+  ]));
 
-  Scene onJobNotYetAvailable = Scene([
+  var noJobsAvailable = EventInteraction(
+      Scene([Dialog.parse('(no jobs)', speaker: Speaker.HuntersGuildClerk)]));
+
+  var farewell = EventInteraction(
+      Scene([Dialog.parse('(farewell)', speaker: Speaker.HuntersGuildClerk)]));
+
+  var jobNotYetAvailable = EventInteraction(Scene([
     Dialog.parse('(not available yet)', speaker: Speaker.HuntersGuildClerk)
-  ]);
-  Scene onFirstJobNoLongerAvailable = Scene([
+  ]));
+
+  var firstJobNoLongerAvailable = EventInteraction(Scene([
     Dialog.parse('(first job no longer available)',
         speaker: Speaker.HuntersGuildClerk)
-  ]);
-  Scene onFirstJobMileDead = Scene([
+  ]));
+
+  var firstJobMileDead = EventInteraction(Scene([
     Dialog.parse('(first job mile dead)', speaker: Speaker.HuntersGuildClerk)
-  ]);
-  Scene onJobNoLongerAvailable = Scene([
+  ]));
+
+  var jobNoLongerAvailable = EventInteraction(Scene([
     Dialog.parse('(no longer available)', speaker: Speaker.HuntersGuildClerk)
-  ]);
+  ]));
+
+  Scene get onWelcome => welcome.onInteract;
+  Scene get onJobBoard => jobBoard.onInteract;
+  Scene get onAlreadyCompleted => alreadyCompleted.onInteract;
+  Scene get onNoJobsAvailable => noJobsAvailable.onInteract;
+  Scene get onFarewell => farewell.onInteract;
+  Scene get onJobNotYetAvailable => jobNotYetAvailable.onInteract;
+  Scene get onFirstJobNoLongerAvailable => firstJobNoLongerAvailable.onInteract;
+  Scene get onFirstJobMileDead => firstJobMileDead.onInteract;
+  Scene get onJobNoLongerAvailable => jobNoLongerAvailable.onInteract;
 
   JobListing pendingJob = JobListing('Listing pending');
 
-  final List<GuildJob> _jobs =
-      List.generate(8, (i) => GuildJob.placeholder(i), growable: false);
-  List<GuildJob> get jobs => List.unmodifiable(_jobs);
+  final Map<JobId, GuildJob> _jobs = {
+    for (var i = 0; i < 8; i++) JobId(i): GuildJob.placeholder(JobId(i))
+  };
+
+  List<GuildJob> get jobsByIndex =>
+      [for (var i = 0; i < 8; i++) _jobs[JobId(i)]!];
+
+  GuildJob? jobById(JobId id) => _jobs[id];
 
   void configureJob(GuildJob job) {
-    checkArgument(job.id >= 0 && job.id < 8,
-        message: 'job id must be between 0 and 7 but got ${job.id}');
     _jobs[job.id] = job;
   }
 }
 
-/// 0 through 7.
-typedef JobId = int;
 typedef ThousandMeseta = int;
+
+class JobId {
+  final int value;
+  JobId(this.value) {
+    checkArgument(value >= 0 && value < 8,
+        message: 'job id must be between 0 and 7 but got $value');
+  }
+  @override
+  String toString() => value.toString();
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is JobId &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+  @override
+  int get hashCode => value.hashCode;
+}
 
 class JobListing {
   final String value;
@@ -79,17 +113,30 @@ class GuildJob {
   EventFlag availableWhen;
   EventFlag unavailableWhen;
 
-  /// Scene for when the job is selected.
-  Scene prompt;
+  EventInteraction prompt;
+  EventInteraction accept;
+  EventInteraction decline;
+  EventInteraction talk;
+  EventInteraction complete;
+
+  Scene get onPrompt {
+    /// Scene for when the job is selected.
+    var onAccept = _onlyDialog(accept.onInteract);
+    var onDecline = _onlyDialog(decline.onInteract);
+    return Scene([
+      ...prompt.onInteract,
+      YesOrNoChoice(ifYes: onAccept, ifNo: onDecline)
+    ]);
+  }
 
   /// Scene upon talking to receptionist when the job is started,
   /// but not completed.
   // Remember, this can use IfFlag to have different dialog
   // throughout the quest
-  Scene onTalk;
+  Scene get onTalk => talk.onInteract;
 
   /// Scene upon talking to to receptionist once the job is completed.
-  Scene onComplete;
+  Scene get onComplete => complete.onInteract;
 
   ThousandMeseta reward;
 
@@ -104,16 +151,20 @@ class GuildJob {
       List<Event> prompt = const [],
       List<Dialog> onAccept = const [],
       List<Dialog> onDecline = const [],
-      this.onTalk = const Scene.none(),
-      this.onComplete = const Scene.none(),
+      Scene onTalk = const Scene.none(),
+      Scene onComplete = const Scene.none(),
       this.reward = 0})
-      : prompt =
-            Scene([...prompt, YesOrNoChoice(ifYes: onAccept, ifNo: onDecline)]),
+      : prompt = EventInteraction(Scene(prompt)),
+        accept = EventInteraction(Scene(onAccept)),
+        decline = EventInteraction(Scene(onDecline)),
+        talk = EventInteraction(onTalk),
+        complete = EventInteraction(onComplete),
         title = title ?? JobListing('job $id'),
-        startFlag = startFlag ?? _defaultJobFlags[id].start,
-        endFlag = endFlag ?? _defaultJobFlags[id].end,
-        rewardedFlag = rewardedFlag ?? _defaultJobFlags[id].completed,
-        availableWhen = availableWhen ?? _defaultJobFlags[id].availableWhen;
+        startFlag = startFlag ?? _defaultJobFlags[id.value].start,
+        endFlag = endFlag ?? _defaultJobFlags[id.value].end,
+        rewardedFlag = rewardedFlag ?? _defaultJobFlags[id.value].completed,
+        availableWhen =
+            availableWhen ?? _defaultJobFlags[id.value].availableWhen;
 
   // TODO: possibly use table of existing quest data
   // maybe parse out the dialog? but in that case
@@ -146,7 +197,7 @@ class GuildJob {
       'rewardedFlag: $rewardedFlag, '
       'availableWhen: $availableWhen, '
       'unavailableWhen: $unavailableWhen, '
-      'prompt: $prompt, '
+      'prompt: $onPrompt, '
       'onTalk: $onTalk, '
       'onComplete: $onComplete, '
       'reward: $reward}';
@@ -163,7 +214,7 @@ class GuildJob {
           rewardedFlag == other.rewardedFlag &&
           availableWhen == other.availableWhen &&
           unavailableWhen == other.unavailableWhen &&
-          prompt == other.prompt &&
+          onPrompt == other.onPrompt &&
           onTalk == other.onTalk &&
           onComplete == other.onComplete &&
           reward == other.reward;
@@ -177,7 +228,7 @@ class GuildJob {
       rewardedFlag.hashCode ^
       availableWhen.hashCode ^
       unavailableWhen.hashCode ^
-      prompt.hashCode ^
+      onPrompt.hashCode ^
       onTalk.hashCode ^
       onComplete.hashCode ^
       reward.hashCode;
@@ -189,11 +240,23 @@ enum JobStage {
   completed;
 
   Scene scene(GuildJob job) => switch (this) {
-        JobStage.available => job.prompt,
+        JobStage.available => job.onPrompt,
         JobStage.inProgress => job.onTalk,
         JobStage.completed => job.onComplete
       };
 }
+
+/// Returns an equivalent to the [scene] as a List of Dialog events.
+///
+/// If the `scene` contains any other kind of Event, an illegal argument error
+/// is thrown.
+List<Dialog> _onlyDialog(Scene scene) => scene.events
+    .map((e) => switch (e) {
+          Dialog() => e,
+          _ => throw ArgumentError.value(
+              e, 'scene', 'must only contain Dialog events')
+        })
+    .toList();
 
 typedef _JobFlags = ({
   EventFlag start,

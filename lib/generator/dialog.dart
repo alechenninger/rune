@@ -697,7 +697,7 @@ final _portraits = const [
   Portrait.Dorin, // dc.l	ArtNem_DorinDialPortrait	; $F
   Portrait.Pana, // dc.l	ArtNem_PanaDialPortrait	; $10
   Portrait
-      .HuntersGuildReceptionist, // dc.l	ArtNem_HntGuildReceptionistDialPortrait	; $11
+      .HuntersGuildClerk, // dc.l	ArtNem_HntGuildReceptionistDialPortrait	; $11
   Portrait.Baker, // dc.l	ArtNem_BakerDialPortrait	; $12
   Portrait.Zio, // dc.l	ArtNem_ZioDialPortrait	; $13
   Portrait.Juza, // dc.l	ArtNem_JuzaDialPortrait	; $14
