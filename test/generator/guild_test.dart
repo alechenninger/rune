@@ -36,14 +36,15 @@ void main() {
           ]));
     });
 
-    test('money table for job rewards', () {});
+    test('money table for job rewards', () {}, skip: 'TODO');
 
-    test('guild text for job titles', () {});
+    test('guild text for job titles', () {}, skip: 'TODO');
 
-    test('guild text for pending listing', () {});
+    test('guild text for pending listing', () {}, skip: 'TODO');
 
-    test('dialog for receptionist', () {});
+    test('dialog for receptionist', () {}, skip: 'TODO');
 
-    test('constants refer to the right receptionist dialog ids', () {});
+    test('constants refer to the right receptionist dialog ids', () {},
+        skip: 'TODO');
   });
 }

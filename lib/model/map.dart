@@ -717,6 +717,8 @@ enum MapId {
 
 sealed class MapElement {}
 
+sealed class MapElementId {}
+
 sealed class InteractiveMapElement
     implements MapElement, Interactive<InteractiveMapElement> {}
 
@@ -1042,11 +1044,9 @@ MapObject placeholderMapObject(int index) {
       spec: InvisibleBlock());
 }
 
-final _random = Random();
-
-sealed class MapElementId {}
-
 class MapObjectId extends MapElementId {
+  static final _random = Random();
+  
   final String value;
 
   MapObjectId(this.value) {

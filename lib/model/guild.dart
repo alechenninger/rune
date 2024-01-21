@@ -14,12 +14,12 @@ class HuntersGuild {
   Scene onAlreadyCompleted = Scene([
     Dialog.parse('(already completed)', speaker: Speaker.HuntersGuildClerk)
   ]);
-  Scene onNoJobs =
+  Scene onNoJobsAvailable =
       Scene([Dialog.parse('(no jobs)', speaker: Speaker.HuntersGuildClerk)]);
   Scene onFarewell =
       Scene([Dialog.parse('(farewell)', speaker: Speaker.HuntersGuildClerk)]);
 
-  Scene onNotYetAvailable = Scene([
+  Scene onJobNotYetAvailable = Scene([
     Dialog.parse('(not available yet)', speaker: Speaker.HuntersGuildClerk)
   ]);
   Scene onFirstJobNoLongerAvailable = Scene([
@@ -29,11 +29,11 @@ class HuntersGuild {
   Scene onFirstJobMileDead = Scene([
     Dialog.parse('(first job mile dead)', speaker: Speaker.HuntersGuildClerk)
   ]);
-  Scene onNoLongerAvailable = Scene([
+  Scene onJobNoLongerAvailable = Scene([
     Dialog.parse('(no longer available)', speaker: Speaker.HuntersGuildClerk)
   ]);
 
-  String pendingJobText = 'Listing pending';
+  JobListing pendingJob = JobListing('Listing pending');
 
   final List<GuildJob> _jobs =
       List.generate(8, (i) => GuildJob.placeholder(i), growable: false);
@@ -50,50 +50,70 @@ class HuntersGuild {
 typedef JobId = int;
 typedef ThousandMeseta = int;
 
+class JobListing {
+  final String value;
+  JobListing(this.value) {
+    checkArgument(value.length <= 16,
+        message: 'title must be no more than 16 characters but got "$value"');
+  }
+  @override
+  String toString() => value;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is JobListing &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
 class GuildJob {
   final JobId id;
 
-  final String title;
+  JobListing title;
 
-  final EventFlag startFlag;
-  final EventFlag endFlag;
-  final EventFlag rewardedFlag;
-  final EventFlag availableWhen;
-  final EventFlag unavailableWhen;
+  EventFlag startFlag;
+  EventFlag endFlag;
+  EventFlag rewardedFlag;
+  EventFlag availableWhen;
+  EventFlag unavailableWhen;
 
   /// Scene for when the job is selected.
-  final Scene prompt;
+  Scene prompt;
 
   /// Scene upon talking to receptionist when the job is started,
   /// but not completed.
   // Remember, this can use IfFlag to have different dialog
   // throughout the quest
-  final Scene onTalk;
+  Scene onTalk;
 
   /// Scene upon talking to to receptionist once the job is completed.
-  final Scene onComplete;
+  Scene onComplete;
 
-  final ThousandMeseta reward;
+  ThousandMeseta reward;
 
   GuildJob(
       {required this.id,
-      required this.title,
-      required this.startFlag,
-      required this.endFlag,
-      required this.rewardedFlag,
-      required this.availableWhen,
+      JobListing? title,
+      EventFlag? startFlag,
+      EventFlag? endFlag,
+      EventFlag? rewardedFlag,
+      EventFlag? availableWhen,
       this.unavailableWhen = const EventFlag('GuildPlaceholder'),
-      required List<Event> prompt,
-      required List<Dialog> onAccept,
-      required List<Dialog> onDecline,
-      required this.onTalk,
-      required this.onComplete,
-      required this.reward})
-      : prompt = Scene(
-            [...prompt, YesOrNoChoice(ifYes: onAccept, ifNo: onDecline)]) {
-    checkArgument(title.length <= 16,
-        message: 'title must be no more than 16 characters but got "$title"');
-  }
+      List<Event> prompt = const [],
+      List<Dialog> onAccept = const [],
+      List<Dialog> onDecline = const [],
+      this.onTalk = const Scene.none(),
+      this.onComplete = const Scene.none(),
+      this.reward = 0})
+      : prompt =
+            Scene([...prompt, YesOrNoChoice(ifYes: onAccept, ifNo: onDecline)]),
+        title = title ?? JobListing('job $id'),
+        startFlag = startFlag ?? _defaultJobFlags[id].start,
+        endFlag = endFlag ?? _defaultJobFlags[id].end,
+        rewardedFlag = rewardedFlag ?? _defaultJobFlags[id].completed,
+        availableWhen = availableWhen ?? _defaultJobFlags[id].availableWhen;
 
   // TODO: possibly use table of existing quest data
   // maybe parse out the dialog? but in that case
@@ -101,12 +121,6 @@ class GuildJob {
   GuildJob.placeholder(JobId id)
       : this(
             id: id,
-            title: 'job $id',
-            startFlag: _defaultJobFlags[id].start,
-            endFlag: _defaultJobFlags[id].end,
-            rewardedFlag: _defaultJobFlags[id].completed,
-            availableWhen: _defaultJobFlags[id].availableWhen,
-            unavailableWhen: _defaultJobFlags[id].unavailableWhen,
             prompt: [
               Dialog.parse('(job $id)', speaker: Speaker.HuntersGuildClerk)
             ],
@@ -123,6 +137,50 @@ class GuildJob {
               Dialog.parse('(complete $id)', speaker: Speaker.HuntersGuildClerk)
             ]),
             reward: 1);
+
+  @override
+  String toString() => 'GuildJob{id: $id, '
+      'title: $title, '
+      'startFlag: $startFlag, '
+      'endFlag: $endFlag, '
+      'rewardedFlag: $rewardedFlag, '
+      'availableWhen: $availableWhen, '
+      'unavailableWhen: $unavailableWhen, '
+      'prompt: $prompt, '
+      'onTalk: $onTalk, '
+      'onComplete: $onComplete, '
+      'reward: $reward}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GuildJob &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          title == other.title &&
+          startFlag == other.startFlag &&
+          endFlag == other.endFlag &&
+          rewardedFlag == other.rewardedFlag &&
+          availableWhen == other.availableWhen &&
+          unavailableWhen == other.unavailableWhen &&
+          prompt == other.prompt &&
+          onTalk == other.onTalk &&
+          onComplete == other.onComplete &&
+          reward == other.reward;
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      title.hashCode ^
+      startFlag.hashCode ^
+      endFlag.hashCode ^
+      rewardedFlag.hashCode ^
+      availableWhen.hashCode ^
+      unavailableWhen.hashCode ^
+      prompt.hashCode ^
+      onTalk.hashCode ^
+      onComplete.hashCode ^
+      reward.hashCode;
 }
 
 enum JobStage {

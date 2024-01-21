@@ -28,8 +28,8 @@ HuntersGuildAsm compileHuntersGuild(
     required DialogTrees dialogTrees,
     required EventFlags eventFlags,
     required EventRoutines eventRoutines}) {
-  for (var (scene, constant)
-      in _receptionistSceneConstants.map((getThem) => getThem(guild))) {
+  for (var (scene, constant) in _receptionistSceneConstants
+      .map((getConstants) => getConstants(guild))) {
     _compileReceptionistScene(
         scene, constant, map, constants, dialogTrees, eventRoutines);
   }
@@ -48,7 +48,7 @@ HuntersGuildAsm compileHuntersGuild(
   }
 
   titles.add(label(Label('GuildText_ListingPending')));
-  titles.add(dc.b(Bytes.ascii(guild.pendingJobText)));
+  titles.add(dc.b(Bytes.ascii(guild.pendingJob.value)));
   titles.add(dc.b([Byte(0xfe)]));
 
   var moneyTable = _compileMoneyTable(guild.jobs);
@@ -64,8 +64,10 @@ final _receptionistSceneConstants = <_ReceptionistSceneConstant>[
       (guild.onWelcome, Constant('GrandCross_HuntersGuild_DialogID_Welcome')),
   (guild) =>
       (guild.onJobBoard, Constant('GrandCross_HuntersGuild_DialogID_JobBoard')),
-  (guild) =>
-      (guild.onNoJobs, Constant('GrandCross_HuntersGuild_DialogID_NoJob')),
+  (guild) => (
+        guild.onNoJobsAvailable,
+        Constant('GrandCross_HuntersGuild_DialogID_NoJob')
+      ),
   (guild) =>
       (guild.onFarewell, Constant('GrandCross_HuntersGuild_DialogID_Farewell')),
   (guild) => (
@@ -73,11 +75,11 @@ final _receptionistSceneConstants = <_ReceptionistSceneConstant>[
         Constant('GrandCross_HuntersGuild_DialogID_MileDead')
       ),
   (guild) => (
-        guild.onNotYetAvailable,
+        guild.onJobNotYetAvailable,
         Constant('GrandCross_HuntersGuild_DialogID_NotYetAvailable')
       ),
   (guild) => (
-        guild.onNoLongerAvailable,
+        guild.onJobNoLongerAvailable,
         Constant('GrandCross_HuntersGuild_DialogID_NoLongerAvailable')
       ),
   (guild) => (
@@ -118,7 +120,7 @@ void _compileJob(GuildJob job,
     required GameMap map,
     required DialogTrees dialogTrees,
     required EventRoutines eventRoutines}) {
-  jobsAsm.add(comment(job.title));
+  jobsAsm.add(comment(job.title.value));
 
   jobsAsm.add(dc.b([
     eventFlags.toConstant(job.startFlag),
@@ -143,7 +145,7 @@ void _compileJob(GuildJob job,
   jobsAsm.addNewline();
 
   titlesAsm.add(label(Label(_jobGuildTextLabels[job.id])));
-  titlesAsm.add(dc.b(Bytes.ascii(job.title)));
+  titlesAsm.add(dc.b(Bytes.ascii(job.title.value)));
   titlesAsm.add(dc.b([Byte(0xfe)]));
   titlesAsm.addNewline();
   titlesAsm.add(Asm.fromRaw('	even'));
