@@ -14,7 +14,8 @@ void main() {
     });
 
     test('job data for progress flags', () {
-      var asm = program.configureHuntersGuild(HuntersGuild(), inMap: guildMap);
+      var asm = program.configureHuntersGuild(HuntersGuildInteractions(),
+          inMap: guildMap);
       var jobData = asm.guildJobs.withoutComments().withoutEmptyLines();
       expect(
           jobData[0],
@@ -26,7 +27,8 @@ void main() {
     });
 
     test('job data for availability flags', () {
-      var asm = program.configureHuntersGuild(HuntersGuild(), inMap: guildMap);
+      var asm = program.configureHuntersGuild(HuntersGuildInteractions(),
+          inMap: guildMap);
       var jobData = asm.guildJobs.withoutComments().withoutEmptyLines();
       expect(
           jobData[2],

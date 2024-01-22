@@ -3,7 +3,6 @@ import 'package:rune/generator/event.dart';
 import 'package:rune/model/model.dart';
 
 import 'generator.dart';
-import '../model/guild.dart';
 
 class HuntersGuildAsm {
   final Asm guildJobs;

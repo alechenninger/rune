@@ -718,7 +718,9 @@ enum MapId {
 
 sealed class MapElement {}
 
-sealed class MapElementId {}
+sealed class MapElementId {
+  const MapElementId();
+}
 
 sealed class InteractiveMapElement
     implements MapElement, Interactive<InteractiveMapElement> {}
@@ -799,7 +801,10 @@ class InteractiveMapArea extends MapArea implements InteractiveMapElement {
 class MapAreaId extends MapElementId {
   final String value;
 
-  MapAreaId(this.value);
+  MapAreaId(this.value) {
+    checkArgument(onlyWordCharacters.hasMatch(value),
+        message: 'id must match $onlyWordCharacters but got $value');
+  }
 
   @override
   String toString() => value;
@@ -1713,14 +1718,32 @@ class InteractiveAsmSpec extends AsmSpec
   int get hashCode => super.hashCode ^ onInteract.hashCode;
 }
 
+abstract class InteractionId extends MapElementId {
+  String get value;
+
+  const InteractionId();
+
+  @override
+  String toString() => value;
+
+  @override
+  bool operator ==(Object other);
+
+  @override
+  int get hashCode => value.hashCode;
+}
+
 /// Models custom, event-based interactions.
 class EventInteraction
     with Interactive<InteractiveMapElement>
     implements InteractiveMapElement {
-  EventInteraction(Scene onInteract) {
+  final InteractionId id;
+
+  EventInteraction(Scene onInteract, {required this.id}) {
     onInteract = onInteract;
   }
 
   @override
-  InteractiveMapElement withNewInteraction() => EventInteraction(Scene.empty());
+  InteractiveMapElement withNewInteraction() =>
+      EventInteraction(Scene.empty(), id: id);
 }

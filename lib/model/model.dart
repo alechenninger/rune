@@ -11,6 +11,7 @@ import '../generator/generator.dart';
 import '../src/iterables.dart';
 import 'animate.dart';
 import 'camera.dart';
+import 'guild.dart';
 import 'objects.dart';
 import 'conditional.dart';
 import 'cutscenes.dart';
@@ -46,6 +47,8 @@ class Game {
       SplayTreeMap<MapId, GameMap>((a, b) => a.index.compareTo(b.index));
 
   List<GameMap> get maps => _maps.values.toList(growable: false);
+
+  final HuntersGuildInteractions huntersGuild = HuntersGuildInteractions();
 
   /// Returns the [Game] split into subsets based on what objects in the game
   /// share the same [Scene].
@@ -83,6 +86,16 @@ class Game {
     }
 
     return interactions;
+  }
+
+  // TODO(interaction elements): may want to move this to be per-map
+  //  rather thangame-level
+  MapElement? interaction(InteractionId id) {
+    // Right now, the only event interactions
+    // are modeled by the HuntersGuild.
+    // If there are others in the future,
+    // handle in this method.
+    return huntersGuild.interactionById(id);
   }
 
   bool containsMap(MapId id) {
