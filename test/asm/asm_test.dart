@@ -69,6 +69,11 @@ main() {
         expect(asm.toString(),
             r'	move.l	#"SEGA", Security_Addr-Z80_Bus_Request(a1)	; satisfy the TMSS');
       });
+
+      test('constant definition', () {
+        var asm = Asm.fromRaw(r'revision	=	0');
+        expect(asm.toString(), r'revision	=	0');
+      });
     });
   });
 

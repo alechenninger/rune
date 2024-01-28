@@ -75,7 +75,7 @@ abstract interface class HuntersGuild {
   JobListing get pendingJob;
 
   List<GuildJob> get jobsByIndex;
-  GuildJob? jobById(JobId id);
+  GuildJob jobById(JobId id);
 }
 
 class HuntersGuildInteractions implements HuntersGuild {
@@ -85,7 +85,7 @@ class HuntersGuildInteractions implements HuntersGuild {
     if (id is GuildInteractionId) {
       return switch (id.interaction) {
         ClerkInteraction i => clerkInteraction(i),
-        JobInteraction i => jobById(i.id)?.interaction(i.scene)
+        JobInteraction i => jobById(i.id).interaction(i.scene)
       };
     }
     return null;
@@ -170,22 +170,17 @@ class HuntersGuildInteractions implements HuntersGuild {
   Scene get onJobNoLongerAvailable => _jobNoLongerAvailable.onInteract;
 
   @override
-  JobListing pendingJob = JobListing('Listing pending');
+  JobListing pendingJob = JobListing('Listing pending...');
 
   final Map<JobId, GuildJob> _jobs = {
-    for (var i = 0; i < 8; i++) JobId(i): GuildJob.placeholder(JobId(i))
+    for (var id in JobId.all) id: GuildJob.placeholder(id)
   };
 
   @override
-  List<GuildJob> get jobsByIndex =>
-      [for (var i = 0; i < 8; i++) _jobs[JobId(i)]!];
+  List<GuildJob> get jobsByIndex => [for (var id in JobId.all) _jobs[id]!];
 
   @override
-  GuildJob? jobById(JobId id) => _jobs[id];
-
-  void configureJob(GuildJob job) {
-    _jobs[job.id] = job;
-  }
+  GuildJob jobById(JobId id) => _jobs[id]!;
 }
 
 typedef ThousandMeseta = int;
@@ -213,8 +208,8 @@ class JobId {
 class JobListing {
   final String value;
   JobListing(this.value) {
-    checkArgument(value.length <= 16,
-        message: 'title must be no more than 16 characters but got "$value"');
+    checkArgument(value.length <= 19,
+        message: 'title must be no more than 19 characters but got "$value"');
   }
   @override
   String toString() => value;
@@ -238,6 +233,8 @@ class GuildJob {
   EventFlag rewardedFlag;
   EventFlag availableWhen;
   EventFlag unavailableWhen;
+
+  ThousandMeseta reward;
 
   EventInteraction interaction(JobScene scene) => switch (scene) {
         JobScene.prompt => _prompt,
@@ -272,8 +269,6 @@ class GuildJob {
   /// Scene upon talking to to receptionist once the job is completed.
   Scene get onComplete => _complete.onInteract;
 
-  ThousandMeseta reward;
-
   GuildJob(
       {required this.id,
       JobListing? title,
@@ -281,7 +276,7 @@ class GuildJob {
       EventFlag? endFlag,
       EventFlag? rewardedFlag,
       EventFlag? availableWhen,
-      this.unavailableWhen = const EventFlag('GuildPlaceholder'),
+      EventFlag? unavailableWhen,
       List<Event> prompt = const [],
       List<Dialog> onAccept = const [],
       List<Dialog> onDecline = const [],
@@ -298,7 +293,9 @@ class GuildJob {
         endFlag = endFlag ?? _defaultJobFlags[id.value].end,
         rewardedFlag = rewardedFlag ?? _defaultJobFlags[id.value].completed,
         availableWhen =
-            availableWhen ?? _defaultJobFlags[id.value].availableWhen;
+            availableWhen ?? _defaultJobFlags[id.value].availableWhen,
+        unavailableWhen =
+            unavailableWhen ?? _defaultJobFlags[id.value].unavailableWhen;
 
   // TODO: possibly use table of existing quest data
   // maybe parse out the dialog? but in that case
@@ -385,8 +382,9 @@ enum JobStage {
 /// If the `scene` contains any other kind of Event, an illegal argument error
 /// is thrown.
 List<Dialog> _onlyDialog(Scene scene) => scene.events
-    .map((e) => switch (e) {
-          Dialog() => e,
+    .expand((e) => switch (e) {
+          Dialog() => [e],
+          SetContext() => <Dialog>[],
           _ => throw ArgumentError.value(
               e, 'scene', 'must only contain Dialog events')
         })

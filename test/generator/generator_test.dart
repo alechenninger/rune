@@ -541,8 +541,8 @@ main() {
                     isSet: [Pause(Duration(seconds: 1))])
               ]))))));
 
-    expect(program.extraConstants(), Asm.fromRaw(r'''EventFlag_Test000 = $00 
-EventFlag_Test001 = $01'''));
+    expect(program.extraConstants(), Asm.fromRaw(r'''EventFlag_Test000 = $0000
+EventFlag_Test001 = $0001'''));
   });
 
   test('same speaker dialog after show panel shows portrait', () {

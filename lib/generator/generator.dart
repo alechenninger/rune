@@ -192,11 +192,11 @@ class Program {
         .customEventFlags()
         .entries
         .sortedBy<num>((e) => e.key.value)
-        .map((e) => Asm.fromRaw('${e.value.constant} = ${e.key}'))
+        .map((e) => Asm.fromRaw('${e.value} = ${e.key}'))
         .reduceOr((a1, a2) => Asm([a1, a2]), ifEmpty: Asm.empty());
 
     asm.add(_constants
-        .map((e) => Asm.fromRaw('${e.key.constant} = ${e.value}'))
+        .map((e) => Asm.fromRaw('${e.key} = ${e.value}'))
         .reduceOr((a1, a2) => Asm([a1, a2]), ifEmpty: Asm.empty()));
 
     return asm;

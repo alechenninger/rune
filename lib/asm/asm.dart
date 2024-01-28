@@ -427,10 +427,18 @@ class _Instruction extends Instruction {
     }
   }
 
+  _Instruction.pseudo(String pseudo, {this.comment})
+      : label = null,
+        cmd = null,
+        operands = const [],
+        line =
+            [pseudo, if (comment != null) '; $comment'].join('\t').trimRight();
+
   factory _Instruction.parse(String line) {
     var chars = line.characters.toList();
 
-    String? label;
+    bool pseudo = false;
+    String? labelOrPseudo;
     String? cmd;
     String? attribute;
     List<Expression> ops = [];
@@ -460,11 +468,20 @@ class _Instruction extends Instruction {
           }
           break;
         case _Token.label:
-          if (c == ':' || isBlank(c)) {
+          if (c == ':') {
             state = _Token.root;
+          } else if (c == ';') {
+            state = _Token.comment;
           } else {
-            label ??= "";
-            label += c!;
+            if (c != null) {
+              labelOrPseudo ??= "";
+              labelOrPseudo += c;
+            }
+
+            if (isBlank(c)) {
+              pseudo = true;
+              state = _Token.pseudo;
+            }
           }
           break;
         case _Token.cmd:
@@ -497,11 +514,25 @@ class _Instruction extends Instruction {
             comment += c;
           }
           break;
+        case _Token.pseudo:
+          if (c == ';') {
+            state = _Token.comment;
+          } else if (c == null) {
+            break;
+          } else {
+            labelOrPseudo ??= "";
+            labelOrPseudo += c;
+          }
+          break;
       }
     }
 
-    return _Instruction(
-        label: label, cmd: cmd, operands: ops, comment: comment);
+    if (pseudo) {
+      return _Instruction.pseudo(labelOrPseudo!, comment: comment);
+    } else {
+      return _Instruction(
+          label: labelOrPseudo, cmd: cmd, operands: ops, comment: comment);
+    }
   }
 
   @override
@@ -529,6 +560,7 @@ enum _Token {
   cmd,
   operand,
   comment,
+  pseudo,
 }
 
 final _number = RegExp(r'^(\$[0-9a-fA-F]+|\d+)$');

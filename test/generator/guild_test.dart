@@ -7,10 +7,12 @@ void main() {
   group('guild compiler generates', () {
     late Program program;
     late GameMap guildMap;
+    late HuntersGuildInteractions guild;
 
     setUp(() {
       program = Program();
       guildMap = GameMap(MapId.HuntersGuild);
+      guild = HuntersGuildInteractions();
     });
 
     test('job data for progress flags', () {
@@ -44,7 +46,21 @@ void main() {
 
     test('guild text for pending listing', () {}, skip: 'TODO');
 
-    test('dialog for receptionist', () {}, skip: 'TODO');
+    group('receptionist', () {
+      test('dialog', () {}, skip: "TODO");
+
+      test('event flag constants if there are conditional checks', () {
+        guild.clerkInteraction(ClerkInteraction.welcome).onInteract = Scene([
+          IfFlag(EventFlag('some_new_flag'),
+              isSet: [Dialog.parse('flag set')],
+              isUnset: [Dialog.parse('flag not set')])
+        ]);
+        program.configureHuntersGuild(guild, inMap: guildMap);
+
+        expect(program.extraConstants().map((l) => l.toString()),
+            containsOnce(matches(r'EventFlag_some_new_flag\s=\s\S*')));
+      });
+    });
 
     test('constants refer to the right receptionist dialog ids', () {},
         skip: 'TODO');

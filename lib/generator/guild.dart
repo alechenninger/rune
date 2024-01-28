@@ -29,8 +29,8 @@ HuntersGuildAsm compileHuntersGuild(
     required EventRoutines eventRoutines}) {
   for (var (scene, constant) in _receptionistSceneConstants
       .map((getConstants) => getConstants(guild))) {
-    _compileReceptionistScene(
-        scene, constant, map, constants, dialogTrees, eventRoutines);
+    _compileReceptionistScene(scene, constant, map, constants, dialogTrees,
+        eventRoutines, eventFlags);
   }
 
   var guildJobs = Asm.empty();
@@ -91,15 +91,21 @@ final _receptionistSceneConstants = <_ReceptionistSceneConstant>[
       ),
 ];
 
-void _compileReceptionistScene(Scene scene, Constant constant, GameMap map,
-    Constants constants, DialogTrees dialogTrees, EventRoutines eventRoutines) {
+void _compileReceptionistScene(
+    Scene scene,
+    Constant constant,
+    GameMap map,
+    Constants constants,
+    DialogTrees dialogTrees,
+    EventRoutines eventRoutines,
+    EventFlags eventFlags) {
   var tree = dialogTrees.forMap(map.id);
   var dialogId = tree.nextDialogId!;
   var eventAsm = EventAsm.empty();
 
   SceneAsmGenerator.forInteraction(
       map, SceneId(constant.constant), dialogTrees, eventAsm, eventRoutines,
-      withObject: false)
+      eventFlags: eventFlags, withObject: false)
     ..scene(scene)
     ..finish();
 
