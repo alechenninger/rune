@@ -275,6 +275,8 @@ class IndividualMoves extends Event {
     return result;
   }
 
+  bool get isEmpty => moves.isEmpty;
+
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.individualMovesToAsm(this, ctx);
@@ -315,6 +317,9 @@ class AbsoluteMoves extends Event {
   StepSpeed speed = StepSpeed.fast;
   Axis startingAxis = Axis.x;
   bool followLeader = false;
+
+  bool get isNotEmpty => destinations.isNotEmpty;
+  bool get isEmpty => destinations.isEmpty;
 
   @override
   void visit(EventVisitor visitor) {
