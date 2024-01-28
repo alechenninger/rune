@@ -319,9 +319,9 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
   bool hasDialogAfter(int i) => events.sublist(i + 1).any((e) => e is Dialog);
 
   var dialogCheck = 0;
-  var dialogChecks = <bool Function(Event, int)>[
-    (event, i) => event is FacePlayer && event.object == interactingWith,
-    (event, i) =>
+  var dialogChecks = <bool Function(Event, int, bool)>[
+    (event, i, _) => event is FacePlayer && event.object == interactingWith,
+    (event, i, hasDialogAfter) =>
         // Events need dialog after, otherwise their order
         // creates unwanted dialog windows.
         (event is Dialog && !event.hidePanelsOnClose) ||
@@ -330,16 +330,19 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
               var f? => _canFaceInDialog(f),
               null => false
             } &&
-            hasDialogAfter(i)) ||
-        (event is PlaySound && hasDialogAfter(i)) ||
-        (event is PlayMusic && hasDialogAfter(i)) ||
-        (event is ShowPanel && event.showDialogBox && hasDialogAfter(i)) ||
-        (event is SetFlag && hasDialogAfter(i)) ||
-        (event is HideTopPanels && hasDialogAfter(i)) ||
-        (event is HideAllPanels && hasDialogAfter(i)) ||
+            hasDialogAfter) ||
+        (event is PlaySound && hasDialogAfter) ||
+        (event is PlayMusic && hasDialogAfter) ||
+        (event is ShowPanel && event.showDialogBox && hasDialogAfter) ||
+        (event is SetFlag && hasDialogAfter) ||
+        (event is HideTopPanels && hasDialogAfter) ||
+        (event is HideAllPanels && hasDialogAfter) ||
+        (event is Pause &&
+            (event.duringDialog == true ||
+                event.duringDialog == null && hasDialogAfter)) ||
         // Choices must NOT have any events after in order to fit in dialog
         (event is YesOrNoChoice && isLast(i)),
-    (event, i) => event is Dialog && event.hidePanelsOnClose && isLast(i),
+    (event, i, _) => event is Dialog && event.hidePanelsOnClose && isLast(i),
   ];
 
   var faded = false;
@@ -351,7 +354,8 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
     for (var cIdx = dialogCheck;
         cIdx < dialogChecks.length && !needsEvent;
         cIdx++) {
-      if (dialogChecks[cIdx](event, i)) {
+      var dialogAfter = hasDialogAfter(i);
+      if (dialogChecks[cIdx](event, i, dialogAfter)) {
         dialogCheck = cIdx;
         continue event;
       }
@@ -693,12 +697,11 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void pause(Pause pause) {
-    // Cannot be done in dialog because,
-    // while dialog supports pausing,
-    // it will show a dialog window during the pause.
+    _checkNotFinished();
 
-    _addToEvent(pause, (i) {
-      var frames = pause.duration.toFrames();
+    var frames = pause.duration.toFrames();
+
+    Asm generateEvent(i) {
       // if (_isProcessingInteraction) {
       //   return EventAsm.of(doInteractionUpdatesLoop(Word(frames)));
       // } else {
@@ -707,8 +710,23 @@ class SceneAsmGenerator implements EventVisitor {
       } else {
         return doMapUpdateLoop(Word(frames));
       }
-      // }
-    });
+    }
+
+    switch (pause.duringDialog) {
+      case true:
+        _generateQueueInCurrentMode();
+        _runOrContinueDialog(pause);
+        _addToDialog(PauseCode(frames.toByte).toAsm());
+        break;
+      case false:
+        _addToEvent(pause, generateEvent);
+        break;
+      case null:
+        _addToEventOrDialog(pause, inDialog: () {
+          _addToDialog(PauseCode(frames.toByte).toAsm());
+        }, inEvent: generateEvent);
+        break;
+    }
   }
 
   @override

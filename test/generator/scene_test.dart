@@ -409,6 +409,33 @@ ${dialog2.toAsm()}
               returnFromDialogEvent()
             ]));
       });
+
+      test('if pause is duringDialog, pause within dialog', () {
+        var dialog = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
+        var pause = Pause(Duration(milliseconds: 32), duringDialog: true);
+
+        var scene =
+            Scene([InteractionObject.facePlayer(), dialog, pause, dialog]);
+        map.addObject(testObjectForScene(scene));
+        var mapAsm = program.addMap(map);
+
+        expect(
+            program.dialogTrees
+                .forMap(map.id)
+                .map((e) => e.withoutComments())
+                .toList(),
+            [
+              DialogAsm([
+                dialog.toAsm(state),
+                dc.b([Byte(0xfd)]),
+                dc.b([Byte(0xf9), Byte(2)]),
+                dialog.toAsm(state),
+                dc.b([Byte.max]),
+              ])
+            ]);
+
+        expect(mapAsm.events.withoutComments().trim(), Asm.empty());
+      });
     });
 
     test('if dialog while faded, uses cutscene routine', () {
@@ -1353,4 +1380,3 @@ ${dialog2.toAsm()}
     });
   });
 }
-

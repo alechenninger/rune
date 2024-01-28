@@ -70,9 +70,14 @@ class SetContext extends Event {
 class Pause extends Event {
   final Duration duration;
 
-  Pause(this.duration);
+  /// Whether or not to pause with the dialog window up, or not.
+  ///
+  /// If `null`, will use either depending on surrounding events.
+  final bool? duringDialog;
 
-  Dialog inDialog() {
+  Pause(this.duration, {this.duringDialog = false});
+
+  Dialog asDialogEvent() {
     return Dialog(spans: [DialogSpan("", pause: duration)]);
   }
 
@@ -88,7 +93,7 @@ class Pause extends Event {
 
   @override
   String toString() {
-    return 'Pause{$duration}';
+    return 'Pause{$duration, duringDialog: $duringDialog}';
   }
 
   @override
@@ -96,10 +101,11 @@ class Pause extends Event {
       identical(this, other) ||
       other is Pause &&
           runtimeType == other.runtimeType &&
-          duration == other.duration;
+          duration == other.duration && 
+          duringDialog == other.duringDialog;
 
   @override
-  int get hashCode => duration.hashCode;
+  int get hashCode => duration.hashCode ^ duringDialog.hashCode;
 }
 
 /// Resets palettes and other state for showing the map.
