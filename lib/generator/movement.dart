@@ -166,7 +166,8 @@ extension IndividualMovesToAsm on IndividualMoves {
       if (allDelay) {
         // Just guessing at 8 frames per step?
         // look at x/y_step_constant and FieldObj_Move routine
-        asm.add(doMapUpdateLoop((8 * maxSteps.toInt).toWord));
+        // Subtract one since value is additional frames
+        asm.add(doMapUpdateLoop((8 * maxSteps.toInt - 1).toWord));
       }
     }
 

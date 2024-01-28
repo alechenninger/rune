@@ -25,14 +25,16 @@ class StepObject extends Event {
   /// Relative movement per frame in pixels.
   final Point<double> stepPerFrame;
 
-  /// How many frames should the movement last.
+  /// How many frames should the movement last. > 0.
   final int frames;
 
   StepObject(this.object,
       {this.onTop = false,
       this.animate = true,
       required this.stepPerFrame,
-      required this.frames});
+      required this.frames}) {
+    checkArgument(frames > 0, message: 'Frames must be greater than 0.');
+  }
 
   @override
   void visit(EventVisitor visitor) {

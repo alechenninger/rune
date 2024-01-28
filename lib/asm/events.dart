@@ -544,7 +544,8 @@ Asm moveCharacter({required Address x, required Address y}) {
   ]);
 }
 
-/// Moves the object at address A4 by rate ([x] and [y]) and time ([frames])).
+/// Moves the object at address A4 by rate ([x] and [y]) and time
+/// ([frames] + 1)).
 Asm stepObject(
     {required Address x, required Address y, required Address frames}) {
   return Asm([

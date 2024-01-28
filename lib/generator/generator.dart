@@ -622,6 +622,9 @@ class SceneAsmGenerator implements EventVisitor {
             current + Position.fromPoint(totalSteps);
       }
 
+      // Step will always execute at least once.
+      var additionalFrames = step.frames - 1;
+
       return Asm([
         step.object.toA4(_memory),
         if (step.onTop) move.b(1.i, 5(a4)),
@@ -633,10 +636,10 @@ class SceneAsmGenerator implements EventVisitor {
           moveq(y.toSignedByte.i, d1)
         else
           move.l(y.toSignedLongword.i, d1),
-        if (step.frames <= 127)
-          moveq(step.frames.toByte.i, d2)
+        if (additionalFrames <= 127)
+          moveq(additionalFrames.toByte.i, d2)
         else
-          move.w(step.frames.toWord.i, d2),
+          move.w(additionalFrames.toWord.i, d2),
         if (step.animate)
           jsr(Label('Event_StepObject').l)
         else
@@ -698,16 +701,20 @@ class SceneAsmGenerator implements EventVisitor {
   void pause(Pause pause) {
     _checkNotFinished();
 
-    var frames = pause.duration.toFrames();
+    var additionalFrames = pause.duration.toFrames() - 1;
+
+    if (additionalFrames < 0) {
+      return;
+    }
 
     Asm generateEvent(i) {
       // if (_isProcessingInteraction) {
       //   return EventAsm.of(doInteractionUpdatesLoop(Word(frames)));
       // } else {
       if (_memory.isFieldShown == false || (_memory.panelsShown ?? 0) > 0) {
-        return vIntPrepareLoop(Word(frames));
+        return vIntPrepareLoop(Word(additionalFrames));
       } else {
-        return doMapUpdateLoop(Word(frames));
+        return doMapUpdateLoop(Word(additionalFrames));
       }
     }
 
@@ -715,14 +722,14 @@ class SceneAsmGenerator implements EventVisitor {
       case true:
         _generateQueueInCurrentMode();
         _runOrContinueDialog(pause);
-        _addToDialog(PauseCode(frames.toByte).toAsm());
+        _addToDialog(PauseCode(additionalFrames.toByte).toAsm());
         break;
       case false:
         _addToEvent(pause, generateEvent);
         break;
       case null:
         _addToEventOrDialog(pause, inDialog: () {
-          _addToDialog(PauseCode(frames.toByte).toAsm());
+          _addToDialog(PauseCode(additionalFrames.toByte).toAsm());
         }, inEvent: generateEvent);
         break;
     }
