@@ -27,7 +27,6 @@ import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/guild.dart';
 import 'package:rune/model/battle.dart';
-import 'package:rune/model/guild.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -97,7 +96,7 @@ class Program {
     Word? cutsceneIndexOffset,
     Map<MapId, Word>? vramTileOffsets,
     Map<MapId, List<SpriteVramMapping>>? builtInSprites,
-  })  : _eventIndexOffset = eventIndexOffset ?? 0xa1.toWord,
+  })  : _eventIndexOffset = eventIndexOffset ?? 0xa2.toWord,
         _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord {
     _vramTileOffsets.addAll(vramTileOffsets ?? _defaultSpriteVramOffsets);
     _builtInSprites.addAll(builtInSprites ?? _defaultBuiltInSprites);
