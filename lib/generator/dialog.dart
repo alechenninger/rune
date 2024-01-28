@@ -104,7 +104,10 @@ extension DialogToAsm on Dialog {
 
       if (span.pause > Duration.zero) {
         codePoints.length = ascii.length + 1;
-        codePoints[ascii.length] = [PauseCode(span.pause.toFrames().toByte)];
+        var additionalFrames = span.pause.toFrames() - 1;
+        if (additionalFrames >= 0) {
+          codePoints[ascii.length] = [PauseCode(additionalFrames.toByte)];
+        }
       }
 
       var panel = span.panel;

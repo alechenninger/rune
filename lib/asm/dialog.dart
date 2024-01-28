@@ -159,12 +159,12 @@ abstract class ControlCode {
 }
 
 class PauseCode extends ControlCode {
-  final Byte frames;
+  final Byte additionalFrames;
 
-  PauseCode(this.frames);
+  PauseCode(this.additionalFrames);
 
   @override
-  Asm toAsm() => delay(frames);
+  Asm toAsm() => delay(additionalFrames);
 }
 
 class PanelCode extends ControlCode {
