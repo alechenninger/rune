@@ -392,6 +392,24 @@ class InstantMoves extends Event {
   int get hashCode => const MapEquality().hash(destinations);
 }
 
+class OverlapCharacters extends Event {
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.overlapCharacters(this);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OverlapCharacters && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  String toString() => 'OverlapCharacters{}';
+}
+
 class Party extends Moveable {
   const Party();
 

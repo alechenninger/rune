@@ -576,6 +576,12 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void overlapCharacters(OverlapCharacters overlap) {
+    _checkNotFinished();
+    _addToEvent(overlap, (_) => jsr(Label('Event_OverlapCharacters').l));
+  }
+
+  @override
   void individualMoves(IndividualMoves moves) {
     var facing = moves.justFacing();
     Asm? dialogAsm;
@@ -1061,8 +1067,16 @@ class SceneAsmGenerator implements EventVisitor {
     // Run no branch in current dialog tree (offset 0).
     var noBranch = _memory = parent.branch();
     for (var d in yesNo.ifNo) {
+      // if (d is YesOrNoChoice) {
+      // we will lose the current value in memory
+      // so run test, then continue this in "no" branch
+      // }
       dialog(d);
     }
+
+    //if (!inDialogLoop) {
+      // add to event to branch to continue label
+    //}
 
     // Terminate no branch, run yes branch.
     // Note inclusion of setting the last dialog event, also.
@@ -1074,6 +1088,7 @@ class SceneAsmGenerator implements EventVisitor {
     _resetCurrentDialog(id: ifYesId, asm: ifYes, lastEventForDialog: yesNo);
 
     var yesBranch = _memory = parent.branch();
+    
     for (var d in yesNo.ifYes) {
       dialog(d);
     }
@@ -1109,6 +1124,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void fadeInField(FadeInField fadeIn) {
+    _checkNotFinished();
+
     if (_memory.isFieldShown == true) return;
 
     _addToEvent(fadeIn, (eventIndex) {
@@ -1150,6 +1167,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void fadeOut(FadeOut fadeOut) {
+    _checkNotFinished();
+
     _addToEvent(fadeOut, (eventIndex) {
       _memory.isFieldShown = false;
       _memory.isMapInCram = false;
@@ -2103,6 +2122,10 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.hasSavedDialogPosition = true;
       _memory.dialogPortrait = null;
       _gameMode = Mode.event;
+
+      // TODO(yesno): we'd need to add `tst.b	(Yes_No_Option).w` here
+      // and then bne/beq to a label for the alternate branch?
+      // and then bsr to label after alt branch
 
       // If any events which could've gone either way,
       // generate in event mode now

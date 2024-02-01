@@ -193,6 +193,7 @@ abstract class EventVisitor {
   void dialog(Dialog dialog);
   void displayText(DisplayText text);
   void facePlayer(FacePlayer face);
+  void overlapCharacters(OverlapCharacters overlap);
   void individualMoves(IndividualMoves moves);
   void absoluteMoves(AbsoluteMoves moves);
   void instantMoves(InstantMoves moves);
