@@ -420,8 +420,8 @@ final eventFlags = BiMap<Constant, Byte>()
 
 final popdlg = cmd('popdlg', []);
 
-Asm vIntPrepareLoop(Word frames) {
-  return Asm([move.w(frames.i, d0), jsr(Label('VInt_PrepareLoop').l)]);
+Asm vIntPrepareLoop(Word additionalFrames) {
+  return Asm([move.w(additionalFrames.i, d0), jsr(Label('VInt_PrepareLoop').l)]);
 }
 
 Asm doMapUpdateLoop(Word frames) {
