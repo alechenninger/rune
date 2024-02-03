@@ -204,7 +204,7 @@ void main() {
       var asm = dialog.toAsm();
 
       expect(asm.toString(), r'''	dc.b	$F4, $02
-	dc.b	$F9, $3C''');
+	dc.b	$F9, $3B''');
     });
 
     test('just pause, no speaker', () {
@@ -212,7 +212,7 @@ void main() {
 
       var asm = dialog.toAsm();
 
-      expect(asm.toString(), r'''	dc.b	$F9, $3C''');
+      expect(asm.toString(), r'''	dc.b	$F9, $3B''');
     });
 
     test('pauses come at the end of spans', () {
@@ -224,7 +224,7 @@ void main() {
 
       expect(asm.toString(), r'''	dc.b	$F4, $02
 	dc.b	"Hi I'm Alys!"
-	dc.b	$F9, $3C''');
+	dc.b	$F9, $3B''');
     });
 
     test('bug1', () {
@@ -241,11 +241,11 @@ void main() {
 	dc.b	"It takes and it takes. And I owe"
 	dc.b	$FC
 	dc.b	"it nothing..."
-	dc.b	$F9, $3C
+	dc.b	$F9, $3B
 	dc.b	"nothing but a"
 	dc.b	$FD
 	dc.b	"fight."
-	dc.b	$F9, $3C''');
+	dc.b	$F9, $3B''');
     });
 
     test('bug2', () {
@@ -277,9 +277,9 @@ void main() {
       expect(asm.toString(), r'''	dc.b	$F4, $01
 	dc.b	"That you've always done this..."
 	dc.b	$FC
-	dc.b	$F9, $3C
+	dc.b	$F9, $3B
 	dc.b	"alone."
-	dc.b	$F9, $3C''');
+	dc.b	$F9, $3B''');
     });
 
     test('pause at 32 characters end of dialog', () {
@@ -292,7 +292,7 @@ void main() {
 
       expect(asm.toString(), r'''	dc.b	$F4, $01
 	dc.b	"That you've always done this..."
-	dc.b	$F9, $3C''');
+	dc.b	$F9, $3B''');
     });
   });
 
