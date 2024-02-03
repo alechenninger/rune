@@ -236,7 +236,7 @@ main() {
           move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
           moveq(0.toByte.i, d0),
           jsr(Label('Event_GetAndRunDialogue3').l),
-          vIntPrepareLoop(60.toWord),
+          vIntPrepareLoop(59.toWord),
           move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
           popdlg,
           jsr(Label('Event_RunDialogue3').l),
@@ -609,7 +609,7 @@ EventFlag_Test001 = $0001'''));
           move.b(Constant('SFXID_Surprise').i, (Sound_Index).l),
           jsr(Label('Panel_Destroy').l),
           dmaPlanesVInt(),
-          doMapUpdateLoop(Word(0x3c)),
+          doMapUpdateLoop(Word(0x3b)),
           popAndRunDialog3
         ]));
   });
@@ -635,7 +635,7 @@ EventFlag_Test001 = $0001'''));
         Asm([
           move.b(Music.motaviaTown.musicId.i, Constant('Sound_Index').l),
           move.b(Music.motaviaTown.musicId.i, Constant('Saved_Sound_Index').w),
-          doMapUpdateLoop(Word(0x3c)),
+          doMapUpdateLoop(Word(0x3b)),
           move.b(SoundEffect.stopAll.sfxId.i, Constant('Sound_Index').l),
           vIntPrepare(),
           move.b(Music.suspicion.musicId.i, Constant('Sound_Index').l),
@@ -666,7 +666,7 @@ EventFlag_Test001 = $0001'''));
             alys.toA4(Memory()),
             moveq(0.toByte.i, d0),
             move.l(0xffff8000.toLongword.i, d1),
-            moveq(7.toByte.i, d2),
+            moveq(6.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
             move.w(curr_x_pos(a4), dest_x_pos(a4)),
             move.w(curr_y_pos(a4), dest_y_pos(a4)),
@@ -686,7 +686,7 @@ EventFlag_Test001 = $0001'''));
             alys.toA4(Memory()),
             moveq(0.toByte.i, d0),
             move.l(0x00008000.toLongword.i, d1),
-            moveq(7.toByte.i, d2),
+            moveq(6.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
             move.w(curr_x_pos(a4), dest_x_pos(a4)),
             move.w(curr_y_pos(a4), dest_y_pos(a4)),
@@ -706,7 +706,7 @@ EventFlag_Test001 = $0001'''));
             alys.toA4(Memory()),
             move.l(0x00010000.toLongword.i, d0),
             move.l(0x00010000.toLongword.i, d1),
-            moveq(7.toByte.i, d2),
+            moveq(6.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
             move.w(curr_x_pos(a4), dest_x_pos(a4)),
             move.w(curr_y_pos(a4), dest_y_pos(a4)),
@@ -1193,7 +1193,7 @@ EventFlag_Test001 = $0001'''));
           move.w(curr_y_pos(a4), d1),
           addi.w(0x0020.toWord.i, d1),
           jsr(Label('Event_MoveCharacter').l),
-          label(Label('testscene_testflag_unset5')),
+          label(Label('.testflag_unset5')),
         ]),
       );
     });
@@ -1230,7 +1230,7 @@ EventFlag_Test001 = $0001'''));
           move.w(curr_y_pos(a4), d1),
           addi.w(0x0020.toWord.i, d1),
           jsr(Label('Event_MoveCharacter').l),
-          label(Label('testscene_testflag_unset6')),
+          label(Label('.testflag_unset6')),
         ]),
       );
     });
@@ -1265,7 +1265,7 @@ EventFlag_Test001 = $0001'''));
           move.w(0x100.toWord.i, d0),
           move.w(0x220.toWord.i, d1),
           jsr(Label('Event_MoveCharacter').l),
-          label(Label('testscene_testflag_unset6')),
+          label(Label('.testflag_unset6')),
         ]),
       );
     });
@@ -1319,7 +1319,7 @@ loc_742A4:
               move.w(Word(2).i, d0),
               jsr(Label('Panel_Create').l),
               jsr(Label('DMAPlanes_VInt').l),
-              move.w(Word(0x3c).i, d0),
+              move.w(Word(0x3b).i, d0),
               // Don't run map updates while panels shown
               jsr(Label('VInt_PrepareLoop').l),
               moveq(1.i, d0),

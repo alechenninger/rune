@@ -126,7 +126,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
   }
 
   if (!startInEvent && ctx.inEvent) {
-    eventAsm.add(returnFromDialogEvent());
+    eventAsm.add(returnFromInteractionEvent());
   }
 
   return SceneAsm(event: eventAsm);

@@ -1,5 +1,17 @@
+import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/model.dart';
+
+Asm generateEventAsm(List<Event> events, [EventState? ctx]) {
+  var asm = EventAsm.empty();
+  var gen = SceneAsmGenerator.forEvent(SceneId('test'), DialogTrees(), asm)
+    ..setContext(setContext(ctx));
+  for (var e in events) {
+    e.visit(gen);
+  }
+  gen.finish();
+  return asm.withoutComments();
+}
 
 class TestEventRoutines extends EventRoutines {
   final eventRoutines = <Label>[];

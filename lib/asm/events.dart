@@ -458,7 +458,7 @@ Asm getAndRunDialog3LowDialogId(Address dialogId) {
   ]);
 }
 
-Asm returnFromDialogEvent() {
+Asm returnFromInteractionEvent() {
   /*
 	move.w	#0, (Game_Mode_Routine).w
 	movea.l	(Map_Chunk_Addr).w, a0

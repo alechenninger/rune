@@ -385,8 +385,8 @@ enum Portrait {
 }
 
 class YesOrNoChoice extends Event {
-  final List<Dialog> ifYes;
-  final List<Dialog> ifNo;
+  final List<Event> ifYes;
+  final List<Event> ifNo;
 
   YesOrNoChoice({this.ifYes = const [], this.ifNo = const []});
 

@@ -140,7 +140,7 @@ ${dialog2.toAsm()}
             setLabel('Event_GrandCross_Test_testObj'),
             getAndRunDialog3LowDialogId(Byte.one.i),
             generateEventAsm([moves], origState).withoutComments(),
-            returnFromDialogEvent()
+            returnFromInteractionEvent()
           ]));
 
       expect(
@@ -184,7 +184,7 @@ ${dialog2.toAsm()}
               ], origState)
                   .withoutComments()
                   .trim(),
-              returnFromDialogEvent()
+              returnFromInteractionEvent()
             ]));
       });
 
@@ -270,7 +270,7 @@ ${dialog2.toAsm()}
               getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([moves], origState).withoutComments(),
               popAndRunDialog3,
-              returnFromDialogEvent()
+              returnFromInteractionEvent()
             ]));
       });
 
@@ -341,7 +341,7 @@ ${dialog2.toAsm()}
                         ..positions[alys] =
                             (origState.positions[alys]! + 1.step.up.asPosition))
                   .withoutComments(),
-              returnFromDialogEvent()
+              returnFromInteractionEvent()
             ]));
       });
 
@@ -377,7 +377,7 @@ ${dialog2.toAsm()}
               setLabel('Event_GrandCross_Test_0'),
               getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([pause]).withoutComments(),
-              returnFromDialogEvent()
+              returnFromInteractionEvent()
             ]));
       });
 
@@ -406,11 +406,11 @@ ${dialog2.toAsm()}
             Asm([
               setLabel('Event_GrandCross_Test_0'),
               generateEventAsm([pause]).withoutComments(),
-              returnFromDialogEvent()
+              returnFromInteractionEvent()
             ]));
       });
 
-      test('if pause is duringDialog, pause within dialog', () {
+      test('if pause is during Dialog, pause within dialog', () {
         var dialog = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
         var pause = Pause(Duration(milliseconds: 32), duringDialog: true);
 
@@ -428,7 +428,7 @@ ${dialog2.toAsm()}
               DialogAsm([
                 dialog.toAsm(state),
                 dc.b([Byte(0xfd)]),
-                dc.b([Byte(0xf9), Byte(2)]),
+                dc.b([Byte(0xf9), Byte(1)]),
                 dialog.toAsm(state),
                 dc.b([Byte.max]),
               ])
@@ -687,9 +687,9 @@ ${dialog2.toAsm()}
           EventAsm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset1')),
+            beq.w(Label('.Test_unset1')),
             pause1.withoutComments(),
-            setLabel('test_Test_unset1')
+            setLabel('.Test_unset1')
           ]));
     });
 
@@ -705,9 +705,9 @@ ${dialog2.toAsm()}
           EventAsm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            bne.w(Label('test_Test_set1')),
+            bne.w(Label('.Test_set1')),
             pause1.withoutComments(),
-            setLabel('test_Test_set1')
+            setLabel('.Test_set1')
           ]));
     });
 
@@ -724,12 +724,12 @@ ${dialog2.toAsm()}
           EventAsm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset1')),
+            beq.w(Label('.Test_unset1')),
             pause2,
-            bra.w(Label('test_Test_cont1')),
-            setLabel('test_Test_unset1'),
+            bra.w(Label('.Test_cont1')),
+            setLabel('.Test_unset1'),
             pause1,
-            setLabel('test_Test_cont1')
+            setLabel('.Test_cont1')
           ]).withoutComments());
     });
 
@@ -752,12 +752,12 @@ ${dialog2.toAsm()}
           EventAsm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset1')),
+            beq.w(Label('.Test_unset1')),
             pause(3),
-            bra.w(Label('test_Test_cont1')),
-            setLabel('test_Test_unset1'),
+            bra.w(Label('.Test_cont1')),
+            setLabel('.Test_unset1'),
             pause2,
-            setLabel('test_Test_cont1')
+            setLabel('.Test_cont1')
           ]).withoutComments());
     });
 
@@ -776,20 +776,20 @@ ${dialog2.toAsm()}
           EventAsm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset1')),
+            beq.w(Label('.Test_unset1')),
             pause2,
-            bra.w(Label('test_Test_cont1')),
-            setLabel('test_Test_unset1'),
+            bra.w(Label('.Test_cont1')),
+            setLabel('.Test_unset1'),
             pause1,
-            setLabel('test_Test_cont1'),
+            setLabel('.Test_cont1'),
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset4')),
+            beq.w(Label('.Test_unset4')),
             pause(4),
-            bra.w(Label('test_Test_cont4')),
-            setLabel('test_Test_unset4'),
+            bra.w(Label('.Test_cont4')),
+            setLabel('.Test_unset4'),
             pause(3),
-            setLabel('test_Test_cont4'),
+            setLabel('.Test_cont4'),
           ]).withoutComments());
     });
 
@@ -810,9 +810,9 @@ ${dialog2.toAsm()}
           EventAsm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset1')),
+            beq.w(Label('.Test_unset1')),
             getAndRunDialog3LowDialogId(0.toByte.i),
-            setLabel('test_Test_unset1'),
+            setLabel('.Test_unset1'),
             getAndRunDialog3LowDialogId(1.toByte.i),
           ]).withoutComments());
 
@@ -846,12 +846,12 @@ ${dialog2.toAsm()}
           EventAsm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset1')),
+            beq.w(Label('.Test_unset1')),
             getAndRunDialog3LowDialogId(0.toByte.i),
-            bra.w(Label('test_Test_cont1')),
-            setLabel('test_Test_unset1'),
+            bra.w(Label('.Test_cont1')),
+            setLabel('.Test_unset1'),
             getAndRunDialog3LowDialogId(1.toByte.i),
-            setLabel('test_Test_cont1'),
+            setLabel('.Test_cont1'),
             getAndRunDialog3LowDialogId(2.toByte.i),
           ]).withoutComments());
 
@@ -893,12 +893,12 @@ ${dialog2.toAsm()}
             getAndRunDialog3LowDialogId(0.toByte.i),
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset2')),
+            beq.w(Label('.Test_unset2')),
             getAndRunDialog3LowDialogId(1.toByte.i),
-            bra.w(Label('test_Test_cont2')),
-            setLabel('test_Test_unset2'),
+            bra.w(Label('.Test_cont2')),
+            setLabel('.Test_unset2'),
             getAndRunDialog3LowDialogId(2.toByte.i),
-            setLabel('test_Test_cont2'),
+            setLabel('.Test_cont2'),
             getAndRunDialog3LowDialogId(3.toByte.i),
           ]).withoutComments());
 
@@ -980,16 +980,16 @@ ${dialog2.toAsm()}
           Asm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset5')),
+            beq.w(Label('.Test_unset5')),
             move.w(0x30.toWord.i, d0),
             move.w(0x30.toWord.i, d1),
             jsr(Label('Event_MoveCharacter').l),
-            bra.w(Label('test_Test_cont5')),
-            setLabel('test_Test_unset5'),
+            bra.w(Label('.Test_cont5')),
+            setLabel('.Test_unset5'),
             move.w(0x70.toWord.i, d0),
             move.w(0x30.toWord.i, d1),
             jsr(Label('Event_MoveCharacter').l),
-            label(Label('test_Test_cont5')),
+            label(Label('.Test_cont5')),
           ]));
     });
 
@@ -1029,18 +1029,18 @@ ${dialog2.toAsm()}
           Asm([
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('test_Test_unset5')),
+            beq.w(Label('.Test_unset5')),
             alys.toA4(Memory()),
             move.w(0x30.toWord.i, d0),
             move.w(0x30.toWord.i, d1),
             jsr(Label('Event_MoveCharacter').l),
-            bra.w(Label('test_Test_cont5')),
-            setLabel('test_Test_unset5'),
+            bra.w(Label('.Test_cont5')),
+            setLabel('.Test_unset5'),
             alys.toA4(Memory()),
             move.w(0x70.toWord.i, d0),
             move.w(0x30.toWord.i, d1),
             jsr(Label('Event_MoveCharacter').l),
-            label(Label('test_Test_cont5')),
+            label(Label('.Test_cont5')),
           ]));
     });
 
@@ -1289,7 +1289,7 @@ ${dialog2.toAsm()}
         expect(asm.withoutComments().firstOrNull?.toAsm(),
             setLabel('Event_GrandCross_interactflag1_unset'));
 
-        var returnFromDialog = returnFromDialogEvent().withoutComments()
+        var returnFromDialog = returnFromInteractionEvent().withoutComments()
           ..addNewline();
         expect(asm.withoutComments().tail(returnFromDialog.length),
             returnFromDialog);

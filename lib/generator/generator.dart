@@ -311,12 +311,16 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
   // SetContext is not a perceivable event, so ignore
   events = events.whereNot((e) => e is SetContext).toList(growable: false);
 
-  // TODO: doesn't it matter what is in the branches?
+  // In interactions, each branch will be evaluated separately
+  // so it doesn't matter what's in each branch.
   if (events.length == 1 && events[0] is IfFlag) return null;
 
   bool isLast(int i) => i == events.length - 1;
   bool hasDialogAfter(int i) => events.sublist(i + 1).any((e) => e is Dialog);
 
+  // One of dialog checks must pass for each event.
+  // If check does not pass, the next check is used for all remaining events.
+  // If there are no more checks, it must require an event.
   var dialogCheck = 0;
   var dialogChecks = <bool Function(Event, int, bool)>[
     (event, i, _) => event is FacePlayer && event.object == interactingWith,
@@ -340,7 +344,10 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
             (event.duringDialog == true ||
                 event.duringDialog == null && hasDialogAfter)) ||
         // Choices must NOT have any events after in order to fit in dialog
-        (event is YesOrNoChoice && isLast(i)),
+        (event is YesOrNoChoice &&
+            isLast(i) &&
+            _sceneEventType(event.ifNo) == null &&
+            _sceneEventType(event.ifYes) == null),
     (event, i, _) => event is Dialog && event.hidePanelsOnClose && isLast(i),
   ];
 
@@ -501,6 +508,13 @@ class SceneAsmGenerator implements EventVisitor {
 
     if (_lastEventInCurrentDialog != null &&
         _lastEventInCurrentDialog is! IfFlag) {
+      /*
+      This is because this is the implementation of this ctrl code:
+      TextCtrlCode_Event:
+        lea	$1(a0), a0
+        bra.w	RunText_CharacterLoop
+      i.e. a no-op.
+      */
       throw StateError('can only run events first or after IfFlag events '
           'but last event was $_lastEventInCurrentDialog');
     }
@@ -846,8 +860,8 @@ class SceneAsmGenerator implements EventVisitor {
         // TODO: need to approximate code size so we can handle jump distance
 
         // use event counter in case flag is checked again
-        var ifUnset = Label('${id}_${flag.name}_unset$i');
-        var ifSet = Label('${id}_${flag.name}_set$i');
+        var ifUnset = Label('.${flag.name}_unset$i');
+        var ifSet = Label('.${flag.name}_set$i');
 
         // For readability, set continue scene label based on what branches
         // there are.
@@ -855,7 +869,7 @@ class SceneAsmGenerator implements EventVisitor {
             ? ifSet
             : (ifFlag.isUnset.isEmpty
                 ? ifUnset
-                : Label('${id}_${flag.name}_cont$i'));
+                : Label('.${flag.name}_cont$i'));
 
         // memory may change while flag is set, so remember this to branch
         // off of for unset branch
@@ -1024,12 +1038,10 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void yesOrNoChoice(YesOrNoChoice yesNo) {
     _checkNotFinished();
-
     _generateQueueInCurrentMode();
-
     _runOrContinueDialog(yesNo, interruptDialog: false);
 
-    // We need to add the control code for yes-no choice.
+    // Trigger the yes-no choice window.
     _addToDialog(dc.b(ControlCodes.yesNo));
 
     // Create the dialog for the "yes" condition
@@ -1050,52 +1062,65 @@ class SceneAsmGenerator implements EventVisitor {
     // Save parent state to pop back to when done.
     var parent = _memory;
 
-    /*
-    Notes on events here:
-
-    If this requires terminating dialog and running event...
-    the event code may be triggered by either branch.
-    So it needs its own check for what the choice was.
-      tst.b	(Yes_No_Option).w
-    It also means if yes no choices are nested
-    we'd need to first run an event to test the current choice
-    before it gets overridden.
-    So for now, only supporting dialog inside yes/no.
-    This is all we need for the guild jobs.
-    */
-
     // Run no branch in current dialog tree (offset 0).
     var noBranch = _memory = parent.branch();
-    for (var d in yesNo.ifNo) {
-      // if (d is YesOrNoChoice) {
-      // we will lose the current value in memory
-      // so run test, then continue this in "no" branch
-      // }
-      dialog(d);
+    var eventAsmLength = _eventAsm.length;
+    var yesLbl = Label('.${_eventCounter}_yes_choice');
+    var continueLbl = Label('.${_eventCounter}_choice_continue');
+
+    void runBranch(List<Event> branch) {
+      for (var d in branch) {
+        if (d is YesOrNoChoice) {
+          throw UnimplementedError(
+              'nested yes or no choices are not supported');
+        }
+        d.visit(this);
+      }
     }
 
-    //if (!inDialogLoop) {
-      // add to event to branch to continue label
-    //}
+    if (_inEvent) {
+      // Preempt event code for "no" branch
+      _eventAsm.add(tst.b(Constant('Yes_No_Option').w));
+      _eventAsm.add(beq.w(yesLbl));
+      eventAsmLength = _eventAsm.length;
 
-    // Terminate no branch, run yes branch.
+      runBranch(yesNo.ifNo);
+
+      // Must terminate dialog first,
+      // since it may trigger some event code is written lazily.
+      _terminateDialog();
+
+      // Prempt event code for "yes" branch
+      if (_eventAsm.length == eventAsmLength) {
+        // If there was no "no" event code,
+        // then change logic to instead skip ahead if "no"
+        _eventAsm.replace(eventAsmLength - 1, bne.w(continueLbl.l));
+      } else {
+        // Otherwise, skip ahead at end of "no" branch
+        _eventAsm.add(bra.w(continueLbl));
+      }
+    } else {
+      runBranch(yesNo.ifNo);
+      _terminateDialog();
+    }
+
     // Note inclusion of setting the last dialog event, also.
     // This is the same last event as the no branch had,
     // and we must restore that for this branch.
     // Both branches act as if the other never happened,
     // since of course only one ever happens in-game.
-    _terminateDialog();
     _resetCurrentDialog(id: ifYesId, asm: ifYes, lastEventForDialog: yesNo);
-
     var yesBranch = _memory = parent.branch();
-    
-    for (var d in yesNo.ifYes) {
-      dialog(d);
-    }
+    _gameMode = Mode.dialog;
 
     if (_inEvent) {
+      _eventAsm.add(setLabel(yesLbl.name));
+      runBranch(yesNo.ifYes);
       _terminateDialog();
+      _eventAsm.add(setLabel(continueLbl.name));
+      // Add continue label for earlier jump
     } else {
+      runBranch(yesNo.ifYes);
       // If we're in dialog loop, we cannot do anything else after this.
       // Terminating both branches means we're done.
       finish();
@@ -1677,7 +1702,7 @@ class SceneAsmGenerator implements EventVisitor {
         }
 
         _eventAsm.add(comment('Finish'));
-        _eventAsm.add(returnFromDialogEvent());
+        _eventAsm.add(returnFromInteractionEvent());
 
         break;
 
@@ -1904,6 +1929,8 @@ class SceneAsmGenerator implements EventVisitor {
   /// called an "interrupt." If this is not the case, set
   /// [interruptDialog] to false.
   void _runOrContinueDialog(Event event, {bool interruptDialog = true}) {
+    // TODO: call generatequeueincurrentmode here instead of before calling this method
+
     _expectFacePlayerFirstIfInteraction();
 
     if (!inDialogLoop) {
@@ -2020,7 +2047,8 @@ class SceneAsmGenerator implements EventVisitor {
       if (_inEvent) {
         _gameMode = Mode.event;
       } else {
-        // we can't run in event, so do in dialog
+        // We can't run in event (because we're not in one),
+        // so do in dialog
         _generateQueueInCurrentMode();
       }
       _addToDialog(terminateDialog());
@@ -2048,7 +2076,11 @@ class SceneAsmGenerator implements EventVisitor {
     _resetCurrentDialog();
 
     if (_inEvent) {
-      // Now that we're not in dialog loop, generate
+      // Now that we're not in dialog loop, generate in event
+      // so we don't run events out of order.
+      // We prefer to generate in event rather than dialog,
+      // because dialog can only work if there is an event
+      // which should preceed a terminate cursor.
       _generateQueueInCurrentMode();
     }
   }
