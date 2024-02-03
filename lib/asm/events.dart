@@ -421,16 +421,20 @@ final eventFlags = BiMap<Constant, Byte>()
 final popdlg = cmd('popdlg', []);
 
 Asm vIntPrepareLoop(Word additionalFrames) {
-  return Asm([move.w(additionalFrames.i, d0), jsr(Label('VInt_PrepareLoop').l)]);
+  return Asm(
+      [move.w(additionalFrames.i, d0), jsr(Label('VInt_PrepareLoop').l)]);
 }
 
-Asm doMapUpdateLoop(Word frames) {
-  return Asm([move.w(frames.i, d0), jsr(Label('DoMapUpdateLoop').l)]);
+Asm doMapUpdateLoop(Word additionalFrames) {
+  return Asm([move.w(additionalFrames.i, d0), jsr(Label('DoMapUpdateLoop').l)]);
 }
 
 @Deprecated('currently broken, but interesting idea')
-Asm doInteractionUpdatesLoop(Word frames) {
-  return Asm([move.w(frames.i, d0), jsr(Label('DoInteractionUpdatesLoop').l)]);
+Asm doInteractionUpdatesLoop(Word additionalFrames) {
+  return Asm([
+    move.w(additionalFrames.i, d0),
+    jsr(Label('DoInteractionUpdatesLoop').l)
+  ]);
 }
 
 Asm dialogTreesToRAM(Address dialogTree) {
@@ -545,13 +549,15 @@ Asm moveCharacter({required Address x, required Address y}) {
 }
 
 /// Moves the object at address A4 by rate ([x] and [y]) and time
-/// ([frames] + 1)).
+/// ([additionalFrames] + 1)).
 Asm stepObject(
-    {required Address x, required Address y, required Address frames}) {
+    {required Address x,
+    required Address y,
+    required Address additionalFrames}) {
   return Asm([
     move.l(x, d0),
     move.l(y, d1),
-    move.l(frames, d2),
+    move.l(additionalFrames, d2),
     jsr(Label('Event_StepObject').l),
     setDestination(
         x: a4.indirect.plus(curr_x_pos), y: a4.indirect.plus(curr_y_pos))
