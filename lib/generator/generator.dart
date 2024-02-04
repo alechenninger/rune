@@ -1111,6 +1111,8 @@ class SceneAsmGenerator implements EventVisitor {
     // since of course only one ever happens in-game.
     _resetCurrentDialog(id: ifYesId, asm: ifYes, lastEventForDialog: yesNo);
     var yesBranch = _memory = parent.branch();
+
+    // We're back in dialog, for the next branch.
     _gameMode = Mode.dialog;
 
     if (_inEvent) {

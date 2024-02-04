@@ -30,6 +30,84 @@ main() {
   });
 
   group('yes no choice in interaction', () {
+    group('with dialog then event in branches', () {
+      // This time use a scene that ends in an event
+      setUp(() {
+        mapObject.onInteract = Scene([
+          Dialog.parse('Are you great?'),
+          YesOrNoChoice(
+            ifYes: [Dialog.parse('Great!'), Pause(1.second)],
+            ifNo: [Dialog.parse('Too bad.'), Pause(2.seconds)],
+          )
+        ]);
+      });
+
+      test('requires event at start of interaction', () {
+        var asm = program.addMap(map);
+        var dialogTree = program.dialogTrees.forMap(map.id);
+        expect(dialogTree, hasLength(3));
+        expect(
+            dialogTree[0],
+            DialogAsm([
+              runEvent(0.toWord),
+              dc.b([Byte(0xff)])
+            ]));
+
+        expect(
+            program.eventPointers.withoutComments(),
+            Asm([
+              dc.l([Label('Event_GrandCross_Test_Npc')])
+            ]));
+
+        expect(
+            asm.events.withoutComments().head(1),
+            Asm([
+              setLabel('Event_GrandCross_Test_Npc'),
+            ]));
+      });
+
+      test('event asm just runs event', () {
+        var asm = program.addMap(map);
+
+        expect(
+            asm.events.withoutComments().trim().skip(1),
+            Asm([
+              getAndRunDialog3LowDialogId(Byte(1).i),
+              tst.b(Constant('Yes_No_Option').w),
+              beq.w(Label('.2_yes_choice')),
+              generateEventAsm([Pause(2.seconds)]),
+              bra.w(Label('.2_choice_continue')),
+              setLabel('.2_yes_choice'),
+              generateEventAsm([Pause(1.seconds)]),
+              setLabel('.2_choice_continue'),
+              returnFromInteractionEvent(),
+            ]));
+      });
+
+      test('dialog terminates to run events', () {
+        program.addMap(map);
+        var dialogTree = program.dialogTrees.forMap(map.id);
+
+        expect(dialogTree, hasLength(3));
+        expect(
+            dialogTree[1].withoutComments(),
+            DialogAsm([
+              dc.b(Bytes.ascii("Are you great?")),
+              dc.b([Byte(0xf5)]),
+              dc.b([Byte(0x1), Byte(0)]),
+              dc.b(Bytes.ascii('Too bad.')),
+              dc.b([Byte(0xff)])
+            ]));
+
+        expect(
+            dialogTree[2].withoutComments(),
+            DialogAsm([
+              dc.b(Bytes.ascii('Great!')),
+              dc.b([Byte(0xff)])
+            ]));
+      });
+    });
+
     group('with event then dialog in branches generates', () {
       setUp(() {
         mapObject.onInteract = Scene([

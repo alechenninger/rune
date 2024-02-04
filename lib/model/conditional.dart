@@ -321,16 +321,22 @@ final silverSoliderEvents = [
 typedef Values = (ModelExpression, ModelExpression);
 
 class Condition {
+  final IMap<ChoiceId, bool> _choices;
   final IMap<EventFlag, bool> _flags;
   final IMap<Values, BranchCondition> _values;
 
-  Condition(Map<EventFlag, bool> flags, {Map<Values, BranchCondition>? values})
+  Condition(Map<EventFlag, bool> flags,
+      {Map<Values, BranchCondition>? values, Map<ChoiceId, bool>? choices})
       : _flags = flags.lock,
-        _values = (values ?? {}).lock;
+        _values = (values ?? {}).lock,
+        _choices = (choices ?? {}).lock;
 
   const Condition.empty()
       : _flags = const IMapConst({}),
-        _values = const IMapConst({});
+        _values = const IMapConst({}),
+        _choices = const IMapConst({});
+
+  Condition._(this._flags, this._values, this._choices);
 
   Iterable<EventFlag> get flagsSet => _flags.where((_, isSet) => isSet).keys;
 
@@ -339,22 +345,18 @@ class Condition {
 
   Condition withFlag(EventFlag flag, bool isSet) {
     if (this[flag] == isSet) return this;
-    return Condition(_flags.unlock
-      ..[flag] = isSet
-      ..lock);
+    return Condition._((_flags.unlock..[flag] = isSet).lock, _values, _choices);
   }
 
-  Condition withFlags(Map<EventFlag, bool> flags) => Condition(_flags.unlock
-    ..addAll(flags)
-    ..lock);
+  Condition withFlags(Map<EventFlag, bool> flags) =>
+      Condition._((_flags.unlock..addAll(flags)).lock, _values, _choices);
 
   Condition withSet(EventFlag flag) => withFlag(flag, true);
 
   Condition withNotSet(EventFlag flag) => withFlag(flag, false);
 
-  Condition without(EventFlag flag) => Condition(_flags.unlock
-    ..remove(flag)
-    ..lock);
+  Condition without(EventFlag flag) =>
+      Condition._((_flags.unlock..remove(flag)).lock, _values, _choices);
 
   Iterable<MapEntry<EventFlag, bool>> get entries => _flags.entries;
 
@@ -364,16 +366,20 @@ class Condition {
 
   bool isKnownUnset(EventFlag flag) => this[flag] == false;
 
-  BranchCondition? branchFor(Values operand) {
-    return _values[operand];
-  }
+  BranchCondition? branchFor(Values operand) => _values[operand];
+
+  bool? choiceFor(ChoiceId operand) => _choices[operand];
 
   Condition withBranch(Values operand, BranchCondition branch) {
     if (branchFor(operand) == branch) return this;
-    return Condition({},
-        values: _values.unlock
-          ..[operand] = branch
-          ..lock);
+    return Condition._(
+        _flags, (_values.unlock..[operand] = branch).lock, _choices);
+  }
+
+  Condition withChoice(ChoiceId operand, bool branch) {
+    if (choiceFor(operand) == branch) return this;
+    return Condition._(
+        _flags, _values, (_choices.unlock..[operand] = branch).lock);
   }
 
   /// This condition is satisfied by another condition
@@ -394,6 +400,9 @@ class Condition {
       // TODO: is equal comparison appropriate?
       // does eq or lt satisfy lte?
       if (other.branchFor(values) != branch) return false;
+    }
+    for (var MapEntry(key: choice, value: state) in _choices.entries) {
+      if (other.choiceFor(choice) != state) return false;
     }
     return true;
   }
@@ -417,6 +426,10 @@ class Condition {
       var current = branchFor(values);
       if (current != null && current != branch) return true;
     }
+    for (var MapEntry(key: choice, value: state) in other._choices.entries) {
+      var current = choiceFor(choice);
+      if (current != null && current != state) return true;
+    }
     return false;
   }
 
@@ -426,58 +439,97 @@ class Condition {
       other is Condition &&
           runtimeType == other.runtimeType &&
           _flags == other._flags &&
-          _values == other._values;
+          _values == other._values &&
+          _choices == other._choices;
 
   @override
-  int get hashCode => _flags.hashCode;
+  int get hashCode => _flags.hashCode ^ _values.hashCode ^ _choices.hashCode;
 
   @override
   String toString() {
-    return 'Condition{$_flags, $_values}';
+    return 'Condition{$_flags, $_values, $_choices}';
   }
 }
 
-sealed class SingleTypeCondition<T, U> {
+sealed class BranchableCondition<T, U> {
+  ValueCondition get branchOnValues;
+  EventFlagCondition get branchOnFlags;
+  ChoiceCondition get branchOnChoices;
   U? branchFor(T operand);
-  SingleTypeCondition<T, U> withBranch(T operand, U branch);
+  BranchableCondition<T, U> withBranch(T operand, U branch);
 }
 
-class ValueCondition extends SingleTypeCondition<Values, BranchCondition> {
+class ValueCondition extends BranchableCondition<Values, BranchCondition> {
   final Condition condition;
 
   ValueCondition(this.condition);
 
-  EventFlagCondition get flags => EventFlagCondition(condition);
+  @override
+  EventFlagCondition get branchOnFlags => EventFlagCondition(condition);
+
+  @override
+  ChoiceCondition get branchOnChoices => ChoiceCondition(condition);
+
+  @override
+  ValueCondition get branchOnValues => this;
 
   @override
   BranchCondition? branchFor(Values operand) {
-    return condition._values[operand];
+    return condition.branchFor(operand);
   }
 
   @override
   ValueCondition withBranch(Values operand, BranchCondition branch) {
     if (branchFor(operand) == branch) return this;
-    return ValueCondition(Condition({},
-        values: condition._values.unlock
-          ..[operand] = branch
-          ..lock));
+    return ValueCondition(condition.withBranch(operand, branch));
   }
 }
 
-class EventFlagCondition extends SingleTypeCondition<EventFlag, bool> {
+class EventFlagCondition extends BranchableCondition<EventFlag, bool> {
   final Condition condition;
 
   EventFlagCondition(this.condition);
 
-  ValueCondition get values => ValueCondition(condition);
+  @override
+  ValueCondition get branchOnValues => ValueCondition(condition);
+
+  @override
+  ChoiceCondition get branchOnChoices => ChoiceCondition(condition);
+
+  @override
+  EventFlagCondition get branchOnFlags => this;
 
   @override
   bool? branchFor(EventFlag operand) => condition[operand];
 
   @override
-  SingleTypeCondition<EventFlag, bool> withBranch(
+  BranchableCondition<EventFlag, bool> withBranch(
           EventFlag operand, bool branch) =>
       EventFlagCondition(condition.withFlag(operand, branch));
+}
+
+class ChoiceCondition extends BranchableCondition<ChoiceId, bool> {
+  final Condition condition;
+
+  ChoiceCondition(this.condition);
+
+  @override
+  EventFlagCondition get branchOnFlags => EventFlagCondition(condition);
+
+  @override
+  ValueCondition get branchOnValues => ValueCondition(condition);
+
+  @override
+  ChoiceCondition get branchOnChoices => this;
+
+  @override
+  bool? branchFor(ChoiceId operand) => condition.choiceFor(operand);
+
+  @override
+  ChoiceCondition withBranch(ChoiceId operand, bool branch) {
+    if (branchFor(operand) == branch) return this;
+    return ChoiceCondition(condition.withChoice(operand, branch));
+  }
 }
 
 class IfFlag extends Event {
@@ -713,5 +765,55 @@ class Branch {
   @override
   String toString() {
     return 'Branch{$condition, $events}';
+  }
+}
+
+class ChoiceId {
+  final String id;
+
+  const ChoiceId(this.id);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChoiceId && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() => id;
+}
+
+class YesOrNoChoice extends Event {
+  final ChoiceId? id;
+  final List<Event> ifYes;
+  final List<Event> ifNo;
+
+  YesOrNoChoice({this.id, this.ifYes = const [], this.ifNo = const []});
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.yesOrNoChoice(this);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is YesOrNoChoice &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          const ListEquality().equals(ifYes, other.ifYes) &&
+          const ListEquality().equals(ifNo, other.ifNo);
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      const ListEquality().hash(ifYes) ^
+      const ListEquality().hash(ifNo);
+
+  @override
+  String toString() {
+    return 'YesNo{$id, ifYes: $ifYes, ifNo: $ifNo}';
   }
 }

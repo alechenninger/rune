@@ -383,32 +383,3 @@ enum Portrait {
         .firstWhereOrNull((e) => e.name.toLowerCase() == name.toLowerCase());
   }
 }
-
-class YesOrNoChoice extends Event {
-  final List<Event> ifYes;
-  final List<Event> ifNo;
-
-  YesOrNoChoice({this.ifYes = const [], this.ifNo = const []});
-
-  @override
-  void visit(EventVisitor visitor) {
-    visitor.yesOrNoChoice(this);
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is YesOrNoChoice &&
-          runtimeType == other.runtimeType &&
-          const ListEquality().equals(ifYes, other.ifYes) &&
-          const ListEquality().equals(ifNo, other.ifNo);
-
-  @override
-  int get hashCode =>
-      const ListEquality().hash(ifYes) ^ const ListEquality().hash(ifNo);
-
-  @override
-  String toString() {
-    return 'YesNo{ifYes: $ifYes, ifNo: $ifNo}';
-  }
-}
