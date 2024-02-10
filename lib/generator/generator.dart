@@ -96,7 +96,7 @@ class Program {
     Word? cutsceneIndexOffset,
     Map<MapId, Word>? vramTileOffsets,
     Map<MapId, List<SpriteVramMapping>>? builtInSprites,
-  })  : _eventIndexOffset = eventIndexOffset ?? 0xa2.toWord,
+  })  : _eventIndexOffset = eventIndexOffset ?? 0xa3.toWord,
         _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord {
     _vramTileOffsets.addAll(vramTileOffsets ?? _defaultSpriteVramOffsets);
     _builtInSprites.addAll(builtInSprites ?? _defaultBuiltInSprites);
@@ -1094,7 +1094,7 @@ class SceneAsmGenerator implements EventVisitor {
       if (_eventAsm.length == eventAsmLength) {
         // If there was no "no" event code,
         // then change logic to instead skip ahead if "no"
-        _eventAsm.replace(eventAsmLength - 1, bne.w(continueLbl.l));
+        _eventAsm.replace(eventAsmLength - 1, bne.w(continueLbl));
       } else {
         // Otherwise, skip ahead at end of "no" branch
         _eventAsm.add(bra.w(continueLbl));
@@ -1663,9 +1663,9 @@ class SceneAsmGenerator implements EventVisitor {
     // because that would cause an unwanted interrupt
 
     var needToShowField =
-        _memory.onExitRunBattle != true && _memory.isFieldShown != true;
+        _memory.onExitRunBattle == false && _memory.isFieldShown == false;
     var needToHidePanels =
-        _memory.onExitRunBattle != true && (_memory.panelsShown ?? 0) > 0;
+        _memory.onExitRunBattle == false && (_memory.panelsShown ?? 0) > 0;
 
     switch ((_isProcessingInteraction, _eventType)) {
       case (true, EventType.cutscene):
@@ -1708,7 +1708,7 @@ class SceneAsmGenerator implements EventVisitor {
 
         break;
 
-      case (false, EventType _):
+      case (false, EventType()):
         _terminateDialog();
 
         if (needToShowField) {
@@ -2188,7 +2188,8 @@ class SceneAsmGenerator implements EventVisitor {
   void _addToEventOrDialog(Event event,
       {required void Function() inDialog,
       required Asm? Function(int eventIndex) inEvent,
-      void Function()? after}) {
+      void Function()? after,
+      bool interuptDialog = true}) {
     _checkNotFinished();
 
     generateEvent() {
@@ -2202,7 +2203,7 @@ class SceneAsmGenerator implements EventVisitor {
     } else {
       // may go either way
       _queuedGeneration.add(_QueuedGeneration(() {
-        _runOrContinueDialog(event);
+        _runOrContinueDialog(event, interruptDialog: interuptDialog);
         inDialog();
         after?.call();
       }, generateEvent));
