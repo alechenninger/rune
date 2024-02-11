@@ -258,6 +258,7 @@ abstract mixin class Speaker {
     Shopkeeper6,
     Shopkeeper7,
     HuntersGuildBartender,
+    MissingStudent,
   ];
 
   static final Map<String, Speaker> _byName = allSpeakers.groupFoldBy(
@@ -286,6 +287,8 @@ abstract mixin class Speaker {
   static final Shopkeeper7 = NpcSpeaker(Portrait.Shopkeeper7, 'Shopkeeper7');
   static final HuntersGuildBartender =
       NpcSpeaker(Portrait.Shopkeeper6, "Hunter's Guild bartender");
+  static final MissingStudent =
+      NpcSpeaker(Portrait.MissingStudent, 'Missing Student');
 
   @override
   String toString() => name;
