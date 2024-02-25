@@ -2282,7 +2282,7 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   /// Add to event code, switching to event from dialog if needed.
-  /// 
+  ///
   /// [generate] may update [_eventAsm] directly, and/or it may return
   /// [Asm] to be added to `_eventAsm`.
   void _addToEvent(Event event, dynamic Function(int eventIndex) generate) {
@@ -2940,6 +2940,12 @@ final _defaultBuiltInSprites = {
         tiles: 0x100,
         art: RomArt(label: Label('loc_14960C')),
         requiredVramTile: Word(0x3BA))
+  ],
+  MapId.KadaryChurch: [
+    SpriteVramMapping(
+        tiles: 0x11,
+        art: RomArt(label: Label('loc_151984')),
+        requiredVramTile: Word(0x413))
   ]
 };
 

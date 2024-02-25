@@ -1599,6 +1599,12 @@ final _fieldRoutines = _FieldRoutineRepository([
       Label('FieldObj_DorinChair'),
       spriteMappingTiles: 0x15,
       SpecFactory.asm(Word(0x1B0))),
+  FieldRoutine(
+    Word(0x12C),
+    Label('loc_48F96'),
+    spriteMappingTiles: 24,
+    SpecFactory.asm(Word(0x12C)),
+  )
 ]);
 
 class _FieldRoutineRepository {
