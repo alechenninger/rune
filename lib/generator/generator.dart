@@ -1743,8 +1743,8 @@ class SceneAsmGenerator implements EventVisitor {
             'event=$onNext');
       }
 
-      SceneAsmGenerator.forInteraction(
-          map, SceneId('${id.id}_next'), _dialogTrees, nextEvent, _eventRoutines!,
+      SceneAsmGenerator.forInteraction(map, SceneId('${id.id}_next'),
+          _dialogTrees, nextEvent, _eventRoutines!,
           eventFlags: _eventFlags, withObject: true)
         ..runEventFromInteractionIfNeeded(onNext.onInteract.events)
         ..scene(onNext.onInteract)
@@ -2281,7 +2281,11 @@ class SceneAsmGenerator implements EventVisitor {
     return _dialogTree!;
   }
 
-  void _addToEvent(Event event, Asm? Function(int eventIndex) generate) {
+  /// Add to event code, switching to event from dialog if needed.
+  /// 
+  /// [generate] may update [_eventAsm] directly, and/or it may return
+  /// [Asm] to be added to `_eventAsm`.
+  void _addToEvent(Event event, dynamic Function(int eventIndex) generate) {
     _checkNotFinished();
 
     var eventIndex = _eventCounter++;
@@ -2306,9 +2310,8 @@ class SceneAsmGenerator implements EventVisitor {
 
     var length = _eventAsm.length;
 
-    var returned = generate(eventIndex);
-    if (returned != null) {
-      _eventAsm.add(returned);
+    if (generate(eventIndex) case Asm asm) {
+      _eventAsm.add(asm);
     }
 
     if (_eventAsm.length > length) {
