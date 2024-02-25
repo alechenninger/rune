@@ -506,9 +506,12 @@ class Scene extends IterableBase<Event> {
   // see TODO on SetContext
   // have to hack around it
   Scene withoutSetContext() {
-    return Scene(_events
-        .whereNot((e) => e is SetContext)
-        .map((e) => e is IfFlag ? e.withoutSetContextInBranches() : e));
+    return Scene(
+        _events.whereNot((e) => e is SetContext).map((e) => switch (e) {
+              IfFlag e => e.withoutSetContextInBranches(),
+              OnNextInteraction e => e.withoutSetContext(),
+              _ => e,
+            }));
   }
 
   Scene asOf(Condition asOf) {
@@ -856,6 +859,16 @@ extension CollapseDialog on List<Event> {
         )
       ]);
     }
+  }
+}
+
+extension WithoutSetContext on List<Event> {
+  Iterable<Event> withoutSetContext() {
+    return whereNot((e) => e is SetContext).map((e) => switch (e) {
+          IfFlag e => e.withoutSetContextInBranches(),
+          OnNextInteraction e => e.withoutSetContext(),
+          _ => e,
+        });
   }
 }
 
