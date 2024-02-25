@@ -855,7 +855,7 @@ class Word extends SizedValue {
 }
 
 class Longword extends SizedValue {
-  Longword(int value) : super(value);
+  Longword(super.value);
   Longword.signed(int value) : super.signed(value, Size.l);
 
   factory Longword.concatBytes(Byte b1, Byte b2, Byte b3, Byte b4) {

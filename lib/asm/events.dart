@@ -44,6 +44,7 @@ y_move_boundary = $3F	; byte ; number of steps NPC's can take between 0 and the 
  */
 
 const facing_dir = Constant('facing_dir');
+const dialogue_id = Constant('dialogue_id');
 const art_tile = Constant('art_tile');
 const dest_x_pos = Constant('dest_x_pos');
 const dest_y_pos = Constant('dest_y_pos');

@@ -560,25 +560,19 @@ extension FieldObjectAsm on FieldObject {
 
     var obj = this;
     var slot = obj.slot(ctx);
+    var asm = switch ((slot, obj)) {
+      (var s?, _) => characterBySlotToA4(s),
+      (_, Character c) => characterByIdToA4(c.charIdAddress),
+      (_, MapObject o) => leaConstant(o.address(ctx), a4),
+      (_, MapObjectById o) => leaConstant(o.address(ctx), a4),
+      // TODO(movement): this could generalize to checking every a register
+      _ when ctx.inAddress(a3)?.obj == obj => lea(a3.indirect, a4),
+      _ => throw UnsupportedError('$this.toA4')
+    };
 
-    try {
-      if (slot != null) {
-        // Slot 1 indexed
-        return characterBySlotToA4(slot);
-      } else if (obj is Character) {
-        return characterByIdToA4(obj.charIdAddress);
-      } else if (obj is MapObjectById) {
-        var address = obj.address(ctx);
-        return lea(Absolute.long(address), a4);
-      } else if (obj is MapObject) {
-        var address = obj.address(ctx);
-        return lea(Absolute.long(address), a4);
-      } else if (ctx.inAddress(a3)?.obj == obj) {
-        // TODO(movement): this could generalize to checking every a register
-        return lea(a3.indirect, a4);
-      }
-
-      /*
+    ctx.putInAddress(a4, obj);
+    return asm;
+    /*
     notes:
 	jsr	(Event_GetCharacter).l
 	bmi.s	loc_6E212
@@ -595,11 +589,6 @@ extension FieldObjectAsm on FieldObject {
 
     that is, just use findcharslot directly.
      */
-
-      throw UnsupportedError('$this.toA4');
-    } finally {
-      ctx.putInAddress(a4, obj);
-    }
   }
 
   /// NOTE! May overwrite data registers.

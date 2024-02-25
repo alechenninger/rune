@@ -12,6 +12,7 @@ import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 import '../fixtures.dart';
+import '../fixtures.dart' as fixtures;
 
 void main() {
   late Program program;
@@ -22,15 +23,9 @@ void main() {
     map = GameMap(MapId.Test);
   });
 
-  EventAsm generateEventAsm(List<Event> events, [EventState? ctx]) {
-    var asm = EventAsm.empty();
-    var gen = SceneAsmGenerator.forEvent(SceneId('test'), DialogTrees(), asm)
-      ..setContext(setContext(ctx));
-    for (var e in events) {
-      e.visit(gen);
-    }
-    gen.finish();
-    return asm;
+  // Shim for backwards compat with fixture library
+  Asm generateEventAsm(List<Event> events, [EventState? ctx]) {
+    return fixtures.generateEventAsm(events, context: ctx, inMap: map);
   }
 
   group('a cursor separates', () {

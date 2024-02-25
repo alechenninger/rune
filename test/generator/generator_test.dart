@@ -1332,195 +1332,323 @@ loc_742A4:
     });
 
     group('top N', () {
-      test('instantly', () {});
+      test('instantly', () {}, skip: 'TODO');
     });
   });
 
-  group('change party', () {
-    test('1 slot', () {
-      var scene = Scene([
-        ChangeParty([rune], saveCurrentParty: false),
-      ]);
+  group('change party order', () {
+    group('during map load', () {
+      test('1 slot', () {
+        var scene = Scene([
+          LoadMap(
+              map: map,
+              facing: up,
+              startingPosition: Position(0x100, 0x100),
+              updateParty: ChangePartyOrder([rune], saveCurrentParty: false)),
+        ]);
 
-      var asm = Program()
-          .addScene(SceneId('testscene'), scene, startingMap: map)
-          .event
-          .withoutComments();
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
 
-      expect(
-          asm,
-          Asm([
-            Instruction.parse(
-                r'	move.l #((CharID_Rune<<24)|$FFFFFF), (Current_Party_Slots).w'),
-            move.b(Byte.max.i, Current_Party_Slot_5.w)
-          ]));
+        expect(
+            asm.head(3),
+            Asm([
+              Instruction.parse(
+                  r'	move.l #((CharID_Rune<<24)|$FFFFFF), (Current_Party_Slots).w'),
+              move.b(Byte.max.i, Current_Party_Slot_5.w),
+              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+            ]));
+      });
+
+      test('2 slots', () {
+        var scene = Scene([
+          LoadMap(
+              map: map,
+              facing: up,
+              startingPosition: Position(0x100, 0x100),
+              updateParty:
+                  ChangePartyOrder([rune, alys], saveCurrentParty: false)),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(
+            asm.head(3),
+            Asm([
+              Instruction.parse(
+                  r'	move.l #(((CharID_Rune<<24)|(CharID_Alys<<16))|$FFFF), (Current_Party_Slots).w'),
+              move.b(Byte.max.i, Current_Party_Slot_5.w),
+              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+            ]));
+      });
+
+      test('3 slots', () {
+        var scene = Scene([
+          LoadMap(
+              map: map,
+              facing: up,
+              startingPosition: Position(0x100, 0x100),
+              updateParty: ChangePartyOrder([rune, alys, hahn],
+                  saveCurrentParty: false)),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(
+            asm.head(3),
+            Asm([
+              Instruction.parse(
+                  r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|$FF), (Current_Party_Slots).w'),
+              move.b(Byte.max.i, Current_Party_Slot_5.w),
+              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+            ]));
+      });
+
+      test('4 slots', () {
+        var scene = Scene([
+          LoadMap(
+              map: map,
+              facing: up,
+              startingPosition: Position(0x100, 0x100),
+              updateParty: ChangePartyOrder([rune, alys, hahn, wren],
+                  saveCurrentParty: false)),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(
+            asm.head(3),
+            Asm([
+              Instruction.parse(
+                  r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+              move.b(Byte.max.i, Current_Party_Slot_5.w),
+              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+            ]));
+      });
+
+      test('5th slot requires another byte beyond longword', () {
+        var scene = Scene([
+          LoadMap(
+              map: map,
+              facing: up,
+              startingPosition: Position(0x100, 0x100),
+              updateParty: ChangePartyOrder([rune, alys, hahn, wren, raja],
+                  saveCurrentParty: false)),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(
+            asm.head(3),
+            Asm([
+              Instruction.parse(
+                  r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+              move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
+              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+            ]));
+      });
+
+      test('sets party order memory', () {
+        var scene = Scene([
+          // Load map reloads objects based on new order
+          LoadMap(
+              map: map,
+              startingPosition: Position(0x100, 0x110),
+              facing: up,
+              arrangement: PartyArrangement.belowLead,
+              updateParty: ChangePartyOrder([rune, alys, hahn, wren, raja],
+                  saveCurrentParty: false)),
+          RelativePartyMove(StepPath()
+            ..distance = 1.step
+            ..direction = up),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        var expected = Program()
+            .addScene(
+                SceneId('testscene'),
+                Scene([
+                  SetContext((ctx) {
+                    ctx.positions[Slot(1)] = Position(0x100, 0x110);
+                    ctx.positions[Slot(2)] = Position(0x100, 0x120);
+                    ctx.positions[Slot(3)] = Position(0x100, 0x130);
+                    ctx.positions[Slot(4)] = Position(0x100, 0x140);
+                    ctx.positions[Slot(5)] = Position(0x100, 0x150);
+                  }),
+                  IndividualMoves()
+                    ..moves[Slot(1)] = (StepPath()
+                      ..distance = 1.step
+                      ..direction = up)
+                    ..moves[Slot(2)] = (StepPath()
+                      ..distance = 1.step
+                      ..direction = up)
+                    ..moves[Slot(3)] = (StepPath()
+                      ..distance = 1.step
+                      ..direction = up)
+                    ..moves[Slot(4)] = (StepPath()
+                      ..distance = 1.step
+                      ..direction = up)
+                    ..moves[Slot(5)] = (StepPath()
+                      ..distance = 1.step
+                      ..direction = up)
+                ]))
+            .event
+            .withoutComments();
+
+        expect(asm.tail(expected.length), expected);
+      });
+
+      test('saves before changing if requested', () {
+        var scene = Scene([
+          LoadMap(
+              map: map,
+              facing: up,
+              startingPosition: Position(0x100, 0x100),
+              updateParty: ChangePartyOrder([rune, alys, hahn, wren, raja],
+                  saveCurrentParty: true)),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(
+            asm.head(5),
+            Asm([
+              move.l(Current_Party_Slots.w, Constant('Saved_Char_ID_Mem_1').w),
+              move.b(Current_Party_Slot_5.w, Constant('Saved_Char_ID_Mem_5').w),
+              Instruction.parse(
+                  r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+              move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
+              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+            ]));
+      });
+
+      test('restore saved party', () {
+        var scene = Scene([
+          LoadMap(
+              map: map,
+              facing: up,
+              startingPosition: Position(0x100, 0x100),
+              updateParty: RestoreSavedPartyOrder())
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(
+            asm.head(3),
+            Asm([
+              move.l(Constant('Saved_Char_ID_Mem_1').w, Current_Party_Slots.w),
+              move.b(Constant('Saved_Char_ID_Mem_5').w, Current_Party_Slot_5.w),
+              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+            ]));
+      });
     });
 
-    test('2 slots', () {
-      var scene = Scene([
-        ChangeParty([rune, alys], saveCurrentParty: false),
-      ]);
+    group('outside of map load', () {
+      test('swaps field objects and slots', () {
+        var scene = Scene([
+          ChangePartyOrder([rune, alys, hahn, wren, raja],
+              saveCurrentParty: false)
+        ]);
 
-      var asm = Program()
-          .addScene(SceneId('testscene'), scene, startingMap: map)
-          .event
-          .withoutComments();
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
 
-      expect(
-          asm,
-          Asm([
-            Instruction.parse(
-                r'	move.l #(((CharID_Rune<<24)|(CharID_Alys<<16))|$FFFF), (Current_Party_Slots).w'),
-            move.b(Byte.max.i, Current_Party_Slot_5.w)
-          ]));
-    });
+        expect(
+            asm,
+            Asm([
+              moveq(Constant('CharID_Rune').i, d0),
+              moveq(0.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+              moveq(Constant('CharID_Alys').i, d0),
+              moveq(1.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+              moveq(Constant('CharID_Hahn').i, d0),
+              moveq(2.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+              moveq(Constant('CharID_Wren').i, d0),
+              moveq(3.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+            ]));
+      });
 
-    test('3 slots', () {
-      var scene = Scene([
-        ChangeParty([rune, alys, hahn], saveCurrentParty: false),
-      ]);
+      test('swaps sparse update', () {
+        var scene = Scene([
+          ChangePartyOrder([rune], saveCurrentParty: false)
+        ]);
 
-      var asm = Program()
-          .addScene(SceneId('testscene'), scene, startingMap: map)
-          .event
-          .withoutComments();
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
 
-      expect(
-          asm,
-          Asm([
-            Instruction.parse(
-                r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|$FF), (Current_Party_Slots).w'),
-            move.b(Byte.max.i, Current_Party_Slot_5.w)
-          ]));
-    });
+        expect(
+            asm,
+            Asm([
+              moveq(Constant('CharID_Rune').i, d0),
+              moveq(0.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+            ]));
+      });
 
-    test('4 slots', () {
-      var scene = Scene([
-        ChangeParty([rune, alys, hahn, wren], saveCurrentParty: false),
-      ]);
+      test('restore saved party swaps only necessary members when known', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.slots[1] = rune;
+            ctx.slots[2] = alys;
+            ctx.slots[3] = hahn;
+            ctx.slots[4] = wren;
+            ctx.slots[5] = raja;
+            ctx.slots.setPartyOrder([alys, hahn, rune, wren, raja],
+                saveCurrent: true);
+          }),
+          RestoreSavedPartyOrder()
+        ]);
 
-      var asm = Program()
-          .addScene(SceneId('testscene'), scene, startingMap: map)
-          .event
-          .withoutComments();
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
 
-      expect(
-          asm,
-          Asm([
-            Instruction.parse(
-                r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
-            move.b(Byte.max.i, Current_Party_Slot_5.w)
-          ]));
-    });
-
-    test('5th slot requires another byte beyond longword', () {
-      var scene = Scene([
-        ChangeParty([rune, alys, hahn, wren, raja], saveCurrentParty: false),
-      ]);
-
-      var asm = Program()
-          .addScene(SceneId('testscene'), scene, startingMap: map)
-          .event
-          .withoutComments();
-
-      expect(
-          asm,
-          Asm([
-            Instruction.parse(
-                r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
-            move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
-          ]));
-    });
-
-    test('sets slot memory', () {
-      var scene = Scene([
-        ChangeParty([rune, alys, hahn, wren, raja], saveCurrentParty: false),
-        SetContext((ctx) {
-          ctx.positions[rune] = Position(0x100, 0x110);
-          ctx.positions[alys] = Position(0x100, 0x120);
-          ctx.positions[hahn] = Position(0x100, 0x130);
-          ctx.positions[wren] = Position(0x100, 0x140);
-          ctx.positions[raja] = Position(0x100, 0x150);
-        }),
-        RelativePartyMove(StepPath()
-          ..distance = 1.step
-          ..direction = up),
-      ]);
-
-      var asm = Program()
-          .addScene(SceneId('testscene'), scene, startingMap: map)
-          .event
-          .withoutComments();
-
-      var expected = Program()
-          .addScene(
-              SceneId('testscene'),
-              Scene([
-                SetContext((ctx) {
-                  ctx.positions[Slot(1)] = Position(0x100, 0x110);
-                  ctx.positions[Slot(2)] = Position(0x100, 0x120);
-                  ctx.positions[Slot(3)] = Position(0x100, 0x130);
-                  ctx.positions[Slot(4)] = Position(0x100, 0x140);
-                  ctx.positions[Slot(5)] = Position(0x100, 0x150);
-                }),
-                IndividualMoves()
-                  ..moves[Slot(1)] = (StepPath()
-                    ..distance = 1.step
-                    ..direction = up)
-                  ..moves[Slot(2)] = (StepPath()
-                    ..distance = 1.step
-                    ..direction = up)
-                  ..moves[Slot(3)] = (StepPath()
-                    ..distance = 1.step
-                    ..direction = up)
-                  ..moves[Slot(4)] = (StepPath()
-                    ..distance = 1.step
-                    ..direction = up)
-                  ..moves[Slot(5)] = (StepPath()
-                    ..distance = 1.step
-                    ..direction = up)
-              ]))
-          .event
-          .withoutComments();
-
-      expect(asm.tail(expected.length), expected);
-    });
-
-    test('saves before changing if requested', () {
-      var scene = Scene([
-        ChangeParty([rune, alys, hahn, wren, raja], saveCurrentParty: true),
-      ]);
-
-      var asm = Program()
-          .addScene(SceneId('testscene'), scene, startingMap: map)
-          .event
-          .withoutComments();
-
-      expect(
-          asm,
-          Asm([
-            move.l(Current_Party_Slots.w, Constant('Saved_Char_ID_Mem_1').w),
-            move.b(Current_Party_Slot_5.w, Constant('Saved_Char_ID_Mem_5').w),
-            Instruction.parse(
-                r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
-            move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
-          ]));
-    });
-
-    test('restore saved party', () {
-      var scene = Scene([RestoreSavedParty()]);
-
-      var asm = Program()
-          .addScene(SceneId('testscene'), scene, startingMap: map)
-          .event
-          .withoutComments();
-
-      expect(
-          asm,
-          Asm([
-            move.l(Constant('Saved_Char_ID_Mem_1').w, Current_Party_Slots.w),
-            move.b(Constant('Saved_Char_ID_Mem_5').w, Current_Party_Slot_5.w)
-          ]));
+        expect(
+            asm,
+            Asm([
+              move.b(Constant('Saved_Char_ID_Mem_1').w, d0),
+              moveq(0.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+              move.b(Constant('Saved_Char_ID_Mem_2').w, d0),
+              moveq(1.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+              move.b(Constant('Saved_Char_ID_Mem_3').w, d0),
+              moveq(2.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+            ]));
+      });
     });
   });
 

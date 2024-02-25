@@ -10,6 +10,12 @@ import 'package:test/test.dart';
 import '../fixtures.dart';
 
 void main() {
+  late GameMap testMap;
+
+  setUp(() {
+    testMap = GameMap(MapId.Test);
+  });
+
   Asm generate(List<Event> events, {GameMap? inMap}) {
     var asm = EventAsm.empty();
     var generator = SceneAsmGenerator.forEvent(
@@ -618,7 +624,7 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
@@ -651,7 +657,7 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
@@ -690,7 +696,7 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
@@ -733,14 +739,14 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
               characterBySlotToA4(1),
               doMapUpdateLoop(Word(7 /*8 frames per step?*/)),
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(Word(0x90).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
@@ -764,7 +770,7 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(0x50.toWord.i, dest_x_pos(a4)),
               move.w(0x60.toWord.i, dest_y_pos(a4)),
@@ -791,12 +797,12 @@ void main() {
             Asm([
               label(Label(
                   '.wait_for_movement_MapObjecttestnpc_1_MapObjecttestnpc_0')),
-              lea(0xFFFFC300.l, a4),
+              lea(0xFFFFC300.w, a4),
               jsr(Label('FieldObj_NPCType2').l),
               jsr(Label('Field_LoadSprites').l),
               jsr(Label('Field_BuildSprites').l),
               jsr(Label('VInt_Prepare').l),
-              lea(0xFFFFC300.l, a4),
+              lea(0xFFFFC300.w, a4),
               moveq(0.i, d0),
               move.w(x_step_duration(a4), d0),
               or.w(y_step_duration(a4), d0),
@@ -828,7 +834,7 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
@@ -857,7 +863,7 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
@@ -865,7 +871,7 @@ void main() {
               followLeader(false),
               characterByNameToA4('Chaz'),
               moveCharacter(x: Word(0x60).i, y: Word(0x60).i),
-              lea(0xFFFFC300.toLongword.l, a4),
+              lea(0xFFFFC300.w, a4),
               move.w(npc.routine.index.i, a4.indirect),
               jsr(npc.routine.label.l),
             ]));
@@ -941,6 +947,54 @@ void main() {
             characterByIdToA4(alys.charIdAddress),
             updateObjFacing(up.address),
           ]));
+    });
+
+    group('just facing', () {
+      test('generates in event if followed by event', () {
+        var scene = Scene([
+          Dialog.parse('test'),
+          IndividualMoves()..moves[shay] = Face(right),
+          Pause(1.second, duringDialog: false)
+        ]);
+
+        var program = Program();
+        var sceneAsm =
+            program.addScene(SceneId('testscene'), scene, startingMap: testMap);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              getAndRunDialog3LowDialogId(0.toByte.i),
+              characterByIdToA4(shay.charIdAddress),
+              updateObjFacing(right.address),
+              generateEventAsm([Pause(1.second)]),
+            ]));
+      });
+
+      test('generates in event if followed by event after facing in dialog',
+          () {
+        var scene = Scene([
+          SetContext((ctx) => ctx.setFacing(shay, right)),
+          Dialog.parse('test1'),
+          IndividualMoves()..moves[shay] = Face(up),
+          Dialog.parse('test2'),
+          IndividualMoves()..moves[shay] = Face(right),
+          Pause(1.second, duringDialog: false),
+        ]);
+
+        var program = Program();
+        var sceneAsm =
+            program.addScene(SceneId('testscene'), scene, startingMap: testMap);
+
+        expect(
+            sceneAsm.event.withoutComments().trim(),
+            Asm([
+              getAndRunDialog3LowDialogId(0.toByte.i),
+              characterByIdToA4(shay.charIdAddress),
+              updateObjFacing(right.address),
+              generateEventAsm([Pause(1.second)]),
+            ]));
+      });
     });
   });
 

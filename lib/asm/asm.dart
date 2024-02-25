@@ -66,6 +66,15 @@ Asm comment(String comment) => Asm.fromInstructions(LineSplitter.split(comment)
     .map((e) => _Instruction(comment: comment))
     .toList(growable: false));
 
+/// Since the constant value of the source address is known,
+/// chooses the most efficient addressing mode.
+Asm leaConstant(Longword src, Address dst) {
+  if (src.value == Size.l.maxValue + src.lowerWord.signedValue + 1) {
+    return lea(Absolute.word(src), a4);
+  }
+  return lea(Absolute.long(src), a4);
+}
+
 Asm lea(Address src, Address dst) => cmd('lea', [src, dst]);
 Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
 

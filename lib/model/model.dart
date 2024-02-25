@@ -3,6 +3,7 @@ import 'dart:core';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:rune/model/battle.dart';
@@ -220,9 +221,10 @@ abstract class EventVisitor {
   void stopMusic(StopMusic stopMusic);
   void addMoney(AddMoney addMoney);
   void resetObjectRoutine(ResetObjectRoutine resetRoutine);
-  void changeParty(ChangeParty changeParty);
-  void restoreSavedParty(RestoreSavedParty restoreParty);
+  void changeParty(ChangePartyOrder changeParty);
+  void restoreSavedParty(RestoreSavedPartyOrder restoreParty);
   void onExitRunBattle(OnExitRunBattle setExit);
+  void onNextInteraction(OnNextInteraction onNext);
 }
 
 class EventState {
@@ -248,7 +250,7 @@ class EventState {
   late final Positions _positions;
   Positions get positions => _positions;
 
-  /// 1-indexed (zero is invalid).
+  /// Character field objects by slot. 1-indexed (zero is invalid).
   final Slots slots = Slots._();
 
   Axis? startingAxis = Axis.x;
@@ -286,16 +288,21 @@ class EventState {
   int? slotFor(Character c) => slots.slotFor(c);
 
   /// 1-indexed (first slot is 1, there is no slot 0).
-  void setSlot(int slot, Character c) => slots[slot] = c;
+  void setSlot(int slot, Character c) {
+    slots[slot] = c;
+  }
 
   /// 1-indexed (first slot is 1, there is no slot 0).
   void clearSlot(int slot) => slots[slot] = null;
 
+  /// FIXME: this is not reliable
   int get numCharacters => slots.numCharacters;
 
   void addCharacter(Character c,
       {int? slot, Position? position, Direction? facing}) {
-    if (slot != null) slots[slot] = c;
+    if (slot != null) {
+      slots[slot] = c;
+    }
     if (position != null) positions[c] = position;
     if (facing != null) _facing[c] = facing;
   }
@@ -345,36 +352,116 @@ class Positions {
 
 class Slots {
   /// 1-indexed (first is 1; 0 is invalid)
-  final _slots = BiMap<int, Character>();
+  final _fieldObjects = BiMap<int, Character>();
+
+  /// Party order (not necessarily the same as field objects).
+  final _party = BiMap<int, Character>();
+  IMap<int, Character>? _priorParty;
 
   static const all = [1, 2, 3, 4, 5];
 
   Slots._();
 
+  /// Whether or not field objects order is consistent with party order.
+  bool get isConsistent =>
+      const MapEquality<int, Character>().equals(_fieldObjects, _party);
+  bool get isNotConsistent => !isConsistent;
+
   void addAll(Slots slots) {
-    _slots.addAll(slots._slots);
+    _fieldObjects.addAll(slots._fieldObjects);
   }
 
   void forEach(Function(int, Character) func) {
-    _slots.forEach(func);
+    _fieldObjects.forEach(func);
   }
 
   /// 1-indexed (first slot is 1, there is no slot 0).
-  Character? operator [](int slot) => _slots[slot];
+  Character? operator [](int slot) => _fieldObjects[slot];
 
-  /// 1-indexed (first slot is 1, there is no slot 0).
-  void operator []=(int slot, Character? c) {
-    if (c == null) {
-      _slots.remove(slot);
-    } else {
-      _slots[slot] = c;
+  Character? party(int slot) => _party[slot];
+
+  void setPartyOrder(List<Character?> party, {bool saveCurrent = false}) {
+    if (saveCurrent) {
+      _priorParty = _party.toIMap();
+    }
+
+    _party.clear();
+
+    for (var i = 0; i < party.length; i++) {
+      var member = party[i];
+      if (member == null) continue;
+      var slot = _party.inverse.remove(member);
+      if (slot != null) {
+        var swapped = _party[i + 1];
+        if (swapped != null) {
+          _party[slot] = swapped;
+        }
+      }
+      _party[i + 1] = member;
+    }
+  }
+
+  void restorePreviousParty(
+      [Function(int index, Character? prior, Character? current)? onRestore]) {
+    if (_priorParty != null) {
+      for (var i = 1; i <= 5; i++) {
+        var prior = _priorParty![i];
+        var current = _party[i];
+        onRestore?.call(i, prior, current);
+        if (prior == null) {
+          _party.remove(i);
+        } else {
+          _party.inverse.remove(prior);
+          _party[i] = prior;
+        }
+      }
+      _priorParty = null;
     }
   }
 
   /// 1-indexed (first slot is 1, there is no slot 0).
-  int? slotFor(Character c) => _slots.inverse[c];
+  void operator []=(int slot, Character? c) {
+    if (c == null) {
+      _fieldObjects.remove(slot);
+      _party.remove(slot);
+    } else {
+      _fieldObjects[slot] = c;
+      _party[slot] = c;
+    }
+  }
 
-  int get numCharacters => _slots.keys.reduce(max);
+  /// 1-indexed (first slot is 1, there is no slot 0).
+  int? slotFor(Character c) => _fieldObjects.inverse[c];
+
+  int get numCharacters => _fieldObjects.keys.reduce(max);
+
+  void unknownPartyOrder() {
+    _party.clear();
+  }
+
+  void unknownPriorPartyOrder() {
+    _priorParty = null;
+  }
+
+  bool hasPartyOrder(Map<int, Character?> order) {
+    for (var MapEntry(key: slot, value: character) in order.entries) {
+      if (_party[slot] != character) return false;
+    }
+    return true;
+  }
+
+  bool priorSameAsCurrent() {
+    if (_priorParty == null) return false;
+    if (_priorParty!.length != _party.length) return false;
+    return const MapEquality<int, Character>()
+        .equals(_priorParty!.unlockView, _party);
+  }
+
+  /// Resets character objects from party order.
+  void reloadObjects() {
+    _fieldObjects.clear();
+    _fieldObjects.addAll(_party);
+  }
 }
 
 class Scene extends IterableBase<Event> {
@@ -620,7 +707,7 @@ class Scene extends IterableBase<Event> {
   ///
   /// Advancing to the next branch in sequence can be controlled however
   /// by setting the [advanceSequenceWhenSet] flag. If provided, advancing the
-  /// sequence will be conditional on the `createSequenceWhenSet` flag.
+  /// sequence will be conditional on the `advanceSequenceWhenSet` flag.
   void addBranch(Iterable<Event> branch,
       {required EventFlag whenSet,
       bool createSequence = false,

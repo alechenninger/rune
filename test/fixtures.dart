@@ -2,10 +2,12 @@ import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/model/model.dart';
 
-Asm generateEventAsm(List<Event> events, [EventState? ctx]) {
+Asm generateEventAsm(List<Event> events,
+    {EventState? context, GameMap? inMap}) {
   var asm = EventAsm.empty();
-  var gen = SceneAsmGenerator.forEvent(SceneId('test'), DialogTrees(), asm)
-    ..setContext(setContext(ctx));
+  var gen = SceneAsmGenerator.forEvent(SceneId('test'), DialogTrees(), asm,
+      startingMap: inMap)
+    ..setContext(setContext(context));
   for (var e in events) {
     e.visit(gen);
   }

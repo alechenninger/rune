@@ -390,9 +390,10 @@ class SceneAsmGenerator implements EventVisitor {
   final DialogTrees _dialogTrees;
   final EventFlags _eventFlags;
   final EventAsm _eventAsm;
+  final _subroutines = <Asm>[];
+
   // required if processing interaction (see todo on ctor)
   EventRoutines? _eventRoutines;
-  //final Byte _dialogIdOffset;
 
   Mode _gameMode = Mode.event;
   bool get inDialogLoop => _gameMode == Mode.dialog;
@@ -603,7 +604,20 @@ class SceneAsmGenerator implements EventVisitor {
     if (facing != null &&
         (dialogAsm = _faceInDialog(facing, memory: _memory)) != null) {
       _addToEventOrDialog(moves,
-          inDialog: () => _addToDialog(dialogAsm!),
+          inDialog: () {
+            _addToDialog(dialogAsm!);
+
+            for (var MapEntry(key: obj, value: dir) in facing.entries) {
+              switch (dir.known(_memory)) {
+                case null:
+                  _memory.clearFacing(obj);
+                  break;
+                case var dir:
+                  _memory.setFacing(obj, dir);
+                  break;
+              }
+            }
+          },
           inEvent: (i) => moves.toAsm(_memory, eventIndex: i));
     } else {
       _addToEvent(moves, (i) => moves.toAsm(_memory, eventIndex: i));
@@ -1259,6 +1273,58 @@ class SceneAsmGenerator implements EventVisitor {
     var alignByte = arrangement.toAsm;
 
     _addToEvent(loadMap, (eventIndex) {
+      switch (loadMap.updateParty) {
+        case ChangePartyOrder changeParty:
+          if (changeParty.saveCurrentParty) {
+            _eventAsm.add(saveCurrentPartySlots());
+          }
+
+          var newParty = changeParty.party;
+
+          var first = newParty.first;
+
+          if (first == null) {
+            throw UnimplementedError(
+                'party update on load map cannot be sparse');
+          }
+
+          Expression firstFourSlots = first.charId << 24.toValue;
+          Expression fifthSlot = 0xFF.toByte;
+
+          for (var i = 1; i < newParty.length; i++) {
+            var member = newParty[i];
+            if (member == null) {
+              throw UnimplementedError(
+                  'party update on load map cannot be sparse');
+            }
+            if (i < 4) {
+              firstFourSlots =
+                  firstFourSlots | (member.charId << (24 - (i * 8)).toValue);
+            } else {
+              fifthSlot = member.charId;
+            }
+          }
+
+          if (newParty.length < 4) {
+            // Fill remaining slots with bytes (8 bits each)
+            var shift = (newParty.length - 1) * 8;
+            firstFourSlots = firstFourSlots | (0xFFFFFF >> shift).toValue;
+          }
+
+          _eventAsm.add(move.l(firstFourSlots.i, Current_Party_Slots.w));
+          _eventAsm.add(move.b(fifthSlot.i, Current_Party_Slot_5.w));
+
+          _memory.slots.setPartyOrder(newParty,
+              saveCurrent: changeParty.saveCurrentParty);
+          break;
+        case RestoreSavedPartyOrder():
+          _memory.slots.restorePreviousParty();
+          _eventAsm.add(restoreSavedPartySlots());
+          break;
+        case null:
+          break;
+      }
+
       if (loadMap.showField) {
         if (_memory.isDisplayEnabled == false) {
           if (_memory.isMapInCram != false) {
@@ -1297,13 +1363,19 @@ class SceneAsmGenerator implements EventVisitor {
     // Due to new map, clear known positions.
     //TODO: _memory.clearAllFacing();
     _memory.positions.clear();
+    _memory.slots.reloadObjects();
 
-    // If party slots are known, reposition party in memory using
-    // the new position and arrangement.
-    for (var i = 1; i < 5; i++) {
-      if (_memory.slots[i] case Character c) {
-        _memory.positions[c] = arrangement.offsets[i - 1] + startPos;
-      }
+    for (var i = 1; i <= 5; i++) {
+      // If party slots are known, reposition party in memory using
+      // the new position and arrangement.
+      var obj = switch (_memory.slots[i]) {
+        Character c => c,
+        // TODO(loadmap): take into account num characters
+        null when i == 1 => Slot(i),
+        null => null,
+      };
+      if (obj == null) continue;
+      _memory.positions[obj] = arrangement.offsets[i - 1] + startPos;
     }
   }
 
@@ -1564,7 +1636,9 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
-  void changeParty(ChangeParty changeParty) {
+  // TODO: we cannot support add here any more.
+  // this is only swap order. add has to accompany a load map
+  void changeParty(ChangePartyOrder changeParty) {
     _checkNotFinished();
 
     _addToEvent(changeParty, (_) {
@@ -1573,44 +1647,49 @@ class SceneAsmGenerator implements EventVisitor {
       }
 
       var newParty = changeParty.party;
-      _memory.setSlot(1, newParty.first);
 
-      Expression firstFourSlots = newParty.first.charId << 24.toValue;
-      Expression fifthSlot = 0xFF.toByte;
-
-      for (var i = 1; i < newParty.length; i++) {
+      bool partial = false;
+      for (var i = 0; i < newParty.length; i++) {
         var member = newParty[i];
-        // TODO: technically this doesn't take affect right away i don't think
-        _memory.setSlot(i + 1, member);
-        if (i < 4) {
-          firstFourSlots =
-              firstFourSlots | (member.charId << (24 - (i * 8)).toValue);
-        } else {
-          fifthSlot = member.charId;
+        if (member == null) {
+          partial = true;
+          continue;
         }
+        if (!partial && i == 4) {
+          // Last party member can be skipped.
+          // Due to swapping, the last member
+          // must already be in the right place.
+          // TODO: if we know actual party length,
+          //  we can make this a little smarter.
+          continue;
+        }
+        _eventAsm.add(Asm([
+          moveq(member.charId.i, d0),
+          moveq(i.i, d1),
+          jsr(Label('Event_SwapCharacter').l),
+        ]));
       }
 
-      if (newParty.length < 4) {
-        // Fill remaining slots with bytes (8 bits each)
-        var shift = (newParty.length - 1) * 8;
-        firstFourSlots = firstFourSlots | (0xFFFFFF >> shift).toValue;
-      }
+      _memory.slots
+          .setPartyOrder(newParty, saveCurrent: changeParty.saveCurrentParty);
 
-      _eventAsm.add(move.l(firstFourSlots.i, Current_Party_Slots.w));
-      _eventAsm.add(move.b(fifthSlot.i, Current_Party_Slot_5.w));
+      return null;
     });
   }
 
   @override
-  void restoreSavedParty(RestoreSavedParty restoreParty) {
+  void restoreSavedParty(RestoreSavedPartyOrder restoreParty) {
     _checkNotFinished();
     _addToEvent(restoreParty, (_) {
-      _memory.clearSlot(1);
-      _memory.clearSlot(2);
-      _memory.clearSlot(3);
-      _memory.clearSlot(4);
-      _memory.clearSlot(5);
-      return restoreSavedPartySlots();
+      _memory.slots.restorePreviousParty((i, prior, current) {
+        if (prior == current) return;
+        _eventAsm.add(Asm([
+          move.b((Constant('Saved_Char_ID_Mem_$i').w), d0),
+          moveq((i - 1).i, d1),
+          jsr(Label('Event_SwapCharacter').l),
+        ]));
+      });
+      return null;
     });
   }
 
@@ -1640,20 +1719,71 @@ class SceneAsmGenerator implements EventVisitor {
     });
   }
 
-  void finish({bool appendNewline = false}) {
+  @override
+  void onNextInteraction(OnNextInteraction onNext) {
+    _checkNotFinished();
+
+    _addToEvent(onNext, (_) {
+      // Generate the new interaction,
+      // which may introduce its own subroutine its own event or cutscene.
+      var tree = _currentDialogTree();
+      var nextDialogId = tree.nextDialogIdOrThrow();
+      var map = _memory.currentMap;
+      var nextEvent = EventAsm.empty();
+
+      if (map == null) {
+        throw StateError('current map not set; cannot generate '
+            'interaction dialog for onNextInteraction. '
+            'event=$onNext');
+      }
+
+      if (_eventRoutines == null) {
+        throw StateError('event routines not set; cannot generate '
+            'interaction dialog for onNextInteraction. '
+            'event=$onNext');
+      }
+
+      SceneAsmGenerator.forInteraction(
+          map, SceneId('${id.id}_next'), _dialogTrees, nextEvent, _eventRoutines!,
+          eventFlags: _eventFlags, withObject: true)
+        ..runEventFromInteractionIfNeeded(onNext.onInteract.events)
+        ..scene(onNext.onInteract)
+        ..finish(appendNewline: true, validateDialogTree: false);
+
+      if (tree.length <= nextDialogId.value) {
+        throw StateError("no interaction dialog generated");
+      }
+
+      if (nextEvent.trim() case var event when event.isNotEmpty) {
+        _subroutines.add(event);
+      }
+
+      // Update map elements' dialog ID's
+      for (var objId in onNext.withObjects) {
+        var obj = map.object(objId);
+        if (obj == null) {
+          throw StateError('cannot set dialog for non-existent map element. '
+              'object_id=$objId current_map=${map.id}');
+        }
+
+        _eventAsm.add(Asm([
+          obj.toA4(_memory),
+          move.b(nextDialogId.i, dialogue_id(a4)),
+        ]));
+      }
+    });
+  }
+
+  void finish({bool appendNewline = false, bool validateDialogTree = true}) {
     // todo: also apply all changes for current mem across graph
     // not sure if still need to do this
     // seems useless because memory won't ever be consulted again after
     // finishing
 
     if (!_finished) {
-      _finish(appendNewline: false);
-      _dialogTree?.finish();
+      _finish(appendNewline: appendNewline);
+      if (validateDialogTree) _dialogTree?.validate();
       _finished = true;
-    }
-
-    if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
-      _eventAsm.addNewline();
     }
   }
 
@@ -1745,6 +1875,14 @@ class SceneAsmGenerator implements EventVisitor {
 
     if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
       _eventAsm.addNewline();
+    }
+
+    for (var subroutine in _subroutines) {
+      _eventAsm.add(subroutine);
+
+      if (appendNewline) {
+        _eventAsm.addNewline();
+      }
     }
   }
 
@@ -2354,10 +2492,11 @@ class DialogTree extends IterableBase<DialogAsm> {
   void addAll(List<DialogAsm> dialog) => dialog.forEach(add);
 
   // todo: rename; somewhat misleading. more like "done with what's there"
-  void finish() {
+  void validate() {
     for (var dialog in _dialogs) {
       if (dialog.dialogs != 1) {
-        throw ArgumentError.value(dialog, 'dialog', '.dialogs must be == 1');
+        throw ArgumentError.value(
+            dialog.dialogs, 'dialog.dialogs', 'must == 1');
       }
     }
   }
@@ -2365,6 +2504,10 @@ class DialogTree extends IterableBase<DialogAsm> {
   /// The ID of the next dialog that would be added.
   Byte? get nextDialogId =>
       _dialogs.length > Size.b.maxValue ? null : _dialogs.length.toByte;
+
+  Byte nextDialogIdOrThrow() {
+    return nextDialogId ?? (throw StateError('no more dialog can fit'));
+  }
 
   DialogAsm operator [](int index) {
     return _dialogs[index];
@@ -2381,7 +2524,7 @@ class DialogTree extends IterableBase<DialogAsm> {
   }
 
   Asm toAsm({bool ensureFinished = true}) {
-    if (ensureFinished) finish();
+    if (ensureFinished) validate();
 
     var all = Asm.empty();
 

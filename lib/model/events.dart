@@ -101,7 +101,7 @@ class Pause extends Event {
       identical(this, other) ||
       other is Pause &&
           runtimeType == other.runtimeType &&
-          duration == other.duration && 
+          duration == other.duration &&
           duringDialog == other.duringDialog;
 
   @override
@@ -142,6 +142,7 @@ class LoadMap extends Event {
   final Position startingPosition;
   final Direction facing;
   final PartyArrangement arrangement;
+  final PartyEvent? updateParty;
 
   /// This controls whether the field stays faded (`false`),
   /// allowing a fade in event,
@@ -153,6 +154,7 @@ class LoadMap extends Event {
       required this.startingPosition,
       required this.facing,
       PartyArrangement? arrangement,
+      this.updateParty,
       this.showField = false})
       : arrangement = arrangement ?? PartyArrangement.overlapping;
 
@@ -167,7 +169,11 @@ class LoadMap extends Event {
       other is LoadMap &&
           runtimeType == other.runtimeType &&
           map == other.map &&
-          showField == other.showField;
+          showField == other.showField &&
+          startingPosition == other.startingPosition &&
+          facing == other.facing &&
+          arrangement == other.arrangement &&
+          updateParty == other.updateParty;
 
   @override
   int get hashCode => map.hashCode ^ showField.hashCode;

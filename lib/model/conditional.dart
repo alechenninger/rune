@@ -817,3 +817,35 @@ class YesOrNoChoice extends Event {
     return 'YesNo{$id, ifYes: $ifYes, ifNo: $ifNo}';
   }
 }
+
+/// Updates the next interaction for some map elements, which are reset back
+/// to their original interaction when the map is reloaded.`
+class OnNextInteraction extends Event {
+  final List<MapObjectId> withObjects;
+  final Scene onInteract;
+
+  OnNextInteraction(
+      {required this.withObjects, this.onInteract = const Scene.none()});
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.onNextInteraction(this);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OnNextInteraction &&
+          runtimeType == other.runtimeType &&
+          const ListEquality().equals(withObjects, other.withObjects) &&
+          onInteract == other.onInteract;
+
+  @override
+  int get hashCode =>
+      const ListEquality().hash(withObjects) ^ onInteract.hashCode;
+
+  @override
+  String toString() {
+    return 'OnNextInteractionInMap{$withObjects, onInteract: $onInteract}';
+  }
+}

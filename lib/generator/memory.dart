@@ -328,10 +328,53 @@ class _Slots implements Slots {
   void forEach(Function(int slot, Character c) func) {
     _memory._eventState.slots.forEach(func);
   }
+
+  @override
+  Character? party(int slot) => _memory._eventState.slots.party(slot);
+
+  @override
+  void setPartyOrder(List<Character?> party, {bool saveCurrent = false}) {
+    _memory._apply(SetPartyOrder(party, saveCurrent: saveCurrent));
+  }
+
+  @override
+  bool hasPartyOrder(Map<int, Character?> order) {
+    return _memory._eventState.slots.hasPartyOrder(order);
+  }
+
+  @override
+  void unknownPartyOrder() {
+    _memory._apply(UnknownPartyOrder());
+  }
+
+  @override
+  void reloadObjects() {
+    _memory._apply(ReloadObjectsInSlots());
+  }
+
+  @override
+  bool get isConsistent => _memory._eventState.slots.isConsistent;
+
+  @override
+  bool get isNotConsistent => _memory._eventState.slots.isNotConsistent;
+
+  @override
+  bool priorSameAsCurrent() => _memory._eventState.slots.priorSameAsCurrent();
+
+  @override
+  void restorePreviousParty(
+      [Function(int index, Character? prior, Character? current)? onRestore]) {
+    _memory._apply(RestoreSavedPartyInSlots(onRestore));
+  }
+
+  @override
+  void unknownPriorPartyOrder() {
+    _memory._apply(UnknownPriorPartyOrder());
+  }
 }
 
 // TODO: if prior value is same, then "may apply" can keep same value
-// e.g. if
+//  in most cases
 
 class SetSavedDialogPosition implements StateChange {
   final bool saved;
@@ -345,6 +388,7 @@ class SetSavedDialogPosition implements StateChange {
 
   @override
   mayApply(Memory memory) {
+    // Save position may be different
     memory._sysState._hasSavedDialogPosition = false;
   }
 }
@@ -362,7 +406,9 @@ class PutInAddress implements StateChange {
 
   @override
   mayApply(Memory memory) {
-    memory._sysState._putInAddress(register, null);
+    if (memory._sysState._inAddress[register]?.obj != obj) {
+      memory._sysState._putInAddress(register, null);
+    }
   }
 }
 
@@ -446,6 +492,95 @@ class AddAllSlots implements StateChange {
   @override
   mayApply(Memory memory) {
     slots.forEach((slot, c) => memory._eventState.slots[slot] = null);
+  }
+}
+
+class SetPartyOrder implements StateChange {
+  final List<Character?> party;
+  final bool saveCurrent;
+
+  SetPartyOrder(this.party, {required this.saveCurrent});
+
+  @override
+  apply(Memory memory) {
+    memory._eventState.slots.setPartyOrder(party, saveCurrent: saveCurrent);
+  }
+
+  @override
+  mayApply(Memory memory) {
+    var newOrder = {for (var i = 0; i < party.length; i++) i + 1: party[i]};
+    // After state:
+    // prior set to current
+    // current set to newOrder
+    // if saveCurrent && prior is already == current, prior is known
+    // if current is already == newOrder, current is known
+    if (!memory._eventState.slots.hasPartyOrder(newOrder)) {
+      memory._eventState.slots.unknownPartyOrder();
+    }
+
+    if (saveCurrent && !memory._eventState.slots.priorSameAsCurrent()) {
+      memory._eventState.slots.unknownPriorPartyOrder();
+    }
+  }
+}
+
+class UnknownPartyOrder implements StateChange {
+  @override
+  apply(Memory memory) {
+    memory._eventState.slots.unknownPartyOrder();
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.slots.unknownPartyOrder();
+  }
+}
+
+class ReloadObjectsInSlots implements StateChange {
+  @override
+  apply(Memory memory) {
+    memory._eventState.slots.reloadObjects();
+  }
+
+  @override
+  mayApply(Memory memory) {
+    var slots = memory._eventState.slots;
+    if (slots.isNotConsistent) {
+      slots.forEach((slot, c) => slots[slot] = null);
+    }
+  }
+}
+
+class RestoreSavedPartyInSlots implements StateChange {
+  Function(int index, Character? prior, Character? current)? onRestore;
+
+  RestoreSavedPartyInSlots([this.onRestore]);
+
+  @override
+  apply(Memory memory) {
+    memory._eventState.slots.restorePreviousParty(onRestore);
+  }
+
+  @override
+  mayApply(Memory memory) {
+    // After state:
+    // current set to prior
+    // If current already == prior, current is known
+    if (!memory._eventState.slots.priorSameAsCurrent()) {
+      memory._eventState.slots.unknownPartyOrder();
+    }
+  }
+}
+
+class UnknownPriorPartyOrder implements StateChange {
+  @override
+  apply(Memory memory) {
+    memory._eventState.slots.unknownPriorPartyOrder();
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.slots.unknownPriorPartyOrder();
   }
 }
 
