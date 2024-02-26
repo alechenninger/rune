@@ -443,7 +443,7 @@ final _defaultJobFlags = <_JobFlags>[
   (
     start: EventFlag('DyingBoy'),
     end: EventFlag('CulversAfterRecovery'),
-    completed: EventFlag('DyingBoyFeee'),
+    completed: EventFlag('DyingBoyFee'),
     availableWhen: EventFlag('Hydrofoil2'),
     unavailableWhen: EventFlag('GuildPlaceholder')
   ),
