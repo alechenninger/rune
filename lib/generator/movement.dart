@@ -253,6 +253,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
   var asm = EventAsm.empty();
   var generator = _MovementGenerator(asm, state);
   var length = moves.destinations.length;
+  var secondaryObjects = <(FieldObject, Position)>[];
 
   if (!moves.followLeader) {
     if (state.followLead != false &&
@@ -290,8 +291,23 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
       asm.add(moveCharacter(x: pos.x.toWord.i, y: pos.y.toWord.i));
     } else {
       asm.add(setDestination(x: pos.x.toWord.i, y: pos.y.toWord.i));
+
+      if (obj is! Slot && obj is! Character) {
+        secondaryObjects.add((obj, pos));
+      }
+
       if (i == length - 1) {
-        asm.add(jsr(Label('Event_MoveCharacters').l));
+        // Secondary objects not checked in MoveCharacters
+        // Easier to just check them individually
+        for (var (obj, pos) in secondaryObjects) {
+          asm.add(obj.toA4(generator._mem));
+          asm.add(moveCharacter(x: pos.x.toWord.i, y: pos.y.toWord.i));
+        }
+
+        // Now ensure characters are done moving.
+        if (secondaryObjects.length < length) {
+          asm.add(jsr(Label('Event_MoveCharacters').l));
+        }
       }
     }
 
