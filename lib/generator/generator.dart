@@ -390,7 +390,11 @@ class SceneAsmGenerator implements EventVisitor {
   final DialogTrees _dialogTrees;
   final EventFlags _eventFlags;
   final EventAsm _eventAsm;
-  final _subroutines = <Asm>[];
+
+  /// Additional assembly segments, labelled, which are added after generation.
+  ///
+  /// Can be used for data tables or additional, top-level subroutines.
+  final _postAsm = <Asm>[];
 
   // required if processing interaction (see todo on ctor)
   EventRoutines? _eventRoutines;
@@ -682,6 +686,82 @@ class SceneAsmGenerator implements EventVisitor {
         move.w(curr_x_pos(a4), dest_x_pos(a4)),
         move.w(curr_y_pos(a4), dest_y_pos(a4)),
       ]);
+    });
+  }
+
+  @override
+  void stepObjects(StepObjects step) {
+    if (step.objects.length == 1) {
+      return stepObject(StepObject(step.objects.single,
+          stepPerFrame: step.stepPerFrame,
+          frames: step.frames,
+          onTop: step.onTop,
+          animate: step.animate));
+    }
+
+    _addToEvent(step, (eventIndex) {
+      var x = (step.stepPerFrame.x * (1 << 4 * 4)).truncate();
+      var y = (step.stepPerFrame.y * (1 << 4 * 4)).truncate();
+
+      // Step will always execute at least once.
+      var additionalFrames = step.frames - 1;
+
+      var loop = Label('.stepObjectsLoop_$eventIndex');
+      _eventAsm.add(Asm([
+        if (additionalFrames <= 127)
+          moveq(additionalFrames.toByte.i, d2)
+        else
+          move.w(additionalFrames.toWord.i, d2),
+        label(loop)
+      ]));
+
+      // Adjust each object for each loop iteration (frame)
+      for (var obj in step.objects) {
+        _eventAsm.add(Asm([
+          obj.toA4(_memory),
+          if (step.onTop) move.b(1.i, 5(a4)),
+          if (Size.b.fitsSigned(x))
+            moveq(x.toSignedByte.i, d0)
+          else
+            move.l(x.toSignedLongword.i, d0),
+          if (Size.b.fitsSigned(y))
+            moveq(y.toSignedByte.i, d1)
+          else
+            move.l(y.toSignedLongword.i, d1),
+          jsr(Label('Event_StepObjectNoWait')),
+        ]));
+      }
+
+      // Now update sprites, wait for vint, and loop
+      _eventAsm.add(Asm([
+        movem.l(d2 / a4, -(sp)),
+        jsr(Label('Field_LoadSprites').l),
+        jsr(Label('Field_BuildSprites').l),
+        jsr(Label('RunMapUpdates').l),
+        jsr(Label('VInt_Prepare').l),
+        movem.l(sp.postIncrement(), d2 / a4),
+        dbf(d2, loop),
+      ]));
+
+      // Now reset all step constants and update memory
+      for (var obj in step.objects.reversed) {
+        _eventAsm.add(Asm([
+          obj.toA4(_memory),
+          moveq(0.i, d0),
+          if (x != 0) move.l(d0, x_step_constant(a4)),
+          if (y != 0) move.l(d0, y_step_constant(a4)),
+          // Set destination to current position.
+          // This is needed if routine will move to destination.
+          // If not set in that case, the object will move the next time
+          // the field object routine is run.
+          setDestination(x: curr_x_pos(a4), y: curr_y_pos(a4)),
+        ]));
+
+        if (_memory.positions[obj] case var current?) {
+          var totalSteps = (step.stepPerFrame * step.frames).truncate();
+          _memory.positions[obj] = current + Position.fromPoint(totalSteps);
+        }
+      }
     });
   }
 
@@ -1424,6 +1504,7 @@ class SceneAsmGenerator implements EventVisitor {
   void hideAllPanels(HideAllPanels hidePanels) {
     _checkNotFinished();
 
+    // FIXME: state check is broken due to possibly queued generations
     var panelsShown = _memory.panelsShown;
     if (panelsShown == 0) return;
 
@@ -1465,6 +1546,7 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
 
     var panels = hidePanels.panelsToHide;
+    // FIXME: state check is broken due to possibly queued generations
     var panelsShown = _memory.panelsShown;
 
     if (panelsShown == 0) return;
@@ -1755,7 +1837,7 @@ class SceneAsmGenerator implements EventVisitor {
       }
 
       if (nextEvent.trim() case var event when event.isNotEmpty) {
-        _subroutines.add(event);
+        _postAsm.add(event);
       }
 
       // Update map elements' dialog ID's
@@ -1877,7 +1959,7 @@ class SceneAsmGenerator implements EventVisitor {
       _eventAsm.addNewline();
     }
 
-    for (var subroutine in _subroutines) {
+    for (var subroutine in _postAsm) {
       _eventAsm.add(subroutine);
 
       if (appendNewline) {
@@ -2298,10 +2380,6 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.hasSavedDialogPosition = true;
       _memory.dialogPortrait = null;
       _gameMode = Mode.event;
-
-      // TODO(yesno): we'd need to add `tst.b	(Yes_No_Option).w` here
-      // and then bne/beq to a label for the alternate branch?
-      // and then bsr to label after alt branch
 
       // If any events which could've gone either way,
       // generate in event mode now

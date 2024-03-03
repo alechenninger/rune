@@ -20,6 +20,7 @@ export 'objects.dart';
 const DcMnemonic dc = DcMnemonic();
 const MoveMnemonic move = MoveMnemonic();
 const MoveaMnemonic movea = MoveaMnemonic();
+const MovemMnemonic movem = MovemMnemonic();
 const ClrMnemonic clr = ClrMnemonic();
 const AndiMnemonic andi = AndiMnemonic();
 const OrMnemonic or = OrMnemonic();
@@ -128,6 +129,15 @@ class MoveaMnemonic {
 
   Asm w(Address from, Address to) => cmd('movea.w', [from, to]);
   Asm l(Address from, Address to) => cmd('movea.l', [from, to]);
+}
+
+class MovemMnemonic {
+  const MovemMnemonic();
+
+  Asm w(RegisterListOrAddress from, RegisterListOrAddress to) =>
+      cmd('movem.l', [from, to]);
+  Asm l(RegisterListOrAddress from, RegisterListOrAddress to) =>
+      cmd('movem.l', [from, to]);
 }
 
 class ClrMnemonic {

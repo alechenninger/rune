@@ -409,7 +409,7 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
       jsr(Label('UpdateCameraXPosBG').l),
       jsr(Label('UpdateCameraYPosBG').l),
     ],
-    move.l(sp.postInc(), a4),
+    move.l(sp.postIncrement(), a4),
   ]));
 
   return asm;

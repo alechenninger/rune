@@ -50,6 +50,8 @@ const dest_x_pos = Constant('dest_x_pos');
 const dest_y_pos = Constant('dest_y_pos');
 const curr_x_pos = Constant('curr_x_pos');
 const curr_y_pos = Constant('curr_y_pos');
+const x_step_constant = Constant('x_step_constant');
+const y_step_constant = Constant('y_step_constant');
 const x_step_duration = Constant('x_step_duration');
 const y_step_duration = Constant('y_step_duration');
 

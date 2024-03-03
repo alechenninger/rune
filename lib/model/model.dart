@@ -199,6 +199,7 @@ abstract class EventVisitor {
   void absoluteMoves(AbsoluteMoves moves);
   void instantMoves(InstantMoves moves);
   void stepObject(StepObject step);
+  void stepObjects(StepObjects step);
   void lockCamera(LockCamera lock);
   void unlockCamera(UnlockCamera unlock);
   void moveCamera(MoveCamera move);

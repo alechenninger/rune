@@ -1,3 +1,5 @@
+import 'package:quiver/collection.dart';
+
 import 'asm.dart';
 
 const d0 = DirectDataRegister._(0);
@@ -19,14 +21,72 @@ const a6 = DirectAddressRegister._(6);
 const a7 = DirectAddressRegister._(7);
 const sp = a7;
 
-abstract class Address {
+abstract class Address implements RegisterListOrAddress {
   static Absolute absolute(Expression e) => Absolute.long(e);
   static Immediate immediate(Expression e) => Immediate(e);
   static DirectDataRegister d(int num) => DirectDataRegister(num);
   static DirectAddressRegister a(int num) => DirectAddressRegister(num);
 }
 
-abstract class AddressRegister extends Address {
+sealed class RegisterListOrAddress {}
+
+class RegisterList implements RegisterListOrAddress {
+  final TreeSet<Register> registers = TreeSet<Register>(comparator: (a, b) {
+    return switch ((a, b)) {
+      (DirectDataRegister(), DirectAddressRegister()) => -1,
+      (DirectAddressRegister(), DirectDataRegister()) => 1,
+      _ => a.register.compareTo(b.register),
+    };
+  });
+
+  RegisterList.of(Iterable<Register> registers) {
+    this.registers.addAll(registers);
+  }
+
+  /// Returns the [RegisterList] as an expression.
+  ///
+  /// Consecutive registers are delimited by the first and last with a "-"
+  /// between.
+  ///
+  /// Otherwise, registers are enumerated with a "/" between.
+  @override
+  String toString() {
+    var output = StringBuffer();
+    Register previous = registers.first;
+    bool range = false;
+
+    output.write(previous);
+
+    for (Register r in registers.skip(1)) {
+      if (previous.next == r) {
+        range = true;
+      } else {
+        if (range) {
+          output.write('-$previous');
+          range = false;
+        }
+        output.write('/');
+        output.write(r);
+      }
+      previous = r;
+    }
+
+    if (range) {
+      output.write('-$previous');
+    }
+
+    return output.toString();
+  }
+}
+
+sealed class Register<T extends Register<T>> {
+  int get register;
+  T? get next;
+  RegisterList operator -(T other);
+  RegisterList operator /(Register other);
+}
+
+abstract class AddressRegister implements Address {
   int get register;
   AddressRegister withRegister(int num);
 }
@@ -80,7 +140,8 @@ class Immediate extends _Address {
 }
 
 /// Value in one of the address registers
-class DirectAddressRegister extends _Address implements AddressRegister {
+class DirectAddressRegister extends _Address
+    implements AddressRegister, Register<DirectAddressRegister> {
   @override
   final int register;
 
@@ -105,20 +166,58 @@ class DirectAddressRegister extends _Address implements AddressRegister {
 
   PreDecAddress operator -() => PreDecAddress(register);
 
-  PostIncAddress postInc() => PostIncAddress(register);
+  PostIncAddress postIncrement() => PostIncAddress(register);
+
+  @override
+  RegisterList operator -(DirectAddressRegister other) {
+    return RegisterList.of([
+      for (var i = register; i <= other.register; i++) DirectAddressRegister(i)
+    ]);
+  }
+
+  @override
+  RegisterList operator /(Register other) {
+    return RegisterList.of([this, other]);
+  }
+
+  @override
+  DirectAddressRegister get next => DirectAddressRegister(register + 1);
 }
 
 /// Value in one of the data registers
-class DirectDataRegister extends _Address {
-  DirectDataRegister(int num) : super('d$num') {
-    if (num > 7 || num < 0) throw AsmError(num, 'is not a valid data register');
+class DirectDataRegister extends _Address
+    implements Register<DirectDataRegister> {
+  DirectDataRegister(this.register) : super('d$register') {
+    if (register > 7 || register < 0) {
+      throw AsmError(register, 'is not a valid data register');
+    }
   }
 
-  const DirectDataRegister._(int num) : super('d$num');
+  const DirectDataRegister._(this.register) : super('d$register');
+
+  @override
+  final int register;
+
+  @override
+  RegisterList operator -(DirectDataRegister other) {
+    return RegisterList.of([
+      for (var i = register; i <= other.register; i++) DirectDataRegister(i)
+    ]);
+  }
+
+  @override
+  RegisterList operator /(Register other) {
+    return RegisterList.of([this, other]);
+  }
+
+  @override
+  DirectDataRegister? get next =>
+      register <= 7 ? DirectDataRegister(register + 1) : null;
 }
 
 /// Value in memory at an address pointed to by an address register
 class IndirectAddressRegister extends _Address implements AddressRegister {
+  @override
   final int register;
   final Expression displacement;
   final DirectDataRegister? variableDisplacement;

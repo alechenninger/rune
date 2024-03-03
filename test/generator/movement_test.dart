@@ -1541,7 +1541,7 @@ void main() {
             jsr(Label('UpdateCameraYPosFG').l),
             jsr(Label('UpdateCameraXPosBG').l),
             jsr(Label('UpdateCameraYPosBG').l),
-            move.l(sp.postInc(), a4),
+            move.l(sp.postIncrement(), a4),
           ]));
     });
 
@@ -1555,7 +1555,7 @@ void main() {
             move.w(FacingDir_Up.i, facing_dir(a4)),
             move.l(a4, -sp),
             jsr(Label('Field_UpdateObjects').l),
-            move.l(sp.postInc(), a4),
+            move.l(sp.postIncrement(), a4),
           ]));
     });
 
@@ -1578,7 +1578,7 @@ void main() {
             jsr(Label('UpdateCameraYPosFG').l),
             jsr(Label('UpdateCameraXPosBG').l),
             jsr(Label('UpdateCameraYPosBG').l),
-            move.l(sp.postInc(), a4),
+            move.l(sp.postIncrement(), a4),
           ]));
     });
 
@@ -1622,7 +1622,7 @@ void main() {
               jsr(Label('UpdateCameraYPosFG').l),
               jsr(Label('UpdateCameraXPosBG').l),
               jsr(Label('UpdateCameraYPosBG').l),
-              move.l(sp.postInc(), a4),
+              move.l(sp.postIncrement(), a4),
             ]));
       }, skip: 'not optimized yet; will redundantly load script routine');
 
@@ -1647,7 +1647,7 @@ void main() {
               jsr(Label('UpdateCameraYPosFG').l),
               jsr(Label('UpdateCameraXPosBG').l),
               jsr(Label('UpdateCameraYPosBG').l),
-              move.l(sp.postInc(), a4),
+              move.l(sp.postIncrement(), a4),
             ]));
       });
     });
@@ -1678,7 +1678,7 @@ void main() {
             jsr(Label('UpdateCameraYPosFG').l),
             jsr(Label('UpdateCameraXPosBG').l),
             jsr(Label('UpdateCameraYPosBG').l),
-            move.l(sp.postInc(), a4),
+            move.l(sp.postIncrement(), a4),
           ]));
     });
 
@@ -1710,7 +1710,7 @@ void main() {
             jsr(Label('UpdateCameraYPosFG').l),
             jsr(Label('UpdateCameraXPosBG').l),
             jsr(Label('UpdateCameraYPosBG').l),
-            move.l(sp.postInc(), a4),
+            move.l(sp.postIncrement(), a4),
           ]));
     });
 
@@ -1744,7 +1744,7 @@ void main() {
             jsr(Label('UpdateCameraYPosFG').l),
             jsr(Label('UpdateCameraXPosBG').l),
             jsr(Label('UpdateCameraYPosBG').l),
-            move.l(sp.postInc(), a4),
+            move.l(sp.postIncrement(), a4),
           ]));
     });
 
@@ -1796,7 +1796,7 @@ void main() {
               jsr(Label('UpdateCameraYPosFG').l),
               jsr(Label('UpdateCameraXPosBG').l),
               jsr(Label('UpdateCameraYPosBG').l),
-              move.l(sp.postInc(), a4),
+              move.l(sp.postIncrement(), a4),
             ]));
       });
     });
