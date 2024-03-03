@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:collection/collection.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/map.dart';
+import 'package:rune/generator/stack.dart';
 
 import '../asm/asm.dart';
 import '../asm/asm.dart' as asmlib;
@@ -493,7 +494,13 @@ class _MovementGenerator {
     asm.add(dir.withDirection(
         labelSuffix: labelSuffix,
         memory: _mem,
-        asm: (d) => Asm([obj.toA4(_mem), updateObjFacing(d)])));
+        asm: (d) => Asm([
+              obj.toA4(_mem,
+                  maintain: d is Immediate
+                      ? NoneToPush()
+                      : PushToStack.one(d0, Size.b)),
+              updateObjFacing(d)
+            ])));
 
     _mem.putInAddress(a3, null);
 
@@ -566,7 +573,8 @@ extension FieldObjectAsm on FieldObject {
   /// from multiple source points (e.g. loops).
   /// It can also be useful if you know the register was overwritten
   /// and need to reload it.
-  Asm toA4(Memory ctx, {bool force = false}) {
+  Asm toA4(Memory ctx,
+      {bool force = false, PushToStack maintain = const NoneToPush()}) {
     var current = ctx.inAddress(a4)?.obj;
     // TODO(movement generator): should we resolve when putting into address
     //  memory?
@@ -578,7 +586,7 @@ extension FieldObjectAsm on FieldObject {
     var slot = obj.slot(ctx);
     var asm = switch ((slot, obj)) {
       (var s?, _) => characterBySlotToA4(s),
-      (_, Character c) => characterByIdToA4(c.charIdAddress),
+      (_, Character c) => maintain.wrap(characterByIdToA4(c.charIdAddress)),
       (_, MapObject o) => leaConstant(o.address(ctx), a4),
       (_, MapObjectById o) => leaConstant(o.address(ctx), a4),
       // TODO(movement): this could generalize to checking every a register
@@ -859,6 +867,10 @@ extension DirectionOfVectorAsm on DirectionOfVector {
 
     return Asm([
       to.withY(memory: memory, asm: (y) => move.w(y, d2), load: load2),
+      // TODO(optimization): could consider allowing a force load of load1
+      // even if not needed. this would be an optimization when using
+      // updateobjfacing, because we wouldn't need to load later and
+      // then have to deal with saving d0 to the stack
       from.withY(
           memory: memory,
           asm: (y) => Asm([

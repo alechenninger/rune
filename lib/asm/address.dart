@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:quiver/collection.dart';
 
 import 'asm.dart';
@@ -30,18 +32,28 @@ abstract class Address implements RegisterListOrAddress {
 
 sealed class RegisterListOrAddress {}
 
-class RegisterList implements RegisterListOrAddress {
-  final TreeSet<Register> registers = TreeSet<Register>(comparator: (a, b) {
-    return switch ((a, b)) {
-      (DirectDataRegister(), DirectAddressRegister()) => -1,
-      (DirectAddressRegister(), DirectDataRegister()) => 1,
-      _ => a.register.compareTo(b.register),
-    };
-  });
+class RegisterList extends Iterable<Register> implements RegisterListOrAddress {
+  final Set<Register> _registers;
 
-  RegisterList.of(Iterable<Register> registers) {
-    this.registers.addAll(registers);
+  const RegisterList.empty() : _registers = const {};
+
+  RegisterList.of(Iterable<Register> registers)
+      : _registers = TreeSet<Register>(comparator: (a, b) {
+          return switch ((a, b)) {
+            (DirectDataRegister(), DirectAddressRegister()) => -1,
+            (DirectAddressRegister(), DirectDataRegister()) => 1,
+            _ => a.register.compareTo(b.register),
+          };
+        }) {
+    _registers.addAll(registers);
   }
+
+  @override
+  bool get isNotEmpty => _registers.isNotEmpty;
+  @override
+  bool get isEmpty => _registers.isEmpty;
+  @override
+  int get length => _registers.length;
 
   /// Returns the [RegisterList] as an expression.
   ///
@@ -52,12 +64,12 @@ class RegisterList implements RegisterListOrAddress {
   @override
   String toString() {
     var output = StringBuffer();
-    Register previous = registers.first;
+    Register previous = _registers.first;
     bool range = false;
 
     output.write(previous);
 
-    for (Register r in registers.skip(1)) {
+    for (Register r in _registers.skip(1)) {
       if (previous.next == r) {
         range = true;
       } else {
@@ -77,9 +89,12 @@ class RegisterList implements RegisterListOrAddress {
 
     return output.toString();
   }
+
+  @override
+  Iterator<Register> get iterator => _registers.iterator;
 }
 
-sealed class Register<T extends Register<T>> {
+sealed class Register<T extends Register<T>> implements Address {
   int get register;
   T? get next;
   RegisterList operator -(T other);

@@ -16,16 +16,9 @@ void main() {
     testMap = GameMap(MapId.Test);
   });
 
-  Asm generate(List<Event> events, {GameMap? inMap}) {
-    var asm = EventAsm.empty();
-    var generator = SceneAsmGenerator.forEvent(
-        SceneId('test'), DialogTrees(), asm,
-        startingMap: inMap);
-    for (var event in events) {
-      event.visit(generator);
-    }
-    generator.finish();
-    return asm.withoutComments();
+  @Deprecated('use generateEventAsm from fixtures')
+  Asm generate(List<Event> events, {GameMap? inMap, EventState? context}) {
+    return generateEventAsm(events, inMap: inMap, context: context);
   }
 
   group('generates asm for individual movements', () {
@@ -1479,6 +1472,54 @@ void main() {
             bcc.s(Label(r'.keep_1_Shay_1')),
             move.w(FacingDir_Left.i, d0),
             label(Label(r'.keep_1_Shay_1')),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
+    });
+
+    test('comparisons use constant position if known', () {
+      var moves = Face(alys.towards(rune)).move(alys);
+      var asm = generateEventAsm([moves],
+          context: EventState()
+            ..currentMap = map
+            ..positions[alys] = Position(0x100, 0x200));
+      expect(
+          asm,
+          Asm([
+            rune.toA3(testState),
+            move.w(curr_y_pos(a3), d2),
+            moveq(FacingDir_Down.i, d0),
+            cmpi.w(0x200.toWord.i, d2),
+            beq.s(Label(r'.checkx_1_Alys_0')),
+            bcc.s(Label(r'.keep_1_Alys_0')),
+            move.w(FacingDir_Up.i, d0),
+            bra.s(Label(r'.keep_1_Alys_0')),
+            label(Label(r'.checkx_1_Alys_0')),
+            move.w(FacingDir_Right.i, d0),
+            // a4 because rune is in both a3 and a4
+            move.w(curr_x_pos(a4), d2),
+            cmpi.w(0x100.toWord.i, d2),
+            bcc.s(Label(r'.keep_1_Alys_0')),
+            move.w(FacingDir_Left.i, d0),
+            label(Label(r'.keep_1_Alys_0')),
+            move.b(d0, -sp),
+            alys.toA4(testState),
+            move.b(sp.postIncrement(), d0),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
+    });
+
+    test('uses constant direction if vector known', () {
+      var moves = Face(alys.towards(rune)).move(alys);
+      var asm = generateEventAsm([moves],
+          context: EventState()
+            ..currentMap = map
+            ..positions[rune] = Position(0x110, 0x200)
+            ..positions[alys] = Position(0x100, 0x200));
+      expect(
+          asm,
+          Asm([
+            alys.toA4(testState),
+            moveq(FacingDir_Right.i, d0),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
