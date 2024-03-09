@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
 
 import 'data.dart';
@@ -313,6 +314,10 @@ final _fieldObjectsJmpTbl = BiMap<Label, Word>()
     Label('FieldObj_SandWormCarving'): Word(0x370),
     Label('loc_4FA30'): Word(0x374),
   });
+
+Map<Label, Word> get fieldObjectsJmpTbl {
+  return _fieldObjectsJmpTbl.lock.unlockView;
+}
 
 bool isInteractive(Word routineIndex) {
   return !_noninteractiveAsmSpecRoutines.contains(routineIndex.value);

@@ -792,7 +792,7 @@ class Byte extends SizedValue {
 }
 
 class Word extends SizedValue {
-  Word(int value) : super(value);
+  Word(super.value);
   Word.signed(int value) : super.signed(value, Size.w);
 
   factory Word.concatBytes(Byte b1, Byte b2) {

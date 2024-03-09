@@ -255,14 +255,14 @@ class Memory implements EventState {
   }
 
   @override
-  RoutineRef? getRoutine(FieldObject obj) => _eventState.getRoutine(obj);
+  SpecModel? getRoutine(FieldObject obj) => _eventState.getRoutine(obj);
 
   void unknownAddressRegisters() {
     _apply(UnknownAddressRegisters());
   }
 
   @override
-  void setRoutine(FieldObject obj, RoutineRef? r) {
+  void setRoutine(FieldObject obj, SpecModel? r) {
     _apply(UpdateRoutine(obj, r));
   }
 
@@ -684,7 +684,7 @@ class RemovePanels implements StateChange {
 
 class UpdateRoutine implements StateChange {
   final FieldObject obj;
-  final RoutineRef? routine;
+  final SpecModel? routine;
 
   UpdateRoutine(this.obj, this.routine);
 

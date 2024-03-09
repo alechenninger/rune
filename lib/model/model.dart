@@ -26,6 +26,7 @@ import 'sound.dart';
 import 'text.dart';
 
 export 'animate.dart';
+export 'battle.dart';
 export 'camera.dart';
 export 'objects.dart';
 export 'conditional.dart';
@@ -222,6 +223,7 @@ abstract class EventVisitor {
   void stopMusic(StopMusic stopMusic);
   void addMoney(AddMoney addMoney);
   void resetObjectRoutine(ResetObjectRoutine resetRoutine);
+  void changeObjectRoutine(ChangeObjectRoutine change);
   void changeParty(ChangePartyOrder changeParty);
   void restoreSavedParty(RestoreSavedPartyOrder restoreParty);
   void onExitRunBattle(OnExitRunBattle setExit);
@@ -308,9 +310,9 @@ class EventState {
     if (facing != null) _facing[c] = facing;
   }
 
-  final _routines = <FieldObject, RoutineRef>{};
-  RoutineRef? getRoutine(FieldObject obj) => _routines[obj.resolve(this)];
-  void setRoutine(FieldObject obj, RoutineRef? r) => r == null
+  final _routines = <FieldObject, SpecModel>{};
+  SpecModel? getRoutine(FieldObject obj) => _routines[obj.resolve(this)];
+  void setRoutine(FieldObject obj, SpecModel? r) => r == null
       ? _routines.remove(obj.resolve(this))
       : _routines[obj.resolve(this)] = r;
 }

@@ -26,7 +26,6 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/guild.dart';
-import 'package:rune/model/battle.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -45,6 +44,7 @@ import 'event.dart';
 import 'map.dart';
 import 'memory.dart';
 import 'movement.dart';
+import 'objects.dart';
 import 'scene.dart';
 import 'text.dart' as textlib;
 
@@ -52,6 +52,7 @@ export '../asm/asm.dart' show Asm;
 export 'deprecated.dart';
 export 'map.dart';
 export 'scene.dart';
+export 'objects.dart';
 
 typedef DebugOptions = ({
   List<EventFlag> eventFlags,
@@ -91,13 +92,17 @@ class Program {
   final _eventFlags = EventFlags();
   final Constants _constants = Constants.wrap({});
 
+  final FieldRoutineRepository _fieldRoutines;
+
   Program({
     Word? eventIndexOffset,
     Word? cutsceneIndexOffset,
     Map<MapId, Word>? vramTileOffsets,
     Map<MapId, List<SpriteVramMapping>>? builtInSprites,
+    FieldRoutineRepository? fieldRoutines,
   })  : _eventIndexOffset = eventIndexOffset ?? 0xa3.toWord,
-        _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord {
+        _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord,
+        _fieldRoutines = fieldRoutines ?? defaultFieldRoutines {
     _vramTileOffsets.addAll(vramTileOffsets ?? _defaultSpriteVramOffsets);
     _builtInSprites.addAll(builtInSprites ?? _defaultBuiltInSprites);
   }
@@ -139,7 +144,8 @@ class Program {
     var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
         startingMap: startingMap,
         eventFlags: _eventFlags,
-        eventType: _sceneEventType(scene.events));
+        eventType: _sceneEventType(scene.events),
+        fieldRoutines: _fieldRoutines);
 
     for (var event in scene.events) {
       event.visit(generator);
@@ -165,7 +171,8 @@ class Program {
         map, _ProgramEventRoutines(this), spriteVramOffset,
         dialogTrees: dialogTrees,
         eventFlags: _eventFlags,
-        builtInSprites: builtInSprites);
+        builtInSprites: builtInSprites,
+        fieldRoutines: _fieldRoutines);
   }
 
   HuntersGuildAsm configureHuntersGuild(HuntersGuild guild,
@@ -397,7 +404,8 @@ class SceneAsmGenerator implements EventVisitor {
   final _postAsm = <Asm>[];
 
   // required if processing interaction (see todo on ctor)
-  EventRoutines? _eventRoutines;
+  final EventRoutines? _eventRoutines;
+  final FieldRoutineRepository _fieldRoutines;
 
   Mode _gameMode = Mode.event;
   bool get inDialogLoop => _gameMode == Mode.dialog;
@@ -448,12 +456,15 @@ class SceneAsmGenerator implements EventVisitor {
   // todo: This might be a subclass really
   SceneAsmGenerator.forInteraction(GameMap map, this.id, this._dialogTrees,
       this._eventAsm, EventRoutines eventRoutines,
-      {EventFlags? eventFlags, bool withObject = true})
+      {EventFlags? eventFlags,
+      bool withObject = true,
+      FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = withObject ? const InteractionObject() : null,
         _isProcessingInteraction = true,
         _eventRoutines = eventRoutines,
-        _eventFlags = eventFlags ?? EventFlags() {
+        _eventFlags = eventFlags ?? EventFlags(),
+        _fieldRoutines = fieldRoutines ?? defaultFieldRoutines {
     _gameMode = Mode.dialog;
 
     if (withObject) _memory.putInAddress(a3, const InteractionObject());
@@ -464,12 +475,17 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   SceneAsmGenerator.forEvent(this.id, this._dialogTrees, this._eventAsm,
-      {GameMap? startingMap, EventFlags? eventFlags, EventType? eventType})
+      {GameMap? startingMap,
+      EventFlags? eventFlags,
+      EventType? eventType,
+      FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = null,
         _isProcessingInteraction = false,
         _eventType = eventType ?? EventType.event,
-        _eventFlags = eventFlags ?? EventFlags() {
+        _eventFlags = eventFlags ?? EventFlags(),
+        _eventRoutines = null, // TODO
+        _fieldRoutines = fieldRoutines ?? defaultFieldRoutines {
     _memory.currentMap = startingMap;
     if (startingMap != null) {
       _memory.loadedDialogTree = _dialogTrees.forMap(startingMap.id);
@@ -587,7 +603,9 @@ class SceneAsmGenerator implements EventVisitor {
           face.object == const InteractionObject()) {
         asm.add(jsr(Label('Interaction_UpdateObj').l));
       } else {
-        asm.add(face.toMoves().toAsm(_memory, eventIndex: i));
+        asm.add(face
+            .toMoves()
+            .toAsm(_memory, eventIndex: i, fieldRoutines: _fieldRoutines));
       }
 
       return asm;
@@ -622,9 +640,13 @@ class SceneAsmGenerator implements EventVisitor {
               }
             }
           },
-          inEvent: (i) => moves.toAsm(_memory, eventIndex: i));
+          inEvent: (i) => moves.toAsm(_memory,
+              eventIndex: i, fieldRoutines: _fieldRoutines));
     } else {
-      _addToEvent(moves, (i) => moves.toAsm(_memory, eventIndex: i));
+      _addToEvent(
+          moves,
+          (i) => moves.toAsm(_memory,
+              eventIndex: i, fieldRoutines: _fieldRoutines));
     }
   }
 
@@ -728,7 +750,10 @@ class SceneAsmGenerator implements EventVisitor {
             moveq(y.toSignedByte.i, d1)
           else
             move.l(y.toSignedLongword.i, d1),
-          jsr(Label('Event_StepObjectNoWait')),
+          if (step.animate)
+            jsr(Label('Event_StepObjectNoWait'))
+          else
+            jsr(Label('Event_StepObjectNoWaitNoAnimate').l),
         ]));
       }
 
@@ -807,8 +832,11 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void partyMove(RelativePartyMove move) {
-    _addToEvent(move,
-        (i) => move.toIndividualMoves(_memory).toAsm(_memory, eventIndex: i));
+    _addToEvent(
+        move,
+        (i) => move
+            .toIndividualMoves(_memory)
+            .toAsm(_memory, eventIndex: i, fieldRoutines: _fieldRoutines));
   }
 
   @override
@@ -1684,30 +1712,50 @@ class SceneAsmGenerator implements EventVisitor {
   void resetObjectRoutine(ResetObjectRoutine resetRoutine) {
     _checkNotFinished();
 
-    _addToEvent(resetRoutine, (_) {
-      var obj = resetRoutine.object.resolve(_memory);
+    var obj = resetRoutine.object.resolve(_memory);
+
+    if (obj is! MapObject) {
+      throw ArgumentError.value(
+          obj,
+          'resetRoutine.object',
+          'can only change routines for MapObjects '
+              'but type=${obj.runtimeType}');
+    }
+
+    // TODO(object routine): only reset if not already reset
+
+    var routine = obj.routine(_fieldRoutines);
+
+    changeObjectRoutine(
+        ChangeObjectRoutine(resetRoutine.object, routine.factory.routineModel));
+  }
+
+  @override
+  void changeObjectRoutine(ChangeObjectRoutine change) {
+    _addToEvent(change, (eventIndex) {
+      var obj = change.object.resolve(_memory);
 
       if (obj is! MapObject) {
         throw ArgumentError.value(
             obj,
-            'resetRoutine.object',
+            'change.object',
             'can only change routines for MapObjects '
                 'but type=${obj.runtimeType}');
       }
 
-      // TODO(object routine): only reset if not already reset
+      var routine = _fieldRoutines.bySpecModel(change.routine);
 
-      var routine = obj.routine;
+      if (routine == null) {
+        // TODO(object routines): technically we could get by with just index
+        // and use the jump table
+        throw ArgumentError.value(
+            change.routine,
+            'change.routine',
+            'routine not found in field routines. '
+                'try adding field routine metadata to generator.');
+      }
 
-      // TODO(object routines): this might be problematic since the routine
-      //  may be one defined in the model, but this uses
-      //  an asm routine no matter what.
-      // we could instead use the routine spec factory
-      // and examine the spec to determine
-      // what kind of routine ref to use.
-      // we could also make routine refs smarter,
-      // and enable them to understand they are the same
-      _memory.setRoutine(obj, AsmRoutineRef(routine.index));
+      _memory.setRoutine(obj, change.routine);
 
       return Asm([
         if (_memory.inAddress(a4)?.obj != obj) obj.toA4(_memory),
@@ -1826,7 +1874,7 @@ class SceneAsmGenerator implements EventVisitor {
       }
 
       SceneAsmGenerator.forInteraction(map, SceneId('${id.id}_next'),
-          _dialogTrees, nextEvent, _eventRoutines!,
+          _dialogTrees, nextEvent, _eventRoutines,
           eventFlags: _eventFlags, withObject: true)
         ..runEventFromInteractionIfNeeded(onNext.onInteract.events)
         ..scene(onNext.onInteract)

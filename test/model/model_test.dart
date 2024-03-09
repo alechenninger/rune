@@ -495,12 +495,12 @@ void main() {
       var jump = JumpObject(alys, duration: 1.second, height: 10);
 
       expect(jump.toSteps(), [
-        StepObject(alys,
+        StepObjects([alys],
             onTop: true,
             animate: false,
             frames: 0.5.seconds.toFrames(),
             stepPerFrame: Point(0, -10 / 0.5.seconds.toFrames())),
-        StepObject(alys,
+        StepObjects([alys],
             onTop: true,
             animate: false,
             frames: 0.5.second.toFrames(),
@@ -513,12 +513,12 @@ void main() {
           JumpObject(alys, duration: 1.second, height: 10, xMovement: -16);
 
       expect(jump.toSteps(), [
-        StepObject(alys,
+        StepObjects([alys],
             onTop: true,
             animate: false,
             frames: 0.5.seconds.toFrames(),
             stepPerFrame: Point(-8 / 30, -10 / 30)),
-        StepObject(alys,
+        StepObjects([alys],
             onTop: true,
             animate: false,
             frames: 0.5.second.toFrames(),

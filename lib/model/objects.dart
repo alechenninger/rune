@@ -1,5 +1,4 @@
 import 'package:collection/collection.dart';
-import 'package:quiver/check.dart';
 
 import '../asm/data.dart';
 import 'model.dart';
@@ -34,43 +33,93 @@ class ChangeObjectRoutine extends Event {
   /// A routine can either be an index,
   /// map object spec type, or
   /// npc behavior type
-  final RoutineRef routineRef;
+  final SpecModel routine;
 
-  ChangeObjectRoutine(this.object, this.routineRef);
+  ChangeObjectRoutine(this.object, this.routine);
 
   @override
   void visit(EventVisitor visitor) {
-    // TODO: implement visit
-  }
-}
-
-sealed class RoutineRef {}
-
-class AsmRoutineRef extends RoutineRef {
-  final Word index;
-
-  AsmRoutineRef(this.index) {
-    checkArgument(index.value & 0x7ffc == index.value,
-        message: 'not a valid field object routine: $index');
+    visitor.changeObjectRoutine(this);
   }
 
   @override
-  String toString() => 'AsmRoutineRef{index: $index}';
+  String toString() {
+    return 'ChangeObjectRoutine{object: $object, routine: $routine}';
+  }
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is AsmRoutineRef && index == other.index;
+      identical(this, other) ||
+      other is ChangeObjectRoutine &&
+          runtimeType == other.runtimeType &&
+          object == other.object &&
+          routine == other.routine;
 
   @override
-  int get hashCode => index.hashCode;
+  int get hashCode => object.hashCode ^ routine.hashCode;
 }
 
-class TypeRoutineRef extends RoutineRef {
-  final Type type;
+sealed class SpecModel {}
 
-  TypeRoutineRef(this.type);
-  TypeRoutineRef.fromSpec(MapObjectSpec spec)
-      : type = spec is Npc ? spec.behavior.runtimeType : spec.runtimeType;
+class NpcRoutineModel extends SpecModel {
+  final Type behaviorType;
+
+  NpcRoutineModel(this.behaviorType);
+
+  @override
+  String toString() {
+    return 'NpcRoutineModel{$behaviorType}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NpcRoutineModel &&
+          runtimeType == other.runtimeType &&
+          behaviorType == other.behaviorType;
+
+  @override
+  int get hashCode => behaviorType.hashCode;
+}
+
+class SpecRoutineModel extends SpecModel {
+  final Type specType;
+
+  SpecRoutineModel(this.specType);
+
+  @override
+  String toString() {
+    return 'SpecRoutineModel{$specType}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SpecRoutineModel &&
+          runtimeType == other.runtimeType &&
+          specType == other.specType;
+
+  @override
+  int get hashCode => specType.hashCode;
+}
+
+class AsmRoutineModel extends SpecModel {
+  final Word index;
+
+  AsmRoutineModel(this.index);
+
+  @override
+  String toString() {
+    return 'AsmRoutineModel{index: $index}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AsmRoutineModel && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
 }
 
 /// Updates the next interaction for some map elements, which are reset back

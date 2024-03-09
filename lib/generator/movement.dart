@@ -4,10 +4,9 @@ import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
 import 'package:rune/asm/events.dart';
-import 'package:rune/generator/map.dart';
+import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/stack.dart';
 
-import '../asm/asm.dart';
 import '../asm/asm.dart' as asmlib;
 import '../model/model.dart';
 import 'event.dart';
@@ -19,7 +18,7 @@ const FacingDir_Left = Constant('FacingDir_Left');
 const FacingDir_Right = Constant('FacingDir_Right');
 const FieldObj_Step_Offset = Constant('FieldObj_Step_Offset');
 
-final scriptableObjectRoutine = AsmRoutineRef(Word(0x194));
+final scriptableObjectRoutine = AsmRoutineModel(Word(0x194));
 
 /*
 Follow lead flag notes:
@@ -40,7 +39,10 @@ if independent moves == follow lead moves, just use follow lead flag
  */
 
 extension IndividualMovesToAsm on IndividualMoves {
-  EventAsm toAsm(Memory ctx, {int? eventIndex}) {
+  EventAsm toAsm(Memory ctx,
+      {int? eventIndex, FieldRoutineRepository? fieldRoutines}) {
+    fieldRoutines ??= defaultFieldRoutines;
+
     var asm = EventAsm.empty();
     var generator = _MovementGenerator(asm, ctx, eventIndex);
 
@@ -150,7 +152,8 @@ extension IndividualMovesToAsm on IndividualMoves {
             if (facing != null &&
                 facing != ctx.getFacing(moveable) &&
                 movement.continuousPaths.first.length == 0.steps) {
-              generator.updateFacing(moveable, facing, i);
+              generator.updateFacing(moveable, facing, i,
+                  fieldRoutines: fieldRoutines);
             }
           }
         }
@@ -465,7 +468,8 @@ class _MovementGenerator {
         _mem.getRoutine(obj) == scriptableObjectRoutine;
   }
 
-  void updateFacing(FieldObject obj, DirectionExpression dir, int moveIndex) {
+  void updateFacing(FieldObject obj, DirectionExpression dir, int moveIndex,
+      {required FieldRoutineRepository fieldRoutines}) {
     var labelSuffix = '_${[
       _eventIndex,
       _labelSafeString(obj),
@@ -479,7 +483,11 @@ class _MovementGenerator {
         // we have to be careful because the object may be mid-movement
         // TODO: this can be optimized out if object doesn't move.
         if (obj.position().known(_mem) == null)
-          _waitForMovement(obj: obj, labelSuffix: labelSuffix, memory: _mem),
+          _waitForMovement(
+              obj: obj,
+              labelSuffix: labelSuffix,
+              memory: _mem,
+              fieldRoutines: fieldRoutines),
         obj.toA4(_mem),
         asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect),
         // Destination attributes are not always set,
@@ -521,13 +529,14 @@ String _labelSafeString(FieldObject obj) {
 Asm _waitForMovement(
     {required FieldObject obj,
     required String labelSuffix,
-    required Memory memory}) {
+    required Memory memory,
+    required FieldRoutineRepository fieldRoutines}) {
   var startOfLoop =
       Label('.wait_for_movement_${_labelSafeString(obj)}$labelSuffix');
   return Asm([
     label(startOfLoop),
     obj.toA4(memory, force: true),
-    jsr(obj.routine),
+    jsr(obj.routine(fieldRoutines)),
     jsr(Label('Field_LoadSprites').l),
     jsr(Label('Field_BuildSprites').l),
     jsr(Label('VInt_Prepare').l),
@@ -556,10 +565,10 @@ extension FieldObjectAsm on FieldObject {
     };
   }
 
-  Address get routine {
+  Address routine(FieldRoutineRepository fieldRoutines) {
     return switch (this) {
       Character c => c.routineAddress,
-      MapObject m => m.routine.label.l,
+      MapObject m => m.routine(fieldRoutines).label.l,
       // Slot could be loaded from memory and field obj jump think
       _ => throw UnsupportedError('routine for $this')
     };

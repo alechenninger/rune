@@ -832,8 +832,8 @@ void main() {
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
-              move.w(npc.routine.index.i, a4.indirect),
-              jsr(npc.routine.label.l),
+              move.w(npc.routine(defaultFieldRoutines).index.i, a4.indirect),
+              jsr(npc.routine(defaultFieldRoutines).label.l),
             ]));
       });
 
@@ -865,8 +865,8 @@ void main() {
               characterByNameToA4('Chaz'),
               moveCharacter(x: Word(0x60).i, y: Word(0x60).i),
               lea(0xFFFFC300.w, a4),
-              move.w(npc.routine.index.i, a4.indirect),
-              jsr(npc.routine.label.l),
+              move.w(npc.routine(defaultFieldRoutines).index.i, a4.indirect),
+              jsr(npc.routine(defaultFieldRoutines).label.l),
             ]));
       });
     });

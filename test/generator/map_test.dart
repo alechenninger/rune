@@ -1811,7 +1811,10 @@ void main() {
         .withoutEmptyLines();
 
     var raw = preprocessMapToRaw(asm,
-        sprites: '', objects: '', dialog: Label('Test'));
+        sprites: '',
+        objects: '',
+        dialog: Label('Test'),
+        fieldRoutines: defaultFieldRoutines);
     var processed = Asm.fromRaw(raw.join('\n'));
 
     var expected = (MapAsmFixture()..dialogTreeLabel = 'Test')
