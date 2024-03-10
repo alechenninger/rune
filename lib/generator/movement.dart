@@ -539,7 +539,11 @@ Asm _waitForMovement(
     jsr(obj.routine(fieldRoutines)),
     jsr(Label('Field_LoadSprites').l),
     jsr(Label('Field_BuildSprites').l),
+    //movem.l(d0 - a4, -(sp)),
+    jsr(Label('AnimateTiles').l),
+    jsr(Label('RunMapUpdates').l),
     jsr(Label('VInt_Prepare').l),
+    //movem.l(sp.postIncrement(), d0 - a4),
     obj.toA4(memory, force: true), // force because we know a4 is overwritten
     moveq(0.i, d0),
     move.w(x_step_duration(a4), d0),

@@ -214,9 +214,14 @@ class DirectDataRegister extends _Address
   final int register;
 
   @override
-  RegisterList operator -(DirectDataRegister other) {
+  RegisterList operator -(Register other) {
+    var (maxDataRegister, maxAddressRegister) = switch (other) {
+      DirectDataRegister() => (other.register, 0),
+      DirectAddressRegister() => (7, other.register),
+    };
     return RegisterList.of([
-      for (var i = register; i <= other.register; i++) DirectDataRegister(i)
+      for (var i = register; i <= maxDataRegister; i++) DirectDataRegister(i),
+      for (var i = 0; i <= maxAddressRegister; i++) DirectAddressRegister(i)
     ]);
   }
 

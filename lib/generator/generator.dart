@@ -762,6 +762,7 @@ class SceneAsmGenerator implements EventVisitor {
         movem.l(d2 / a4, -(sp)),
         jsr(Label('Field_LoadSprites').l),
         jsr(Label('Field_BuildSprites').l),
+        jsr(Label('AnimateTiles').l),
         jsr(Label('RunMapUpdates').l),
         jsr(Label('VInt_Prepare').l),
         movem.l(sp.postIncrement(), d2 / a4),
@@ -1629,6 +1630,7 @@ class SceneAsmGenerator implements EventVisitor {
         // Necessary to ensure previous sound change occurs
         // TODO: as last event in current dialog is relevant to current dialog
         // depending on how dialog generation is managed this may miss cases
+        // TODO(frame perfect): may need to run tiles/map updates
         if (_lastEventInCurrentDialog is PlaySound ||
             _lastEventInCurrentDialog is PlayMusic)
           vIntPrepare(),
@@ -1657,6 +1659,7 @@ class SceneAsmGenerator implements EventVisitor {
         // Necessary to ensure previous sound change occurs
         // TODO: as last event in current dialog is relevant to current dialog
         // depending on how dialog generation is managed this may miss cases
+        // TODO(frame perfect): may need to run tiles/map updates
         if (_lastEventInCurrentDialog is PlaySound ||
             _lastEventInCurrentDialog is PlayMusic)
           vIntPrepare(),

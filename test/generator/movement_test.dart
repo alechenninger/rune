@@ -794,6 +794,8 @@ void main() {
               jsr(Label('FieldObj_NPCType2').l),
               jsr(Label('Field_LoadSprites').l),
               jsr(Label('Field_BuildSprites').l),
+              jsr(Label('AnimateTiles').l),
+              jsr(Label('RunMapUpdates').l),
               jsr(Label('VInt_Prepare').l),
               lea(0xFFFFC300.w, a4),
               moveq(0.i, d0),
