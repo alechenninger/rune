@@ -519,6 +519,8 @@ class Label extends Sized implements Address {
     }
   }
 
+  const Label.known(this.name) : super.constant();
+
   @override
   String toString() => name;
 
@@ -794,6 +796,7 @@ class Byte extends SizedValue {
 class Word extends SizedValue {
   Word(super.value);
   Word.signed(int value) : super.signed(value, Size.w);
+  const Word.constant(super.value) : super._();
 
   factory Word.concatBytes(Byte b1, Byte b2) {
     return Word((b1.value << 8) + b2.value);

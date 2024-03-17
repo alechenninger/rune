@@ -15,6 +15,8 @@ import 'data.dart';
 export 'address.dart';
 export 'data.dart';
 export 'objects.dart';
+export 'jump_table.dart';
+export 'array.dart';
 
 /// Data constant
 const DcMnemonic dc = DcMnemonic();
@@ -113,7 +115,8 @@ class DcMnemonic {
   Asm l(List<Expression> c, {String? comment}) =>
       cmd('dc.l', c, comment: comment);
 
-  Asm size(Size size, List<Expression> constants) => cmd('dc.$size', constants);
+  Asm size(Size size, List<Expression> constants, {String? comment}) =>
+      cmd('dc.$size', constants, comment: comment);
 }
 
 class MoveMnemonic {
@@ -166,8 +169,10 @@ class BranchMnemonic {
   final String _branch;
   const BranchMnemonic(this._branch);
 
-  Asm s(Address to) => cmd('$_branch.s', [to]);
-  Asm w(Address to) => cmd('$_branch.w', [to]);
+  Asm s(Address to, {String? comment}) =>
+      cmd('$_branch.s', [to], comment: comment);
+  Asm w(Address to, {String? comment}) =>
+      cmd('$_branch.w', [to], comment: comment);
 }
 
 class AddiMnemonic {
