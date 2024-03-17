@@ -1103,6 +1103,11 @@ abstract class Data<T extends List<int>, E extends SizedValue,
   }
 
   @override
+  void add(E element) {
+    bytes.add(element.value);
+  }
+
+  @override
   D skip(int count) {
     return _new(bytes.skip(1).toList());
   }
