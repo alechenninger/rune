@@ -1340,7 +1340,7 @@ class SceneAsmGenerator implements EventVisitor {
             // The purpose of this is to catch if we need a cutscene
             // while we know what events will be visited.
             runEventIfNeeded(ifFlag.isSet,
-                nameSuffix: '${ifFlag.flag.name}_set');
+                nameSuffix: '_${ifFlag.flag.name}_set');
             for (var event in ifFlag.isSet) {
               event.visit(this);
             }
@@ -1370,7 +1370,7 @@ class SceneAsmGenerator implements EventVisitor {
             }
 
             runEventIfNeeded(ifFlag.isUnset,
-                nameSuffix: '${ifFlag.flag.name}_unset');
+                nameSuffix: '_${ifFlag.flag.name}_unset');
 
             for (var event in ifFlag.isUnset) {
               event.visit(this);

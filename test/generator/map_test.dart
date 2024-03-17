@@ -4,7 +4,6 @@ import 'package:rune/asm/text.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
-import 'package:rune/model/events.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
@@ -2084,10 +2083,18 @@ void main() {
       });
 
       test('branch inside event code', () {
-        expect(asm.events.withoutComments(),
-        Asm([
-          
-        ]));
+        expect(
+            asm.events.withoutComments(),
+            Asm([
+              label(Label('Event_GrandCross_testrun_testflag1_set')),
+              getAndRunDialog3LowDialogId(0.toByte.i),
+              moveq(Constant('EventFlag_testflag2').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag2_unset3')),
+              getAndRunDialog3LowDialogId(1.toByte.i),
+              label(Label('.testflag2_unset3')),
+              rts,
+            ]));
       });
     });
   });
