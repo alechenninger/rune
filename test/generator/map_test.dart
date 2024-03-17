@@ -3,6 +3,7 @@ import 'package:rune/asm/text.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/events.dart';
 import 'package:rune/model/model.dart';
 import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
@@ -16,7 +17,7 @@ void main() {
 
   setUp(() {
     testMap = GameMap(MapId.Test);
-    program = Program(eventIndexOffset: Word(0));
+    program = Program(eventPointers: EventPointers.empty());
     testEventRoutines = TestEventRoutines();
   });
 
@@ -1025,7 +1026,7 @@ void main() {
 
     test('does not product event code', () {
       expect(mapAsm.events, Asm.empty());
-      expect(program.eventPointers, Asm.empty());
+      expect(program.additionalEventPointers, Asm.empty());
     });
   });
 
@@ -1083,7 +1084,7 @@ void main() {
       program.addMap(testMap);
 
       expect(
-          program.eventPointers,
+          program.additionalEventPointers,
           Asm([
             dc.l([Label('Event_GrandCross_Test_npc1')], comment: r'$0000'),
             dc.l([Label('Event_GrandCross_Test_npc2')], comment: r'$0001')
@@ -1106,7 +1107,7 @@ void main() {
 
       print(mapAsm.events);
       print(program.cutscenesPointers);
-      print(program.eventPointers);
+      print(program.additionalEventPointers);
     });
   });
 
@@ -1864,6 +1865,43 @@ void main() {
 
     expect(testMap.addressOf(obj1), Longword(0xFFFFC340));
     expect(testMap.addressOf(obj2), Longword(0xFFFFC3C0));
+  });
+
+  group('run events', () {
+    late MapAsm asm;
+
+    setUp(() {
+      testMap.addRunEvent(
+          SceneId('testrun'),
+          Scene([
+            IfFlag(EventFlag('testflag'), isSet: [
+              Dialog(spans: [DialogSpan('Hi')]),
+            ])
+          ]));
+
+      asm = program.addMap(testMap);
+    });
+
+    test('define run event pointer', () {
+      expect(program.runEventsJumpTable,
+          Asm([bra.w(Label('RunEvent_GrandCross_testrun'), comment: r'$00')]));
+    });
+
+    test('generate run event routine which triggers event', () {
+      expect(
+          asm.runEventRoutines,
+          Asm([
+            label(Label('RunEvent_GrandCross_testrun')),
+            jsr(Label('EventFlag_testflag').l),
+            beq.w(Label('RunEvent_NoEvent')),
+            move.w(Word(0).i, Constant('Event_Index').w),
+            moveq(1.i, d7),
+          ]));
+    });
+
+    test('generates run event indicies for map data', () {});
+
+    test('generate event routines', () {});
   });
 }
 

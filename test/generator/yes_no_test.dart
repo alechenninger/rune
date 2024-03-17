@@ -26,7 +26,7 @@ main() {
 
     map.addObject(mapObject);
 
-    program = Program(eventIndexOffset: 0.toWord);
+    program = Program(eventPointers: EventPointers.empty());
   });
 
   group('yes no choice in interaction', () {
@@ -54,7 +54,7 @@ main() {
             ]));
 
         expect(
-            program.eventPointers.withoutComments(),
+            program.additionalEventPointers.withoutComments(),
             Asm([
               dc.l([Label('Event_GrandCross_Test_Npc')])
             ]));
@@ -130,7 +130,7 @@ main() {
             ]));
 
         expect(
-            program.eventPointers.withoutComments(),
+            program.additionalEventPointers.withoutComments(),
             Asm([
               dc.l([Label('Event_GrandCross_Test_Npc')])
             ]));

@@ -20,6 +20,8 @@ class GameMap {
   // doesn't appear to be a limit other than ROM size
   final _areas = <MapAreaId, MapArea>{};
 
+  final _runEvents = <SceneId, Scene>{};
+
   GameMap(this.id);
 
   // TODO: we may want a way to retrieve back
@@ -118,6 +120,13 @@ class GameMap {
   }
 
   MapArea? area(MapAreaId id) => _areas[id];
+
+  Iterable<(SceneId, Scene)> get runEvents =>
+      _runEvents.entries.map((e) => (e.key, e.value));
+
+  void addRunEvent(SceneId id, Scene runEvent) {
+    _runEvents[id] = runEvent;
+  }
 
   @override
   String toString() {

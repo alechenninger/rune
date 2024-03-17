@@ -14,7 +14,7 @@ void main() {
   late MapObject object;
 
   setUp(() {
-    program = Program(eventIndexOffset: 0.toWord);
+    program = Program(eventPointers: EventPointers.empty());
     map = GameMap(MapId.Test);
     object = MapObject(
         id: 'test_0',

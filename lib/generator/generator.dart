@@ -29,9 +29,9 @@ import 'package:rune/generator/guild.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
-import '../asm/dialog.dart' as asmdialoglib;
+import '../asm/dialog.dart' as dialog_asm;
 import '../asm/events.dart';
-import '../asm/events.dart' as asmeventslib;
+import '../asm/events.dart' as events_asm;
 import '../asm/text.dart';
 import '../model/model.dart';
 import '../src/iterables.dart';
@@ -46,7 +46,7 @@ import 'memory.dart';
 import 'movement.dart';
 import 'objects.dart';
 import 'scene.dart';
-import 'text.dart' as textlib;
+import 'text.dart' as text_model;
 
 export '../asm/asm.dart' show Asm;
 export 'deprecated.dart';
@@ -74,57 +74,53 @@ class Program {
   final _maps = <MapId, MapAsm>{};
   Map<MapId, MapAsm> get maps => UnmodifiableMapView(_maps);
 
-  final dialogTrees = DialogTrees();
+  final _AsmProgramConfiguration _config;
 
-  final Asm _eventPointers = Asm.empty();
-  Asm get eventPointers => Asm([_eventPointers]);
+  DialogTrees get dialogTrees => _config.dialogTrees;
+  Asm get additionalEventPointers => _config.additionalEvents.toAsm();
+  Asm get allEventPointers => _config.events.toAsm();
+  Word get peekNextEventIndex => _config.events.nextIndex;
+  Asm get cutscenesPointers => _config.cutscenes.toAsm();
 
-  Word _eventIndexOffset;
-  Word get peekNextEventIndex => _eventIndexOffset;
+  EventFlags get _eventFlags => _config.eventFlags;
+  Constants get _constants => _config.constants;
+  Asm get runEventsJumpTable => _config.runEvents.toAsm();
 
-  final Asm _cutscenesPointers = Asm.empty();
-  Asm get cutscenesPointers => Asm([_cutscenesPointers]);
-  Word _cutsceneIndexOffset;
-
-  final Map<MapId, Word> _vramTileOffsets = {};
-  final Map<MapId, List<SpriteVramMapping>> _builtInSprites = {};
-
-  final _eventFlags = EventFlags();
-  final Constants _constants = Constants.wrap({});
-
-  final FieldRoutineRepository _fieldRoutines;
+  FieldRoutineRepository get _fieldRoutines => _config.fieldRoutines;
 
   Program({
-    Word? eventIndexOffset,
-    Word? cutsceneIndexOffset,
+    EventPointers? eventPointers,
+    EventPointers? cutscenePointers,
+    JumpTable<Byte>? runEvents,
     Map<MapId, Word>? vramTileOffsets,
     Map<MapId, List<SpriteVramMapping>>? builtInSprites,
     FieldRoutineRepository? fieldRoutines,
-  })  : _eventIndexOffset = eventIndexOffset ?? 0xa3.toWord,
-        _cutsceneIndexOffset = cutsceneIndexOffset ?? 0x22.toWord,
-        _fieldRoutines = fieldRoutines ?? defaultFieldRoutines {
-    _vramTileOffsets.addAll(vramTileOffsets ?? _defaultSpriteVramOffsets);
-    _builtInSprites.addAll(builtInSprites ?? _defaultBuiltInSprites);
-  }
+  }) : _config = _AsmProgramConfiguration(
+            events: eventPointers ?? eventPtrs(),
+            cutscenes:
+                cutscenePointers?.withOffset(Word(0x8000)) ?? cutscenePtrs(),
+            runEvents: runEvents ?? runEventsJmpTbl(),
+            fieldRoutines: fieldRoutines ?? defaultFieldRoutines,
+            eventFlags: EventFlags(),
+            constants: Constants.wrap({}),
+            dialogTrees: DialogTrees(),
+            spriteVramOffsets: vramTileOffsets ?? _defaultSpriteVramOffsets,
+            builtInSprites: builtInSprites ?? _defaultBuiltInSprites);
 
   /// Returns event index by which [routine] can be referenced.
   ///
   /// The event code must be added separate with the exact label of [routine].
+  @Deprecated('use ProgramConfiguration instead')
   Word _addEventPointer(Label routine) {
-    var eventIndex = _eventIndexOffset;
-    _eventPointers.add(dc.l([routine], comment: '$eventIndex'));
-    _eventIndexOffset = (_eventIndexOffset.value + 1).toWord;
-    return eventIndex;
+    return _config.events.add(routine);
   }
 
   /// Returns event index by which [routine] can be referenced.
   ///
   /// The event code must be added separate with the exact label of [routine].
+  @Deprecated('use ProgramConfiguration instead')
   Word _addCutscenePointer(Label routine) {
-    var cutsceneIndex = _cutsceneIndexOffset;
-    _cutscenesPointers.add(dc.l([routine], comment: '$cutsceneIndex'));
-    _cutsceneIndexOffset = (cutsceneIndex.value + 1).toWord;
-    return (cutsceneIndex + Word(0x8000)) as Word;
+    return _config.cutscenes.add(routine);
   }
 
   EventAsm debugStart(DebugOptions debugOptions) {
@@ -140,11 +136,21 @@ class Program {
 
   SceneAsm addScene(SceneId id, Scene scene, {GameMap? startingMap}) {
     var eventAsm = EventAsm.empty();
+    var eventType = sceneEventType(scene.events);
+
+    switch (eventType) {
+      case EventType.cutscene:
+        _addCutscenePointer(Label('Cutscene_$id'));
+        break;
+      case _:
+        _addEventPointer(Label('Event_$id'));
+        break;
+    }
 
     var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
         startingMap: startingMap,
         eventFlags: _eventFlags,
-        eventType: _sceneEventType(scene.events),
+        eventType: eventType,
         fieldRoutines: _fieldRoutines);
 
     for (var event in scene.events) {
@@ -164,15 +170,10 @@ class Program {
           map.id.name, 'map', 'map with same id already added');
     }
 
-    var spriteVramOffset = _vramTileOffsets[map.id];
-    var builtInSprites = _builtInSprites[map.id] ?? const [];
+    var spriteVramOffset = _config.spriteVramOffsetForMap(map.id);
+    var builtInSprites = _config.builtInSpritesForMap(map.id);
 
-    return _maps[map.id] = compileMap(
-        map, _ProgramEventRoutines(this), spriteVramOffset,
-        dialogTrees: dialogTrees,
-        eventFlags: _eventFlags,
-        builtInSprites: builtInSprites,
-        fieldRoutines: _fieldRoutines);
+    return _maps[map.id] = compileMap(map, _config);
   }
 
   HuntersGuildAsm configureHuntersGuild(HuntersGuild guild,
@@ -212,6 +213,207 @@ class Program {
 abstract class EventRoutines {
   Word addEvent(Label name);
   Word addCutscene(Label name);
+}
+
+abstract class ProgramConfiguration implements EventRoutines {
+  Byte addRunEvent(Label name);
+  FieldRoutineRepository get fieldRoutines;
+  EventFlags get eventFlags;
+  Constants get constants;
+  DialogTrees get dialogTrees;
+  Word? spriteVramOffsetForMap(MapId map);
+  List<SpriteVramMapping> builtInSpritesForMap(MapId map);
+
+  ProgramConfiguration._();
+
+  factory ProgramConfiguration.empty(
+      {EventPointers? events,
+      EventPointers? cutscenes,
+      JumpTable<Byte>? runEvents,
+      FieldRoutineRepository? fieldRoutines,
+      EventFlags? eventFlags,
+      Constants? constants,
+      DialogTrees? dialogTrees,
+      Map<MapId, Word>? spriteVramOffsets,
+      Map<MapId, List<SpriteVramMapping>>? builtInSprites}) {
+    return _AsmProgramConfiguration(
+        events: events ?? EventPointers([]),
+        cutscenes: cutscenes?.withOffset(Word(0x8000)) ??
+            EventPointers([], offset: Word(0x8000)),
+        runEvents: runEvents ??
+            JumpTable.sparse(
+              jump: withNoop(Label.known('RunEvent_NoEvent'), bra.w),
+              newIndex: (i) => Byte(i),
+            ),
+        fieldRoutines: fieldRoutines ?? defaultFieldRoutines,
+        eventFlags: eventFlags ?? EventFlags(),
+        constants: constants ?? Constants.wrap({}),
+        dialogTrees: dialogTrees ?? DialogTrees(),
+        spriteVramOffsets: spriteVramOffsets ?? _defaultSpriteVramOffsets,
+        builtInSprites: builtInSprites ?? _defaultBuiltInSprites);
+  }
+
+  factory ProgramConfiguration.grandCross() {
+    return _AsmProgramConfiguration(
+        events: eventPtrs(),
+        cutscenes: cutscenePtrs(),
+        runEvents: runEventsJmpTbl(),
+        fieldRoutines: defaultFieldRoutines,
+        eventFlags: EventFlags(),
+        constants: Constants.wrap({}),
+        dialogTrees: DialogTrees(),
+        spriteVramOffsets: _defaultSpriteVramOffsets,
+        builtInSprites: _defaultBuiltInSprites);
+  }
+}
+
+class _AsmProgramConfiguration extends ProgramConfiguration {
+  final int _startEventCount;
+  final EventPointers events;
+  EventPointers get additionalEvents => events.skip(_startEventCount);
+  final EventPointers cutscenes;
+  final JumpTable<Byte> runEvents;
+
+  @override
+  final FieldRoutineRepository fieldRoutines;
+  @override
+  final EventFlags eventFlags;
+  @override
+  final Constants constants;
+  @override
+  final DialogTrees dialogTrees;
+
+  final Map<MapId, Word> _spriteVramOffsets;
+  final Map<MapId, List<SpriteVramMapping>> _builtInSprites;
+
+  _AsmProgramConfiguration(
+      {required this.events,
+      required this.cutscenes,
+      required this.runEvents,
+      required this.fieldRoutines,
+      required this.eventFlags,
+      required this.constants,
+      required this.dialogTrees,
+      required Map<MapId, Word> spriteVramOffsets,
+      required Map<MapId, List<SpriteVramMapping>> builtInSprites})
+      : _spriteVramOffsets = Map.of(spriteVramOffsets),
+        _builtInSprites = Map.of(builtInSprites),
+        _startEventCount = events.length,
+        super._();
+
+  @override
+  Word addCutscene(Label name) {
+    return cutscenes.add(name);
+  }
+
+  @override
+  Word addEvent(Label name) {
+    return events.add(name);
+  }
+
+  @override
+  Byte addRunEvent(Label name) {
+    return runEvents.add(name);
+  }
+
+  @override
+  Word? spriteVramOffsetForMap(MapId map) => _spriteVramOffsets[map];
+
+  @override
+  List<SpriteVramMapping> builtInSpritesForMap(MapId map) =>
+      _builtInSprites[map] ?? const [];
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _AsmProgramConfiguration &&
+          runtimeType == other.runtimeType &&
+          events == other.events &&
+          cutscenes == other.cutscenes &&
+          runEvents == other.runEvents &&
+          fieldRoutines == other.fieldRoutines &&
+          eventFlags == other.eventFlags &&
+          constants == other.constants &&
+          dialogTrees == other.dialogTrees &&
+          const MapEquality()
+              .equals(_spriteVramOffsets, other._spriteVramOffsets) &&
+          const MapEquality().equals(_builtInSprites, other._builtInSprites);
+
+  @override
+  int get hashCode =>
+      events.hashCode ^
+      cutscenes.hashCode ^
+      runEvents.hashCode ^
+      fieldRoutines.hashCode ^
+      eventFlags.hashCode ^
+      constants.hashCode ^
+      dialogTrees.hashCode ^
+      const MapEquality().hash(_spriteVramOffsets) ^
+      const MapEquality().hash(_builtInSprites);
+
+  @override
+  String toString() {
+    return '_ProgramConfiguration{events: $events, '
+        'cutscenes: $cutscenes, '
+        'runEvents: $runEvents, '
+        'fieldRoutines: $fieldRoutines, '
+        'eventFlags: $eventFlags, '
+        'constants: $constants, '
+        'dialogTrees: $dialogTrees, '
+        '_spriteVramOffsets: $_spriteVramOffsets, '
+        '_builtInSprites: $_builtInSprites}';
+  }
+}
+
+class _EventRoutinesWrappingConfiguration extends ProgramConfiguration {
+  final EventRoutines _eventRoutines;
+  final JumpTable<Byte> _runEvents;
+
+  @override
+  final Constants constants;
+
+  @override
+  final DialogTrees dialogTrees;
+
+  @override
+  final EventFlags eventFlags;
+
+  @override
+  final FieldRoutineRepository fieldRoutines;
+
+  final Map<MapId, Word> _spriteVramOffsets;
+  final Map<MapId, List<SpriteVramMapping>> _builtInSprites;
+
+  _EventRoutinesWrappingConfiguration(
+      {required EventRoutines eventRoutines,
+      JumpTable<Byte>? runEvents,
+      required this.constants,
+      required this.dialogTrees,
+      required this.eventFlags,
+      required this.fieldRoutines,
+      Map<MapId, Word> spriteVramOffsets = const {},
+      Map<MapId, List<SpriteVramMapping>> builtInSprites = const {}})
+      : _spriteVramOffsets = Map.of(spriteVramOffsets),
+        _builtInSprites = Map.of(builtInSprites),
+        _eventRoutines = eventRoutines,
+        _runEvents = runEvents ?? runEventsJmpTbl(),
+        super._();
+
+  @override
+  Word addCutscene(Label name) => _eventRoutines.addCutscene(name);
+
+  @override
+  Word addEvent(Label name) => _eventRoutines.addEvent(name);
+
+  @override
+  Byte addRunEvent(Label name) => _runEvents.add(name);
+
+  @override
+  Word? spriteVramOffsetForMap(MapId map) => _spriteVramOffsets[map];
+
+  @override
+  List<SpriteVramMapping> builtInSpritesForMap(MapId map) =>
+      _builtInSprites[map] ?? const [];
 }
 
 class EventFlags {
@@ -269,10 +471,10 @@ class _ProgramEventRoutines extends EventRoutines {
   _ProgramEventRoutines(this._program);
 
   @override
-  Word addEvent(Label routine) => _program._addEventPointer(routine);
+  Word addEvent(Label routine) => _program._config.events.add(routine);
 
   @override
-  Word addCutscene(Label routine) => _program._addCutscenePointer(routine);
+  Word addCutscene(Label routine) => _program._config.cutscenes.add(routine);
 }
 
 /// Returns true if an event routine is needed in code generated for [events].
@@ -314,7 +516,7 @@ $F2 = Determines actions during dialogues. The byte after this has the following
   $B = Sets event flag
   $C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
   */
-EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
+EventType? sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
   // SetContext is not a perceivable event, so ignore
   events = events.whereNot((e) => e is SetContext).toList(growable: false);
 
@@ -323,7 +525,7 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
   if (events.length == 1 && events[0] is IfFlag) return null;
 
   bool isLast(int i) => i == events.length - 1;
-  bool hasDialogAfter(int i) => events.sublist(i + 1).any((e) => e is Dialog);
+  bool hasDialogAfter(int i) => events.skip(i + 1).any((e) => e is Dialog);
 
   // One of dialog checks must pass for each event.
   // If check does not pass, the next check is used for all remaining events.
@@ -353,8 +555,8 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
         // Choices must NOT have any events after in order to fit in dialog
         (event is YesOrNoChoice &&
             isLast(i) &&
-            _sceneEventType(event.ifNo) == null &&
-            _sceneEventType(event.ifYes) == null),
+            sceneEventType(event.ifNo) == null &&
+            sceneEventType(event.ifYes) == null),
     (event, i, _) => event is Dialog && event.hidePanelsOnClose && isLast(i),
   ];
 
@@ -390,22 +592,100 @@ EventType? _sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
   return null;
 }
 
-class SceneAsmGenerator implements EventVisitor {
-  final SceneId id;
+class GenerationContext {
+  GenerationContext(this.config,
+      {required this.eventAsm, required this.runEventAsm});
 
   // Non-volatile state (state of the code being generated)
-  final DialogTrees _dialogTrees;
-  final EventFlags _eventFlags;
-  final EventAsm _eventAsm;
+  final ProgramConfiguration config;
+  DialogTrees get dialogTrees => config.dialogTrees;
+  EventFlags get eventFlags => config.eventFlags;
+  final EventAsm eventAsm;
+  final Asm runEventAsm;
 
   /// Additional assembly segments, labelled, which are added after generation.
   ///
   /// Can be used for data tables or additional, top-level subroutines.
-  final _postAsm = <Asm>[];
+  final postEvents = <Asm>[];
 
   // required if processing interaction (see todo on ctor)
-  final EventRoutines? _eventRoutines;
-  final FieldRoutineRepository _fieldRoutines;
+  EventRoutines get eventRoutines => config;
+  FieldRoutineRepository get fieldRoutines => config.fieldRoutines;
+
+  var _eventCounter = 1;
+  int get eventCounter => _eventCounter;
+
+  int getEventCountAndIncrement() {
+    return _eventCounter++;
+  }
+
+  /// For currently generating branch, what is the known state of event flags
+  // note: empty is currently used to understand "root" condition
+  // if we allow starting scenes with other conditions,
+  // we'll need to store the starting point.
+  Condition currentCondition = Condition.empty();
+
+  /// mem state which exactly matches current flags; other states may need
+  /// updates
+  Memory memory = Memory(); // todo: ctor initialization
+  /// should also contain root state
+  final stateGraph = <Condition, Memory>{};
+
+  //AsmGeneratingEventVisitor mode;
+}
+
+class SceneAsmGenerator implements EventVisitor {
+  final SceneId id;
+
+  // Non-volatile state (state of the code being generated)
+  final GenerationContext _context;
+
+  ProgramConfiguration get _config => _context.config;
+  DialogTrees get _dialogTrees => _config.dialogTrees;
+  EventFlags get _eventFlags => _config.eventFlags;
+  EventAsm get _eventAsm => _context.eventAsm;
+
+  /// Additional assembly segments, labelled, which are added after generation.
+  ///
+  /// Can be used for data tables or additional, top-level subroutines.
+  List<Asm> get _postAsm => _context.postEvents;
+
+  // required if processing interaction (see todo on ctor)
+  EventRoutines get _eventRoutines => _config;
+  FieldRoutineRepository get _fieldRoutines => _config.fieldRoutines;
+
+  int get _eventCounter => _context.eventCounter;
+
+  // conditional runtime state
+
+  /// For currently generating branch, what is the known state of event flags
+  // note: empty is currently used to understand "root" condition
+  // if we allow starting scenes with other conditions,
+  // we'll need to store the starting point.
+  Condition get _currentCondition => _context.currentCondition;
+  set _currentCondition(Condition value) {
+    _context.currentCondition = value;
+  }
+
+  /// mem state which exactly matches current flags; other states may need
+  /// updates
+  Memory get _memory => _context.memory;
+  // TODO: probably move this to method on context
+  set _memory(Memory value) {
+    _context.memory = value;
+  }
+
+  /// should also contain root state
+  Map<Condition, Memory> get _stateGraph => _context.stateGraph;
+
+  var _finished = false;
+
+  // Current dialog generation state:
+
+  DialogTree? _dialogTree;
+  Byte? _currentDialogId;
+  DialogAsm? _currentDialog;
+  var _lastEventBreak = -1;
 
   Mode _gameMode = Mode.event;
   bool get inDialogLoop => _gameMode == Mode.dialog;
@@ -422,49 +702,30 @@ class SceneAsmGenerator implements EventVisitor {
   final bool _isProcessingInteraction;
   bool get _isInteractingWithObject => _interactingWith != null;
 
-  var _eventCounter = 1;
-  var _finished = false;
-
-  // Current dialog generation state:
-
-  DialogTree? _dialogTree;
-  Byte? _currentDialogId;
-  DialogAsm? _currentDialog;
-  var _lastEventBreak = -1;
-  int? _lastInterrupt;
-
   /// Events processed in current dialog, last event first.
   final _queuedGeneration = Queue<_QueuedGeneration>();
   Event? _lastEventInCurrentDialog;
 
   Function([int? dialogRoutine])? _replaceDialogRoutine;
 
-  // conditional runtime state
-
-  /// For currently generating branch, what is the known state of event flags
-  // note: empty is currently used to understand "root" condition
-  // if we allow starting scenes with other conditions,
-  // we'll need to store the starting point.
-  Condition _currentCondition = Condition.empty();
-
-  /// mem state which exactly matches current flags; other states may need
-  /// updates
-  Memory _memory = Memory(); // todo: ctor initialization
-  /// should also contain root state
-  final _stateGraph = <Condition, Memory>{};
-
   // todo: This might be a subclass really
-  SceneAsmGenerator.forInteraction(GameMap map, this.id, this._dialogTrees,
-      this._eventAsm, EventRoutines eventRoutines,
+  SceneAsmGenerator.forInteraction(GameMap map, this.id,
+      DialogTrees dialogTrees, EventAsm eventAsm, EventRoutines eventRoutines,
       {EventFlags? eventFlags,
       bool withObject = true,
       FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _interactingWith = withObject ? const InteractionObject() : null,
         _isProcessingInteraction = true,
-        _eventRoutines = eventRoutines,
-        _eventFlags = eventFlags ?? EventFlags(),
-        _fieldRoutines = fieldRoutines ?? defaultFieldRoutines {
+        _context = GenerationContext(
+            _EventRoutinesWrappingConfiguration(
+                eventRoutines: eventRoutines,
+                constants: Constants.wrap({}),
+                dialogTrees: dialogTrees,
+                eventFlags: eventFlags ?? EventFlags(),
+                fieldRoutines: fieldRoutines ?? defaultFieldRoutines),
+            eventAsm: eventAsm,
+            runEventAsm: Asm.empty()) {
     _gameMode = Mode.dialog;
 
     if (withObject) _memory.putInAddress(a3, const InteractionObject());
@@ -474,7 +735,8 @@ class SceneAsmGenerator implements EventVisitor {
     _stateGraph[Condition.empty()] = _memory;
   }
 
-  SceneAsmGenerator.forEvent(this.id, this._dialogTrees, this._eventAsm,
+  SceneAsmGenerator.forEvent(
+      this.id, DialogTrees dialogTrees, EventAsm eventAsm,
       {GameMap? startingMap,
       EventFlags? eventFlags,
       EventType? eventType,
@@ -483,14 +745,39 @@ class SceneAsmGenerator implements EventVisitor {
         _interactingWith = null,
         _isProcessingInteraction = false,
         _eventType = eventType ?? EventType.event,
-        _eventFlags = eventFlags ?? EventFlags(),
-        _eventRoutines = null, // TODO
-        _fieldRoutines = fieldRoutines ?? defaultFieldRoutines {
+        _context = GenerationContext(
+            _AsmProgramConfiguration(
+                events: eventPtrs(),
+                cutscenes: cutscenePtrs(),
+                runEvents: runEventsJmpTbl(),
+                fieldRoutines: fieldRoutines ?? defaultFieldRoutines,
+                eventFlags: eventFlags ?? EventFlags(),
+                constants: Constants.wrap({}),
+                dialogTrees: dialogTrees,
+                spriteVramOffsets: _defaultSpriteVramOffsets,
+                builtInSprites: _defaultBuiltInSprites),
+            eventAsm: eventAsm,
+            runEventAsm: Asm.empty()) {
     _memory.currentMap = startingMap;
     if (startingMap != null) {
       _memory.loadedDialogTree = _dialogTrees.forMap(startingMap.id);
     }
     _gameMode = Mode.event;
+    _stateGraph[Condition.empty()] = _memory;
+  }
+
+  SceneAsmGenerator.forRunEvent(this.id,
+      {required GameMap inMap,
+      required EventAsm eventAsm,
+      required Asm runEventAsm,
+      required ProgramConfiguration config})
+      : _interactingWith = null,
+        _isProcessingInteraction = false,
+        _context = GenerationContext(config,
+            eventAsm: eventAsm, runEventAsm: runEventAsm) {
+    _gameMode = Mode.runEvent;
+    _memory.currentMap = inMap;
+    _memory.loadedDialogTree = _dialogTrees.forMap(inMap.id);
     _stateGraph[Condition.empty()] = _memory;
   }
 
@@ -500,9 +787,9 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  /// See [_sceneEventType].
+  /// See [sceneEventType].
   EventType? needsEvent(List<Event> events) {
-    return _sceneEventType(events, interactingWith: _interactingWith);
+    return sceneEventType(events, interactingWith: _interactingWith);
   }
 
   void runEventFromInteractionIfNeeded(List<Event> events,
@@ -548,11 +835,11 @@ class SceneAsmGenerator implements EventVisitor {
           ? '$id${_currentCondition == Condition.empty() ? '' : _eventCounter}'
           : '$id$nameSuffix';
       var eventRoutine = Label('Event_GrandCross_$eventName');
-      eventIndex = type.addRoutine(_eventRoutines!, eventRoutine);
+      eventIndex = type.addRoutine(_eventRoutines, eventRoutine);
       _eventAsm.add(setLabel(eventRoutine.name));
     }
 
-    _addToDialog(asmdialoglib.runEvent(eventIndex));
+    _addToDialog(dialog_asm.runEvent(eventIndex));
     _eventType = type;
 
     _terminateDialog();
@@ -578,7 +865,7 @@ class SceneAsmGenerator implements EventVisitor {
   void displayText(DisplayText display) {
     _addToEvent(display, (i) {
       _terminateDialog();
-      var asm = textlib.displayTextToAsm(display, _currentDialogTree());
+      var asm = text_model.displayTextToAsm(display, _currentDialogTree());
       return asm.event;
     });
   }
@@ -794,15 +1081,13 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void lockCamera(LockCamera lock) {
     _addToEvent(lock,
-        (i) => EventAsm.of(asmeventslib.lockCamera(_memory.cameraLock = true)));
+        (i) => EventAsm.of(events_asm.lockCamera(_memory.cameraLock = true)));
   }
 
   @override
   void unlockCamera(UnlockCamera unlock) {
-    _addToEvent(
-        unlock,
-        (i) =>
-            EventAsm.of(asmeventslib.lockCamera(_memory.cameraLock = false)));
+    _addToEvent(unlock,
+        (i) => EventAsm.of(events_asm.lockCamera(_memory.cameraLock = false)));
   }
 
   @override
@@ -819,14 +1104,14 @@ class SceneAsmGenerator implements EventVisitor {
       return move.to.withPosition(
           memory: _memory,
           asm: ((x, y) => Asm([
-                if (_memory.cameraLock == true) asmeventslib.lockCamera(false),
-                asmeventslib.moveCamera(
+                if (_memory.cameraLock == true) events_asm.lockCamera(false),
+                events_asm.moveCamera(
                     x: x,
                     y: y,
                     // TODO: speed
                     // seems to mostly be 1 but not sure if this is slow or fast
                     speed: 1.i),
-                if (_memory.cameraLock == true) asmeventslib.lockCamera(true),
+                if (_memory.cameraLock == true) events_asm.lockCamera(true),
               ])));
     });
   }
@@ -1342,7 +1627,7 @@ class SceneAsmGenerator implements EventVisitor {
       // e.g. if after fading out, we want to show a panel,
       // the swap it to initvramandcram & fadein
 
-      _eventAsm.add(asmeventslib.fadeOut(initVramAndCram: false));
+      _eventAsm.add(events_asm.fadeOut(initVramAndCram: false));
 
       if ((_memory.panelsShown ?? 0) > 0) {
         _eventAsm.add(jsr(Label('Panel_DestroyAll').l));
@@ -1437,7 +1722,7 @@ class SceneAsmGenerator implements EventVisitor {
       if (loadMap.showField) {
         if (_memory.isDisplayEnabled == false) {
           if (_memory.isMapInCram != false) {
-            _eventAsm.add(asmeventslib.fadeOut());
+            _eventAsm.add(events_asm.fadeOut());
             _memory.isMapInCram = false;
             _memory.isDialogInCram = false;
           }
@@ -1447,7 +1732,7 @@ class SceneAsmGenerator implements EventVisitor {
         }
       }
 
-      return asmeventslib.changeMap(
+      return events_asm.changeMap(
           to: newId.i,
           from: currentId?.i,
           startX: x.i,
@@ -2211,7 +2496,7 @@ class SceneAsmGenerator implements EventVisitor {
     } else if (_lastEventInCurrentDialog is Dialog && interruptDialog) {
       // Add cursor for previous dialog
       // This is delayed because this interrupt may be a termination
-      _lastInterrupt = _addToDialog(interrupt());
+      _addToDialog(interrupt());
     }
 
     _lastEventInCurrentDialog = event;
@@ -2227,7 +2512,8 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void _runDialog() {
-    _eventAsm.add(Asm([comment('${_eventCounter++}: $Dialog')]));
+    _eventAsm.add(
+        Asm([comment('${_context.getEventCountAndIncrement()}: $Dialog')]));
 
     // todo if null, have to check somehow?
     // todo: not sure if this is right
@@ -2372,7 +2658,6 @@ class SceneAsmGenerator implements EventVisitor {
       _currentDialogId = null; // _dialogTree.nextDialogId;
       _currentDialog = null;
       _lastEventInCurrentDialog = null;
-      _lastInterrupt = null;
     }
 
     // i think terminate might still save dialog position but i don't usually
@@ -2421,7 +2706,7 @@ class SceneAsmGenerator implements EventVisitor {
   void _addToEvent(Event event, dynamic Function(int eventIndex) generate) {
     _checkNotFinished();
 
-    var eventIndex = _eventCounter++;
+    var eventIndex = _context.getEventCountAndIncrement();
 
     if (!_inEvent) {
       throw StateError("can't add event when not in event loop");
@@ -2494,12 +2779,12 @@ class SceneAsmGenerator implements EventVisitor {
   void _initVramAndCram() {
     if (_memory.isDisplayEnabled != false) {
       // doesn't hurt if we do this while already disabled i guess
-      _eventAsm.add(asmeventslib.fadeOut(initVramAndCram: true));
+      _eventAsm.add(events_asm.fadeOut(initVramAndCram: true));
       _memory.isDisplayEnabled = false;
     } else {
       var last = _lastLineIfFadeOut(_eventAsm);
       if (last != null) {
-        _eventAsm.replace(last, asmeventslib.fadeOut(initVramAndCram: true));
+        _eventAsm.replace(last, events_asm.fadeOut(initVramAndCram: true));
       } else {
         _eventAsm.add(jsr(Label('InitVRAMAndCRAMAfterFadeOut').l));
       }
@@ -2562,7 +2847,7 @@ int? _lastLineIfFadeOut(Asm asm) {
   for (var i = asm.lines.length - 1; i >= 0; --i) {
     var line = asm.lines[i];
     if (line.isCommentOnly) continue;
-    if (line == asmeventslib.fadeOut(initVramAndCram: false).single) {
+    if (line == events_asm.fadeOut(initVramAndCram: false).single) {
       return i;
     }
     break;
@@ -2577,7 +2862,7 @@ class _QueuedGeneration {
   _QueuedGeneration(this.generateDialog, this.generateEvent);
 }
 
-enum Mode { dialog, event }
+enum Mode { dialog, event, runEvent }
 
 Word _addEventRoutine(EventRoutines r, Label name) {
   return r.addEvent(name);

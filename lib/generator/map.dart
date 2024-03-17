@@ -4,10 +4,10 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' as iterables;
-import 'package:rune/generator/movement.dart';
-import 'package:rune/src/null.dart';
 
+import '../src/null.dart';
 import '../model/model.dart';
+import 'movement.dart';
 import 'dialog.dart';
 import 'event.dart';
 import 'generator.dart';
@@ -19,6 +19,8 @@ class MapAsm {
   @Deprecated('use DialogTrees API instead')
   final Asm? dialog;
   final Asm events;
+  final Asm runEventRoutines;
+  final Asm runEventIndices;
   // might also need dialogTrees ASM
   // if these labels need to be programmatically referred to
 
@@ -27,14 +29,18 @@ class MapAsm {
       required this.objects,
       required this.areas,
       required this.dialog,
-      required this.events});
+      required this.events,
+      this.runEventRoutines = const Asm.none(),
+      this.runEventIndices = const Asm.none()});
 
   MapAsm.empty()
       : sprites = Asm.empty(),
         objects = Asm.empty(),
         areas = Asm.empty(),
         dialog = Asm.empty(),
-        events = Asm.empty();
+        events = Asm.empty(),
+        runEventRoutines = Asm.empty(),
+        runEventIndices = Asm.empty();
 
   @override
   String toString() {
@@ -94,17 +100,19 @@ extension MapIdAsm on MapId {
   Constant get toAsm => mapIdToAsm(this);
 }
 
-MapAsm compileMap(
-    GameMap map, EventRoutines eventRoutines, Word? spriteVramOffset,
-    {required DialogTrees dialogTrees,
-    required EventFlags eventFlags,
-    required FieldRoutineRepository fieldRoutines,
-    List<SpriteVramMapping> builtInSprites = const []}) {
-  var trees = dialogTrees;
+MapAsm compileMap(GameMap map, ProgramConfiguration config) {
+  var spriteVramOffset = config.spriteVramOffsetForMap(map.id);
+  var builtInSprites = config.builtInSpritesForMap(map.id);
+  var dialogTrees = config.dialogTrees;
+  var eventFlags = config.eventFlags;
+  var fieldRoutines = config.fieldRoutines;
+
   var spritesAsm = Asm.empty();
   var objectsAsm = Asm.empty();
   var areasAsm = Asm.empty();
   var eventsAsm = EventAsm.empty();
+  var runEventsAsm = Asm.empty();
+  var runEventIndices = <Byte>[];
 
   var objects = map.orderedObjects;
 
@@ -122,7 +130,7 @@ MapAsm compileMap(
     return scenes.putIfAbsent(
         scene,
         () => _compileInteractionScene(
-            map, scene, id, trees, eventsAsm, eventRoutines, eventFlags,
+            map, scene, id, dialogTrees, eventsAsm, config, eventFlags,
             withObject: withObject, fieldRoutines: fieldRoutines));
   }
 
@@ -144,12 +152,36 @@ MapAsm compileMap(
             withObject: false));
   }
 
+  for (var (id, scene) in map.runEvents) {
+    var label = Label('RunEvent_GrandCross_$id');
+    runEventIndices.add(config.addRunEvent(label));
+
+    var generator = SceneAsmGenerator.forRunEvent(id,
+        inMap: map,
+        eventAsm: eventsAsm,
+        runEventAsm: runEventsAsm,
+        config: config);
+
+    for (var event in scene.events) {
+      event.visit(generator);
+    }
+
+    generator.finish();
+  }
+
+  if (runEventIndices.length.isEven) {
+    // Must be word aligned – terminating byte counts as one.
+    runEventIndices.add(Byte(0));
+  }
+
   return MapAsm(
       sprites: spritesAsm,
       objects: objectsAsm,
       areas: areasAsm,
-      dialog: trees.forMap(map.id).toAsm(),
-      events: eventsAsm);
+      dialog: dialogTrees.forMap(map.id).toAsm(),
+      events: eventsAsm,
+      runEventRoutines: runEventsAsm,
+      runEventIndices: dc.b(runEventIndices));
 }
 
 /// Writes all sprite pointer and VRAM tile pairs for objects in the map.

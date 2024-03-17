@@ -139,7 +139,7 @@ ${dialog2.toAsm()}
           ]));
 
       expect(
-          program.eventPointers.withoutComments(),
+          program.additionalEventPointers.withoutComments(),
           Asm([
             dc.l([Label('Event_GrandCross_Test_testObj')])
           ]));

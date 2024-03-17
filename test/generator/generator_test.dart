@@ -21,7 +21,7 @@ main() {
   });
 
   test('cutscene pointers are offset by 0x8000', () {
-    var program = Program(cutsceneIndexOffset: Word(0));
+    var program = Program(cutscenePointers: EventPointers.empty());
     var obj = MapObject(startPosition: Position(0, 0), spec: AlysWaiting());
     obj.onInteract = Scene.forNpcInteraction([
       FadeOut(),
