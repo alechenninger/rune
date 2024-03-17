@@ -81,6 +81,8 @@ const Map_Load_Flags = Constant('Map_Load_Flags');
 const Event_Index = Constant('Event_Index');
 const Sound_Index = Constant('Sound_Index');
 
+const RunEvent_NoEvent = Label.known('RunEvent_NoEvent');
+
 final eventFlags = BiMap<Constant, Byte>()
   ..addAll({
     Constant('EventFlag_PiataFirstTime'):
