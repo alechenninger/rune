@@ -1286,6 +1286,11 @@ class SceneAsmGenerator implements EventVisitor {
 
         break;
       case EventMode() || RunEventMode():
+        // TODO(ifflag): if we're in dialog loop,
+        //  we can check event flag in dialog
+        // This would however make running common events
+        // after the check more difficult.
+
         _addToEventOrRunEvent(ifFlag, (i, asm) {
           // note that if we need to move further than beq.w
           // we will need to branch to subroutine
@@ -1346,14 +1351,14 @@ class SceneAsmGenerator implements EventVisitor {
               _finish();
             } else {
               _terminateDialog();
+
+              // skip past unset events
+              if (ifFlag.isUnset.isNotEmpty) {
+                asm.add(bra.w(continueScene));
+              }
             }
 
             _gameMode = startingMode;
-
-            // skip past unset events
-            if (ifFlag.isUnset.isNotEmpty) {
-              asm.add(bra.w(continueScene));
-            }
           }
 
           // define routine for unset events if there are any
@@ -1383,10 +1388,16 @@ class SceneAsmGenerator implements EventVisitor {
           _updateStateGraphAndSibling(flag);
           _flagUnknown(flag);
 
-          // define routine for continuing
-          asm.add(setLabel(continueScene.name));
-
-          return null;
+          // Check if both branches had events. If this is a run event,
+          // then there is no need to define continue label (it is unused)
+          // TODO: if finished was a per branch (+ per mode?) state,
+          //  we could just check finished flag here
+          // Semantically that is what this is doing.
+          if (!(startingMode is RunEventMode &&
+              ifFlag.isSet.isNotEmpty &&
+              ifFlag.isUnset.isNotEmpty)) {
+            asm.add(setLabel(continueScene.name));
+          }
         });
 
         break;
@@ -1412,7 +1423,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void ifValue(IfValue ifValue) {
-    _addToEvent(ifValue, (i) {
+    _addToEventOrRunEvent(ifValue, (i, asm) {
       // This event will apply changes to reachable states in the graph.
       // Because of this, we need to be sure any queued changes
       // are applied first,
@@ -1429,6 +1440,7 @@ class SceneAsmGenerator implements EventVisitor {
       // Evaluate expression at runtime if needed
       // at code where expression is true, fork memory state,
       var parent = _memory;
+      var startingMode = _gameMode;
 
       // These branches are not added to state graph intentionally,
       // since we don't have ways to express these conditions in the graph
@@ -1445,11 +1457,11 @@ class SceneAsmGenerator implements EventVisitor {
         _terminateDialog();
       }
 
-      _eventAsm.add(ifValue.compare(memory: _memory));
+      asm.add(ifValue.compare(memory: _memory));
 
       Label branchTo(Branch b) {
         var lbl = Label('.${i}_${b.condition.name}');
-        _eventAsm.add(b.condition.mnemonicUnsigned.w(lbl));
+        asm.add(b.condition.mnemonicUnsigned.w(lbl));
         return lbl;
       }
 
@@ -1459,7 +1471,7 @@ class SceneAsmGenerator implements EventVisitor {
       var emptyBranch = ifValue.emptyBranch;
 
       if (emptyBranch != null) {
-        _eventAsm.add(emptyBranch.mnemonicUnsigned.w(continueLbl));
+        asm.add(emptyBranch.mnemonicUnsigned.w(continueLbl));
       }
 
       var branched = branches
@@ -1470,12 +1482,12 @@ class SceneAsmGenerator implements EventVisitor {
       runBranch(branches.last.events);
 
       for (var (b, lbl) in branched) {
-        _eventAsm.add(bra.w(continueLbl));
-        _eventAsm.add(label(lbl));
+        asm.add(bra.w(continueLbl));
+        asm.add(label(lbl));
         runBranch(b.events);
       }
 
-      _eventAsm.add(label(continueLbl));
+      asm.add(label(continueLbl));
 
       _memory = parent;
 

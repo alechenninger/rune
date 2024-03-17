@@ -1871,71 +1871,224 @@ void main() {
     expect(testMap.addressOf(obj2), Longword(0xFFFFC3C0));
   });
 
-  group('run events', () {
+  group('run events compiler', () {
     late MapAsm asm;
 
-    setUp(() {
-      testMap.addRunEvent(
-          SceneId('testrun'),
-          Scene([
-            IfFlag(EventFlag('testflag'), isSet: [
-              Dialog(spans: [DialogSpan('Hi')]),
-            ])
-          ]));
+    group('with event flag check and just dialog generates', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag'), isSet: [
+                Dialog(spans: [DialogSpan('Hi')]),
+              ])
+            ]));
 
-      asm = program.addMap(testMap);
+        asm = program.addMap(testMap);
+      });
+
+      test('run event pointer', () {
+        expect(
+            program.runEventsJumpTable,
+            Asm([
+              bra.w(RunEvent_NoEvent, comment: r'$00'),
+              bra.w(Label('RunEvent_GrandCross_testrun'), comment: r'$01')
+            ]));
+      });
+
+      test('optimized run event routine which triggers event', () {
+        expect(
+            asm.runEventRoutines.withoutComments(),
+            Asm([
+              label(Label('RunEvent_GrandCross_testrun')),
+              moveq(Constant('EventFlag_testflag').i, d0),
+              jsr(Label('EventFlag_testflag').l),
+              beq.w(Label('RunEvent_NoEvent')),
+              move.w(Word(0).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+            ]));
+      }, skip: 'not optimized yet');
+
+      test('run event routine which triggers event', () {
+        expect(
+            asm.runEventRoutines.withoutComments(),
+            Asm([
+              label(Label('RunEvent_GrandCross_testrun')),
+              moveq(Constant('EventFlag_testflag').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag_unset1')),
+              move.w(Word(0).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              label(Label('.testflag_unset1')),
+              bra.w(Label('RunEvent_NoEvent')),
+            ]));
+      });
+
+      test('run event indices for map data', () {
+        expect(asm.runEventIndices.withoutComments(), dc.b([1.toByte]));
+      });
+
+      test('event routines', () {
+        expect(
+            asm.events.withoutComments(),
+            Asm([
+              label(Label('Event_GrandCross_testrun2')),
+              getAndRunDialog3LowDialogId(0.toByte.i),
+              rts,
+            ]));
+      });
     });
 
-    test('define run event pointer', () {
-      expect(
-          program.runEventsJumpTable,
-          Asm([
-            bra.w(RunEvent_NoEvent, comment: r'$00'),
-            bra.w(Label('RunEvent_GrandCross_testrun'), comment: r'$01')
-          ]));
+    group('with nested event flag checks generates', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag1'), isSet: [
+                IfFlag(EventFlag('testflag2'), isSet: [
+                  Dialog(spans: [DialogSpan('Hi')]),
+                ])
+              ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('consecutive event flag checks', () {
+        expect(
+            asm.runEventRoutines.withoutComments(),
+            Asm([
+              label(Label('RunEvent_GrandCross_testrun')),
+              moveq(Constant('EventFlag_testflag1').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag1_unset1')),
+              moveq(Constant('EventFlag_testflag2').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag2_unset2')),
+              move.w(Word(0).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              label(Label('.testflag2_unset2')),
+              bra.w(Label('RunEvent_NoEvent')),
+              label(Label('.testflag1_unset1')),
+              bra.w(Label('RunEvent_NoEvent')),
+            ]));
+      });
     });
 
-    test('generate optimized run event routine which triggers event', () {
-      expect(
-          asm.runEventRoutines.withoutComments(),
-          Asm([
-            label(Label('RunEvent_GrandCross_testrun')),
-            moveq(Constant('EventFlag_testflag').i, d0),
-            jsr(Label('EventFlag_testflag').l),
-            beq.w(Label('RunEvent_NoEvent')),
-            move.w(Word(0).i, Constant('Event_Index').w),
-            moveq(1.i, d7),
-          ]));
-    }, skip: 'not optimized yet');
+    group('with both branches of nested event flag checks, generates', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag1'), isSet: [
+                IfFlag(EventFlag('testflag2'), isSet: [
+                  Dialog(spans: [DialogSpan('Hi')]),
+                ], isUnset: [
+                  Dialog(spans: [DialogSpan('Bye')]),
+                ])
+              ], isUnset: [
+                IfFlag(EventFlag('testflag3'), isSet: [
+                  Dialog(spans: [DialogSpan('How are you?')]),
+                ], isUnset: [
+                  Dialog(spans: [DialogSpan('Goodbye')]),
+                ])
+              ])
+            ]));
 
-    test('generate run event routine which triggers event', () {
-      expect(
-          asm.runEventRoutines.withoutComments(),
-          Asm([
-            label(Label('RunEvent_GrandCross_testrun')),
-            moveq(Constant('EventFlag_testflag').i, d0),
-            jsr(Label('EventFlags_Test').l),
-            beq.w(Label('.testflag_unset1')),
-            move.w(Word(0).i, Constant('Event_Index').w),
-            moveq(1.i, d7),
-            rts,
-            label(Label('.testflag_unset1')),
-            bra.w(Label('RunEvent_NoEvent')),
-          ]));
+        asm = program.addMap(testMap);
+      });
+
+      test('consecutive event flag checks', () {
+        expect(
+            asm.runEventRoutines.withoutComments(),
+            Asm([
+              label(Label('RunEvent_GrandCross_testrun')),
+              moveq(Constant('EventFlag_testflag1').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag1_unset1')),
+              moveq(Constant('EventFlag_testflag2').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag2_unset2')),
+              move.w(Word(0).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              label(Label('.testflag2_unset2')),
+              move.w(Word(1).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              label(Label('.testflag1_unset1')),
+              moveq(Constant('EventFlag_testflag3').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag3_unset5')),
+              move.w(Word(2).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              label(Label('.testflag3_unset5')),
+              move.w(Word(3).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+            ]));
+      });
     });
 
-    test('generates run event indices for map data', () {
-      expect(asm.runEventIndices.withoutComments(), dc.b([1.toByte]));
+    group('with multiple event branches generates', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag'), isSet: [
+                Dialog(spans: [DialogSpan('Hi')]),
+              ], isUnset: [
+                Dialog(spans: [DialogSpan('Bye')]),
+              ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('alternative event branch', () {
+        expect(
+            asm.runEventRoutines.withoutComments(),
+            Asm([
+              label(Label('RunEvent_GrandCross_testrun')),
+              moveq(Constant('EventFlag_testflag').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag_unset1')),
+              move.w(Word(0).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              label(Label('.testflag_unset1')),
+              move.w(Word(1).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+            ]));
+      });
     });
 
-    test('generate event routines', () {
-      expect(
-          asm.events.withoutComments(),
-          Asm([
-            label(Label('Event_GrandCross_testrun2')),
-            getAndRunDialog3LowDialogId(0.toByte.i),
-            rts,
-          ]));
+    group('with branching event, generates', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag1'), isSet: [
+                Dialog(spans: [DialogSpan('Hi')]),
+                IfFlag(EventFlag('testflag2'), isSet: [
+                  Dialog(spans: [DialogSpan('How are you?')]),
+                ])
+              ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('branch inside event code', () {
+        expect(asm.events.withoutComments(),
+        Asm([
+          
+        ]));
+      });
     });
   });
 }
