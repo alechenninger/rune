@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:rune/src/iterables.dart';
 
 import 'asm.dart';
 
@@ -15,12 +16,12 @@ class Array<T extends Expression> extends Iterable<T> {
   Array.fromIterable(this.elementSize, Iterable<T> data)
       : _data = data.toList();
 
-  const Array.of(this.elementSize, this._data);
+  const Array.wrap(this.elementSize, this._data);
 
   Asm toAsm({bool comment = true}) => _data
       .mapIndexed(
           (i, e) => dc.size(elementSize, [e], comment: Word(i).toString()))
-      .reduce((a, b) => a..add(b));
+      .reduceOr((a, b) => a..add(b), ifEmpty: Asm.empty());
 
   T operator [](int index) {
     return _data[index];
@@ -43,6 +44,11 @@ class Array<T extends Expression> extends Iterable<T> {
 
   int indexOf(T element) {
     return _data.indexOf(element);
+  }
+
+  @override
+  Array<T> skip(int count) {
+    return Array.fromIterable(elementSize, _data.skip(count));
   }
 
   @override
@@ -80,6 +86,12 @@ class EventPointers {
       : _routines = Array.empty(Size.l),
         _offset = offset;
 
+  int get length => _routines.length;
+
+  EventPointers withOffset(Word offset) {
+    return EventPointers(_routines, offset: offset);
+  }
+
   Word? offsetFor(Label routine) {
     var index = _routines.indexOf(routine);
     if (index == -1) return null;
@@ -92,7 +104,12 @@ class EventPointers {
     return (_routines.length - 1 + _offset.value).toWord;
   }
 
+  EventPointers skip(int count) {
+    return EventPointers(_routines.skip(count),
+        offset: (_offset.value + count).toWord);
+  }
+
   Asm toAsm() => _routines.toAsm();
 
-  Word get nextIndex => Word(_routines.length + 1);
+  Word get nextIndex => Word(_offset.value + _routines.length);
 }
