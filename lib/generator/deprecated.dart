@@ -15,6 +15,9 @@ export '../asm/asm.dart';
 // may not be relevant to all generation, for ex map objects
 // this is the state of running code
 
+@Deprecated('see GameMode')
+enum Mode { dialog, event, runEvent }
+
 @Deprecated('use Program/SceneAsmGenerator API instead')
 class AsmContext {
   AsmContext.fresh({Mode gameMode = Mode.event})

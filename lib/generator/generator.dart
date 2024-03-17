@@ -2900,8 +2900,6 @@ class _QueuedGeneration {
   _QueuedGeneration(this.generateDialog, this.generateEvent);
 }
 
-enum Mode { dialog, event, runEvent }
-
 sealed class GameMode {}
 
 sealed class DialogCapableMode extends GameMode {
