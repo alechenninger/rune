@@ -46,7 +46,7 @@ abstract class _AbstractJumpTable<T extends Label?, S extends SizedValue>
   @override
   Asm toAsm({bool comment = true}) => _labels
       .mapIndexed(
-          (i, e) => _jump(e, comment: comment ? Word(i).toString() : null))
+          (i, e) => _jump(e, comment: comment ? _newIndex(i).toString() : null))
       .reduce((asm, r) => asm..add(r));
 }
 
