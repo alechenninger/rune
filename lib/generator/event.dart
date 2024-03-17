@@ -22,14 +22,15 @@ EventPointers eventPtrs() => EventPointers(_eventPtrs);
 EventPointers cutscenePtrs() =>
     EventPointers(_cutscenePtrs, offset: Word(0x8000));
 
-JumpTable runEventsJmpTbl() {
-  return JumpTable<Label?>(
+JumpTable<Byte> runEventsJmpTbl() {
+  return JumpTable.sparse(
     jump: withNoop(Label.known('RunEvent_NoEvent'), bra.w),
     labels: _runEventsTable,
+    newIndex: (i) => Byte(i),
   );
 }
 
-final _eventPtrs = const Array.of(Size.l, [
+final _eventPtrs = const Array.wrap(Size.l, [
   Label.known('Event_NoEvent'),
   Label.known('Event_NoEvent2'),
   Label.known('Event_NoEvent3'),
@@ -195,7 +196,7 @@ final _eventPtrs = const Array.of(Size.l, [
   Label.known('Event_AfterFortuneTeller'),
 ]);
 
-final _cutscenePtrs = const Array.of(Size.l, [
+final _cutscenePtrs = const Array.wrap(Size.l, [
   Label.known('Event_NoEvent'),
   Label.known('Cutscene_PiataPrincipal'),
   Label.known('Cutscene_ProfHolt'),
