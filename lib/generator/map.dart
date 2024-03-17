@@ -153,8 +153,9 @@ MapAsm compileMap(GameMap map, ProgramConfiguration config) {
   }
 
   for (var (id, scene) in map.runEvents) {
-    var label = Label('RunEvent_GrandCross_$id');
-    runEventIndices.add(config.addRunEvent(label));
+    var name = Label('RunEvent_GrandCross_$id');
+    runEventIndices.add(config.addRunEvent(name));
+    runEventsAsm.add(label(name));
 
     var generator = SceneAsmGenerator.forRunEvent(id,
         inMap: map,

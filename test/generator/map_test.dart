@@ -1,4 +1,5 @@
 import 'package:rune/asm/dialog.dart';
+import 'package:rune/asm/events.dart';
 import 'package:rune/asm/text.dart';
 import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
@@ -17,7 +18,10 @@ void main() {
 
   setUp(() {
     testMap = GameMap(MapId.Test);
-    program = Program(eventPointers: EventPointers.empty());
+    program = Program(
+        eventPointers: EventPointers.empty(),
+        runEvents: JumpTable(
+            jump: bra.w, newIndex: Byte.new, labels: [RunEvent_NoEvent]));
     testEventRoutines = TestEventRoutines();
   });
 
@@ -1883,25 +1887,56 @@ void main() {
     });
 
     test('define run event pointer', () {
-      expect(program.runEventsJumpTable,
-          Asm([bra.w(Label('RunEvent_GrandCross_testrun'), comment: r'$00')]));
+      expect(
+          program.runEventsJumpTable,
+          Asm([
+            bra.w(RunEvent_NoEvent, comment: r'$00'),
+            bra.w(Label('RunEvent_GrandCross_testrun'), comment: r'$01')
+          ]));
     });
 
-    test('generate run event routine which triggers event', () {
+    test('generate optimized run event routine which triggers event', () {
       expect(
-          asm.runEventRoutines,
+          asm.runEventRoutines.withoutComments(),
           Asm([
             label(Label('RunEvent_GrandCross_testrun')),
+            moveq(Constant('EventFlag_testflag').i, d0),
             jsr(Label('EventFlag_testflag').l),
             beq.w(Label('RunEvent_NoEvent')),
             move.w(Word(0).i, Constant('Event_Index').w),
             moveq(1.i, d7),
           ]));
+    }, skip: 'not optimized yet');
+
+    test('generate run event routine which triggers event', () {
+      expect(
+          asm.runEventRoutines.withoutComments(),
+          Asm([
+            label(Label('RunEvent_GrandCross_testrun')),
+            moveq(Constant('EventFlag_testflag').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.testflag_unset1')),
+            move.w(Word(0).i, Constant('Event_Index').w),
+            moveq(1.i, d7),
+            rts,
+            label(Label('.testflag_unset1')),
+            bra.w(Label('RunEvent_NoEvent')),
+          ]));
     });
 
-    test('generates run event indicies for map data', () {});
+    test('generates run event indices for map data', () {
+      expect(asm.runEventIndices.withoutComments(), dc.b([1.toByte]));
+    });
 
-    test('generate event routines', () {});
+    test('generate event routines', () {
+      expect(
+          asm.events.withoutComments(),
+          Asm([
+            label(Label('Event_GrandCross_testrun2')),
+            getAndRunDialog3LowDialogId(0.toByte.i),
+            rts,
+          ]));
+    });
   });
 }
 
