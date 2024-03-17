@@ -826,7 +826,7 @@ Byte _compileInteractionScene(
       withObject: withObject,
       fieldRoutines: fieldRoutines);
 
-  generator.runEventFromInteractionIfNeeded(events);
+  generator.runEventIfNeeded(events);
 
   for (var event in events) {
     event.visit(generator);

@@ -1066,13 +1066,13 @@ void main() {
 
       SceneAsmGenerator.forInteraction(testMap, SceneId('Test_npc1'),
           comparisonDialogTrees, comparisonEventAsm, testEventRoutines)
-        ..runEventFromInteraction()
+        ..runEvent()
         ..scene(npc1.onInteract)
         ..finish(appendNewline: true);
 
       SceneAsmGenerator.forInteraction(testMap, SceneId('Test_npc2'),
           comparisonDialogTrees, comparisonEventAsm, testEventRoutines)
-        ..runEventFromInteraction()
+        ..runEvent()
         ..scene(npc2.onInteract)
         ..finish(appendNewline: true);
 

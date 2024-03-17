@@ -170,9 +170,6 @@ class Program {
           map.id.name, 'map', 'map with same id already added');
     }
 
-    var spriteVramOffset = _config.spriteVramOffsetForMap(map.id);
-    var builtInSprites = _config.builtInSpritesForMap(map.id);
-
     return _maps[map.id] = compileMap(map, _config);
   }
 
@@ -499,7 +496,7 @@ class _ProgramEventRoutines extends EventRoutines {
 /// (i.e. `$F3` control code)
 /// - Zero or more [Dialog]
 ///
-/// See also: [SceneAsmGenerator.runEventFromInteraction]
+/// See also: [SceneAsmGenerator.runEvent]
 /*
 todo: can also support all of this action control code stuff as events:
 $F2 = Determines actions during dialogues. The byte after this has the following values:
@@ -687,19 +684,31 @@ class SceneAsmGenerator implements EventVisitor {
   DialogAsm? _currentDialog;
   var _lastEventBreak = -1;
 
-  Mode _gameMode = Mode.event;
-  bool get inDialogLoop => _gameMode == Mode.dialog;
+  GameMode _gameMode;
+  bool get inDialogLoop => switch (_gameMode) {
+        DialogCapableMode mode => mode.isInDialogLoop,
+        _ => false
+      };
 
   // i think this should always be true if mode == event?
   /// Whether or not we are generating in the context of an existing event.
   ///
   /// This is necessary to understand whether, when in dialog mode, we can pop
   /// back to an event or have to trigger a new one.
-  bool get _inEvent => _eventType != null;
-  EventType? _eventType;
+  bool get _inEvent => switch (_gameMode) { EventMode() => true, _ => false };
+  EventType? get _eventType => switch (_gameMode) {
+        EventMode m => m.type,
+        _ => null,
+      };
 
-  final FieldObject? _interactingWith;
-  final bool _isProcessingInteraction;
+  FieldObject? get _interactingWith => switch (_gameMode) {
+        InteractionMode m => m.withObject,
+        _ => null,
+      };
+  bool get _isProcessingInteraction => switch (_gameMode) {
+        DialogCapableMode m => m.fromInteraction != null,
+        _ => false,
+      };
   bool get _isInteractingWithObject => _interactingWith != null;
 
   /// Events processed in current dialog, last event first.
@@ -715,8 +724,8 @@ class SceneAsmGenerator implements EventVisitor {
       bool withObject = true,
       FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
-        _interactingWith = withObject ? const InteractionObject() : null,
-        _isProcessingInteraction = true,
+        _gameMode = InteractionMode(
+            withObject: withObject ? const InteractionObject() : null),
         _context = GenerationContext(
             _EventRoutinesWrappingConfiguration(
                 eventRoutines: eventRoutines,
@@ -726,8 +735,6 @@ class SceneAsmGenerator implements EventVisitor {
                 fieldRoutines: fieldRoutines ?? defaultFieldRoutines),
             eventAsm: eventAsm,
             runEventAsm: Asm.empty()) {
-    _gameMode = Mode.dialog;
-
     if (withObject) _memory.putInAddress(a3, const InteractionObject());
     _memory.hasSavedDialogPosition = false;
     _memory.currentMap = map;
@@ -742,9 +749,7 @@ class SceneAsmGenerator implements EventVisitor {
       EventType? eventType,
       FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
-        _interactingWith = null,
-        _isProcessingInteraction = false,
-        _eventType = eventType ?? EventType.event,
+        _gameMode = EventMode(type: eventType ?? EventType.event),
         _context = GenerationContext(
             _AsmProgramConfiguration(
                 events: eventPtrs(),
@@ -762,7 +767,6 @@ class SceneAsmGenerator implements EventVisitor {
     if (startingMap != null) {
       _memory.loadedDialogTree = _dialogTrees.forMap(startingMap.id);
     }
-    _gameMode = Mode.event;
     _stateGraph[Condition.empty()] = _memory;
   }
 
@@ -771,11 +775,9 @@ class SceneAsmGenerator implements EventVisitor {
       required EventAsm eventAsm,
       required Asm runEventAsm,
       required ProgramConfiguration config})
-      : _interactingWith = null,
-        _isProcessingInteraction = false,
+      : _gameMode = RunEventMode(),
         _context = GenerationContext(config,
             eventAsm: eventAsm, runEventAsm: runEventAsm) {
-    _gameMode = Mode.runEvent;
     _memory.currentMap = inMap;
     _memory.loadedDialogTree = _dialogTrees.forMap(inMap.id);
     _stateGraph[Condition.empty()] = _memory;
@@ -792,42 +794,26 @@ class SceneAsmGenerator implements EventVisitor {
     return sceneEventType(events, interactingWith: _interactingWith);
   }
 
-  void runEventFromInteractionIfNeeded(List<Event> events,
+  void runEventIfNeeded(List<Event> events,
       {Word? eventIndex, String? nameSuffix}) {
     var type = needsEvent(events);
     if (type == null) return;
-    runEventFromInteraction(
-        type: type, eventIndex: eventIndex, nameSuffix: nameSuffix);
+    runEvent(type: type, eventIndex: eventIndex, nameSuffix: nameSuffix);
   }
 
   /// If in interaction and not yet in an event, run an event from dialog.
   ///
   /// If [eventIndex] is not provided, a new event will be added with optional
   /// [nameSuffix].
-  void runEventFromInteraction(
+  void runEvent(
       {Word? eventIndex,
       String? nameSuffix,
       EventType type = EventType.event}) {
     _checkNotFinished();
 
-    if (_inEvent) {
-      throw StateError('cannot run event; already in event');
-    }
+    Word addEventIfNeeded() {
+      if (eventIndex != null) return eventIndex!;
 
-    if (_lastEventInCurrentDialog != null &&
-        _lastEventInCurrentDialog is! IfFlag) {
-      /*
-      This is because this is the implementation of this ctrl code:
-      TextCtrlCode_Event:
-        lea	$1(a0), a0
-        bra.w	RunText_CharacterLoop
-      i.e. a no-op.
-      */
-      throw StateError('can only run events first or after IfFlag events '
-          'but last event was $_lastEventInCurrentDialog');
-    }
-
-    if (eventIndex == null) {
       // only include event counter if we're in a branch condition
       // todo: we might not always start with an empty condition so this should
       // maybe be something about root or starting condition
@@ -837,12 +823,44 @@ class SceneAsmGenerator implements EventVisitor {
       var eventRoutine = Label('Event_GrandCross_$eventName');
       eventIndex = type.addRoutine(_eventRoutines, eventRoutine);
       _eventAsm.add(setLabel(eventRoutine.name));
+
+      return eventIndex!;
     }
 
-    _addToDialog(dialog_asm.runEvent(eventIndex));
-    _eventType = type;
+    switch (_gameMode) {
+      case InteractionMode m:
+        if (_lastEventInCurrentDialog != null &&
+            _lastEventInCurrentDialog is! IfFlag) {
+          // This is because this is the implementation of this ctrl code:
+          // TextCtrlCode_Event:
+          //   lea	$1(a0), a0
+          //   bra.w	RunText_CharacterLoop
+          // i.e. a no-op.
+          throw StateError('can only run events first or after IfFlag events '
+              'but last event was $_lastEventInCurrentDialog');
+        }
 
-    _terminateDialog();
+        var eventIndex = addEventIfNeeded();
+        _addToDialog(dialog_asm.runEvent(eventIndex));
+        _terminateDialog();
+        _gameMode = m.toEventMode(type);
+
+        break;
+      case RunEventMode m:
+        var eventIndex = addEventIfNeeded();
+
+        _context.runEventAsm.add(Asm([
+          move.w(eventIndex.i, Event_Index.w),
+          moveq(1.i, d7),
+          rts,
+        ]));
+
+        _gameMode = m.toEventMode(type);
+
+        break;
+      default:
+        throw StateError('cannot run event; already in event');
+    }
   }
 
   @override
@@ -1199,7 +1217,7 @@ class SceneAsmGenerator implements EventVisitor {
       for (var event in events) {
         event.visit(this);
       }
-    } else if (!_inEvent) {
+    } else if (_gameMode case InteractionMode startingMode) {
       // attempt to process in dialog
       // this must be the only event in the dialog in that case,
       // because it is treated as a hard fork.
@@ -1219,8 +1237,7 @@ class SceneAsmGenerator implements EventVisitor {
           extendableEventCheck(_eventFlags.toConstantValue(flag), ifSetOffset));
       _flagIsNotSet(flag);
 
-      runEventFromInteractionIfNeeded(ifFlag.isUnset,
-          nameSuffix: '${ifFlag.flag.name}_unset');
+      runEventIfNeeded(ifFlag.isUnset, nameSuffix: '${ifFlag.flag.name}_unset');
 
       for (var event in ifFlag.isUnset) {
         event.visit(this);
@@ -1232,15 +1249,13 @@ class SceneAsmGenerator implements EventVisitor {
       if (_inEvent) {
         // we may be in event now, but we have to go back to dialog generation
         // since we're playing out the "isSet" branch now
-        _eventType = null;
-        _gameMode = Mode.dialog;
+        _gameMode = startingMode;
       }
 
       _resetCurrentDialog(id: ifSetId, asm: ifSet);
       _flagIsSet(flag, parent: parent);
 
-      runEventFromInteractionIfNeeded(ifFlag.isSet,
-          nameSuffix: '${ifFlag.flag.name}_set');
+      runEventIfNeeded(ifFlag.isSet, nameSuffix: '${ifFlag.flag.name}_set');
 
       for (var event in ifFlag.isSet) {
         event.visit(this);
@@ -1449,6 +1464,8 @@ class SceneAsmGenerator implements EventVisitor {
     _generateQueueInCurrentMode();
     _runOrContinueDialog(yesNo, interruptDialog: false);
 
+    var startingMode = _gameMode;
+
     // Trigger the yes-no choice window.
     _addToDialog(dc.b(ControlCodes.yesNo));
 
@@ -1521,7 +1538,7 @@ class SceneAsmGenerator implements EventVisitor {
     var yesBranch = _memory = parent.branch();
 
     // We're back in dialog, for the next branch.
-    _gameMode = Mode.dialog;
+    _gameMode = startingMode;
 
     if (_inEvent) {
       _eventAsm.add(setLabel(yesLbl.name));
@@ -2155,16 +2172,10 @@ class SceneAsmGenerator implements EventVisitor {
             'event=$onNext');
       }
 
-      if (_eventRoutines == null) {
-        throw StateError('event routines not set; cannot generate '
-            'interaction dialog for onNextInteraction. '
-            'event=$onNext');
-      }
-
       SceneAsmGenerator.forInteraction(map, SceneId('${id.id}_next'),
           _dialogTrees, nextEvent, _eventRoutines,
           eventFlags: _eventFlags, withObject: true)
-        ..runEventFromInteractionIfNeeded(onNext.onInteract.events)
+        ..runEventIfNeeded(onNext.onInteract.events)
         ..scene(onNext.onInteract)
         ..finish(appendNewline: true, validateDialogTree: false);
 
@@ -2215,8 +2226,12 @@ class SceneAsmGenerator implements EventVisitor {
     var needToHidePanels =
         _memory.onExitRunBattle == false && (_memory.panelsShown ?? 0) > 0;
 
-    switch ((_isProcessingInteraction, _eventType)) {
-      case (true, EventType.cutscene):
+    // switch ((_isProcessingInteraction, _eventType)) {
+    switch (_gameMode) {
+      case EventMode(
+          fromInteraction: InteractionMode(),
+          type: EventType.cutscene
+        ):
         if (needToShowField) {
           if (_replaceDialogRoutine != null) {
             // dialog 5 will fade out the whole screen
@@ -2242,7 +2257,7 @@ class SceneAsmGenerator implements EventVisitor {
 
         break;
 
-      case (true, EventType.event):
+      case EventMode(fromInteraction: InteractionMode(), type: EventType.event):
         _terminateDialog();
 
         if (needToShowField) {
@@ -2256,7 +2271,7 @@ class SceneAsmGenerator implements EventVisitor {
 
         break;
 
-      case (false, EventType()):
+      case EventMode(fromInteraction: null):
         _terminateDialog();
 
         if (needToShowField) {
@@ -2278,7 +2293,7 @@ class SceneAsmGenerator implements EventVisitor {
 
         break;
 
-      case (_, null):
+      case InteractionMode():
         // todo: not sure about this. might want to do this after terminating
         // dialog only?
         if (needToHidePanels) {
@@ -2289,6 +2304,8 @@ class SceneAsmGenerator implements EventVisitor {
         _terminateDialog();
 
         break;
+      case RunEventMode():
+      // TODO: Handle this case.
     }
 
     if (appendNewline && _eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
@@ -2491,12 +2508,19 @@ class SceneAsmGenerator implements EventVisitor {
 
     _expectFacePlayerFirstIfInteraction();
 
-    if (!inDialogLoop) {
-      _runDialog();
-    } else if (_lastEventInCurrentDialog is Dialog && interruptDialog) {
-      // Add cursor for previous dialog
-      // This is delayed because this interrupt may be a termination
-      _addToDialog(interrupt());
+    switch (_gameMode) {
+      case InteractionMode() || EventMode(isInDialogLoop: true):
+        if (_lastEventInCurrentDialog is Dialog && interruptDialog) {
+          // Add cursor for previous dialog
+          // This is delayed because this interrupt may be a termination
+          _addToDialog(interrupt());
+        }
+        break;
+      case EventMode m:
+        _runDialog(m);
+        break;
+      case RunEventMode():
+        throw StateError('cannot run dialog from run event');
     }
 
     _lastEventInCurrentDialog = event;
@@ -2511,7 +2535,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  void _runDialog() {
+  void _runDialog(EventMode mode) {
     _eventAsm.add(
         Asm([comment('${_context.getEventCountAndIncrement()}: $Dialog')]));
 
@@ -2596,24 +2620,34 @@ class SceneAsmGenerator implements EventVisitor {
 
     _memory.unknownAddressRegisters();
 
-    _gameMode = Mode.dialog;
+    _gameMode = mode.enterDialogLoop();
   }
 
   /// Terminates the current dialog, if there is any,
   /// regardless of whether current generating within dialog loop or not.
   void _terminateDialog({bool? hidePanels}) {
-    if (inDialogLoop) {
-      if (_inEvent) {
-        _gameMode = Mode.event;
-      } else {
-        // We can't run in event (because we're not in one),
-        // so do in dialog
-        _generateQueueInCurrentMode();
-      }
-      _addToDialog(terminateDialog());
-    } else if (_lastEventBreak >= 0) {
-      // i think this is only ever the last line so could simplify
-      _currentDialog!.replace(_lastEventBreak, terminateDialog());
+    switch (_gameMode) {
+      case DialogCapableMode m when m.isInDialogLoop:
+        switch (m) {
+          case EventMode m:
+            _gameMode = m.exitDialogLoop();
+            break;
+          case InteractionMode():
+            // We can't run in event (because we're not in one),
+            // so do in dialog
+            _generateQueueInCurrentMode();
+            break;
+        }
+
+        _addToDialog(terminateDialog());
+
+        break;
+      default:
+        if (_lastEventBreak >= 0) {
+          // i think this is only ever the last line so could simplify
+          _currentDialog!.replace(_lastEventBreak, terminateDialog());
+        }
+        break;
     }
 
     // fixme: hidePanels tracking not implemented yet
@@ -2625,7 +2659,7 @@ class SceneAsmGenerator implements EventVisitor {
       _replaceDialogRoutine!();
     }
 
-    if (hidePanels == false && _isProcessingInteraction && !_inEvent) {
+    if (hidePanels == false && _gameMode is InteractionMode) {
       throw StateError('ending interaction without event cannot keep panels, '
           'but hidePanels == false');
     }
@@ -2634,7 +2668,7 @@ class SceneAsmGenerator implements EventVisitor {
 
     _resetCurrentDialog();
 
-    if (_inEvent) {
+    if (_gameMode case EventMode()) {
       // Now that we're not in dialog loop, generate in event
       // so we don't run events out of order.
       // We prefer to generate in event rather than dialog,
@@ -2708,18 +2742,22 @@ class SceneAsmGenerator implements EventVisitor {
 
     var eventIndex = _context.getEventCountAndIncrement();
 
-    if (!_inEvent) {
-      throw StateError("can't add event when not in event loop");
-    } else if (inDialogLoop) {
-      _addToDialog(comment('scene event $eventIndex'));
-      _lastEventBreak = _addToDialog(eventBreak());
-      _memory.hasSavedDialogPosition = true;
-      _memory.dialogPortrait = null;
-      _gameMode = Mode.event;
+    switch (_gameMode) {
+      case EventMode m:
+        if (m.isInDialogLoop) {
+          _addToDialog(comment('scene event $eventIndex'));
+          _lastEventBreak = _addToDialog(eventBreak());
+          _memory.hasSavedDialogPosition = true;
+          _memory.dialogPortrait = null;
+          _gameMode = m.exitDialogLoop();
 
-      // If any events which could've gone either way,
-      // generate in event mode now
-      _generateQueueInCurrentMode();
+          // If any events which could've gone either way,
+          // generate in event mode now
+          _generateQueueInCurrentMode();
+        }
+        break;
+      default:
+        throw StateError("can't add event when not in event loop");
     }
 
     var length = _eventAsm.length;
@@ -2863,6 +2901,62 @@ class _QueuedGeneration {
 }
 
 enum Mode { dialog, event, runEvent }
+
+sealed class GameMode {}
+
+sealed class DialogCapableMode extends GameMode {
+  InteractionMode? get fromInteraction;
+  bool get isInDialogLoop;
+}
+
+sealed class RunEventCapableMode extends GameMode {
+  EventMode toEventMode(EventType type);
+}
+
+class EventMode implements DialogCapableMode {
+  @override
+  final InteractionMode? fromInteraction;
+  final EventType type;
+  final bool _inDialog;
+
+  EventMode({this.fromInteraction, required this.type, bool inDialog = false})
+      : _inDialog = inDialog;
+
+  @override
+  bool get isInDialogLoop => _inDialog;
+
+  EventMode enterDialogLoop() {
+    return EventMode(
+        fromInteraction: fromInteraction, type: type, inDialog: true);
+  }
+
+  EventMode exitDialogLoop() {
+    return EventMode(
+        fromInteraction: fromInteraction, type: type, inDialog: false);
+  }
+}
+
+class RunEventMode implements RunEventCapableMode {
+  @override
+  EventMode toEventMode(EventType type) => EventMode(type: type);
+}
+
+class InteractionMode implements RunEventCapableMode, DialogCapableMode {
+  @override
+  InteractionMode get fromInteraction => this;
+  @override
+  final isInDialogLoop = true;
+  final FieldObject? withObject;
+
+  bool get isWithObject => withObject != null;
+  bool get isWithArea => !isWithObject;
+
+  InteractionMode({required this.withObject});
+
+  @override
+  EventMode toEventMode(EventType type) =>
+      EventMode(fromInteraction: this, type: type);
+}
 
 Word _addEventRoutine(EventRoutines r, Label name) {
   return r.addEvent(name);

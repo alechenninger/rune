@@ -451,7 +451,7 @@ ${dialog2.toAsm()}
 
       var generator = SceneAsmGenerator.forInteraction(
           map, SceneId('testscene'), dialog, asm, eventRoutines)
-        ..runEventFromInteractionIfNeeded(events);
+        ..runEventIfNeeded(events);
 
       for (var event in events) {
         event.visit(generator);
@@ -487,7 +487,7 @@ ${dialog2.toAsm()}
 
       var generator = SceneAsmGenerator.forInteraction(
           map, SceneId('testscene'), dialog, asm, eventRoutines)
-        ..runEventFromInteractionIfNeeded(events);
+        ..runEventIfNeeded(events);
 
       for (var event in events) {
         event.visit(generator);
@@ -1354,22 +1354,22 @@ ${dialog2.toAsm()}
               map, SceneId('interact'), dialog, asm, eventRoutines)
             ..dialog(Dialog(spans: DialogSpan.parse('Flag1 is set')));
 
-          expect(() => generator.runEventFromInteraction(), throwsStateError);
+          expect(() => generator.runEvent(), throwsStateError);
         });
 
         test('if already in event', () {
           var generator =
               SceneAsmGenerator.forEvent(SceneId('event'), dialog, asm);
 
-          expect(() => generator.runEventFromInteraction(), throwsStateError);
+          expect(() => generator.runEvent(), throwsStateError);
         });
 
         test('if already run event in interaction', () {
           var generator = SceneAsmGenerator.forInteraction(
               map, SceneId('interact'), dialog, asm, eventRoutines)
-            ..runEventFromInteraction();
+            ..runEvent();
 
-          expect(() => generator.runEventFromInteraction(), throwsStateError);
+          expect(() => generator.runEvent(), throwsStateError);
         });
       });
     });

@@ -1014,7 +1014,7 @@ void main() {
       SceneAsmGenerator.forInteraction(
           map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
           withObject: true)
-        ..runEventFromInteraction()
+        ..runEvent()
         ..facePlayer(FacePlayer(InteractionObject()))
         ..finish();
 
@@ -1533,7 +1533,7 @@ void main() {
       SceneAsmGenerator.forInteraction(
           map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
           withObject: true)
-        ..runEventFromInteraction()
+        ..runEvent()
         ..individualMoves(moves)
         ..finish();
       expect(
@@ -1554,7 +1554,7 @@ void main() {
       SceneAsmGenerator.forInteraction(
           map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
           withObject: true)
-        ..runEventFromInteraction()
+        ..runEvent()
         ..individualMoves(moves)
         ..finish();
 

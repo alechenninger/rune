@@ -78,6 +78,7 @@ const Current_Party_Slot_5 = Constant('Current_Party_Slot_5');
 const Map_Start_Char_Align = Constant('Map_Start_Char_Align');
 const Map_Load_Flags = Constant('Map_Load_Flags');
 
+const Event_Index = Constant('Event_Index');
 const Sound_Index = Constant('Sound_Index');
 
 final eventFlags = BiMap<Constant, Byte>()
