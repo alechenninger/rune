@@ -273,6 +273,9 @@ class Asm extends IterableBase<Instruction> {
     return lines.length - asm.length;
   }
 
+  @override
+  Instruction get last => lines.last;
+
   Asm operator [](int i) => Asm.fromInstruction(lines[i]);
 
   void replace(int index, Asm asm) {
