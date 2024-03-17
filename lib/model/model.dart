@@ -164,8 +164,6 @@ abstract class FindsGameElement {
   MapElement? findInGame(Game game);
 }
 
-// todo: use sealed type once supported in dart
-// it might remove need for visitor pattern?
 abstract class Event {
   const Event();
 
@@ -174,6 +172,8 @@ abstract class Event {
     throw UnimplementedError('generateAsm');
   }
 
+  // Use visitor instead of sealed types,
+  // so that types need not all be in the same library.
   void visit(EventVisitor visitor);
 }
 
