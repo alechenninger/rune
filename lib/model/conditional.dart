@@ -616,14 +616,16 @@ class SetFlag extends Event {
 }
 
 final class IfValue<T extends ModelExpression> extends Event {
-  final T op1, op2;
+  final T operand1, operand2;
 
   final _branches = <Branch>[];
+
+  /// Branch with no events, if there is one.
   BranchCondition? emptyBranch;
 
-  /// [comparedTo] is subtracted from [op1] (`op1 - comparedTo`)
+  /// [comparedTo] is subtracted from [operand1] (`op1 - comparedTo`)
   IfValue(
-    this.op1, {
+    this.operand1, {
     List<Event> equal = const [],
     List<Event> notEqual = const [],
     List<Event> greater = const [],
@@ -631,7 +633,7 @@ final class IfValue<T extends ModelExpression> extends Event {
     List<Event> less = const [],
     List<Event> lessOrEqual = const [],
     required T comparedTo,
-  }) : op2 = comparedTo {
+  }) : operand2 = comparedTo {
     var conditions = <BranchCondition>{};
 
     void addBranch(BranchCondition condition, List<Event> events) {
@@ -674,19 +676,19 @@ final class IfValue<T extends ModelExpression> extends Event {
       other is IfValue &&
           // runtimeType check intentionally omitted
           // to prevent generic type from being checked
-          op1 == other.op1 &&
-          op2 == other.op2 &&
+          operand1 == other.operand1 &&
+          operand2 == other.operand2 &&
           const ListEquality<Branch>().equals(_branches, other._branches);
 
   @override
   int get hashCode =>
-      op1.hashCode ^
-      op2.hashCode ^
+      operand1.hashCode ^
+      operand2.hashCode ^
       const ListEquality<Branch>().hash(_branches);
 
   @override
   String toString() {
-    return 'IfValue{$op1, $op2, $_branches}';
+    return 'IfValue{$operand1, $operand2, $_branches}';
   }
 }
 

@@ -128,6 +128,8 @@ class GameMap {
     _runEvents[id] = runEvent;
   }
 
+  Scene? runEventById(SceneId sceneId) => _runEvents[sceneId];
+
   @override
   String toString() {
     return 'GameMap{id: $id, '

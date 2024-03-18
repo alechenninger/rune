@@ -1969,7 +1969,6 @@ void main() {
               moveq(1.i, d7),
               rts,
               label(Label('.testflag2_unset2')),
-              bra.w(Label('RunEvent_NoEvent')),
               label(Label('.testflag1_unset1')),
               bra.w(Label('RunEvent_NoEvent')),
             ]));
@@ -2032,7 +2031,7 @@ void main() {
       });
     });
 
-    group('with multiple event branches generates', () {
+    group('with events in both branches generates', () {
       setUp(() {
         testMap.addRunEvent(
             SceneId('testrun'),
@@ -2047,7 +2046,7 @@ void main() {
         asm = program.addMap(testMap);
       });
 
-      test('alternative event branch', () {
+      test('alternative event branch and no continue label', () {
         expect(
             asm.runEventRoutines.withoutComments(),
             Asm([
@@ -2086,7 +2085,7 @@ void main() {
         expect(
             asm.events.withoutComments(),
             Asm([
-              label(Label('Event_GrandCross_testrun_testflag1_set')),
+              label(Label('Event_GrandCross_testrun2')),
               getAndRunDialog3LowDialogId(0.toByte.i),
               moveq(Constant('EventFlag_testflag2').i, d0),
               jsr(Label('EventFlags_Test').l),
@@ -2096,6 +2095,104 @@ void main() {
               rts,
             ]));
       });
+    });
+
+    group('with consecutive flag checks', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag1'), isSet: [
+                SetFlag(EventFlag('testflag1')),
+                Dialog(spans: [DialogSpan('Hi')]),
+              ]),
+              IfFlag(EventFlag('testflag2'), isSet: [
+                SetFlag(EventFlag('testflag2')),
+                Dialog(spans: [DialogSpan('Hi 2')]),
+              ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('consecutive flag checks', () {
+        expect(asm.runEventRoutines.withoutComments(), Asm([]));
+      }, skip: 'TODO');
+    });
+
+    group('with consecutive nested flag checks', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag1'), isSet: [
+                IfFlag(EventFlag('testflag2'), isSet: [
+                  SetFlag(EventFlag('testflag1')),
+                  SetFlag(EventFlag('testflag2')),
+                  Dialog(spans: [DialogSpan('Hi')]),
+                ])
+              ]),
+              IfFlag(EventFlag('testflag3'), isSet: [
+                SetFlag(EventFlag('testflag3')),
+                Dialog(spans: [DialogSpan('Hi 2')]),
+              ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('consecutive flag checks', () {
+        expect(asm.runEventRoutines.withoutComments(), Asm([]));
+      }, skip: 'TODO');
+    });
+
+    group('with multiple run events', () {
+      // TODO indices + both routines
+    });
+
+    group('with flag and value check and just dialog, generates', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfValue(Slot.one.position().component(Axis.y),
+                  comparedTo: PositionComponent(0x200, Axis.y),
+                  greaterOrEqual: [
+                    IfFlag(EventFlag('testflag'), isSet: [
+                      Dialog(spans: [DialogSpan('Hi')]),
+                    ])
+                  ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('checks for flag and value', () {
+        expect(asm.runEventRoutines.withoutComments(), Asm([]));
+      }, skip: 'TODO');
+    });
+
+    group('multiple value check branches, generates', () {
+      setUp(() {
+        testMap.addRunEvent(
+            SceneId('testrun'),
+            Scene([
+              IfValue(Slot.one.position().component(Axis.y),
+                  comparedTo: PositionComponent(0x200, Axis.y),
+                  greaterOrEqual: [
+                    Dialog(spans: [DialogSpan('Hi')]),
+                  ],
+                  less: [
+                    Dialog(spans: [DialogSpan('Bye')]),
+                  ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('both value check branches and no continue label', () {
+        expect(asm.runEventRoutines.withoutComments(), Asm([]));
+      }, skip: 'TODO');
     });
   });
 }

@@ -4,10 +4,10 @@ import 'memory.dart';
 import 'movement.dart';
 
 extension IfValueAsm on IfValue {
-  /// Set CCR based on subtracing comparing [op1] with [op2].
+  /// Set CCR based on subtracing comparing [operand1] with [operand2].
   ///
-  /// Note that in this case, [op1] is the destination operand,
-  /// and [op2] is the source operand.
+  /// Note that in this case, [operand1] is the destination operand,
+  /// and [operand2] is the source operand.
   /// I.e. if we're checking if an x position is > some constant,
   /// the constant will be the source operand,
   /// and x position will be the the destination,
@@ -16,7 +16,7 @@ extension IfValueAsm on IfValue {
     Asm compareTo(Address src) {
       var asm = Asm.empty();
 
-      switch (op1) {
+      switch (operand1) {
         case PositionComponent c:
           asm.add(c.withValue(
               memory: memory, asm: (dst) => _cmp(src, dst, Size.w)));
@@ -40,7 +40,7 @@ extension IfValueAsm on IfValue {
       return asm;
     }
 
-    return switch (op2) {
+    return switch (operand2) {
       PositionComponentExpression c =>
         c.withValue(memory: memory, load: a4, asm: compareTo),
       PositionExpression p => throw 'todo',

@@ -1319,6 +1319,8 @@ class SceneAsmGenerator implements EventVisitor {
           // Save the current mode now to be restored later
           // when processing the alternate branch (if needed).
           var startingMode = _gameMode;
+          GameMode? setMode;
+          GameMode? unsetMode;
 
           // run isSet events unless there are none
           if (ifFlag.isSet.isEmpty) {
@@ -1339,13 +1341,18 @@ class SceneAsmGenerator implements EventVisitor {
             // this won't run an event immediately.
             // The purpose of this is to catch if we need a cutscene
             // while we know what events will be visited.
-            runEventIfNeeded(ifFlag.isSet,
-                nameSuffix: '_${ifFlag.flag.name}_set');
+            if (_gameMode is RunEventMode &&
+                sceneEventType(ifFlag.isSet) == EventType.cutscene) {
+              runEvent(nameSuffix: '_${ifFlag.flag.name}_set');
+            }
+
             for (var event in ifFlag.isSet) {
               event.visit(this);
             }
 
-            if (startingMode is RunEventMode) {
+            setMode = _gameMode;
+
+            if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
               // We're done with the event code; finish it.
               // If we need an event at this point it will be a new event.
               _finish();
@@ -1369,14 +1376,18 @@ class SceneAsmGenerator implements EventVisitor {
               asm.add(setLabel(ifUnset.name));
             }
 
-            runEventIfNeeded(ifFlag.isUnset,
-                nameSuffix: '_${ifFlag.flag.name}_unset');
+            if (_gameMode is RunEventMode &&
+                sceneEventType(ifFlag.isSet) == EventType.cutscene) {
+              runEvent(nameSuffix: '_${ifFlag.flag.name}_unset');
+            }
 
             for (var event in ifFlag.isUnset) {
               event.visit(this);
             }
 
-            if (startingMode is RunEventMode) {
+            unsetMode = _gameMode;
+
+            if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
               // We're done with the event code; finish it.
               // If we need an event at this point it will be a new event.
               _finish();
@@ -1393,9 +1404,10 @@ class SceneAsmGenerator implements EventVisitor {
           // TODO: if finished was a per branch (+ per mode?) state,
           //  we could just check finished flag here
           // Semantically that is what this is doing.
-          if (!(startingMode is RunEventMode &&
-              ifFlag.isSet.isNotEmpty &&
-              ifFlag.isUnset.isNotEmpty)) {
+          var isFinishedRunEvent = startingMode is RunEventMode &&
+              setMode is EventMode &&
+              unsetMode is EventMode;
+          if (!isFinishedRunEvent) {
             asm.add(setLabel(continueScene.name));
           }
         });
@@ -1441,6 +1453,7 @@ class SceneAsmGenerator implements EventVisitor {
       // at code where expression is true, fork memory state,
       var parent = _memory;
       var startingMode = _gameMode;
+      var continued = false;
 
       // These branches are not added to state graph intentionally,
       // since we don't have ways to express these conditions in the graph
@@ -1454,7 +1467,13 @@ class SceneAsmGenerator implements EventVisitor {
           event.visit(this);
         }
 
-        _terminateDialog();
+        if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
+          // We're done with the event code; finish it.
+          // If we need an event at this point it will be a new event.
+          _finish();
+        } else {
+          _terminateDialog();
+        }
       }
 
       asm.add(ifValue.compare(memory: _memory));
@@ -1472,6 +1491,7 @@ class SceneAsmGenerator implements EventVisitor {
 
       if (emptyBranch != null) {
         asm.add(emptyBranch.mnemonicUnsigned.w(continueLbl));
+        continued = true;
       }
 
       var branched = branches
@@ -1482,12 +1502,19 @@ class SceneAsmGenerator implements EventVisitor {
       runBranch(branches.last.events);
 
       for (var (b, lbl) in branched) {
-        asm.add(bra.w(continueLbl));
+        _gameMode = startingMode;
+
+        if (_gameMode is! RunEventMode || asm.last != rts.single) {
+          asm.add(bra.w(continueLbl));
+          continued = true;
+        }
         asm.add(label(lbl));
         runBranch(b.events);
       }
 
-      asm.add(label(continueLbl));
+      if (continued) {
+        asm.add(label(continueLbl));
+      }
 
       _memory = parent;
 
@@ -2338,7 +2365,9 @@ class SceneAsmGenerator implements EventVisitor {
           _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
         }
 
-        if (prior != null) _eventAsm.add(rts);
+        if (prior != null) {
+          _eventAsm.add(rts);
+        }
 
         break;
 
