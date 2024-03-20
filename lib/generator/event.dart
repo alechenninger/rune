@@ -212,7 +212,7 @@ final _cutscenePtrs = const Array.wrap(Size.l, [
   Label.known('Cutscene_MeetingWren'),
   Label.known('Cutscene_InsideSpaceship'),
   Label.known('Cutscene_SpaceshipSabotage'),
-  Label.known('Cutscene_CrashLaanding'),
+  Label.known('Cutscene_CrashLanding'),
   Label.known('Cutscene_Landale'),
   Label.known('Cutscene_DarkForce1Defeated'),
   Label.known('Cutscene_RajaSick'),

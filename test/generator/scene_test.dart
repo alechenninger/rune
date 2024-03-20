@@ -1307,7 +1307,7 @@ ${dialog2.toAsm()}
         expect(
             SceneAsmGenerator.forInteraction(
                     map, SceneId('interact'), dialog, asm, eventRoutines)
-                .needsEvent([
+                .needsEventMode([
               IfFlag(EventFlag('flag1'), isSet: [
                 Dialog(spans: DialogSpan.parse('Flag1 is set'))
               ], isUnset: [
@@ -1321,7 +1321,7 @@ ${dialog2.toAsm()}
         expect(
             SceneAsmGenerator.forInteraction(
                     map, SceneId('interact'), dialog, asm, eventRoutines)
-                .needsEvent([
+                .needsEventMode([
               IfFlag(EventFlag('flag1'), isSet: [
                 Dialog(spans: DialogSpan.parse('Flag1 is set')),
                 Pause(1.second),
@@ -1336,7 +1336,7 @@ ${dialog2.toAsm()}
         expect(
             SceneAsmGenerator.forInteraction(
                     map, SceneId('interact'), dialog, asm, eventRoutines)
-                .needsEvent([
+                .needsEventMode([
               IfFlag(EventFlag('flag1'), isSet: [
                 Dialog(spans: DialogSpan.parse('Flag1 is set')),
                 Pause(1.second),

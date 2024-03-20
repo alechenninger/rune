@@ -1875,7 +1875,7 @@ void main() {
 
     group('with event flag check and just dialog generates', () {
       setUp(() {
-        testMap.addRunEvent(
+        testMap.addEvent(
             SceneId('testrun'),
             Scene([
               IfFlag(EventFlag('testflag'), isSet: [
@@ -1928,7 +1928,7 @@ void main() {
         expect(asm.runEventIndices.withoutComments(), dc.b([1.toByte]));
       });
 
-      test('event routines', () {
+      test('event routine', () {
         expect(
             asm.events.withoutComments(),
             Asm([
@@ -1941,7 +1941,7 @@ void main() {
 
     group('with nested event flag checks generates', () {
       setUp(() {
-        testMap.addRunEvent(
+        testMap.addEvent(
             SceneId('testrun'),
             Scene([
               IfFlag(EventFlag('testflag1'), isSet: [
@@ -1975,9 +1975,47 @@ void main() {
       });
     });
 
+    group('with events in both branches generates', () {
+      setUp(() {
+        testMap.addEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag'), isSet: [
+                Dialog(spans: [DialogSpan('Hi')]),
+              ], isUnset: [
+                Dialog(spans: [DialogSpan('Bye')]),
+              ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('alternative event branch and no continue label', () {
+        expect(
+            asm.runEventRoutines.withoutComments(),
+            Asm([
+              label(Label('RunEvent_GrandCross_testrun')),
+              moveq(Constant('EventFlag_testflag').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.testflag_unset1')),
+              move.w(Word(0).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              label(Label('.testflag_unset1')),
+              move.w(Word(1).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+            ]));
+      });
+
+      test('unique event routines for each branch', () {
+        expect(asm.events.withoutComments(), Asm([]));
+      });
+    });
+
     group('with both branches of nested event flag checks, generates', () {
       setUp(() {
-        testMap.addRunEvent(
+        testMap.addEvent(
             SceneId('testrun'),
             Scene([
               IfFlag(EventFlag('testflag1'), isSet: [
@@ -2031,43 +2069,9 @@ void main() {
       });
     });
 
-    group('with events in both branches generates', () {
-      setUp(() {
-        testMap.addRunEvent(
-            SceneId('testrun'),
-            Scene([
-              IfFlag(EventFlag('testflag'), isSet: [
-                Dialog(spans: [DialogSpan('Hi')]),
-              ], isUnset: [
-                Dialog(spans: [DialogSpan('Bye')]),
-              ])
-            ]));
-
-        asm = program.addMap(testMap);
-      });
-
-      test('alternative event branch and no continue label', () {
-        expect(
-            asm.runEventRoutines.withoutComments(),
-            Asm([
-              label(Label('RunEvent_GrandCross_testrun')),
-              moveq(Constant('EventFlag_testflag').i, d0),
-              jsr(Label('EventFlags_Test').l),
-              beq.w(Label('.testflag_unset1')),
-              move.w(Word(0).i, Constant('Event_Index').w),
-              moveq(1.i, d7),
-              rts,
-              label(Label('.testflag_unset1')),
-              move.w(Word(1).i, Constant('Event_Index').w),
-              moveq(1.i, d7),
-              rts,
-            ]));
-      });
-    });
-
     group('with branching event, generates', () {
       setUp(() {
-        testMap.addRunEvent(
+        testMap.addEvent(
             SceneId('testrun'),
             Scene([
               IfFlag(EventFlag('testflag1'), isSet: [
@@ -2099,7 +2103,7 @@ void main() {
 
     group('with consecutive flag checks', () {
       setUp(() {
-        testMap.addRunEvent(
+        testMap.addEvent(
             SceneId('testrun'),
             Scene([
               IfFlag(EventFlag('testflag1'), isSet: [
@@ -2122,7 +2126,7 @@ void main() {
 
     group('with consecutive nested flag checks', () {
       setUp(() {
-        testMap.addRunEvent(
+        testMap.addEvent(
             SceneId('testrun'),
             Scene([
               IfFlag(EventFlag('testflag1'), isSet: [
@@ -2152,7 +2156,7 @@ void main() {
 
     group('with flag and value check and just dialog, generates', () {
       setUp(() {
-        testMap.addRunEvent(
+        testMap.addEvent(
             SceneId('testrun'),
             Scene([
               IfValue(Slot.one.position().component(Axis.y),
@@ -2174,7 +2178,7 @@ void main() {
 
     group('multiple value check branches, generates', () {
       setUp(() {
-        testMap.addRunEvent(
+        testMap.addEvent(
             SceneId('testrun'),
             Scene([
               IfValue(Slot.one.position().component(Axis.y),
@@ -2193,6 +2197,15 @@ void main() {
       test('both value check branches and no continue label', () {
         expect(asm.runEventRoutines.withoutComments(), Asm([]));
       }, skip: 'TODO');
+
+      test('unique event routines which terminate', () {
+        expect(asm.events.withoutComments(), Asm([]));
+      });
+    });
+
+    group('with cutscenes', () {
+      // TODO: ensure cutscenes are run when needed
+      // TODO: ensure cutscene pointers are created
     });
   });
 }

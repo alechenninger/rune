@@ -152,7 +152,7 @@ MapAsm compileMap(GameMap map, ProgramConfiguration config) {
             withObject: false));
   }
 
-  for (var (id, scene) in map.runEvents) {
+  for (var (id, scene) in map.events) {
     var name = Label('RunEvent_GrandCross_$id');
     runEventIndices.add(config.addRunEvent(name));
     runEventsAsm.add(label(name));
@@ -1007,6 +1007,7 @@ List<String> preprocessMapToRaw(Asm original,
     required String objects,
     String? areas,
     required Label dialog,
+    String? events,
     FieldRoutineRepository? fieldRoutines}) {
   fieldRoutines ??= defaultFieldRoutines;
   var reader = ConstantReader.asm(original);
@@ -1082,6 +1083,13 @@ List<String> preprocessMapToRaw(Asm original,
     addComment('Areas');
     processed.add(areas);
     defineConstants([Word(0xffff)]);
+  }
+
+  if (events != null) {
+    _readEvents(reader);
+    addComment('Events');
+    processed.add(events);
+    defineConstants([Byte(0xff)]);
   }
 
   processed.addAll(reader.remaining.lines.map((l) => l.toString()));
@@ -1419,6 +1427,18 @@ List<_AsmArea> _readAreas(ConstantReader reader) {
 
     areas.add(_AsmArea(areas.length, range, position,
         flagType: flagType, flag: flag, routine: routine, param: param));
+  }
+}
+
+List<Byte> _readEvents(ConstantReader reader) {
+  var events = <Byte>[];
+
+  while (true) {
+    var control = reader.readByte();
+    if (control == Byte(0xff)) {
+      return events;
+    }
+    events.add(control);
   }
 }
 

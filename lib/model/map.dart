@@ -20,7 +20,8 @@ class GameMap {
   // doesn't appear to be a limit other than ROM size
   final _areas = <MapAreaId, MapArea>{};
 
-  final _runEvents = <SceneId, Scene>{};
+  final _events = <SceneId, Scene>{};
+  final _asmEvents = <Byte>{};
 
   GameMap(this.id);
 
@@ -121,14 +122,20 @@ class GameMap {
 
   MapArea? area(MapAreaId id) => _areas[id];
 
-  Iterable<(SceneId, Scene)> get runEvents =>
-      _runEvents.entries.map((e) => (e.key, e.value));
+  Iterable<(SceneId, Scene)> get events =>
+      _events.entries.map((e) => (e.key, e.value));
 
-  void addRunEvent(SceneId id, Scene runEvent) {
-    _runEvents[id] = runEvent;
+  void addEvent(SceneId id, Scene event) {
+    _events[id] = event;
   }
 
-  Scene? runEventById(SceneId sceneId) => _runEvents[sceneId];
+  Scene? runEventById(SceneId sceneId) => _events[sceneId];
+
+  Iterable<Byte> get asmEvents => UnmodifiableSetView(_asmEvents);
+
+  void addAsmEvent(Byte runEventIndex) {
+    _asmEvents.add(runEventIndex);
+  }
 
   @override
   String toString() {

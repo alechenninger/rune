@@ -741,7 +741,7 @@ class Byte extends SizedValue {
   static const two = Byte._(2);
   static const max = Byte._(0xFF);
 
-  Byte(int value) : super(value);
+  Byte(super.value);
   Byte.signed(int value) : super.signed(value, Size.b);
   factory Byte.truncate(int value) => Size.b.truncate(value) as Byte;
 

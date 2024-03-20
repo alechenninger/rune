@@ -78,7 +78,7 @@ class Program {
 
   DialogTrees get dialogTrees => _config.dialogTrees;
   Asm get additionalEventPointers => _config.additionalEvents.toAsm();
-  Asm get allEventPointers => _config.events.toAsm();
+  Asm get eventPointers => _config.events.toAsm();
   Word get peekNextEventIndex => _config.events.nextIndex;
   Asm get cutscenesPointers => _config.cutscenes.toAsm();
 
@@ -785,7 +785,7 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   /// See [sceneEventType].
-  EventType? needsEvent(List<Event> events) {
+  EventType? needsEventMode(List<Event> events) {
     return sceneEventType(events, interactingWith: _interactingWith);
   }
 
@@ -793,10 +793,29 @@ class SceneAsmGenerator implements EventVisitor {
       {Word? eventIndex, String? nameSuffix}) {
     // Check if we're already in an event
     if (_gameMode is EventMode) return;
+
     // We're not so see if the events require one.
-    var type = needsEvent(events);
-    if (type == null) return;
-    runEvent(type: type, eventIndex: eventIndex, nameSuffix: nameSuffix);
+    var type = needsEventMode(events);
+
+    switch ((type, _gameMode)) {
+      case (EventType.cutscene, _):
+        // Cutscenes always require special handling.
+        runEvent(
+            type: EventType.cutscene,
+            eventIndex: eventIndex,
+            nameSuffix: nameSuffix);
+        break;
+      case (EventType.event, InteractionMode()):
+        // Interactions require special handling for any event.
+        runEvent(
+            type: EventType.event,
+            eventIndex: eventIndex,
+            nameSuffix: nameSuffix);
+        break;
+      default:
+        // Other modes (event, run event) support events.
+        break;
+    }
   }
 
   /// If in interaction and not yet in an event, run an event from dialog.
@@ -1197,7 +1216,7 @@ class SceneAsmGenerator implements EventVisitor {
       return;
     }
 
-    var flag = ifFlag.flag;
+    final flag = ifFlag.flag;
 
     // If a state already exists for this flag,
     // ensure it is updated with changes that apply from this parent.
@@ -1209,8 +1228,7 @@ class SceneAsmGenerator implements EventVisitor {
     // TODO(state graph): could this still allow out of order changes?
     _updateStateGraph();
 
-    var knownState = _currentCondition[flag];
-    if (knownState != null) {
+    if (_currentCondition[flag] case var knownState?) {
       // one branch is dead code so only run the other, and skip useless
       // conditional check
       // also, no need to manage flags in scene graph because this flag is
@@ -1231,14 +1249,14 @@ class SceneAsmGenerator implements EventVisitor {
         // there can be no common events as there is no one scene now;
         // it is split into two after this.
 
-        var ifSet = DialogAsm.empty();
-        var currentDialogId = _currentDialogIdOrStart();
-        var ifSetId = _currentDialogTree().add(ifSet);
-        var ifSetOffset = ifSetId - currentDialogId as Byte;
+        final ifSet = DialogAsm.empty();
+        final currentDialogId = _currentDialogIdOrStart();
+        final ifSetId = _currentDialogTree().add(ifSet);
+        final ifSetOffset = ifSetId - currentDialogId as Byte;
 
         // memory may change while flag is set, so remember this to branch
         // off of for unset branch
-        var parent = _memory;
+        final parent = _memory;
 
         _addToDialog(extendableEventCheck(
             _eventFlags.toConstantValue(flag), ifSetOffset));
@@ -1318,7 +1336,7 @@ class SceneAsmGenerator implements EventVisitor {
 
           // Save the current mode now to be restored later
           // when processing the alternate branch (if needed).
-          var startingMode = _gameMode;
+          final startingMode = _gameMode;
           GameMode? setMode;
           GameMode? unsetMode;
 
@@ -1341,10 +1359,8 @@ class SceneAsmGenerator implements EventVisitor {
             // this won't run an event immediately.
             // The purpose of this is to catch if we need a cutscene
             // while we know what events will be visited.
-            if (_gameMode is RunEventMode &&
-                sceneEventType(ifFlag.isSet) == EventType.cutscene) {
-              runEvent(nameSuffix: '_${ifFlag.flag.name}_set');
-            }
+            runEventIfNeeded(ifFlag.isSet,
+                nameSuffix: '_${ifFlag.flag.name}_set');
 
             for (var event in ifFlag.isSet) {
               event.visit(this);
@@ -1376,10 +1392,8 @@ class SceneAsmGenerator implements EventVisitor {
               asm.add(setLabel(ifUnset.name));
             }
 
-            if (_gameMode is RunEventMode &&
-                sceneEventType(ifFlag.isSet) == EventType.cutscene) {
-              runEvent(nameSuffix: '_${ifFlag.flag.name}_unset');
-            }
+            runEventIfNeeded(ifFlag.isSet,
+                nameSuffix: '_${ifFlag.flag.name}_unset');
 
             for (var event in ifFlag.isUnset) {
               event.visit(this);
@@ -1398,16 +1412,20 @@ class SceneAsmGenerator implements EventVisitor {
 
           _updateStateGraphAndSibling(flag);
           _flagUnknown(flag);
+          _gameMode = startingMode;
 
           // Check if both branches had events. If this is a run event,
           // then there is no need to define continue label (it is unused)
           // TODO: if finished was a per branch (+ per mode?) state,
           //  we could just check finished flag here
           // Semantically that is what this is doing.
-          var isFinishedRunEvent = startingMode is RunEventMode &&
+          final isFinishedRunEvent = startingMode is RunEventMode &&
               setMode is EventMode &&
               unsetMode is EventMode;
-          if (!isFinishedRunEvent) {
+          if (isFinishedRunEvent) {
+            // TODO: this ignores newlines on finish() call
+            _finished = true;
+          } else {
             asm.add(setLabel(continueScene.name));
           }
         });
@@ -1463,6 +1481,8 @@ class SceneAsmGenerator implements EventVisitor {
       void runBranch(List<Event> events) {
         states.add(_memory = parent.branch());
 
+        // FIXME: run cutscene if needed
+
         for (var event in events) {
           event.visit(this);
         }
@@ -1504,19 +1524,25 @@ class SceneAsmGenerator implements EventVisitor {
       for (var (b, lbl) in branched) {
         _gameMode = startingMode;
 
-        if (_gameMode is! RunEventMode || asm.last != rts.single) {
+        var isBranchFinished =
+            _gameMode is RunEventMode && asm.last == rts.single;
+        if (!isBranchFinished) {
           asm.add(bra.w(continueLbl));
           continued = true;
         }
+
         asm.add(label(lbl));
         runBranch(b.events);
       }
 
       if (continued) {
         asm.add(label(continueLbl));
+      } else {
+        _finished = true;
       }
 
       _memory = parent;
+      _gameMode = startingMode;
 
       // As for now we are not tracking these states in the graph,
       // consider their events as possibly applied
