@@ -513,7 +513,8 @@ $F2 = Determines actions during dialogues. The byte after this has the following
   $B = Sets event flag
   $C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
   */
-EventType? sceneEventType(List<Event> events, {FieldObject? interactingWith}) {
+EventType? sceneEventType(List<Event> events,
+    {FieldObject? interactingWith, bool checkBranches = false}) {
   // SetContext is not a perceivable event, so ignore
   events = events.whereNot((e) => e is SetContext).toList(growable: false);
 
@@ -1481,7 +1482,7 @@ class SceneAsmGenerator implements EventVisitor {
       void runBranch(List<Event> events) {
         states.add(_memory = parent.branch());
 
-        // FIXME: run cutscene if needed
+        runEventIfNeeded(events);
 
         for (var event in events) {
           event.visit(this);

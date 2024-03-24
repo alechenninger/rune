@@ -30,7 +30,7 @@ JumpTable<Byte> runEventsJmpTbl() {
   );
 }
 
-final _eventPtrs = const Array.wrap(Size.l, [
+const _eventPtrs = Array.wrap(Size.l, [
   Label.known('Event_NoEvent'),
   Label.known('Event_NoEvent2'),
   Label.known('Event_NoEvent3'),
@@ -196,7 +196,7 @@ final _eventPtrs = const Array.wrap(Size.l, [
   Label.known('Event_AfterFortuneTeller'),
 ]);
 
-final _cutscenePtrs = const Array.wrap(Size.l, [
+const _cutscenePtrs = Array.wrap(Size.l, [
   Label.known('Event_NoEvent'),
   Label.known('Cutscene_PiataPrincipal'),
   Label.known('Cutscene_ProfHolt'),
@@ -233,7 +233,7 @@ final _cutscenePtrs = const Array.wrap(Size.l, [
   Label.known('Cutscene_Ending'),
 ]);
 
-final _runEventsTable = [
+const _runEventsTable = [
   Label.known('RunEvent_Null00'),
   Label.known('RunEvent_Null01'),
   Label.known('RunEvent_Null02'),

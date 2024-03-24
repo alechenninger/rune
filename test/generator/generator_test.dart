@@ -5,7 +5,6 @@ import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/memory.dart';
 import 'package:rune/generator/movement.dart';
-import 'package:rune/model/battle.dart';
 import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 

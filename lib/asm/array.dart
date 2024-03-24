@@ -112,4 +112,21 @@ class EventPointers {
   Asm toAsm() => _routines.toAsm();
 
   Word get nextIndex => Word(_offset.value + _routines.length);
+
+  @override
+  String toString() {
+    return 'EventPointers{offset: $_offset, routines: $_routines}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EventPointers &&
+          runtimeType == other.runtimeType &&
+          _offset == other._offset &&
+          const ListEquality().equals(_routines._data, other._routines._data);
+
+  @override
+  int get hashCode =>
+      _offset.hashCode ^ const ListEquality().hash(_routines._data);
 }
