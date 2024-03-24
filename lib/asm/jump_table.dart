@@ -15,6 +15,8 @@ abstract class JumpTable<S extends SizedValue> {
           List<Label?> labels = const []}) =>
       _SparseJumpTable<S>(jump: jump, newIndex: newIndex, labels: labels);
 
+  Label? labelAtIndex(int index);
+  Label? labelAt(S index);
   S? operator [](Label name);
   S add(Label name);
   Asm toAsm({bool comment = true});
@@ -34,6 +36,12 @@ abstract class _AbstractJumpTable<T extends Label?, S extends SizedValue>
         _newIndex = newIndex {
     _labels.addAll(labels);
   }
+
+  @override
+  T labelAtIndex(int index) => _labels[index];
+
+  @override
+  T labelAt(S index) => labelAtIndex(index.value);
 
   @override
   S? operator [](Label name) {
