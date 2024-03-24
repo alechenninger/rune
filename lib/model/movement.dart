@@ -266,7 +266,10 @@ class IndividualMoves extends Event {
     var result = <FieldObject, DirectionExpression>{};
     for (var MapEntry(key: obj, value: move) in moves.entries) {
       var direction = move.facing;
-      if (move.distance == 0.steps && direction != null) {
+      if (move.continuousPaths.length == 1 &&
+          move.distance == 0.steps &&
+          direction != null &&
+          move.duration == 0.steps) {
         result[obj] = direction;
       } else {
         return null;
