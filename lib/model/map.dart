@@ -126,6 +126,9 @@ class GameMap {
       _events.entries.map((e) => (e.key, e.value));
 
   void addEvent(SceneId id, Scene event) {
+    if (_events.containsKey(id)) {
+      throw ArgumentError('map already contains event with id: $id');
+    }
     _events[id] = event;
   }
 
