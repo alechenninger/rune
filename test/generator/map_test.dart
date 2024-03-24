@@ -2002,7 +2002,7 @@ void main() {
 
       test('event routine', () {
         expect(
-            asm.events.withoutComments(),
+            asm.events.withoutComments().trim(),
             Asm([
               label(Label('Event_GrandCross_testrun2')),
               getAndRunDialog3LowDialogId(0.toByte.i),
@@ -2081,7 +2081,18 @@ void main() {
       });
 
       test('unique event routines for each branch', () {
-        expect(asm.events.withoutComments(), Asm([]));
+        expect(
+            asm.events.withoutComments(),
+            Asm([
+              label(Label('Event_GrandCross_testrun2')),
+              getAndRunDialog3LowDialogId(0.toByte.i),
+              rts,
+              newLine(),
+              label(Label('Event_GrandCross_testrun3')),
+              getAndRunDialog3LowDialogId(1.toByte.i),
+              rts,
+              newLine()
+            ]));
       });
     });
 
@@ -2159,7 +2170,7 @@ void main() {
 
       test('branch inside event code', () {
         expect(
-            asm.events.withoutComments(),
+            asm.events.withoutComments().trim(),
             Asm([
               label(Label('Event_GrandCross_testrun2')),
               getAndRunDialog3LowDialogId(0.toByte.i),
@@ -2271,7 +2282,18 @@ void main() {
       }, skip: 'TODO');
 
       test('unique event routines which terminate', () {
-        expect(asm.events.withoutComments(), Asm([]));
+        expect(
+            asm.events.withoutComments(),
+            Asm([
+              label(Label('Event_GrandCross_testrun2')),
+              getAndRunDialog3LowDialogId(0.toByte.i),
+              rts,
+              newLine(),
+              label(Label('Event_GrandCross_testrun3')),
+              getAndRunDialog3LowDialogId(1.toByte.i),
+              rts,
+              newLine()
+            ]));
       });
     });
 

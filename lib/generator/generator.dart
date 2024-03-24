@@ -678,7 +678,11 @@ class SceneAsmGenerator implements EventVisitor {
   /// should also contain root state
   Map<Condition, Memory> get _stateGraph => _context.stateGraph;
 
-  var _finished = false;
+  final _finishedStates = <Condition>{};
+
+  bool get _isFinished => _finishedStates.contains(_currentCondition);
+
+  void _setCurrentStateFinished() => _finishedStates.add(_currentCondition);
 
   // Current dialog generation state:
 
@@ -829,16 +833,16 @@ class SceneAsmGenerator implements EventVisitor {
       EventType type = EventType.event}) {
     _checkNotFinished();
 
-    Word addEventIfNeeded() {
+    Word addEventIfNeeded(String nameSuffix) {
       if (eventIndex != null) return eventIndex!;
 
       // only include event counter if we're in a branch condition
       // todo: we might not always start with an empty condition so this should
       // maybe be something about root or starting condition
-      var eventName = nameSuffix == null
-          ? '$id${_currentCondition == Condition.empty() ? '' : _eventCounter}'
-          : '$id$nameSuffix';
-      var eventRoutine = Label('Event_GrandCross_$eventName');
+      // var eventName = nameSuffix == null
+      //     ? '$id${_currentCondition == Condition.empty() ? '' : _eventCounter}'
+      //     : '$id$nameSuffix';
+      var eventRoutine = Label('Event_GrandCross_$id$nameSuffix');
       eventIndex = type.addRoutine(_eventRoutines, eventRoutine);
       _eventAsm.add(setLabel(eventRoutine.name));
 
@@ -860,14 +864,18 @@ class SceneAsmGenerator implements EventVisitor {
               'but last event was $_lastEventInCurrentDialog');
         }
 
-        var eventIndex = addEventIfNeeded();
+        var suffix = nameSuffix ??
+            (_currentCondition == Condition.empty()
+                ? ''
+                : _eventCounter.toString());
+        var eventIndex = addEventIfNeeded(suffix);
         _addToDialog(dialog_asm.runEvent(eventIndex));
         _terminateDialog();
         _gameMode = newMode = m.toEventMode(type);
 
         break;
       case RunEventMode m:
-        var eventIndex = addEventIfNeeded();
+        var eventIndex = addEventIfNeeded(_eventCounter.toString());
 
         _context.runEventAsm.add(Asm([
           move.w(eventIndex.i, Event_Index.w),
@@ -1338,8 +1346,6 @@ class SceneAsmGenerator implements EventVisitor {
           // Save the current mode now to be restored later
           // when processing the alternate branch (if needed).
           final startingMode = _gameMode;
-          GameMode? setMode;
-          GameMode? unsetMode;
 
           // run isSet events unless there are none
           if (ifFlag.isSet.isEmpty) {
@@ -1367,17 +1373,15 @@ class SceneAsmGenerator implements EventVisitor {
               event.visit(this);
             }
 
-            setMode = _gameMode;
-
             if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
               // We're done with the event code; finish it.
               // If we need an event at this point it will be a new event.
-              _finish();
+              finish(appendNewline: true, validateDialogTree: false);
             } else {
               _terminateDialog();
 
               // skip past unset events
-              if (ifFlag.isUnset.isNotEmpty) {
+              if (ifFlag.isUnset.isNotEmpty && !_isFinished) {
                 asm.add(bra.w(continueScene));
               }
             }
@@ -1400,12 +1404,10 @@ class SceneAsmGenerator implements EventVisitor {
               event.visit(this);
             }
 
-            unsetMode = _gameMode;
-
             if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
               // We're done with the event code; finish it.
               // If we need an event at this point it will be a new event.
-              _finish();
+              finish(appendNewline: true, validateDialogTree: false);
             } else {
               _terminateDialog();
             }
@@ -1420,12 +1422,13 @@ class SceneAsmGenerator implements EventVisitor {
           // TODO: if finished was a per branch (+ per mode?) state,
           //  we could just check finished flag here
           // Semantically that is what this is doing.
-          final isFinishedRunEvent = startingMode is RunEventMode &&
-              setMode is EventMode &&
-              unsetMode is EventMode;
-          if (isFinishedRunEvent) {
+          final bothBranchesAreFinished =
+              _finishedStates.contains(_currentCondition.withSet(flag)) &&
+                  _finishedStates.contains(_currentCondition.withNotSet(flag));
+          if (bothBranchesAreFinished) {
+            // ...then implicity this parent state is finished, too
             // TODO: this ignores newlines on finish() call
-            _finished = true;
+            _setCurrentStateFinished();
           } else {
             asm.add(setLabel(continueScene.name));
           }
@@ -1491,7 +1494,9 @@ class SceneAsmGenerator implements EventVisitor {
         if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
           // We're done with the event code; finish it.
           // If we need an event at this point it will be a new event.
-          _finish();
+          // TODO(if value/run events): if we put value based states
+          //  in condition graph, we would use finish()
+          _finish(appendNewline: true);
         } else {
           _terminateDialog();
         }
@@ -1525,6 +1530,8 @@ class SceneAsmGenerator implements EventVisitor {
       for (var (b, lbl) in branched) {
         _gameMode = startingMode;
 
+        // TODO(if value/run events): if we put value based states in condition
+        //  graph, we could make this check less hacky
         var isBranchFinished =
             _gameMode is RunEventMode && asm.last == rts.single;
         if (!isBranchFinished) {
@@ -1539,7 +1546,7 @@ class SceneAsmGenerator implements EventVisitor {
       if (continued) {
         asm.add(label(continueLbl));
       } else {
-        _finished = true;
+        _setCurrentStateFinished();
       }
 
       _memory = parent;
@@ -2317,10 +2324,10 @@ class SceneAsmGenerator implements EventVisitor {
     // seems useless because memory won't ever be consulted again after
     // finishing
 
-    if (!_finished) {
+    if (!_isFinished) {
       _finish(appendNewline: appendNewline);
       if (validateDialogTree) _dialogTree?.validate();
-      _finished = true;
+      _setCurrentStateFinished();
     }
   }
 
@@ -2415,13 +2422,21 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     if (appendNewline) {
-      if (_eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
-        _eventAsm.addNewline();
-      }
-
-      if (_context.runEventAsm.isNotEmpty &&
-          _context.runEventAsm.last.isNotEmpty) {
-        _context.runEventAsm.addNewline();
+      switch (_gameMode) {
+        case EventMode():
+          if (_eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
+            _eventAsm.addNewline();
+          }
+          break;
+        case RunEventMode():
+          if (_context.runEventAsm.isNotEmpty &&
+              _context.runEventAsm.last.isNotEmpty) {
+            _context.runEventAsm.addNewline();
+          }
+          break;
+        default:
+          // empty
+          break;
       }
     }
 
@@ -2435,7 +2450,7 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   void _checkNotFinished() {
-    if (_finished) {
+    if (_isFinished) {
       throw StateError('scene is finished; cannot add more to scene');
     }
   }
