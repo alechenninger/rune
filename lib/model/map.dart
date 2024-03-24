@@ -134,6 +134,10 @@ class GameMap {
   Iterable<Byte> get asmEvents => UnmodifiableSetView(_asmEvents);
 
   void addAsmEvent(Byte runEventIndex) {
+    if (runEventIndex == Byte.max) {
+      throw ArgumentError('runEventIndex cannot be $runEventIndex');
+    }
+
     _asmEvents.add(runEventIndex);
   }
 
@@ -141,7 +145,9 @@ class GameMap {
   String toString() {
     return 'GameMap{id: $id, '
         '_objects: $_objects, '
-        '_areas: $_areas}';
+        '_areas: $_areas, '
+        '_events: $_events, '
+        '_asmEvents: $_asmEvents}';
   }
 
   @override
@@ -151,13 +157,18 @@ class GameMap {
           runtimeType == other.runtimeType &&
           id == other.id &&
           const MapEquality().equals(_objects, other._objects) &&
-          const MapEquality().equals(_areas, other._areas);
+          const MapEquality().equals(_areas, other._areas) &&
+          const MapEquality().equals(_events, other._events) &&
+          const SetEquality()
+              .equals(_asmEvents.toSet(), other._asmEvents.toSet());
 
   @override
   int get hashCode =>
       id.hashCode ^
       const MapEquality().hash(_objects) ^
-      const MapEquality().hash(_areas);
+      const MapEquality().hash(_areas) ^
+      const MapEquality().hash(_events) ^
+      const SetEquality().hash(_asmEvents.toSet());
 }
 
 class _MapObjectAt {

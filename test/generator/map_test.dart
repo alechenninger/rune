@@ -1796,6 +1796,23 @@ void main() {
                     Scene([Dialog(spans: DialogSpan.parse("It's an area"))])))
       ]);
     });
+
+    test('parses events', () async {
+      var dialog =
+          TestDialogTreeLookup({Label('TestDialogTree'): DialogTree()});
+      var asm = (MapAsmFixture()
+            ..addEvent(6)
+            ..addEvent(0x3a)
+            ..addEvent(0x3b)
+            ..addEvent(0x3c))
+          .toAsm();
+
+      var map = await asmToMap(Label('Map_Test'), asm, dialog);
+
+      expect(map.events, isEmpty);
+      // Additional padding
+      expect(map.asmEvents, Bytes.list([6, 0x3a, 0x3b, 0x3c, 0]));
+    });
   });
 
   test('preprocesses map does not change existing data', () async {
@@ -1872,6 +1889,61 @@ void main() {
 
   group('run events compiler', () {
     late MapAsm asm;
+
+    group('with only asm events', () {
+      test('generates run event indices', () {
+        testMap.addAsmEvent(Byte(0xf));
+
+        asm = program.addMap(testMap);
+
+        expect(asm.runEventIndices.withoutComments(), dc.b([Byte(0xf)]));
+      });
+
+      test('word aligns run event indices', () {
+        testMap.addAsmEvent(Byte(1));
+        testMap.addAsmEvent(Byte(0x3a));
+
+        asm = program.addMap(testMap);
+
+        expect(asm.runEventIndices.withoutComments(),
+            dc.b(Bytes.list([1, 0x3a, 0])));
+      });
+    });
+
+    group('with asm and scene events', () {
+      test('includes both in run event indices', () {
+        testMap.addEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag'), isSet: [
+                Dialog(spans: [DialogSpan('Hi')]),
+              ])
+            ]));
+        testMap.addAsmEvent(Byte(0xd));
+        testMap.addAsmEvent(Byte(0xe));
+
+        asm = program.addMap(testMap);
+
+        expect(asm.runEventIndices.withoutComments(),
+            dc.b(Bytes.list([1, 0xd, 0xe])));
+      });
+
+      test('word aligns run event indices', () {
+        testMap.addEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag'), isSet: [
+                Dialog(spans: [DialogSpan('Hi')]),
+              ])
+            ]));
+        testMap.addAsmEvent(Byte(0xd));
+
+        asm = program.addMap(testMap);
+
+        expect(asm.runEventIndices.withoutComments(),
+            dc.b(Bytes.list([1, 0xd, 0])));
+      });
+    });
 
     group('with event flag check and just dialog generates', () {
       setUp(() {
@@ -2266,6 +2338,11 @@ class MapAsmFixture {
     return _areas.length - 1;
   }
 
+  final _events = <int>[];
+  void addEvent(int event) {
+    _events.add(event);
+  }
+
   Asm toAsm() => Asm.fromRaw('''Map_$mapName:
 	dc.b	\$08
 	dc.b	MusicID_TonoeDePon
@@ -2318,7 +2395,7 @@ class MapAsmFixture {
 	dc.w	\$FFFF
 
 ; Events
-	dc.b	\$00
+  ${_eventsAsm()}
 	dc.b	\$FF
 
 ; Palettes address
@@ -2373,6 +2450,15 @@ class MapAsmFixture {
       asm.addNewline();
     }
     return asm.toString();
+  }
+
+  String _eventsAsm() {
+    var bytes = [for (var e in _events) Byte(e)];
+    if (bytes.length.isEven) {
+      // Padding
+      bytes.add(Byte.zero);
+    }
+    return dc.b(bytes).toString();
   }
 }
 

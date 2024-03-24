@@ -170,8 +170,14 @@ MapAsm compileMap(GameMap map, ProgramConfiguration config) {
     generator.finish();
   }
 
+  for (var id in map.asmEvents) {
+    runEventIndices.add(id);
+  }
+
   if (runEventIndices.length.isEven) {
     // Must be word aligned – terminating byte counts as one.
+    // This requires 0 is a noop event,
+    // which would probaly be good to externalize, but...
     runEventIndices.add(Byte(0));
   }
 
@@ -1010,11 +1016,11 @@ List<String> preprocessMapToRaw(Asm original,
     String? events,
     FieldRoutineRepository? fieldRoutines}) {
   fieldRoutines ??= defaultFieldRoutines;
-  var reader = ConstantReader.asm(original);
-  var processed = <String>[];
+  final reader = ConstantReader.asm(original);
+  final processed = <String>[];
 
-  var trimmed = original.trim();
-  var map = trimmed.first.label?.map((l) => Label(l));
+  final trimmed = original.trim();
+  final map = trimmed.first.label?.map((l) => Label(l));
   if (map == null) {
     throw ArgumentError(
         'original asm does not start with label: ${trimmed.first}');
@@ -1053,7 +1059,7 @@ List<String> preprocessMapToRaw(Asm original,
   defineConstants(_skipAfterSpritesToObjects(reader));
 
   // ignore & replace real object data
-  _readObjects(reader, fieldRoutines: fieldRoutines);
+  _readObjects(reader, fieldRoutines: fieldRoutines).forEach((_) {});
   addComment('Objects');
   processed.add(objects);
   defineConstants([Word(0xffff)]);
@@ -1079,14 +1085,14 @@ List<String> preprocessMapToRaw(Asm original,
 
   // ignore & replace real area data, if there is any area data
   if (areas != null) {
-    _readAreas(reader);
+    _readAreas(reader).forEach((_) {});
     addComment('Areas');
     processed.add(areas);
     defineConstants([Word(0xffff)]);
   }
 
   if (events != null) {
-    _readEvents(reader);
+    _readEvents(reader).forEach((_) {});
     addComment('Events');
     processed.add(events);
     defineConstants([Byte(0xff)]);
@@ -1121,7 +1127,10 @@ Future<GameMap> asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup,
     {FieldRoutineRepository? fieldRoutines}) async {
   fieldRoutines ??= defaultFieldRoutines;
 
-  var reader = ConstantReader.asm(asm);
+  final mapId = labelToMapId(mapLabel);
+  final map = GameMap(mapId);
+
+  final reader = ConstantReader.asm(asm);
 
   _skipToSprites(reader);
 
@@ -1129,14 +1138,14 @@ Future<GameMap> asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup,
 
   _skipAfterSpritesToObjects(reader);
 
-  var asmObjects = _readObjects(reader, fieldRoutines: fieldRoutines);
+  final asmObjects = _readObjects(reader, fieldRoutines: fieldRoutines)
+      .toList(growable: false);
 
   _skipAfterObjectsToLabels(reader);
 
   // on maps there are 2 labels before dialog,
   // except on motavia and dezolis
   // (this is simply hard coded based on map IDs)
-  var mapId = labelToMapId(mapLabel);
   Label dialogLabel;
   if ([MapId.Motavia, MapId.Dezolis].contains(mapId)) {
     dialogLabel = reader.readLabel();
@@ -1147,23 +1156,24 @@ Future<GameMap> asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup,
   }
 
   var lookup = dialogLookup.byLabel(dialogLabel);
+  var scenes = <_DialogAndLabel, Scene>{};
 
   // todo: pass map instead of returning lists to add to map?
-  var scenes = <_DialogAndLabel, Scene>{};
-  var areas = [
-    for (var a in _readAreas(reader))
-      await _buildArea(mapId, a,
-          dialogLookup: dialogLookup,
-          isWorldMotavia: mapId.world == World.Motavia,
-          scenes: scenes)
-  ];
+  for (var asm in _readAreas(reader)) {
+    var model = await _buildArea(mapId, asm,
+        dialogLookup: dialogLookup,
+        isWorldMotavia: mapId.world == World.Motavia,
+        scenes: scenes);
+    map.addArea(model);
+  }
 
-  var dialogTree = await lookup;
-  var mapObjects = _buildObjects(mapId, sprites, asmObjects, dialogTree);
+  for (var asm in _readEvents(reader)) {
+    map.addAsmEvent(asm);
+  }
 
-  var map = GameMap(mapId);
-  mapObjects.forEach(map.addObject);
-  areas.forEach(map.addArea);
+  for (var obj in _buildObjects(mapId, sprites, asmObjects, await lookup)) {
+    map.addObject(obj);
+  }
 
   return map;
 }
@@ -1310,15 +1320,15 @@ Iterable<Sized> _skipAfterSpritesToObjects(ConstantReader reader) {
   return iterables.concat([sprite, updates, transition]);
 }
 
-List<_AsmObject> _readObjects(ConstantReader reader,
-    {required FieldRoutineRepository fieldRoutines}) {
-  var objects = <_AsmObject>[];
+Iterable<_AsmObject> _readObjects(ConstantReader reader,
+    {required FieldRoutineRepository fieldRoutines}) sync* {
+  var i = 0;
 
   while (true) {
     var routineOrTerminate = reader.readWord();
 
     if (routineOrTerminate == Word(0xffff)) {
-      return objects;
+      return;
     }
 
     var facing = reader.readByte();
@@ -1330,18 +1340,20 @@ List<_AsmObject> _readObjects(ConstantReader reader,
     var spec = fieldRoutines.byIndex(routineOrTerminate)?.factory;
     if (spec == null) {
       throw Exception('unknown field routine: $routineOrTerminate '
-          'objectIndex=${objects.length}');
+          'objectIndex=$i');
     }
 
     var position = Position(x.value * 8, y.value * 8);
 
-    objects.add(_AsmObject(
+    yield _AsmObject(
         routine: routineOrTerminate,
         spec: spec,
         facing: _byteToFacingDirection(facing),
         dialogId: dialogId,
         vramTile: vramTile,
-        position: position));
+        position: position);
+
+    i++;
   }
 }
 
@@ -1375,8 +1387,8 @@ class _AsmObject {
       required this.position});
 }
 
-List<MapObject> _buildObjects(MapId mapId, Map<_SpriteLoc, Label> sprites,
-    List<_AsmObject> asmObjects, DialogTree dialogTree) {
+Iterable<MapObject> _buildObjects(MapId mapId, Map<_SpriteLoc, Label> sprites,
+    Iterable<_AsmObject> asmObjects, DialogTree dialogTree) {
   // The same scene must reuse same object in memory
   var scenesById = <Byte, Scene>{};
 
@@ -1404,16 +1416,16 @@ List<MapObject> _buildObjects(MapId mapId, Map<_SpriteLoc, Label> sprites,
     }
 
     return object;
-  }).toList(growable: false);
+  });
 }
 
-List<_AsmArea> _readAreas(ConstantReader reader) {
-  var areas = <_AsmArea>[];
+Iterable<_AsmArea> _readAreas(ConstantReader reader) sync* {
+  var i = 0;
 
   while (true) {
     var xOrTerminate = reader.readWord();
     if (xOrTerminate == Word(0xffff)) {
-      return areas;
+      return;
     }
 
     var x = xOrTerminate;
@@ -1425,12 +1437,12 @@ List<_AsmArea> _readAreas(ConstantReader reader) {
     var param = reader.readByteExpression();
     var position = Position(x.value << 3, y.value << 3);
 
-    areas.add(_AsmArea(areas.length, range, position,
-        flagType: flagType, flag: flag, routine: routine, param: param));
+    yield _AsmArea(i++, range, position,
+        flagType: flagType, flag: flag, routine: routine, param: param);
   }
 }
 
-List<Byte> _readEvents(ConstantReader reader) {
+Iterable<Byte> _readEvents(ConstantReader reader) {
   var events = <Byte>[];
 
   while (true) {
