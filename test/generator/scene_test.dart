@@ -1348,6 +1348,37 @@ ${dialog2.toAsm()}
             EventType.event);
       });
 
+      test('ending with events runnable in dialog or event run in event', () {
+        var map = GameMap(MapId.Test);
+        map.addObject(MapObject(
+            id: 'one',
+            startPosition: Position(0x100, 0x100),
+            spec: Npc(
+                Sprite.Motavian1,
+                FaceDown(
+                    onInteract: Scene([
+                  IfFlag(EventFlag('testflag'), isSet: [
+                    Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),
+                    IndividualMoves()..moves[alys] = Face(down),
+                  ], isUnset: [
+                    Dialog(speaker: alys, spans: DialogSpan.parse('Bye')),
+                  ]),
+                ])))));
+
+        var program = Program();
+        var asm = program.addMap(map);
+
+        expect(
+            asm.events.withoutComments().trim().skip(1),
+            Asm([
+              moveq(Byte(2).i, d0), // 0 is start, 1 is unset, 2 is set
+              jsr(Label('Event_GetAndRunDialogue3').l),
+              alys.toA4(Memory()),
+              updateObjFacing(down.address),
+              returnFromInteractionEvent(),
+            ]));
+      });
+
       group('cannot then run event in interaction', () {
         test('if another event other than IfFlag has occurred', () {
           var generator = SceneAsmGenerator.forInteraction(

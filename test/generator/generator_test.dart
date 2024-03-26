@@ -585,7 +585,7 @@ EventFlag_Test001 = $0001'''));
         ]));
   });
 
-  test('events runnable in dialog or event run in event when no continue arrow',
+  test('events runnable in dialog or event run in event with no continue arrow',
       () {
     // events that are ambiguous should wait until there is a an upcoming
     // dialog event before running in dialog

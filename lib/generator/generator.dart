@@ -740,6 +740,9 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.currentMap = map;
     _memory.loadedDialogTree = _dialogTrees.forMap(map.id);
     _stateGraph[Condition.empty()] = _memory;
+
+    // Since we start in dialog mode, there must be at least one dialog.
+    _currentDialogIdOrStart();
   }
 
   SceneAsmGenerator.forEvent(
@@ -1279,7 +1282,7 @@ class SceneAsmGenerator implements EventVisitor {
         }
 
         // Wrap up this branch
-        _finish(appendNewline: true);
+        finish(appendNewline: true, allowIncompleteDialogTrees: true);
 
         if (_inEvent) {
           // we may be in event now, but we have to go back to dialog generation
@@ -1296,7 +1299,9 @@ class SceneAsmGenerator implements EventVisitor {
           event.visit(this);
         }
 
-        _generateQueueInCurrentMode();
+        // Wrap up this branch
+        finish(appendNewline: true, allowIncompleteDialogTrees: true);
+
         _flagUnknown(flag);
 
         // no more events can be added
@@ -1306,7 +1311,7 @@ class SceneAsmGenerator implements EventVisitor {
         //   but we're using 'empty' condition
         //   to proxy for the original state or 'root' state
         if (_currentCondition == Condition.empty()) {
-          finish(appendNewline: true);
+          _setCurrentStateFinished();
         }
 
         // TODO(ifflag): should we update state graph here?
@@ -1376,7 +1381,7 @@ class SceneAsmGenerator implements EventVisitor {
             if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
               // We're done with the event code; finish it.
               // If we need an event at this point it will be a new event.
-              finish(appendNewline: true, validateDialogTree: false);
+              finish(appendNewline: true, allowIncompleteDialogTrees: true);
             } else {
               _terminateDialog();
 
@@ -1407,7 +1412,7 @@ class SceneAsmGenerator implements EventVisitor {
             if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
               // We're done with the event code; finish it.
               // If we need an event at this point it will be a new event.
-              finish(appendNewline: true, validateDialogTree: false);
+              finish(appendNewline: true, allowIncompleteDialogTrees: true);
             } else {
               _terminateDialog();
             }
@@ -2292,7 +2297,7 @@ class SceneAsmGenerator implements EventVisitor {
           eventFlags: _eventFlags, withObject: true)
         ..runEventIfNeeded(onNext.onInteract.events)
         ..scene(onNext.onInteract)
-        ..finish(appendNewline: true, validateDialogTree: false);
+        ..finish(appendNewline: true, allowIncompleteDialogTrees: true);
 
       if (tree.length <= nextDialogId.value) {
         throw StateError("no interaction dialog generated");
@@ -2318,7 +2323,8 @@ class SceneAsmGenerator implements EventVisitor {
     });
   }
 
-  void finish({bool appendNewline = false, bool validateDialogTree = true}) {
+  void finish(
+      {bool appendNewline = false, bool allowIncompleteDialogTrees = false}) {
     // todo: also apply all changes for current mem across graph
     // not sure if still need to do this
     // seems useless because memory won't ever be consulted again after
@@ -2326,7 +2332,7 @@ class SceneAsmGenerator implements EventVisitor {
 
     if (!_isFinished) {
       _finish(appendNewline: appendNewline);
-      if (validateDialogTree) _dialogTree?.validate();
+      if (!allowIncompleteDialogTrees) _dialogTree?.validate();
       _setCurrentStateFinished();
     }
   }
@@ -2769,7 +2775,9 @@ class SceneAsmGenerator implements EventVisitor {
             break;
         }
 
-        _addToDialog(terminateDialog());
+        if (_currentDialog != null) {
+          _addToDialog(terminateDialog());
+        }
 
         break;
       default:
