@@ -595,7 +595,7 @@ class Scene extends IterableBase<Event> {
   /// The intent is to speed up the scene
   /// while keeping meaningful state changes.
   void fastForward({required Span dialogTo, int? upTo}) {
-    condenseRecursively(List<Event> events) {
+    List<Event> condenseRecursively(List<Event> events) {
       for (var i = 0; i < events.length; i++) {
         var e = events[i];
 
@@ -642,8 +642,26 @@ class Scene extends IterableBase<Event> {
             condenseRecursively(isUnset);
             events[i] = IfFlag(e.flag, isSet: isSet, isUnset: isUnset);
             break;
+
+          case IfValue e:
+            var branches = {
+              for (var b in e.branches)
+                b.condition: condenseRecursively([...b.events])
+            };
+            events[i] = IfValue(
+              e.operand1,
+              comparedTo: e.operand2,
+              equal: branches[BranchCondition.eq] ?? [],
+              greater: branches[BranchCondition.gt] ?? [],
+              less: branches[BranchCondition.lt] ?? [],
+              greaterOrEqual: branches[BranchCondition.gte] ?? [],
+              lessOrEqual: branches[BranchCondition.lte] ?? [],
+              notEqual: branches[BranchCondition.neq] ?? [],
+            );
         }
       }
+
+      return events;
     }
 
     if (upTo == null) {
