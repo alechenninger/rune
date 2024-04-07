@@ -13,6 +13,7 @@ import 'address.dart';
 import 'data.dart';
 
 export 'address.dart';
+export 'battles.dart';
 export 'data.dart';
 export 'objects.dart';
 export 'jump_table.dart';
@@ -859,5 +860,38 @@ class ConstantReader {
     if (c is SizedConstant) return c;
     if (c is! Value) return Constant('$c');
     throw StateError('cannot read constant from $c');
+  }
+}
+
+class ByteIterable extends IterableBase<Byte> {
+  final ConstantReader _reader;
+
+  ByteIterable(this._reader);
+
+  @override
+  Iterator<Byte> get iterator => _ByteIterator(_reader);
+}
+
+class _ByteIterator implements Iterator<Byte> {
+  final ConstantReader _reader;
+  Byte? _current;
+
+  _ByteIterator(this._reader);
+
+  @override
+  Byte get current => switch (_current) {
+        null => throw StateError('iterator has not started or is finished'),
+        var c => c
+      };
+
+  @override
+  bool moveNext() {
+    try {
+      _current = _reader.readByte();
+      return true;
+    } catch (e) {
+      _current = null;
+      return false;
+    }
   }
 }
