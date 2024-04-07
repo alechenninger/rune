@@ -250,6 +250,7 @@ abstract mixin class Speaker {
     Dorin,
     Seed,
     Mito,
+    Juza,
     Shopkeeper1,
     Shopkeeper2,
     Shopkeeper3,
@@ -278,6 +279,7 @@ abstract mixin class Speaker {
   static final Dorin = NpcSpeaker(Portrait.Dorin, "Dorin");
   static final Seed = NoPortraitSpeaker('Seed');
   static final Mito = NpcSpeaker(Portrait.FortuneTeller, 'Mito');
+  static final Juza = NpcSpeaker(Portrait.Juza, 'Juza');
   static final Shopkeeper1 = NpcSpeaker(Portrait.Shopkeeper1, 'Shopkeeper1');
   static final Shopkeeper2 = NpcSpeaker(Portrait.Shopkeeper2, 'Shopkeeper2');
   static final Shopkeeper3 = NpcSpeaker(Portrait.Shopkeeper3, 'Shopkeeper3');
