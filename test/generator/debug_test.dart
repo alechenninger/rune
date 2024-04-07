@@ -33,10 +33,10 @@ void main() {
     expect(asm, Asm.fromRaw(r'''	jsr	(PalFadeOut_ClrSpriteTbl).l
 
 	move.l	#((CharID_Alys<<24)|$00FFFFFF), (Current_Party_Slots).w
+	moveq	#CharID_Alys,d0
+	jsr	(Event_AddMacro).l
 
 	move.b	#CharID_Chaz, (Current_Party_Slot_2).w
-	moveq	#CharID_Chaz,d0
-	jsr	(Event_AddMacro).l
 
 	move.b	#CharID_Hahn, (Current_Party_Slot_3).w
 	moveq	#CharID_Hahn, d0

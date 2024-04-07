@@ -55,6 +55,7 @@ Asm _loadParty(List<model.Character> party) {
 
   asm.add(move.l((party[0].charId << 24.toValue | 0xffffff.toLongword).i,
       Constant('Current_Party_Slots').w));
+  asm.add(_addMacro(party[0]));
 
   for (int i = 1; i < party.length; i++) {
     var c = party[i];
@@ -62,9 +63,13 @@ Asm _loadParty(List<model.Character> party) {
     asm.add(Asm([
       // + 1 because slots start at 1, not 0
       move.b(c.charIdAddress, Constant('Current_Party_Slot_${i + 1}').w),
-      moveq(c.charIdAddress, d0),
-      jsr(Label('Event_AddMacro').l)
+      _addMacro(c),
     ]));
   }
   return asm;
+}
+
+Asm _addMacro(model.Character c) {
+  if (c == model.shay) return Asm.empty();
+  return Asm([moveq(c.charIdAddress, d0), jsr(Label('Event_AddMacro').l)]);
 }
