@@ -5,7 +5,6 @@ import 'package:characters/characters.dart';
 import 'package:charcode/ascii.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 
-import '../asm/asm.dart';
 import '../asm/dialog.dart';
 import '../asm/events.dart';
 import '../characters.dart';
@@ -22,7 +21,7 @@ class DialogAsm extends Asm {
   DialogAsm.fromRaw(String raw) : super.empty() {
     add(Instruction.parse(raw));
   }
-  DialogAsm(List<Asm> asm) : super(asm);
+  DialogAsm(super.asm);
 
   DialogAsm.emptyDialog()
       : super([

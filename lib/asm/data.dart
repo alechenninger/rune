@@ -1057,10 +1057,9 @@ abstract class Data<T extends List<int>, E extends SizedValue,
     D extends Data<T, E, D>> extends ListBase<E> {
   final T bytes;
   final int elementSizeInBytes;
-  final int hexDigits;
+  final int nibbles;
 
-  Data(this.bytes, this.elementSizeInBytes)
-      : hexDigits = elementSizeInBytes * 2;
+  Data(this.bytes, this.elementSizeInBytes) : nibbles = elementSizeInBytes * 2;
 
   D _new(List<int> l);
 
@@ -1128,7 +1127,7 @@ abstract class Data<T extends List<int>, E extends SizedValue,
   String toString() {
     return bytes
         .map((e) =>
-            '\$${e.toRadixString(16).toUpperCase().padLeft(hexDigits, '0')}')
+            '\$${e.toRadixString(16).toUpperCase().padLeft(nibbles, '0')}')
         .join(', ');
   }
 

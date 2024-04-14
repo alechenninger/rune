@@ -1,6 +1,8 @@
 /// Events for "animating" characters.
 library;
 
+import 'dart:math';
+
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
 import 'package:rune/generator/generator.dart';
@@ -130,6 +132,78 @@ class StepObjects extends Event {
       animate.hashCode ^
       stepPerFrame.hashCode ^
       frames;
+}
+
+class ShutterObjects extends Event {
+  final List<FieldObject> objects;
+  final Duration duration;
+  final int times;
+
+  static const _up = Point<double>(0, -1);
+  static const _down = Point<double>(0, 1);
+
+  ShutterObjects(this.objects, {required this.duration, required this.times}) {
+    checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
+    checkArgument(duration > Duration.zero,
+        message: 'Duration must be greater than 0.');
+    checkArgument(times > 0, message: 'Times must be greater than 0.');
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    for (var event in toEvents()) {
+      event.visit(visitor);
+    }
+  }
+
+  List<Event> toEvents() {
+    var framesPerShutter = duration.toFrames();
+    var pauseTime = max(0, (framesPerShutter - 2) ~/ 2).framesToDuration();
+    var events = <Event>[];
+    var addEvents = pauseTime > Duration.zero
+        ? (e) => _addEventsWithPause(e, pauseTime)
+        : _addEventsWithoutPause;
+
+    for (var i = 0; i < times; i++) {
+      addEvents(events);
+    }
+
+    return events;
+  }
+
+  _addEventsWithPause(List events, Duration pause) {
+    events.add(StepObjects(objects, stepPerFrame: _up, frames: 1));
+    events.add(Pause(pause));
+    events.add(StepObjects(objects, stepPerFrame: _down, frames: 1));
+    events.add(Pause(pause));
+  }
+
+  _addEventsWithoutPause(List events) {
+    events.add(StepObjects(objects, stepPerFrame: _up, frames: 1));
+    events.add(StepObjects(objects, stepPerFrame: _down, frames: 1));
+  }
+
+  @override
+  String toString() {
+    return 'ShutterObjects(objects: $objects, '
+        'duration: $duration, '
+        'times: $times)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is ShutterObjects &&
+        const ListEquality<FieldObject>().equals(other.objects, objects) &&
+        other.duration == duration &&
+        other.times == times;
+  }
+
+  @override
+  int get hashCode =>
+      const ListEquality<FieldObject>().hash(objects) ^
+      duration.hashCode ^
+      times.hashCode;
 }
 
 class JumpObject extends Event {
