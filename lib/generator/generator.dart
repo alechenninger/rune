@@ -898,10 +898,25 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void asm(AsmEvent asm) {
-    _addToEvent(asm, (i) {
-      _memory.unknownAddressRegisters();
-      return asm.asm;
-    });
+    if (asm.requireEvent) {
+      _addToEvent(asm, (i) {
+        _memory.unknownAddressRegisters();
+        return asm.asm;
+      });
+    } else {
+      _addToEventOrRunEvent(asm, (i, _) {
+        _memory.unknownAddressRegisters();
+        return asm.asm;
+      });
+    }
+  }
+
+  @override
+  void dialogCodes(DialogCodes codes) {
+    _checkNotFinished();
+    _generateQueueInCurrentMode();
+    _runOrContinueDialog(codes);
+    _addToDialog(dc.b(codes.codes));
   }
 
   @override
@@ -1698,7 +1713,8 @@ class SceneAsmGenerator implements EventVisitor {
   void fadeInField(FadeInField fadeIn) {
     _checkNotFinished();
 
-    if (_memory.isFieldShown == true) return;
+    // Sometimes we might not know its not shown (e.g. at the start of a scene)
+    // if (_memory.isFieldShown == true) return;
 
     _addToEvent(fadeIn, (eventIndex) {
       var wasFieldShown = _memory.isFieldShown;
@@ -3243,6 +3259,15 @@ extension FramesPerSecond on Duration {
     // could use conditional pseudo-assembly if / else
     // see: http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_3_6_
     return (inMilliseconds / 1000 * 60).round();
+  }
+}
+
+extension SecondsPerFrame on int {
+  Duration framesToDuration() {
+    // 60 fps
+    // 1/60 spf
+    // x frames * 1/60 = seconds * 1000 milli per sec = y milliseconds
+    return Duration(milliseconds: (this / 60 * 1000).round());
   }
 }
 

@@ -7,7 +7,12 @@ import 'model.dart';
 class AsmEvent implements Event {
   final Asm asm;
 
-  AsmEvent(this.asm);
+  /// If assembly must run in an event. Otherwise it may be triggered before
+  /// first field updates (transitions, object updates, tiles, map updates, and
+  /// vint).
+  final bool requireEvent;
+
+  AsmEvent(this.asm, {this.requireEvent = false});
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
@@ -27,6 +32,32 @@ class AsmEvent implements Event {
   void visit(EventVisitor visitor) {
     visitor.asm(this);
   }
+}
+
+class DialogCodes extends Event {
+  final Bytes codes;
+
+  DialogCodes(this.codes);
+  
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.dialogCodes(this);
+  }
+
+  @override
+  String toString() {
+    return 'DialogCodes{codes: $codes}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DialogCodes &&
+          runtimeType == other.runtimeType &&
+          codes == other.codes;
+  
+  @override
+  int get hashCode => codes.hashCode;
 }
 
 // todo: this event is not like the others, and routinely causes some issues

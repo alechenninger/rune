@@ -194,6 +194,7 @@ class ModelException implements Exception {
 
 abstract class EventVisitor {
   void asm(AsmEvent asm);
+  void dialogCodes(DialogCodes dialogCodes);
   void dialog(Dialog dialog);
   void displayText(DisplayText text);
   void facePlayer(FacePlayer face);
