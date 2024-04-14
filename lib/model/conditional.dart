@@ -94,6 +94,7 @@ const storyEvents = [
   //EventFlag('FissureOfFearFee'),
   //EventFlag('TallasSaved'),
   //EventFlag('WreckageSystem'), - optional dungeon
+  EventFlag('JuzaFirstEncounter'),
   EventFlag('Juza'),
   EventFlag('JuzaDefeated'),
   EventFlag('Zio'),
