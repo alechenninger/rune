@@ -2,6 +2,25 @@ import 'package:quiver/check.dart';
 
 import 'model.dart';
 
+class IncreaseTone extends Event {
+  /// 1 is 100% white.
+  final double percent;
+
+  /// Time to wait with increased tone.
+  final Duration wait;
+
+  IncreaseTone({required this.percent, required this.wait}) {
+    checkArgument(percent >= 0 && percent <= 1,
+        message: 'percent must be between 0 and 1');
+    checkArgument(wait >= Duration.zero, message: 'wait must be non-negative');
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.increaseTone(this);
+  }
+}
+
 class FlashScreen extends Event {
   final SoundEffect? sound;
   final Duration flashed;

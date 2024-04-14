@@ -26,7 +26,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/guild.dart';
-import 'package:rune/model/flash_screen.dart';
+import 'package:rune/model/palette.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -1793,25 +1793,43 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void increaseTone(IncreaseTone increase) {
+    _checkNotFinished();
+
+    // It takes 28 frames max to go fully white from any palette.
+    var frames = (increase.percent * 28).ceil();
+
+    if (frames > 0) {
+      _addToEvent(increase, (eventIndex) {
+        var extraFrames = frames - 1;
+        return Asm([
+          if (extraFrames <= 128)
+            moveq(extraFrames.toByte.i, d7)
+          else
+            move.w(extraFrames.i, d7),
+          label(Label('.increase_tone$eventIndex')),
+          jsr(Pal_IncreaseTone.l),
+          dbf(d7, Label('.increase_tone$eventIndex')),
+        ]);
+      });
+    }
+
+    pause(Pause(increase.wait));
+  }
+
+  @override
   void flashScreen(FlashScreen flash) {
     _checkNotFinished();
+
+    if (flash.sound case var s?) {
+      playSound(PlaySound(s));
+    }
 
     _addToEvent(flash, (i) {
       var extraFlashedFrames = max(0, flash.flashed.toFrames() - 1);
       var calmFrames = flash.calm.toFrames();
 
-      // TODO(possible bug): if panels are shown might cause palette corruption
       return Asm([
-        // Queue sound
-        if (flash.sound case var s?) ...[
-          // Necessary to ensure previous sound change occurs
-          // TODO: as last event in current dialog is relevant to current dialog
-          // depending on how dialog generation is managed this may miss cases
-          if (_lastEventInCurrentDialog is PlaySound ||
-              _lastEventInCurrentDialog is PlayMusic)
-            doMapUpdateLoop(0.toWord),
-          move.b(s.sfxId.i, Constant('Sound_Index').l),
-        ],
         // Copy current palette to buffer 2
         lea(Palette_Table_Buffer.w, a0),
         lea(Palette_Table_Buffer_2.w, a1),
@@ -1821,7 +1839,8 @@ class SceneAsmGenerator implements EventVisitor {
         // Rewrite the palette white
         moveq(0x1F.i, d7),
         label(Label('.flash$i')),
-        move.l(0xEEE0EEE.i, a0.postIncrement()),
+        // Two words at a time
+        move.l(0x0EEE0EEE.i, a0.postIncrement()),
         dbf(d7, Label('.flash$i')),
         doMapUpdateLoop(extraFlashedFrames.toWord),
         // Restore the palette gradually
