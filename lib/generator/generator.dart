@@ -26,6 +26,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/guild.dart';
+import 'package:rune/model/flash_screen.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -1792,6 +1793,50 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void flashScreen(FlashScreen flash) {
+    _checkNotFinished();
+
+    _addToEvent(flash, (i) {
+      var extraFlashedFrames = max(0, flash.flashed.toFrames() - 1);
+      var calmFrames = flash.calm.toFrames();
+
+      // TODO(possible bug): if panels are shown might cause palette corruption
+      return Asm([
+        // Queue sound
+        if (flash.sound case var s?) ...[
+          // Necessary to ensure previous sound change occurs
+          // TODO: as last event in current dialog is relevant to current dialog
+          // depending on how dialog generation is managed this may miss cases
+          if (_lastEventInCurrentDialog is PlaySound ||
+              _lastEventInCurrentDialog is PlayMusic)
+            doMapUpdateLoop(0.toWord),
+          move.b(s.sfxId.i, Constant('Sound_Index').l),
+        ],
+        // Copy current palette to buffer 2
+        lea(Palette_Table_Buffer.w, a0),
+        lea(Palette_Table_Buffer_2.w, a1),
+        move.w(0x3F.i, d7),
+        trap(1.i),
+        lea(Palette_Table_Buffer.w, a0),
+        // Rewrite the palette white
+        moveq(0x1F.i, d7),
+        label(Label('.flash$i')),
+        move.l(0xEEE0EEE.i, a0.postIncrement()),
+        dbf(d7, Label('.flash$i')),
+        doMapUpdateLoop(extraFlashedFrames.toWord),
+        // Restore the palette gradually
+        move.w(0x27.i, d7),
+        label(Label('.restore_palette$i')),
+        jsr(Pal_DecreaseToneToPal2.l),
+        doMapUpdateLoop(0.toWord),
+        dbf(d7, Label('.restore_palette$i')),
+        // Wait out calm time if any
+        if (calmFrames > 0) doMapUpdateLoop((calmFrames - 1).toWord),
+      ]);
+    });
+  }
+
+  @override
   void prepareMap(PrepareMap prepareMap) {
     _checkNotFinished();
 
@@ -2068,10 +2113,12 @@ class SceneAsmGenerator implements EventVisitor {
         // Necessary to ensure previous sound change occurs
         // TODO: as last event in current dialog is relevant to current dialog
         // depending on how dialog generation is managed this may miss cases
-        // TODO(frame perfect): may need to run tiles/map updates
         if (_lastEventInCurrentDialog is PlaySound ||
             _lastEventInCurrentDialog is PlayMusic)
-          vIntPrepare(),
+          if (_memory.isFieldShown == false || (_memory.panelsShown ?? 0) > 0)
+            doMapUpdateLoop(0.toWord)
+          else
+            vIntPrepare(),
         move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l),
       ]);
     });
@@ -2081,10 +2128,10 @@ class SceneAsmGenerator implements EventVisitor {
   void playMusic(PlayMusic playMusic) {
     /*
     ; $F2 = Determines actions during dialogues. The byte after this has the following values:
-		3 = Loads sound; the byte after this is the Sound index
-		4 = Loads sound; the byte after this is the Sound index
-		8 = Pauses music
-		9 = Resumes music
+    3 = Loads sound; the byte after this is the Sound index
+    4 = Loads sound; the byte after this is the Sound index
+    8 = Pauses music
+    9 = Resumes music
      */
     var musicId = playMusic.music.musicId;
 
@@ -2111,14 +2158,14 @@ class SceneAsmGenerator implements EventVisitor {
   void stopMusic(StopMusic stopMusic) {
     /*
     ; $F2 = Determines actions during dialogues. The byte after this has the following values:
-		3 = Loads sound; the byte after this is the Sound index
-		4 = Loads sound; the byte after this is the Sound index
-		8 = Pauses music
-	move.b	#1, $00FF5007
-	jsr	(VInt_Prepare).l
-		9 = Resumes music
-	move.b	#$80, ($FF5007).l
-	jsr	(VInt_Prepare).l
+    3 = Loads sound; the byte after this is the Sound index
+    4 = Loads sound; the byte after this is the Sound index
+    8 = Pauses music
+  move.b	#1, $00FF5007
+  jsr	(VInt_Prepare).l
+    9 = Resumes music
+  move.b	#$80, ($FF5007).l
+  jsr	(VInt_Prepare).l
      */
     _addToEvent(
         stopMusic,

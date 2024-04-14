@@ -83,6 +83,8 @@ const Sound_Index = Constant('Sound_Index');
 
 const RunEvent_NoEvent = Label.known('RunEvent_NoEvent');
 
+const Pal_DecreaseToneToPal2 = Label.known('Pal_DecreaseToneToPal2');
+
 final eventFlags = BiMap<Constant, Byte>()
   ..addAll({
     Constant('EventFlag_PiataFirstTime'):
