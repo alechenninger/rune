@@ -1809,6 +1809,7 @@ class SceneAsmGenerator implements EventVisitor {
             move.w(extraFrames.i, d7),
           label(Label('.increase_tone$eventIndex')),
           jsr(Pal_IncreaseTone.l),
+          doMapUpdateLoop(0.toWord),
           dbf(d7, Label('.increase_tone$eventIndex')),
         ]);
       });
@@ -1821,37 +1822,57 @@ class SceneAsmGenerator implements EventVisitor {
   void flashScreen(FlashScreen flash) {
     _checkNotFinished();
 
-    if (flash.sound case var s?) {
-      playSound(PlaySound(s));
-    }
-
     _addToEvent(flash, (i) {
-      var extraFlashedFrames = max(0, flash.flashed.toFrames() - 1);
-      var calmFrames = flash.calm.toFrames();
-
-      return Asm([
+      _eventAsm.add(Asm([
         // Copy current palette to buffer 2
         lea(Palette_Table_Buffer.w, a0),
         lea(Palette_Table_Buffer_2.w, a1),
         move.w(0x3F.i, d7),
-        trap(1.i),
-        lea(Palette_Table_Buffer.w, a0),
-        // Rewrite the palette white
-        moveq(0x1F.i, d7),
-        label(Label('.flash$i')),
-        // Two words at a time
-        move.l(0x0EEE0EEE.i, a0.postIncrement()),
-        dbf(d7, Label('.flash$i')),
-        doMapUpdateLoop(extraFlashedFrames.toWord),
-        // Restore the palette gradually
-        move.w(0x27.i, d7),
-        label(Label('.restore_palette$i')),
-        jsr(Pal_DecreaseToneToPal2.l),
-        doMapUpdateLoop(0.toWord),
-        dbf(d7, Label('.restore_palette$i')),
-        // Wait out calm time if any
-        if (calmFrames > 0) doMapUpdateLoop((calmFrames - 1).toWord),
-      ]);
+        trap(1.i)
+      ]));
+
+      var sequence = 0;
+
+      void doFlash(
+        double percent,
+        int extraFlashedFrames,
+        int calmFrames,
+      ) {
+        if (flash.sound case var s?) {
+          playSound(PlaySound(s));
+        }
+
+        _eventAsm.add(Asm([
+          lea(Palette_Table_Buffer.w, a0),
+          // Rewrite the palette white
+          moveq(0x1F.i, d7),
+          label(Label('.flash${i}_$sequence')),
+          // Two words at a time
+          move.l(0x0EEE0EEE.i, a0.postIncrement()),
+          dbf(d7, Label('.flash${i}_$sequence')),
+        ]));
+
+        var additionalRestoreFrames = max(0, (percent * 28 - 1).ceil());
+        var loop = Label('.restore_palette${i}_$sequence');
+
+        _eventAsm.add(Asm([
+          doMapUpdateLoop(extraFlashedFrames.toWord),
+          move.w(additionalRestoreFrames.i, d7),
+          label(loop),
+          jsr(Pal_DecreaseToneToPal2.l),
+          doMapUpdateLoop(0.toWord),
+          dbf(d7, loop),
+          if (calmFrames > 0) doMapUpdateLoop((calmFrames - 1).toWord)
+        ]));
+
+        sequence++;
+      }
+
+      for (var partial in flash.partialFlashes) {
+        doFlash(partial, 0, 0);
+      }
+
+      doFlash(1, max(0, flash.flashed.toFrames() - 1), flash.calm.toFrames());
     });
   }
 

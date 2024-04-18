@@ -9,7 +9,7 @@ class IncreaseTone extends Event {
   /// Time to wait with increased tone.
   final Duration wait;
 
-  IncreaseTone({required this.percent, required this.wait}) {
+  IncreaseTone({required this.percent, this.wait = Duration.zero}) {
     checkArgument(percent >= 0 && percent <= 1,
         message: 'percent must be between 0 and 1');
     checkArgument(wait >= Duration.zero, message: 'wait must be non-negative');
@@ -23,11 +23,20 @@ class IncreaseTone extends Event {
 
 class FlashScreen extends Event {
   final SoundEffect? sound;
+
+  /// Additional partial flashes in percentages.
+  final List<double> partialFlashes;
   final Duration flashed;
   final Duration calm;
   // Could also allow custom colors in future
 
-  FlashScreen({this.sound, required this.calm, this.flashed = Duration.zero}) {
+  FlashScreen(
+      {this.sound,
+      this.partialFlashes = const [],
+      required this.calm,
+      this.flashed = Duration.zero}) {
+    checkArgument(partialFlashes.every((r) => r >= 0 && r <= 1),
+        message: 'restore percentages in sequence must be between 0 and 1');
     checkArgument(calm >= Duration.zero, message: 'calm must non-negative');
     checkArgument(flashed >= Duration.zero,
         message: 'flashed must be non-negative');
