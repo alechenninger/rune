@@ -172,9 +172,9 @@ class ShutterObjects extends Event {
   }
 
   _addEventsWithPause(List events, Duration pause) {
-    events.add(StepObjects(objects, stepPerFrame: _up, frames: 1));
-    events.add(Pause(pause));
     events.add(StepObjects(objects, stepPerFrame: _down, frames: 1));
+    events.add(Pause(pause));
+    events.add(StepObjects(objects, stepPerFrame: _up, frames: 1));
     events.add(Pause(pause));
   }
 
