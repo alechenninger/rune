@@ -2242,7 +2242,7 @@ void main() {
         testMap.addEvent(
             SceneId('testrun'),
             Scene([
-              IfValue(Slot.one.position().component(Axis.y),
+              IfValue(BySlot.one.position().component(Axis.y),
                   comparedTo: PositionComponent(0x200, Axis.y),
                   greaterOrEqual: [
                     IfFlag(EventFlag('testflag'), isSet: [
@@ -2264,7 +2264,7 @@ void main() {
         testMap.addEvent(
             SceneId('testrun'),
             Scene([
-              IfValue(Slot.one.position().component(Axis.y),
+              IfValue(BySlot.one.position().component(Axis.y),
                   comparedTo: PositionComponent(0x200, Axis.y),
                   greaterOrEqual: [
                     Dialog(spans: [DialogSpan('Hi')]),

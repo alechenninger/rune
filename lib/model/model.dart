@@ -930,16 +930,16 @@ class SceneId {
 }
 
 // TODO(refactor): should just be an enum?
-class Slot extends FieldObject {
+class BySlot extends FieldObject {
   final int index;
 
-  const Slot(this.index);
+  const BySlot(this.index);
 
-  static const one = Slot(1);
-  static const two = Slot(2);
-  static const three = Slot(3);
-  static const four = Slot(4);
-  static const five = Slot(5);
+  static const one = BySlot(1);
+  static const two = BySlot(2);
+  static const three = BySlot(3);
+  static const four = BySlot(4);
+  static const five = BySlot(5);
 
   @override
   FieldObject resolve(EventState state) {
@@ -956,12 +956,14 @@ class Slot extends FieldObject {
   }
 
   @override
-  int slot(EventState c) => index;
+  int slotAsOf(EventState c) => index;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Slot && runtimeType == other.runtimeType && index == other.index;
+      other is BySlot &&
+          runtimeType == other.runtimeType &&
+          index == other.index;
 
   @override
   int get hashCode => index.hashCode;
@@ -1013,7 +1015,9 @@ sealed class Character extends FieldObject with Speaker {
   ];
 
   @override
-  int? slot(EventState c) => c.slotFor(this);
+  int? slotAsOf(EventState c) => c.slotFor(this);
+
+  SlotOfCharacter slot() => SlotOfCharacter(this);
 }
 
 const alys = Alys();

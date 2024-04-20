@@ -179,10 +179,10 @@ void main() {
       expect(
           moves,
           IndividualMoves()
-            ..moves[Slot(1)] = (StepPath()
+            ..moves[BySlot(1)] = (StepPath()
               ..direction = right
               ..distance = 3.steps)
-            ..moves[Slot(2)] = (StepPath()
+            ..moves[BySlot(2)] = (StepPath()
               ..direction = right
               ..distance = 3.steps));
     });
@@ -207,10 +207,10 @@ void main() {
           moves,
           IndividualMoves()
             ..speed = StepSpeed.walk
-            ..moves[Slot(1)] = (StepPath()
+            ..moves[BySlot(1)] = (StepPath()
               ..direction = right
               ..distance = 3.steps)
-            ..moves[Slot(2)] = (StepPath()
+            ..moves[BySlot(2)] = (StepPath()
               ..direction = right
               ..distance = 3.steps));
     });
@@ -239,14 +239,14 @@ void main() {
       expect(
           moves,
           IndividualMoves()
-            ..moves[Slot(1)] = (StepPaths()
+            ..moves[BySlot(1)] = (StepPaths()
               ..step(StepPath()
                 ..direction = right
                 ..distance = 3.steps)
               ..step(StepPath()
                 ..direction = down
                 ..distance = 5.steps))
-            ..moves[Slot(2)] = (StepPaths()
+            ..moves[BySlot(2)] = (StepPaths()
               ..step(StepPath()
                 ..direction = right
                 ..distance = 4.steps)
@@ -281,14 +281,14 @@ void main() {
       expect(
           moves,
           IndividualMoves()
-            ..moves[Slot(1)] = (StepPaths()
+            ..moves[BySlot(1)] = (StepPaths()
               ..step(StepPath()
                 ..direction = right
                 ..distance = 3.steps)
               ..step(StepPath()
                 ..direction = down
                 ..distance = 5.steps))
-            ..moves[Slot(2)] = (StepPaths()
+            ..moves[BySlot(2)] = (StepPaths()
               ..step(StepPath()
                 ..direction = right
                 ..distance = 4.steps)
@@ -323,14 +323,14 @@ void main() {
       expect(
           moves,
           IndividualMoves()
-            ..moves[Slot(1)] = (StepPaths()
+            ..moves[BySlot(1)] = (StepPaths()
               ..step(StepPath()
                 ..direction = right
                 ..distance = 3.steps)
               ..step(StepPath()
                 ..direction = down
                 ..distance = 5.steps))
-            ..moves[Slot(2)] = (StepPaths()
+            ..moves[BySlot(2)] = (StepPaths()
               ..step(StepPath()
                 ..direction = down
                 ..distance = 1.steps)
@@ -363,7 +363,7 @@ void main() {
       var moves = move.toIndividualMoves(ctx);
 
       expect(
-          moves.moves[Slot(2)],
+          moves.moves[BySlot(2)],
           StepPaths()
             ..step(StepPath()
               ..direction = left
@@ -402,19 +402,19 @@ void main() {
       expect(
           move.toIndividualMoves(ctx),
           IndividualMoves()
-            ..moves[Slot(1)] = (StepPath()
+            ..moves[BySlot(1)] = (StepPath()
               ..direction = up
               ..distance = 9.steps)
-            ..moves[Slot(2)] = (StepPath()
+            ..moves[BySlot(2)] = (StepPath()
               ..direction = up
               ..distance = 9.steps)
-            ..moves[Slot(3)] = (StepPath()
+            ..moves[BySlot(3)] = (StepPath()
               ..direction = up
               ..distance = 9.steps)
-            ..moves[Slot(4)] = (StepPath()
+            ..moves[BySlot(4)] = (StepPath()
               ..direction = up
               ..distance = 9.steps)
-            ..moves[Slot(5)] = (StepPath()
+            ..moves[BySlot(5)] = (StepPath()
               ..direction = up
               ..distance = 9.steps));
     });
@@ -423,15 +423,15 @@ void main() {
   group('individual moves', () {
     test('just face when there is only facing', () {
       var moves = IndividualMoves()
-        ..moves[Slot(1)] = Face(up)
-        ..moves[Slot(2)] = Face(down);
+        ..moves[BySlot(1)] = Face(up)
+        ..moves[BySlot(2)] = Face(down);
 
-      expect(moves.justFacing(), {Slot(1): up, Slot(2): down});
+      expect(moves.justFacing(), {BySlot(1): up, BySlot(2): down});
     });
 
     test('do not just face when there are delays', () {
       var moves = IndividualMoves()
-        ..moves[Slot(1)] = (StepPaths()
+        ..moves[BySlot(1)] = (StepPaths()
           ..face(up)
           ..step(StepPath()
             ..delay = 1.step

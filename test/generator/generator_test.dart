@@ -1268,6 +1268,47 @@ EventFlag_Test001 = $0001'''));
         ]),
       );
     });
+
+    test('character slot compared to slot constant', () {
+      var scene = Scene([
+        IfValue(rune.slot(),
+            comparedTo: Slot(1),
+            equal: [Face(up).move(rune)],
+            greater: [Face(down).move(rune)],
+            less: [Face(right).move(rune)])
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            moveq(rune.charIdAddress, d0),
+            jsr(FindCharacterSlot.l),
+            cmpi.b(0.i, d1),
+            beq.w(Label('.1_eq')),
+            bhi.w(Label('.1_gt')),
+            // lt branch
+            characterByIdToA4(rune.charIdAddress),
+            updateObjFacing(right.address),
+            bra.w(Label('.1_continue')),
+
+            // eq branch
+            label(Label('.1_eq')),
+            characterByIdToA4(rune.charIdAddress),
+            updateObjFacing(up.address),
+            bra.w(Label('.1_continue')),
+
+            // gt branch
+            label(Label('.1_gt')),
+            characterByIdToA4(rune.charIdAddress),
+            updateObjFacing(down.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
   });
 
   group('hide panels', () {
@@ -1486,26 +1527,26 @@ loc_742A4:
                 SceneId('testscene'),
                 Scene([
                   SetContext((ctx) {
-                    ctx.positions[Slot(1)] = Position(0x100, 0x110);
-                    ctx.positions[Slot(2)] = Position(0x100, 0x120);
-                    ctx.positions[Slot(3)] = Position(0x100, 0x130);
-                    ctx.positions[Slot(4)] = Position(0x100, 0x140);
-                    ctx.positions[Slot(5)] = Position(0x100, 0x150);
+                    ctx.positions[BySlot(1)] = Position(0x100, 0x110);
+                    ctx.positions[BySlot(2)] = Position(0x100, 0x120);
+                    ctx.positions[BySlot(3)] = Position(0x100, 0x130);
+                    ctx.positions[BySlot(4)] = Position(0x100, 0x140);
+                    ctx.positions[BySlot(5)] = Position(0x100, 0x150);
                   }),
                   IndividualMoves()
-                    ..moves[Slot(1)] = (StepPath()
+                    ..moves[BySlot(1)] = (StepPath()
                       ..distance = 1.step
                       ..direction = up)
-                    ..moves[Slot(2)] = (StepPath()
+                    ..moves[BySlot(2)] = (StepPath()
                       ..distance = 1.step
                       ..direction = up)
-                    ..moves[Slot(3)] = (StepPath()
+                    ..moves[BySlot(3)] = (StepPath()
                       ..distance = 1.step
                       ..direction = up)
-                    ..moves[Slot(4)] = (StepPath()
+                    ..moves[BySlot(4)] = (StepPath()
                       ..distance = 1.step
                       ..direction = up)
-                    ..moves[Slot(5)] = (StepPath()
+                    ..moves[BySlot(5)] = (StepPath()
                       ..distance = 1.step
                       ..direction = up)
                 ]))

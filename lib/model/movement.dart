@@ -123,7 +123,7 @@ class FacePlayer extends Event {
 
   FacePlayer(this.object);
 
-  IndividualMoves toMoves() => Face(object.towards(Slot.one)).move(object);
+  IndividualMoves toMoves() => Face(object.towards(BySlot.one)).move(object);
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
@@ -164,18 +164,18 @@ class RelativePartyMove extends Event {
     if (speed case StepSpeed s) {
       individual.speed = s;
     }
-    individual.moves[Slot(1)] = movement;
+    individual.moves[BySlot(1)] = movement;
 
     var positions = <int, Position>{};
     var followerMovements = <FieldObject, StepPaths>{};
 
-    var leadStartPosition = ctx.positions[Slot(1)];
+    var leadStartPosition = ctx.positions[BySlot(1)];
     if (leadStartPosition == null) {
       throw ArgumentError('ctx does not include slot 1 position');
     }
 
     Position ctxPositionForSlot(int s) {
-      var p = ctx.positions[Slot(s)];
+      var p = ctx.positions[BySlot(s)];
       if (p == null) throw ArgumentError('missing character in slot $s');
       return p;
     }
@@ -203,7 +203,7 @@ class RelativePartyMove extends Event {
           // fixme facing
           step = StepPath()..delay = 1.step;
         } else {
-          var facing = ctx.getFacing(Slot(1));
+          var facing = ctx.getFacing(BySlot(1));
           var move = StepToPoint()
             ..from = position
             ..to = nextLeaderPosition
@@ -217,7 +217,7 @@ class RelativePartyMove extends Event {
             ..distance = 1.step;
         }
 
-        followerMovements.update(Slot(s), (move) => move..step(step),
+        followerMovements.update(BySlot(s), (move) => move..step(step),
             ifAbsent: () => StepPaths()..step(step));
       }
     }
@@ -418,7 +418,7 @@ class Party extends Moveable {
 
   RelativePartyMove move(RelativeMovement m) => RelativePartyMove(m);
   AbsoluteMoves moveTo(Position destination) => AbsoluteMoves()
-    ..destinations[Slot(1)] = destination
+    ..destinations[BySlot(1)] = destination
     ..followLeader = true;
 }
 
@@ -447,8 +447,8 @@ abstract class FieldObject extends Moveable {
   const FieldObject();
 
   int compareTo(FieldObject other, EventState ctx) {
-    var thisSlot = slot(ctx);
-    var otherSlot = other.slot(ctx);
+    var thisSlot = slotAsOf(ctx);
+    var otherSlot = other.slotAsOf(ctx);
 
     if (thisSlot != null && otherSlot != null) {
       return thisSlot.compareTo(otherSlot);
@@ -457,7 +457,7 @@ abstract class FieldObject extends Moveable {
     return toString().compareTo(other.toString());
   }
 
-  int? slot(EventState c);
+  int? slotAsOf(EventState c);
 
   // TODO(refactor): this api stinks; should not be on same type as "real" thing
   @override
@@ -492,7 +492,7 @@ class MapObjectById extends FieldObject {
   }
 
   @override
-  int? slot(EventState c) => null;
+  int? slotAsOf(EventState c) => null;
 
   @override
   bool operator ==(Object other) =>
@@ -517,7 +517,7 @@ class InteractionObject extends FieldObject {
   static FacePlayer facePlayer() => FacePlayer(const InteractionObject());
 
   @override
-  int? slot(EventState c) => null;
+  int? slotAsOf(EventState c) => null;
 
   @override
   bool operator ==(Object other) =>

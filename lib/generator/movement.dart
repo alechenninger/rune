@@ -276,8 +276,8 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
     var obj = dest.key.resolve(state);
 
     if (moves.followLeader &&
-        (obj is Character && obj.slot(state) != 1 ||
-            (obj is Slot && obj.index > 1))) {
+        (obj is Character && obj.slotAsOf(state) != 1 ||
+            (obj is BySlot && obj.index > 1))) {
       throw StateError(
           'cannot move $obj independently when follow leader flag is set');
     }
@@ -296,7 +296,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
     } else {
       asm.add(setDestination(x: pos.x.toWord.i, y: pos.y.toWord.i));
 
-      if (obj is! Slot && obj is! Character) {
+      if (obj is! BySlot && obj is! Character) {
         secondaryObjects.add((obj, pos));
       }
 
@@ -335,7 +335,7 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
   for (var MapEntry(key: obj, value: (position, facing))
       in moves.destinations.entries) {
     if (position != null) {
-      var slot = obj.slot(memory);
+      var slot = obj.slotAsOf(memory);
       if (slot == 1 || slot == null) {
         adjustCamera = true;
       }
@@ -556,7 +556,7 @@ extension FieldObjectAsm on FieldObject {
   int? compactId(Memory mem) {
     return switch (resolve(mem)) {
       Character c => c.charIdValue.value,
-      Slot s => (s.index - 1) | 0x80,
+      BySlot s => (s.index - 1) | 0x80,
       MapObject m => (mem.currentMap!.indexOf(m.id)! + 12) | 0x80,
       _ => null,
     };
@@ -564,7 +564,7 @@ extension FieldObjectAsm on FieldObject {
 
   bool get hasCompactIdRepresentation {
     return switch (this) {
-      Character() || Slot() || MapObject() || MapObjectById() => true,
+      Character() || BySlot() || MapObject() || MapObjectById() => true,
       _ => false,
     };
   }
@@ -596,7 +596,7 @@ extension FieldObjectAsm on FieldObject {
     }
 
     var obj = this;
-    var slot = obj.slot(ctx);
+    var slot = obj.slotAsOf(ctx);
     var asm = switch ((slot, obj)) {
       (var s?, _) => characterBySlotToA4(s),
       (_, Character c) => maintain.wrap(characterByIdToA4(c.charIdAddress)),
@@ -648,7 +648,7 @@ extension FieldObjectAsm on FieldObject {
       } else if (obj is MapObjectById) {
         var address = obj.address(memory);
         return lea(Absolute.long(address), a);
-      } else if (obj is Slot) {
+      } else if (obj is BySlot) {
         // why word? this is what asm appears to do
         return lea('Character_${obj.index}'.toConstant.w, a);
       } else if (obj is InteractionObject &&
@@ -824,7 +824,8 @@ extension DirectionExpressionAsm on DirectionExpression {
 
 extension DirectionOfVectorAsm on DirectionOfVector {
   bool get playerIsFacingFrom =>
-      from == const InteractionObject().position() && to == Slot.one.position();
+      from == const InteractionObject().position() &&
+      to == BySlot.one.position();
 
   Direction? known(Memory mem) {
     var knownFrom = from.known(mem);
@@ -833,7 +834,7 @@ extension DirectionOfVectorAsm on DirectionOfVector {
       // If we know the player is facing this object,
       // try using the opposite direction of the player facing.
       if (playerIsFacingFrom) {
-        var dir = mem.getFacing(Slot.one)?.opposite;
+        var dir = mem.getFacing(BySlot.one)?.opposite;
         if (dir is Direction) return dir;
       }
 
@@ -864,7 +865,7 @@ extension DirectionOfVectorAsm on DirectionOfVector {
 
     if (playerIsFacingFrom) {
       return Asm([
-        Slot.one.toA(load1, memory),
+        BySlot.one.toA(load1, memory),
         move.w(facing_dir(load1), destination),
         bchg(2.i, destination),
         asm(destination),

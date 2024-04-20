@@ -1,14 +1,8 @@
+import 'package:quiver/check.dart';
+
 import 'model.dart';
 
 sealed class ModelExpression {}
-
-sealed class BooleanExpression extends ModelExpression {}
-
-class Comparison<T extends ModelExpression> {
-  final T op1, op2;
-
-  Comparison(this.op1, this.op2);
-}
 
 sealed class PositionComponentExpression extends ModelExpression {}
 
@@ -238,4 +232,44 @@ enum Direction implements DirectionExpression {
   Path operator *(Steps magnitude) => Path(magnitude, this);
 
   Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
+}
+
+sealed class SlotExpression extends ModelExpression {}
+
+class Slot extends SlotExpression {
+  final int index;
+  int get offset => index - 1;
+
+  Slot(this.index) {
+    checkArgument(index >= 1 && index <= 5,
+        message: 'Slot index must be between 1 and 5');
+  }
+
+  BySlot toFieldObject() => BySlot(index);
+
+  @override
+  String toString() {
+    return 'Slot{index: $index}';
+  }
+}
+
+class SlotOfCharacter extends SlotExpression {
+  final Character character;
+
+  SlotOfCharacter(this.character);
+
+  @override
+  String toString() {
+    return 'SlotOfCharacter{character: $character}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SlotOfCharacter &&
+          runtimeType == other.runtimeType &&
+          character == other.character;
+
+  @override
+  int get hashCode => character.hashCode;
 }

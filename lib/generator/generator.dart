@@ -2003,7 +2003,7 @@ class SceneAsmGenerator implements EventVisitor {
       var obj = switch (_memory.slots[i]) {
         Character c => c,
         // TODO(loadmap): take into account num characters
-        null when i == 1 => Slot(i),
+        null when i == 1 => BySlot(i),
         null => null,
       };
       if (obj == null) continue;

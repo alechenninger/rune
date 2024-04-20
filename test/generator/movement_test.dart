@@ -1178,21 +1178,21 @@ void main() {
     group('following leader', () {
       test('moving leader by slot', () {
         var event = AbsoluteMoves()
-          ..destinations[Slot.one] = Position(0x1a0, 0x1f0)
+          ..destinations[BySlot.one] = Position(0x1a0, 0x1f0)
           ..followLeader = true;
         var asm = absoluteMovesToAsm(event, state);
 
         expect(
             asm,
             EventAsm([
-              Slot.one.toA4(testState),
+              BySlot.one.toA4(testState),
               moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
             ]));
       });
 
       test('sets follow leader flag if unset', () {
         var event = AbsoluteMoves()
-          ..destinations[Slot.one] = Position(0x1a0, 0x1f0)
+          ..destinations[BySlot.one] = Position(0x1a0, 0x1f0)
           ..followLeader = true;
         var asm = absoluteMovesToAsm(event, state..followLead = false);
 
@@ -1200,14 +1200,14 @@ void main() {
             asm,
             EventAsm([
               followLeader(true),
-              Slot.one.toA4(testState),
+              BySlot.one.toA4(testState),
               moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
             ]));
       });
 
       test('moving leader y first', () {
         var event = AbsoluteMoves()
-          ..destinations[Slot.one] = Position(0x1a0, 0x1f0)
+          ..destinations[BySlot.one] = Position(0x1a0, 0x1f0)
           ..startingAxis = Axis.y
           ..followLeader = true;
         var asm = absoluteMovesToAsm(event, state);
@@ -1216,14 +1216,14 @@ void main() {
             asm,
             EventAsm([
               moveAlongXAxisFirst(false),
-              Slot.one.toA4(testState),
+              BySlot.one.toA4(testState),
               moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
             ]));
       });
 
       test('moving slot 2 is error', () {
         var event = AbsoluteMoves()
-          ..destinations[Slot.two] = Position(0x1a0, 0x1f0)
+          ..destinations[BySlot.two] = Position(0x1a0, 0x1f0)
           ..followLeader = true;
 
         expect(() => absoluteMovesToAsm(event, state),
@@ -1242,7 +1242,7 @@ void main() {
         expect(
             asm,
             EventAsm([
-              Slot.one.toA4(testState),
+              BySlot.one.toA4(testState),
               moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i)
             ]));
       });
@@ -1373,14 +1373,14 @@ void main() {
     });
 
     test('slot faces slot', () {
-      var moves = Face(Slot.one.towards(Slot.two)).move(Slot.one);
+      var moves = Face(BySlot.one.towards(BySlot.two)).move(BySlot.one);
       var asm = generate([moves]);
       expect(
           asm,
           Asm([
-            Slot.two.toA3(testState),
+            BySlot.two.toA3(testState),
             move.w(curr_y_pos(a3), d2),
-            Slot.one.toA4(testState),
+            BySlot.one.toA4(testState),
             moveq(FacingDir_Down.i, d0),
             cmp.w(curr_y_pos(a4), d2),
             beq.s(Label(r'.checkx_1_Slot1_0')),
@@ -1527,8 +1527,8 @@ void main() {
     });
 
     test('interaction object faces player optimization', () {
-      var moves =
-          Face(InteractionObject().towards(Slot.one)).move(InteractionObject());
+      var moves = Face(InteractionObject().towards(BySlot.one))
+          .move(InteractionObject());
       var asm = EventAsm.empty();
       SceneAsmGenerator.forInteraction(
           map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
@@ -1539,7 +1539,7 @@ void main() {
       expect(
           asm.withoutComments().skip(1).take(5),
           Asm([
-            Slot.one.toA4(testState),
+            BySlot.one.toA4(testState),
             move.w(facing_dir(a4), d0),
             bchg(2.i, d0),
             // or maybe exg?
@@ -1549,7 +1549,8 @@ void main() {
     });
 
     test('character 1 facing interaction object is noop', () {
-      var moves = Face(Slot.one.towards(InteractionObject())).move(Slot.one);
+      var moves =
+          Face(BySlot.one.towards(InteractionObject())).move(BySlot.one);
       var asm = EventAsm.empty();
       SceneAsmGenerator.forInteraction(
           map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),

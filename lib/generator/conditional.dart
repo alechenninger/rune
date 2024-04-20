@@ -1,4 +1,5 @@
 import '../asm/asm.dart';
+import '../asm/events.dart';
 import '../model/model.dart';
 import 'memory.dart';
 import 'movement.dart';
@@ -31,6 +32,11 @@ extension IfValueAsm on IfValue {
               memory: memory, load: a4, asm: (dst) => _cmp(src, dst, Size.w)));
 
           break;
+        case Slot s:
+          asm.add(_cmp(src, s.offset.i, Size.b));
+        case SlotOfCharacter s:
+          asm.add(s.withValue(
+              memory: memory, asm: (slot) => _cmp(src, slot, Size.b)));
         case PositionExpression p:
           throw 'todo';
         case DirectionExpression d:
@@ -43,6 +49,8 @@ extension IfValueAsm on IfValue {
     return switch (operand2) {
       PositionComponentExpression c =>
         c.withValue(memory: memory, load: a4, asm: compareTo),
+      Slot s => compareTo(s.offset.i),
+      SlotOfCharacter s => s.withValue(memory: memory, asm: compareTo),
       PositionExpression p => throw 'todo',
       DirectionExpression d => throw 'todo',
     };
@@ -58,6 +66,10 @@ Asm _cmp(Address src, Address dst, Size size, {DirectDataRegister dR = d0}) {
 
   if (src is Immediate) {
     return width(cmpi)(src, dst);
+  }
+
+  if (dst is DirectDataRegister) {
+    return width(cmp)(src, dst);
   }
 
   return Asm([
@@ -87,5 +99,16 @@ extension PositionComponentExpressionAsm on PositionComponentExpression {
       PositionComponentOfObject p =>
         p.withValue(memory: memory, load: load, asm: asm)
     };
+  }
+}
+
+extension SlotOfCharacterExpressionAsm on SlotOfCharacter {
+  Asm withValue(
+      {required Memory memory, required Asm Function(Address slot) asm}) {
+    return Asm([
+      moveq(character.charIdAddress, d0),
+      jsr(FindCharacterSlot.l),
+      asm(d1)
+    ]);
   }
 }

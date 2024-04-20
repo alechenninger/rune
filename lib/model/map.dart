@@ -1029,7 +1029,7 @@ class MapObject extends FieldObject implements MapElement, UnnamedSpeaker {
   }
 
   @override
-  int? slot(EventState c) => null;
+  int? slotAsOf(EventState c) => null;
 
   @override
   String toString() {
