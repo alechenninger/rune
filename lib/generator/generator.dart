@@ -23,6 +23,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/guild.dart';
@@ -1206,11 +1207,7 @@ class SceneAsmGenerator implements EventVisitor {
       // if (_isProcessingInteraction) {
       //   return EventAsm.of(doInteractionUpdatesLoop(Word(frames)));
       // } else {
-      if (_memory.isFieldShown == false || (_memory.panelsShown ?? 0) > 0) {
-        return vIntPrepareLoop(Word(additionalFrames));
-      } else {
-        return doMapUpdateLoop(Word(additionalFrames));
-      }
+      return _waitFrames(additionalFrames + 1);
     }
 
     switch (pause.duringDialog) {
@@ -1809,7 +1806,7 @@ class SceneAsmGenerator implements EventVisitor {
             move.w(extraFrames.i, d7),
           label(Label('.increase_tone$eventIndex')),
           jsr(Pal_IncreaseTone.l),
-          doMapUpdateLoop(0.toWord),
+          _waitFrames(1),
           dbf(d7, Label('.increase_tone$eventIndex')),
         ]);
       });
@@ -1835,7 +1832,7 @@ class SceneAsmGenerator implements EventVisitor {
 
       void doFlash(
         double percent,
-        int extraFlashedFrames,
+        int flashedFrames,
         int calmFrames,
       ) {
         if (flash.sound case var s?) {
@@ -1856,23 +1853,24 @@ class SceneAsmGenerator implements EventVisitor {
         var loop = Label('.restore_palette${i}_$sequence');
 
         _eventAsm.add(Asm([
-          doMapUpdateLoop(extraFlashedFrames.toWord),
+          _waitFrames(flashedFrames),
           move.w(additionalRestoreFrames.i, d7),
           label(loop),
           jsr(Pal_DecreaseToneToPal2.l),
-          doMapUpdateLoop(0.toWord),
+          _waitFrames(1),
           dbf(d7, loop),
-          if (calmFrames > 0) doMapUpdateLoop((calmFrames - 1).toWord)
+          _waitFrames(calmFrames)
         ]));
 
         sequence++;
       }
 
       for (var partial in flash.partialFlashes) {
-        doFlash(partial, 0, 0);
+        doFlash(partial, 1, 0);
       }
 
-      doFlash(1, max(0, flash.flashed.toFrames() - 1), flash.calm.toFrames());
+      // TODO(flash): maybe allow 0 frames?
+      doFlash(1, min(1, flash.flashed.toFrames()), flash.calm.toFrames());
     });
   }
 
@@ -2155,10 +2153,7 @@ class SceneAsmGenerator implements EventVisitor {
         // depending on how dialog generation is managed this may miss cases
         if (_lastEventInCurrentDialog is PlaySound ||
             _lastEventInCurrentDialog is PlayMusic)
-          if (_memory.isFieldShown == false || (_memory.panelsShown ?? 0) > 0)
-            doMapUpdateLoop(0.toWord)
-          else
-            vIntPrepare(),
+          _waitFrames(1),
         move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l),
       ]);
     });
@@ -2187,7 +2182,7 @@ class SceneAsmGenerator implements EventVisitor {
         // TODO(frame perfect): may need to run tiles/map updates
         if (_lastEventInCurrentDialog is PlaySound ||
             _lastEventInCurrentDialog is PlayMusic)
-          vIntPrepare(),
+          _waitFrames(1),
         move.b(musicId.i, Constant('Sound_Index').l),
         move.b(musicId.i, Constant('Saved_Sound_Index').w)
       ]);
@@ -2561,6 +2556,17 @@ class SceneAsmGenerator implements EventVisitor {
   void _checkNotFinished() {
     if (_isFinished) {
       throw StateError('scene is finished; cannot add more to scene');
+    }
+  }
+
+  Asm _waitFrames(int frames) {
+    checkArgument(frames >= 0, message: 'frames must be non-negative');
+    if (frames == 0) return Asm.empty();
+
+    if (_memory.isFieldShown == false || (_memory.panelsShown ?? 0) > 0) {
+      return frames == 1 ? vIntPrepare() : vIntPrepareLoop(Word(frames - 1));
+    } else {
+      return doMapUpdateLoop(Word(frames - 1));
     }
   }
 
