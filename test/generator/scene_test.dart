@@ -407,7 +407,7 @@ ${dialog2.toAsm()}
 
       test('if pause is during Dialog, pause within dialog', () {
         var dialog = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));
-        var pause = Pause(Duration(milliseconds: 32), duringDialog: true);
+        var pause = Pause(Duration(milliseconds: 33), duringDialog: true);
 
         var scene =
             Scene([InteractionObject.facePlayer(), dialog, pause, dialog]);
@@ -423,7 +423,8 @@ ${dialog2.toAsm()}
               DialogAsm([
                 dialog.toAsm(state),
                 dc.b([Byte(0xfd)]),
-                dc.b([Byte(0xf9), Byte(1)]),
+                // Dialog pause is frames to pause for, not frames - 1
+                dc.b([Byte(0xf9), Byte(2)]),
                 dialog.toAsm(state),
                 dc.b([Byte.max]),
               ])

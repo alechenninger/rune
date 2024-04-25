@@ -50,6 +50,8 @@ const storyEvents = [
   EventFlag('Igglanova'),
   EventFlag('AfterIgglanova'),
   EventFlag('PrincipalConfession'),
+  // Grand Cross custom – avoid these because makes sram incompatible?
+  // EventFlag('ZemaFirstTime'),
   EventFlag('HoltPetrified'),
   EventFlag('RuneJoined'),
   //EventFlag('Saya'), // May occur in different order

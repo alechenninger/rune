@@ -1710,6 +1710,8 @@ loc_742A4:
       expect(
           asm,
           Asm([
+            moveq(0.i, d0),
+            move.b(d0, (Panel_Num).w),
             move.b(Constant('MusicID_RedAlert').i,
                 Constant('Saved_Sound_Index').w),
             bset(7.i, Map_Load_Flags.w),
@@ -1736,6 +1738,8 @@ loc_742A4:
       expect(
           asm,
           Asm([
+            moveq(0.i, d0),
+            move.b(d0, (Panel_Num).w),
             move.b(
                 Constant('Sound_StopAll').i, Constant('Saved_Sound_Index').w),
             bclr(7.i, Map_Load_Flags.w),
@@ -1761,6 +1765,8 @@ loc_742A4:
       expect(
           asm,
           Asm([
+            moveq(0.i, d0),
+            move.b(d0, (Panel_Num).w),
             bclr(7.i, Map_Load_Flags.w),
             bclr(3.i, Map_Load_Flags.w),
             move.b(0x12.toByte.i, Constant('Event_Battle_Index').w),
@@ -1785,6 +1791,8 @@ loc_742A4:
             move.w(Word(1).i, d0),
             jsr(Label('Panel_Create').l),
             dmaPlanesVInt(),
+            moveq(0.i, d0),
+            move.b(d0, (Panel_Num).w),
             bclr(7.i, Map_Load_Flags.w),
             bset(3.i, Map_Load_Flags.w),
             move.b(0x10.toByte.i, Constant('Event_Battle_Index').w),

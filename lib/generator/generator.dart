@@ -1197,9 +1197,8 @@ class SceneAsmGenerator implements EventVisitor {
   void pause(Pause pause) {
     _checkNotFinished();
 
-    var additionalFrames = pause.duration.toFrames() - 1;
-
-    if (additionalFrames < 0) {
+    var frames = pause.duration.toFrames();
+    if (frames == 0) {
       return;
     }
 
@@ -1207,21 +1206,21 @@ class SceneAsmGenerator implements EventVisitor {
       // if (_isProcessingInteraction) {
       //   return EventAsm.of(doInteractionUpdatesLoop(Word(frames)));
       // } else {
-      return _waitFrames(additionalFrames + 1);
+      return _waitFrames(frames);
     }
 
     switch (pause.duringDialog) {
       case true:
         _generateQueueInCurrentMode();
         _runOrContinueDialog(pause);
-        _addToDialog(PauseCode(additionalFrames.toByte).toAsm());
+        _addToDialog(PauseCode(frames.toByte).toAsm());
         break;
       case false:
         _addToEvent(pause, generateEvent);
         break;
       case null:
         _addToEventOrDialog(pause, inDialog: () {
-          _addToDialog(PauseCode(additionalFrames.toByte).toAsm());
+          _addToDialog(PauseCode(frames.toByte).toAsm());
         }, inEvent: generateEvent);
         break;
     }
@@ -2350,7 +2349,15 @@ class SceneAsmGenerator implements EventVisitor {
   void onExitRunBattle(OnExitRunBattle onExit) {
     _checkNotFinished();
 
+    // TODO(onexit): this event has to be at the end of a scene to work,
+    //  we could be smarter than that.
     _addToEvent(onExit, (_) {
+      // See RunDialogue2, which is normally used before boss battles.
+      _eventAsm.add(Asm([
+        moveq(0.i, d0),
+        move.b(d0, (Panel_Num).w),
+      ]));
+
       if (onExit.postBattleSound case Sound s) {
         _eventAsm.add(move.b(s.soundId.i, Constant('Saved_Sound_Index').w));
       }
