@@ -85,10 +85,10 @@ extension IndividualMovesToAsm on IndividualMoves {
 
       var maxStepsXFirst = movesList
           .map((m) => m.movement.delayOrContinuousStepsWithFirstAxis(Axis.x))
-          .reduce((min, s) => min = min.min(s));
+          .reduce((min, s) => min.min(s));
       var maxStepsYFirst = movesList
           .map((m) => m.movement.delayOrContinuousStepsWithFirstAxis(Axis.y))
-          .reduce((min, s) => min = min.min(s));
+          .reduce((min, s) => min.min(s));
 
       // Axis we will end up moving first
       Axis firstAxis;
@@ -257,7 +257,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
   var asm = EventAsm.empty();
   var generator = _MovementGenerator(asm, state);
   var length = moves.destinations.length;
-  var secondaryObjects = <(FieldObject, Position)>[];
+  var secondaryObjects = <(FieldObject, PositionExpression)>[];
 
   if (!moves.followLeader) {
     if (state.followLead != false &&
@@ -292,9 +292,15 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
     generator.ensureScriptable(obj);
 
     if (length == 1) {
-      asm.add(moveCharacter(x: pos.x.toWord.i, y: pos.y.toWord.i));
+      asm.add(pos.withPosition(
+          memory: state,
+          load: a3,
+          asm: (x, y) => Asm([
+                moveCharacter(x: x, y: y),
+              ])));
     } else {
-      asm.add(setDestination(x: pos.x.toWord.i, y: pos.y.toWord.i));
+      asm.add(pos.withPosition(
+          memory: state, load: a3, asm: (x, y) => setDestination(x: x, y: y)));
 
       if (obj is! BySlot && obj is! Character) {
         secondaryObjects.add((obj, pos));
@@ -305,7 +311,10 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
         // Easier to just check them individually
         for (var (obj, pos) in secondaryObjects) {
           asm.add(obj.toA4(generator._mem));
-          asm.add(moveCharacter(x: pos.x.toWord.i, y: pos.y.toWord.i));
+          asm.add(pos.withPosition(
+              memory: state,
+              load: a3,
+              asm: (x, y) => moveCharacter(x: x, y: y)));
         }
 
         // Now ensure characters are done moving.
@@ -315,7 +324,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
       }
     }
 
-    state.positions[obj] = pos;
+    state.positions[obj] = pos.known(state);
     // If we don't know which direction the object was coming from,
     // we don't know which direction it will be facing.
     state.clearFacing(obj);

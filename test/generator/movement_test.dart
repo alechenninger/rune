@@ -1175,6 +1175,22 @@ void main() {
           ]));
     });
 
+    group('to expression', () {
+      test('single character', () {
+        var event = AbsoluteMoves()..destinations[shay] = alys.position();
+        var asm = absoluteMovesToAsm(event, state);
+
+        expect(
+            asm,
+            EventAsm([
+              followLeader(false),
+              shay.toA4(testState),
+              alys.toA3(testState),
+              moveCharacter(x: curr_x_pos(a3), y: curr_y_pos(a3))
+            ]));
+      });
+    });
+
     group('following leader', () {
       test('moving leader by slot', () {
         var event = AbsoluteMoves()

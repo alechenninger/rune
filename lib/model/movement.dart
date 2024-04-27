@@ -1,10 +1,9 @@
-import 'dart:math';
 import 'dart:math' as math;
+import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:rune/generator/generator.dart';
-import 'package:rune/src/iterables.dart';
 
+import '../generator/generator.dart';
 import 'model.dart';
 
 class Steps implements Comparable<Steps> {
@@ -316,7 +315,7 @@ class AbsoluteMoves extends Event {
   // TODO(movement): we could support delays
   // even though we don't know the duration of movements,
   // we can still delay individual movements.
-  Map<FieldObject, Position> destinations = {};
+  Map<FieldObject, PositionExpression> destinations = {};
   StepSpeed speed = StepSpeed.fast;
   Axis startingAxis = Axis.x;
   bool followLeader = false;
