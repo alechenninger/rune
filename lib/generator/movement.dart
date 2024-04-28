@@ -932,11 +932,6 @@ extension DirectionOfVectorAsm on DirectionOfVector {
 // rather than use a bunch of extension methods and switch statements
 
 extension PositionExpressionAsm on PositionExpression {
-  Position? known(Memory mem) => switch (this) {
-        Position p => p,
-        PositionOfObject p => mem.positions[p.obj]
-      };
-
   Asm withPosition(
       {required Memory memory,
       required Asm Function(Address x, Address y) asm,

@@ -7,6 +7,7 @@ sealed class ModelExpression {}
 sealed class PositionComponentExpression extends ModelExpression {}
 
 sealed class PositionExpression extends ModelExpression {
+  Position? known(EventState state);
   PositionComponentExpression component(Axis axis);
 }
 
@@ -19,6 +20,9 @@ class PositionOfObject extends PositionExpression {
   final FieldObject obj;
 
   PositionOfObject(this.obj);
+
+  @override
+  Position? known(EventState state) => state.positions[obj];
 
   @override
   PositionComponentOfObject component(Axis axis) =>
@@ -124,6 +128,9 @@ class Position implements PositionExpression {
   Position operator ~/(int factor) {
     return Position((x ~/ factor), (y ~/ factor));
   }
+
+  @override
+  Position? known(EventState state) => this;
 
   @override
   PositionComponent component(Axis axis) =>
