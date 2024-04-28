@@ -3,9 +3,9 @@ import 'model.dart';
 
 class MoveCamera extends Event {
   final PositionExpression to;
-  // TODO: speed
+  final CameraSpeed speed;
 
-  MoveCamera(this.to);
+  MoveCamera(this.to, {this.speed = CameraSpeed.one});
 
   @override
   operator ==(Object other) {
@@ -24,6 +24,8 @@ class MoveCamera extends Event {
     visitor.moveCamera(this);
   }
 }
+
+enum CameraSpeed { one, two, four, eight }
 
 class LockCamera extends Event {
   @override

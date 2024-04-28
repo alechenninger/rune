@@ -1169,16 +1169,22 @@ class SceneAsmGenerator implements EventVisitor {
             'creates artifacts.');
       }
 
+      var speed = switch (move.speed) {
+        CameraSpeed.one => 1,
+        CameraSpeed.two => 2,
+        CameraSpeed.four => 4,
+        CameraSpeed.eight => 8,
+      };
+
       return move.to.withPosition(
           memory: _memory,
           asm: ((x, y) => Asm([
                 if (_memory.cameraLock == true) events_asm.lockCamera(false),
                 events_asm.moveCamera(
-                    x: x,
-                    y: y,
-                    // TODO: speed
-                    // seems to mostly be 1 but not sure if this is slow or fast
-                    speed: 1.i),
+                  x: x,
+                  y: y,
+                  speed: speed.i,
+                ),
                 if (_memory.cameraLock == true) events_asm.lockCamera(true),
               ])));
     });
