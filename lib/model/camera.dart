@@ -10,11 +10,11 @@ class MoveCamera extends Event {
   @override
   operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is MoveCamera && other.to == to;
+    return other is MoveCamera && other.to == to && other.speed == speed;
   }
 
   @override
-  int get hashCode => to.hashCode;
+  int get hashCode => to.hashCode ^ speed.hashCode;
 
   @override
   String toString() => 'MoveCamera{to: $to}';
