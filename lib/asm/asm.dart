@@ -61,6 +61,8 @@ const SubqMnemonic subq = SubqMnemonic();
 const CmpMnemonic cmp = CmpMnemonic();
 const CmpiMnemonic cmpi = CmpiMnemonic();
 const TstMnemonic tst = TstMnemonic();
+const LsMnemonic lsl = LsMnemonic('l');
+const LsMnemonic lsr = LsMnemonic('r');
 
 final rts = cmd('rts', []);
 
@@ -229,6 +231,15 @@ class OrMnemonic {
   Asm b(Address from, Address to) => cmd('or.b', [from, to]);
   Asm w(Address from, Address to) => cmd('or.w', [from, to]);
   Asm l(Address from, Address to) => cmd('or.l', [from, to]);
+}
+
+class LsMnemonic {
+  final String direction;
+  const LsMnemonic(this.direction);
+
+  Asm b(Address from, Address to) => cmd('ls$direction.w', [from, to]);
+  Asm w(Address from, Address to) => cmd('ls$direction.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('ls$direction.l', [from, to]);
 }
 
 class AsmError extends ArgumentError {
