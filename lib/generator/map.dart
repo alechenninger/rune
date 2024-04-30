@@ -124,32 +124,42 @@ MapAsm compileMap(GameMap map, ProgramConfiguration config) {
       objects, spritesAsm, spriteVramOffset?.value,
       builtIns: builtInSprites, fieldRoutines: fieldRoutines);
 
-  var scenes = Map<Scene, Byte>.identity();
+  var sceneIds = Map<MapObject, Byte>.identity();
+  var objectsByScene = Map<Scene, List<MapObject>>.identity();
 
-  Byte compileInteraction(Scene scene, SceneId id, {required bool withObject}) {
-    return scenes.putIfAbsent(
-        scene,
-        () => _compileInteractionScene(
-            map, scene, id, dialogTrees, eventsAsm, config, eventFlags,
-            withObject: withObject, fieldRoutines: fieldRoutines));
+  Byte compileInteraction(Scene scene, SceneId id, {FieldObject? withObject}) {
+    return _compileInteractionScene(
+        map, scene, id, dialogTrees, eventsAsm, config, eventFlags,
+        withObject: withObject, fieldRoutines: fieldRoutines);
   }
 
   for (var obj in objects) {
+    objectsByScene.putIfAbsent(obj.onInteract, () => []).add(obj);
+  }
+
+  for (var MapEntry(key: scene, value: objects) in objectsByScene.entries) {
+    var first = objects.first;
     var dialogId = compileInteraction(
-        obj.onInteract, SceneId('${map.id.name}_${obj.id}'),
-        withObject: true);
+        scene, SceneId('${map.id.name}_${first.id}'),
+        withObject: objects.singleOrNull ?? const InteractionObject());
+    for (var obj in objects) {
+      sceneIds[obj] = dialogId;
+    }
+  }
+
+  for (var obj in objects) {
     var tileNumber = objectsTileNumbers[obj.id] ?? Word(0);
+    var dialogId = sceneIds[obj];
+    if (dialogId == null) {
+      throw Exception('no dialog id for object ${obj.id}');
+    }
     _compileMapObjectData(objectsAsm, obj, tileNumber, dialogId,
         fieldRoutines: fieldRoutines);
   }
 
   for (var area in map.areas) {
-    _compileMapAreaData(
-        areasAsm,
-        area,
-        eventFlags,
-        (s) => compileInteraction(s, SceneId('${map.id.name}_${area.id}'),
-            withObject: false));
+    _compileMapAreaData(areasAsm, area, eventFlags,
+        (s) => compileInteraction(s, SceneId('${map.id.name}_${area.id}')));
   }
 
   for (var (id, scene) in map.events) {
@@ -819,7 +829,7 @@ Byte _compileInteractionScene(
     EventAsm asm,
     EventRoutines eventRoutines,
     EventFlags eventFlags,
-    {required bool withObject,
+    {required FieldObject? withObject,
     required FieldRoutineRepository fieldRoutines}) {
   var events = scene.events;
 

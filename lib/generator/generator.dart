@@ -534,7 +534,10 @@ EventType? sceneEventType(List<Event> events,
   // If there are no more checks, it must require an event.
   var dialogCheck = 0;
   var dialogChecks = <bool Function(Event, int, bool)>[
-    (event, i, _) => event is FacePlayer && event.object == interactingWith,
+    (event, i, _) =>
+        event is FacePlayer &&
+        (event.object == interactingWith ||
+            event.object == const InteractionObject()),
     (event, i, hasDialogAfter) =>
         // Events need dialog after, otherwise their order
         // creates unwanted dialog windows.
@@ -708,6 +711,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   FieldObject? get _interactingWith => switch (_gameMode) {
         InteractionMode m => m.withObject,
+        DialogCapableMode(priorMode: InteractionMode m) => m.withObject,
         _ => null,
       };
 
@@ -723,11 +727,10 @@ class SceneAsmGenerator implements EventVisitor {
   SceneAsmGenerator.forInteraction(GameMap map, this.id,
       DialogTrees dialogTrees, EventAsm eventAsm, EventRoutines eventRoutines,
       {EventFlags? eventFlags,
-      bool withObject = true,
+      FieldObject? withObject = const InteractionObject(),
       FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
-        _gameMode = InteractionMode(
-            withObject: withObject ? const InteractionObject() : null),
+        _gameMode = InteractionMode(withObject: withObject),
         _context = GenerationContext(
             _EventRoutinesWrappingConfiguration(
                 eventRoutines: eventRoutines,
@@ -737,7 +740,9 @@ class SceneAsmGenerator implements EventVisitor {
                 fieldRoutines: fieldRoutines ?? defaultFieldRoutines),
             eventAsm: eventAsm,
             runEventAsm: Asm.empty()) {
-    if (withObject) _memory.putInAddress(a3, const InteractionObject());
+    if (withObject != null) {
+      _memory.putInAddress(a3, const InteractionObject());
+    }
     _memory.hasSavedDialogPosition = false;
     _memory.currentMap = map;
     _memory.loadedDialogTree = _dialogTrees.forMap(map.id);
@@ -2405,7 +2410,7 @@ class SceneAsmGenerator implements EventVisitor {
 
       SceneAsmGenerator.forInteraction(map, SceneId('${id.id}_next'),
           _dialogTrees, nextEvent, _eventRoutines,
-          eventFlags: _eventFlags, withObject: true)
+          eventFlags: _eventFlags, withObject: const InteractionObject())
         ..runEventIfNeeded(onNext.onInteract.events)
         ..scene(onNext.onInteract)
         ..finish(appendNewline: true, allowIncompleteDialogTrees: true);

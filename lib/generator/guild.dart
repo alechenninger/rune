@@ -105,7 +105,7 @@ void _compileReceptionistScene(
 
   SceneAsmGenerator.forInteraction(
       map, SceneId(constant.constant), dialogTrees, eventAsm, eventRoutines,
-      eventFlags: eventFlags, withObject: false)
+      eventFlags: eventFlags, withObject: null)
     ..scene(scene)
     ..finish();
 
@@ -169,7 +169,7 @@ Byte _compileJobScene(GuildJob job, JobStage stage, GameMap map,
       dialogTrees,
       eventAsm,
       eventRoutines,
-      withObject: false);
+      withObject: null);
 
   var scene = stage.scene(job);
 

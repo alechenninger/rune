@@ -89,19 +89,6 @@ extension BranchConditionAsm on BranchCondition {
       };
 }
 
-extension PositionComponentExpressionAsm on PositionComponentExpression {
-  Asm withValue(
-      {required Memory memory,
-      required Asm Function(Address c) asm,
-      DirectAddressRegister load = a4}) {
-    return switch (this) {
-      PositionComponent p => asm(Word(p.value).i),
-      PositionComponentOfObject p =>
-        p.withValue(memory: memory, load: load, asm: asm)
-    };
-  }
-}
-
 extension SlotOfCharacterExpressionAsm on SlotOfCharacter {
   Asm withValue(
       {required Memory memory, required Asm Function(Address slot) asm}) {
