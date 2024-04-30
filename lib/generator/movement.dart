@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/conditional.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/stack.dart';
 
@@ -940,6 +941,7 @@ extension PositionExpressionAsm on PositionExpression {
       Position p => asm(p.x.toWord.i, p.y.toWord.i),
       PositionOfObject p =>
         p.withPosition(memory: memory, asm: asm, load: load),
+      PositionOfXY p => p.withPosition(memory: memory, asm: asm, loadX: load),
     };
   }
 
@@ -950,6 +952,7 @@ extension PositionExpressionAsm on PositionExpression {
     return switch (this) {
       Position p => asm(p.x.toWord.i),
       PositionOfObject p => p.withX(memory: memory, asm: asm, load: load),
+      PositionOfXY p => p.withX(memory: memory, asm: asm, load: load),
     };
   }
 
@@ -960,6 +963,7 @@ extension PositionExpressionAsm on PositionExpression {
     return switch (this) {
       Position p => asm(p.y.toWord.i),
       PositionOfObject p => p.withY(memory: memory, asm: asm, load: load),
+      PositionOfXY p => p.withY(memory: memory, asm: asm, load: load),
     };
   }
 }
@@ -1016,5 +1020,39 @@ extension PositionComponentOfObjectAsm on PositionComponentOfObject {
       obj.toA(load, memory),
       asm(offset(load)),
     ]);
+  }
+}
+
+extension PositionOfXYAsm on PositionOfXY {
+  Asm withPosition(
+      {required Memory memory,
+      required Asm Function(Address x, Address y) asm,
+      DirectAddressRegister loadX = a3,
+      DirectAddressRegister loadY = a4}) {
+    return x.withValue(
+        memory: memory,
+        load: loadX,
+        asm: (x) {
+          return y.withValue(
+              memory: memory,
+              load: loadY,
+              asm: (y) {
+                return asm(x, y);
+              });
+        });
+  }
+
+  Asm withX(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectAddressRegister load = a4}) {
+    return x.withValue(memory: memory, load: load, asm: (x) => asm(x));
+  }
+
+  Asm withY(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectAddressRegister load = a4}) {
+    return y.withValue(memory: memory, load: load, asm: (y) => asm(y));
   }
 }

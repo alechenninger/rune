@@ -4,7 +4,9 @@ import 'model.dart';
 
 sealed class ModelExpression {}
 
-sealed class PositionComponentExpression extends ModelExpression {}
+sealed class PositionComponentExpression extends ModelExpression {
+  int? known(EventState state);
+}
 
 sealed class PositionExpression extends ModelExpression {
   Position? known(EventState state);
@@ -62,6 +64,46 @@ class PositionComponentOfObject extends PositionComponentExpression {
 
   @override
   int get hashCode => obj.hashCode ^ component.hashCode;
+
+  @override
+  int? known(EventState state) =>
+      switch (state.positions[obj]) { null => null, var p => component.of(p) };
+}
+
+class PositionOfXY extends PositionExpression {
+  final PositionComponentExpression x;
+  final PositionComponentExpression y;
+
+  PositionOfXY(this.x, this.y);
+
+  @override
+  PositionComponentExpression component(Axis axis) => switch (axis) {
+        Axis.x => x,
+        Axis.y => y,
+      };
+
+  @override
+  Position? known(EventState state) =>
+      switch ((x.known(state), y.known(state))) {
+        (var x?, var y?) => Position(x, y),
+        _ => null,
+      };
+
+  @override
+  String toString() {
+    return 'PositionOfXY{x: $x, y: $y}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PositionOfXY &&
+          runtimeType == other.runtimeType &&
+          x == other.x &&
+          y == other.y;
+
+  @override
+  int get hashCode => x.hashCode ^ y.hashCode;
 }
 
 const unitsPerStep = 16;
@@ -151,6 +193,9 @@ class PositionComponent extends PositionComponentExpression {
       : this(switch (axis) { Axis.x => p.x, Axis.y => p.y }, axis);
 
   PositionComponent(this.value, this.axis);
+
+  @override
+  int? known(EventState state) => value;
 
   @override
   String toString() {

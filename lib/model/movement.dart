@@ -112,6 +112,10 @@ enum Axis {
     }
   }
 
+  int of(Position position) {
+    return this == x ? position.x : position.y;
+  }
+
   Position operator *(Position p) {
     return Position(p.x * _normal.normal.x, p.y * _normal.normal.y);
   }
