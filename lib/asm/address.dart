@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'package:quiver/collection.dart';
 
 import 'asm.dart';
@@ -174,7 +172,7 @@ class DirectAddressRegister extends _Address
 
   IndirectAddressRegister plus(Expression exp) => indirect.plus(exp);
 
-  IndirectAddressRegister plusD(int dataRegister) =>
+  IndirectAddressRegister plusD(OffsetRegister dataRegister) =>
       indirect.plusD(dataRegister);
 
   IndirectAddressRegister get indirect => IndirectAddressRegister(register);
@@ -213,6 +211,9 @@ class DirectDataRegister extends _Address
   @override
   final int register;
 
+  OffsetRegister get w => OffsetRegister._(this, word);
+  OffsetRegister get l => OffsetRegister._(this, long);
+
   @override
   RegisterList operator -(Register other) {
     var (maxDataRegister, maxAddressRegister) = switch (other) {
@@ -235,12 +236,33 @@ class DirectDataRegister extends _Address
       register <= 7 ? DirectDataRegister(register + 1) : null;
 }
 
+class OffsetRegister {
+  final DirectDataRegister data;
+  final Size size;
+
+  OffsetRegister._(this.data, this.size);
+
+  @override
+  String toString() => '$data.$size';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OffsetRegister &&
+          runtimeType == other.runtimeType &&
+          data == other.data &&
+          size == other.size;
+
+  @override
+  int get hashCode => data.hashCode ^ size.hashCode;
+}
+
 /// Value in memory at an address pointed to by an address register
 class IndirectAddressRegister extends _Address implements AddressRegister {
   @override
   final int register;
   final Expression displacement;
-  final DirectDataRegister? variableDisplacement;
+  final OffsetRegister? variableDisplacement;
 
   IndirectAddressRegister(this.register,
       {this.displacement = Byte.zero, this.variableDisplacement})
@@ -264,20 +286,35 @@ class IndirectAddressRegister extends _Address implements AddressRegister {
       IndirectAddressRegister(register,
           displacement: exp, variableDisplacement: variableDisplacement);
 
-  IndirectAddressRegister plusD(int dataRegister) =>
+  IndirectAddressRegister plusD(OffsetRegister? offset) =>
       IndirectAddressRegister(register,
-          displacement: displacement,
-          variableDisplacement: DirectDataRegister(dataRegister));
+          displacement: displacement, variableDisplacement: offset);
+}
+
+extension IndirectRegister on (DirectAddressRegister, OffsetRegister) {
+  IndirectAddressRegister get a =>
+      IndirectAddressRegister($1.register, variableDisplacement: $2);
+}
+
+extension IndirectRegisterWithDisplacement on (
+  Expression,
+  DirectAddressRegister,
+  OffsetRegister
+) {
+  IndirectAddressRegister get a => IndirectAddressRegister($2.register,
+      displacement: $1, variableDisplacement: $3);
 }
 
 extension ExpressionDisplacement on Expression {
-  IndirectAddressRegister call(DirectAddressRegister a) =>
-      a.indirect.plus(this);
+  IndirectAddressRegister call(DirectAddressRegister a,
+          [OffsetRegister? offset]) =>
+      a.indirect.plus(this).plusD(offset);
 }
 
 extension IntDisplacement on int {
-  IndirectAddressRegister call(DirectAddressRegister a) =>
-      a.indirect.plus(toValue);
+  IndirectAddressRegister call(DirectAddressRegister a,
+          [OffsetRegister? offset]) =>
+      a.indirect.plus(toValue).plusD(offset);
 }
 
 class PostIncAddress extends _Address {
