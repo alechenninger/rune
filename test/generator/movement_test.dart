@@ -1229,6 +1229,26 @@ void main() {
               moveCharacter(x: curr_x_pos(a3), y: curr_y_pos(a2))
             ]));
       });
+
+      test('single character to position of xy of self and others', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] = PositionOfXY(
+            shay.position().component(Axis.x),
+            alys.position().component(Axis.y),
+          );
+        var asm = absoluteMovesToAsm(event, state);
+
+        print(asm);
+
+        expect(
+            asm,
+            EventAsm([
+              followLeader(false),
+              shay.toA4(testState),
+              alys.toA(a2, testState),
+              moveCharacter(x: curr_x_pos(a4), y: curr_y_pos(a2))
+            ]));
+      });
     });
 
     group('following leader', () {
