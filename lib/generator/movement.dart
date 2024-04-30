@@ -296,12 +296,16 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
       asm.add(pos.withPosition(
           memory: state,
           load: a3,
+          load2: a2,
           asm: (x, y) => Asm([
                 moveCharacter(x: x, y: y),
               ])));
     } else {
       asm.add(pos.withPosition(
-          memory: state, load: a3, asm: (x, y) => setDestination(x: x, y: y)));
+          memory: state,
+          load: a3,
+          load2: a2,
+          asm: (x, y) => setDestination(x: x, y: y)));
 
       if (obj is! BySlot && obj is! Character) {
         secondaryObjects.add((obj, pos));
@@ -315,6 +319,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
           asm.add(pos.withPosition(
               memory: state,
               load: a3,
+              load2: a2,
               asm: (x, y) => moveCharacter(x: x, y: y)));
         }
 
@@ -545,7 +550,7 @@ Asm _waitForMovement(
       Label('.wait_for_movement_${_labelSafeString(obj)}$labelSuffix');
   return Asm([
     label(startOfLoop),
-    obj.toA4(memory, force: true),
+    //obj.toA4(memory, force: true),
     jsr(obj.routine(fieldRoutines)),
     jsr(Label('Field_LoadSprites').l),
     jsr(Label('Field_BuildSprites').l),
@@ -588,6 +593,18 @@ extension FieldObjectAsm on FieldObject {
     };
   }
 
+  bool hasKnownAddress(Memory memory) {
+    var obj = this;
+    var slot = obj.slotAsOf(memory);
+    return switch ((slot, obj)) {
+      (int(), _) => true,
+      (_, Character()) => true,
+      (_, MapObject()) => true,
+      (_, MapObjectById()) => true,
+      _ => memory.addressRegisterFor(obj) != null,
+    };
+  }
+
   /// NOTE! May overwrite data registers.
   ///
   /// By default, will avoid a redundant load if the object is already in a4.
@@ -625,16 +642,6 @@ extension FieldObjectAsm on FieldObject {
 	bmi.s	loc_6E212
 
     i.e. bmi branch if char id not found in party
-
-    if don't want to load to a4, do something like
-
-	bsr.w	FindCharacterSlot
-	bmi.s	+
-	lsl.w	#6, d1
-	lea	(Character_1).w, a3
-	lea	(a3,d1.w), a3
-
-    that is, just use findcharslot directly.
      */
   }
 
@@ -642,7 +649,11 @@ extension FieldObjectAsm on FieldObject {
   Asm toA3(Memory ctx) => toA(a3, ctx);
 
   /// NOTE! May overwrite data registers.
-  Asm toA(DirectAddressRegister a, Memory memory) {
+  ///
+  /// If [keepA4] is `true` and A4 must be overwritten,
+  /// then it will be pushed/popped onto the stack so afterwards
+  /// the value in A4 remains the same.
+  Asm toA(DirectAddressRegister a, Memory memory, {bool keepA4 = true}) {
     if (a == a4) return toA4(memory);
 
     if (memory.inAddress(a)?.obj == resolve(memory)) {
@@ -650,29 +661,44 @@ extension FieldObjectAsm on FieldObject {
     }
 
     var obj = this;
+    Asm asm;
 
-    try {
-      if (obj is MapObject) {
+    switch (obj) {
+      case MapObject():
         var address = obj.address(memory);
-        return lea(Absolute.long(address), a);
-      } else if (obj is MapObjectById) {
+        asm = lea(Absolute.long(address), a);
+      case MapObjectById():
         var address = obj.address(memory);
-        return lea(Absolute.long(address), a);
-      } else if (obj is BySlot) {
+        asm = lea(Absolute.long(address), a);
+      case BySlot():
         // why word? this is what asm appears to do
-        return lea('Character_${obj.index}'.toConstant.w, a);
-      } else if (obj is InteractionObject &&
-          memory.inAddress(a3)?.obj == InteractionObject()) {
-        if (a == a3) return Asm.empty();
-        return lea(a3.indirect, a);
-      } else {
-        var asm = Asm([obj.toA4(memory), lea(a4.indirect, a)]);
-        memory.putInAddress(a4, obj);
-        return asm;
-      }
-    } finally {
-      memory.putInAddress(a, obj);
+        asm = lea(Constant('Character_${obj.index}').w, a);
+      case InteractionObject() when memory.inAddress(a3)?.obj == obj:
+        asm = (a == a3) ? Asm.empty() : lea(a3.indirect, a);
+      case Character():
+        asm = Asm([
+          moveq(obj.charIdAddress, d0),
+          Asm.fromRaw('	getcharacter	$a'),
+        ]);
+      default:
+        // Does this branch ever get reached?
+        var inA4 = memory.inAddress(a4)?.obj;
+        var doLoad = Asm([
+          obj.toA4(memory),
+          lea(a4.indirect, a),
+        ]);
+
+        if (keepA4) {
+          asm = PushToStack.one(a4, Size.l).wrap(doLoad);
+          if (inA4 case Object()) memory.putInAddress(a4, inA4);
+        } else {
+          memory.putInAddress(a4, obj);
+          asm = doLoad;
+        }
     }
+
+    memory.putInAddress(a, obj);
+    return asm;
   }
 }
 
@@ -936,12 +962,14 @@ extension PositionExpressionAsm on PositionExpression {
   Asm withPosition(
       {required Memory memory,
       required Asm Function(Address x, Address y) asm,
-      DirectAddressRegister load = a4}) {
+      DirectAddressRegister load = a4,
+      DirectAddressRegister load2 = a3}) {
     return switch (this) {
       Position p => asm(p.x.toWord.i, p.y.toWord.i),
       PositionOfObject p =>
         p.withPosition(memory: memory, asm: asm, load: load),
-      PositionOfXY p => p.withPosition(memory: memory, asm: asm, loadX: load),
+      PositionOfXY p =>
+        p.withPosition(memory: memory, asm: asm, loadX: load, loadY: load2),
     };
   }
 
@@ -1007,28 +1035,12 @@ extension PositionOfObjectAsm on PositionOfObject {
       withPosition(memory: memory, asm: (_, y) => asm(y), load: load);
 }
 
-extension PositionComponentOfObjectAsm on PositionComponentOfObject {
-  Asm withValue(
-      {required Memory memory,
-      required Asm Function(Address a) asm,
-      DirectAddressRegister load = a4}) {
-    var offset = switch (component) { Axis.x => curr_x_pos, _ => curr_y_pos };
-
-    load = memory.addressRegisterFor(obj) ?? load;
-
-    return Asm([
-      obj.toA(load, memory),
-      asm(offset(load)),
-    ]);
-  }
-}
-
 extension PositionOfXYAsm on PositionOfXY {
   Asm withPosition(
       {required Memory memory,
       required Asm Function(Address x, Address y) asm,
-      DirectAddressRegister loadX = a3,
-      DirectAddressRegister loadY = a4}) {
+      DirectAddressRegister loadX = a4,
+      DirectAddressRegister loadY = a3}) {
     return x.withValue(
         memory: memory,
         load: loadX,
@@ -1054,5 +1066,34 @@ extension PositionOfXYAsm on PositionOfXY {
       required Asm Function(Address) asm,
       DirectAddressRegister load = a4}) {
     return y.withValue(memory: memory, load: load, asm: (y) => asm(y));
+  }
+}
+
+extension PositionComponentExpressionAsm on PositionComponentExpression {
+  Asm withValue(
+      {required Memory memory,
+      required Asm Function(Address c) asm,
+      DirectAddressRegister load = a4}) {
+    return switch (this) {
+      PositionComponent p => asm(Word(p.value).i),
+      PositionComponentOfObject p =>
+        p.withValue(memory: memory, load: load, asm: asm)
+    };
+  }
+}
+
+extension PositionComponentOfObjectAsm on PositionComponentOfObject {
+  Asm withValue(
+      {required Memory memory,
+      required Asm Function(Address a) asm,
+      DirectAddressRegister load = a4}) {
+    var offset = switch (component) { Axis.x => curr_x_pos, _ => curr_y_pos };
+
+    load = memory.addressRegisterFor(obj) ?? load;
+
+    return Asm([
+      obj.toA(load, memory),
+      asm(offset(load)),
+    ]);
   }
 }

@@ -1013,7 +1013,7 @@ void main() {
       var asm = EventAsm.empty();
       SceneAsmGenerator.forInteraction(
           map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
-          withObject: true)
+          withObject: const InteractionObject())
         ..runEvent()
         ..facePlayer(FacePlayer(InteractionObject()))
         ..finish();
@@ -1176,7 +1176,7 @@ void main() {
     });
 
     group('to expression', () {
-      test('single character', () {
+      test('single character to position of another', () {
         var event = AbsoluteMoves()..destinations[shay] = alys.position();
         var asm = absoluteMovesToAsm(event, state);
 
@@ -1187,6 +1187,46 @@ void main() {
               shay.toA4(testState),
               alys.toA3(testState),
               moveCharacter(x: curr_x_pos(a3), y: curr_y_pos(a3))
+            ]));
+      });
+
+      test('single character to position of xy of another', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] = PositionOfXY(PositionComponent(0x150, Axis.x),
+              alys.position().component(Axis.y));
+
+        var asm = absoluteMovesToAsm(event, state);
+
+        print(asm);
+
+        expect(
+            asm,
+            EventAsm([
+              followLeader(false),
+              shay.toA4(testState),
+              alys.toA(a2, testState),
+              moveCharacter(x: 0x150.toWord.i, y: curr_y_pos(a2))
+            ]));
+      });
+
+      test('single character to position of xy of others', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] = PositionOfXY(
+            rune.position().component(Axis.x),
+            alys.position().component(Axis.y),
+          );
+        var asm = absoluteMovesToAsm(event, state);
+
+        print(asm);
+
+        expect(
+            asm,
+            EventAsm([
+              followLeader(false),
+              shay.toA4(testState),
+              rune.toA(a3, testState),
+              alys.toA(a2, testState),
+              moveCharacter(x: curr_x_pos(a3), y: curr_y_pos(a2))
             ]));
       });
     });
@@ -1513,8 +1553,7 @@ void main() {
             bra.s(Label(r'.keep_1_Alys_0')),
             label(Label(r'.checkx_1_Alys_0')),
             move.w(FacingDir_Right.i, d0),
-            // a4 because rune is in both a3 and a4
-            move.w(curr_x_pos(a4), d2),
+            move.w(curr_x_pos(a3), d2),
             cmpi.w(0x100.toWord.i, d2),
             bcc.s(Label(r'.keep_1_Alys_0')),
             move.w(FacingDir_Left.i, d0),
@@ -1548,7 +1587,7 @@ void main() {
       var asm = EventAsm.empty();
       SceneAsmGenerator.forInteraction(
           map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
-          withObject: true)
+          withObject: const InteractionObject())
         ..runEvent()
         ..individualMoves(moves)
         ..finish();
@@ -1570,7 +1609,7 @@ void main() {
       var asm = EventAsm.empty();
       SceneAsmGenerator.forInteraction(
           map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
-          withObject: true)
+          withObject: const InteractionObject())
         ..runEvent()
         ..individualMoves(moves)
         ..finish();
