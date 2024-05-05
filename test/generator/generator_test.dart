@@ -473,6 +473,20 @@ main() {
         ])));
   });
 
+  test('fade out with speed uses alternate routine', () {
+    var scene = Scene([FadeOut.withSpeed(2)]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().trim().head(2),
+        Asm([
+          move.b(2.i, (0xFFFFED52).w),
+          jsr((Label('Pal_VariableFadeOut')).l)
+        ]));
+  });
+
   test('changes dialog tree after changing map', () {
     var dialog1 = Dialog(speaker: alys, spans: [DialogSpan('map 1')]);
     var dialog2 = Dialog(speaker: alys, spans: [DialogSpan('map 2')]);

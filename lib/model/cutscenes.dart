@@ -1,3 +1,5 @@
+import 'package:quiver/check.dart';
+
 import 'model.dart';
 
 class ShowPanel extends Event {
@@ -84,7 +86,13 @@ class HideAllPanels extends Event {
 }
 
 class FadeOut extends Event {
-  const FadeOut();
+  final int? speed;
+
+  const FadeOut() : speed = null;
+
+  FadeOut.withSpeed(int this.speed) {
+    checkArgument(speed! >= 0, message: 'speed must be >= 0');
+  }
 
   @override
   void visit(EventVisitor visitor) {

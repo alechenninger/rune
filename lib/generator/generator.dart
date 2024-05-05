@@ -1788,7 +1788,14 @@ class SceneAsmGenerator implements EventVisitor {
       // e.g. if after fading out, we want to show a panel,
       // the swap it to initvramandcram & fadein
 
-      _eventAsm.add(events_asm.fadeOut(initVramAndCram: false));
+      if (fadeOut.speed case var s?) {
+        _eventAsm.add(Asm([
+          move.b(s.i, 0xffffed52.w),
+          jsr(Label('Pal_VariableFadeOut').l),
+        ]));
+      } else {
+        _eventAsm.add(events_asm.fadeOut(initVramAndCram: false));
+      }
 
       if ((_memory.panelsShown ?? 0) > 0) {
         _eventAsm.add(jsr(Label('Panel_DestroyAll').l));

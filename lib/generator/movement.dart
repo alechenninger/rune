@@ -706,7 +706,8 @@ extension AddressOfMapObjectId on MapObjectById {
   Longword address(EventState ctx) {
     var map = ctx.currentMap;
     if (map == null) {
-      throw UnsupportedError('got field obj in map, but map was null');
+      throw UnsupportedError('got field obj in map, but map was null. '
+          'this=$this');
     }
     var obj = inMap(map);
     if (obj == null) {
@@ -721,7 +722,8 @@ extension AddressOfMapObject on MapObject {
   Longword address(EventState ctx) {
     var map = ctx.currentMap;
     if (map == null) {
-      throw UnsupportedError('got field obj in map, but map was null');
+      throw UnsupportedError('got field obj in map, but map was null. '
+          'this=$this');
     }
     return map.addressOf(this);
   }
@@ -744,6 +746,7 @@ const _charIds = [
 extension CharacterData on Character {
   Expression get charId {
     switch (runtimeType) {
+      // ignore: type_literal_in_constant_pattern
       case Shay:
         return Constant('CharID_Chaz');
       default:
