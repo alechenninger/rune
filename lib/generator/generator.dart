@@ -27,7 +27,6 @@ import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/guild.dart';
-import 'package:rune/model/palette.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';

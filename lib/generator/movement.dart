@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
 import 'package:rune/asm/events.dart';
-import 'package:rune/generator/conditional.dart';
 import 'package:rune/generator/generator.dart';
 import 'package:rune/generator/stack.dart';
 
@@ -550,7 +549,7 @@ Asm _waitForMovement(
       Label('.wait_for_movement_${_labelSafeString(obj)}$labelSuffix');
   return Asm([
     label(startOfLoop),
-    //obj.toA4(memory, force: true),
+    obj.toA4(memory, force: false),
     jsr(obj.routine(fieldRoutines)),
     jsr(Label('Field_LoadSprites').l),
     jsr(Label('Field_BuildSprites').l),
