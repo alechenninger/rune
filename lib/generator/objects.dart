@@ -26,12 +26,11 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 8,
       vramAnimated: true,
       SpecFactory((_) => AlysWaiting(), forSpec: AlysWaiting)),
-  FieldRoutine(
+  FieldRoutine.asm(
       Word(0xF0),
       Label('FieldObj_NPCGryz'),
       spriteMappingTiles: 8,
-      vramAnimated: true,
-      SpecFactory.asm(Word(0xF0))),
+      vramAnimated: true),
   FieldRoutine(
       Word(0x138),
       Label('loc_490B8'),
@@ -95,55 +94,56 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 8,
       SpecFactory.npc((s, _) => Npc(s, FixedFaceRight()),
           forBehavior: FixedFaceRight)),
-  FieldRoutine(
+  FieldRoutine.asm(
       Word(0xF8),
       Label('FieldObj_NPCType28'),
       spriteMappingTiles: 6,
       ramArt: RamArt(address: Word(0)),
-      vramAnimated: true,
-      SpecFactory.asm(Word(0xF8))),
-  FieldRoutine(
+      vramAnimated: true),
+  FieldRoutine.asm(
       Word(0x174),
       Label('FieldObj_BigDuck'),
-      spriteMappingTiles: 0x20,
-      SpecFactory.asm(Word(0x174))),
-  FieldRoutine(
+      spriteMappingTiles: 0x20),
+  FieldRoutine.asm(
       Word(0x178),
       Label('FieldObj_SmallWhiteDuck'),
-      spriteMappingTiles: 0x20,
-      SpecFactory.asm(Word(0x178))),
-  FieldRoutine(
+      spriteMappingTiles: 0x20),
+  FieldRoutine.asm(
       Word(0x17c),
       Label('FieldObj_SmallBrownDuck'),
-      spriteMappingTiles: 0x20,
-      SpecFactory.asm(Word(0x17c))),
-  FieldRoutine(
+      spriteMappingTiles: 0x20),
+  FieldRoutine.asm(
       Word(0x144),
       Label('loc_49192'),
-      spriteMappingTiles: 0x36,
-      SpecFactory.asm(Word(0x144))),
-  FieldRoutine(
+      spriteMappingTiles: 0x36),
+  FieldRoutine.asm(
       Word(0x170),
       Label('FieldObj_Butterfly'),
-      spriteMappingTiles: 2,
-      SpecFactory.asm(Word(0x170))),
-  FieldRoutine(
+      spriteMappingTiles: 2),
+  FieldRoutine.asm(
       Word(0x2F4),
       Label('FieldObj_StrayRocky'),
       // TODO(field routines): this can probably be less
-      spriteMappingTiles: 0x40,
-      SpecFactory.asm(Word(0x2F4))),
-  FieldRoutine(
+      spriteMappingTiles: 0x40),
+  FieldRoutine.asm(
       Word(0x1B0),
       Label('FieldObj_DorinChair'),
-      spriteMappingTiles: 0x15,
-      SpecFactory.asm(Word(0x1B0))),
-  FieldRoutine(
+      spriteMappingTiles: 0x15),
+  FieldRoutine.asm(
     Word(0x12C),
     Label('loc_48F96'),
     spriteMappingTiles: 24,
-    SpecFactory.asm(Word(0x12C)),
-  )
+  ),
+  FieldRoutine.asm(
+    Word(0x298),
+    Label('FieldObj_NPCAlysInBed'),
+    spriteMappingTiles: 7,
+  ),
+  FieldRoutine.asm(
+    Word(0xEC),
+    Label('FieldObj_NPCHahn'),
+    spriteMappingTiles: 8,
+  ),
 ]);
 
 class FieldRoutineRepository {
@@ -284,6 +284,17 @@ class FieldRoutine<T extends MapObjectSpec> {
 
   final SpecFactory factory;
 
+  const FieldRoutine(this.index, this.label, this.factory,
+      {this.spriteMappingTiles = _defaultVramTilesPerSprite,
+      this.ramArt,
+      this.vramAnimated = false});
+
+  FieldRoutine.asm(this.index, this.label,
+      {this.spriteMappingTiles = _defaultVramTilesPerSprite,
+      this.ramArt,
+      this.vramAnimated = false})
+      : factory = SpecFactory.asm(index);
+
   SpriteVramMapping? spriteVramMapping(MapObjectSpec spec) {
     // What do we need to know?
     // - how the sprite is defined: routine->rom, map->rom, map->ram
@@ -313,17 +324,14 @@ class FieldRoutine<T extends MapObjectSpec> {
         ? const [0x28]
         : const <int>[];
 
+    // TODO: need way to set required vram tile here
+    // probably parameterize this per map object somehow
     return SpriteVramMapping(
         tiles: spriteMappingTiles,
         art: artPointer,
         duplicateOffsets: duplicateOffsets,
         animated: vramAnimated);
   }
-
-  const FieldRoutine(this.index, this.label, this.factory,
-      {this.spriteMappingTiles = _defaultVramTilesPerSprite,
-      this.ramArt,
-      this.vramAnimated = false});
 
   @override
   String toString() {
