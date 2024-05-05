@@ -437,7 +437,11 @@ class SetFacing implements StateChange {
 
   @override
   mayApply(Memory memory) {
-    memory._eventState.clearFacing(obj);
+    try {
+      memory._eventState.clearFacing(obj);
+    } on ResolveException catch (_) {
+      // Fall through; object may not be relevant in this state
+    }
   }
 }
 
@@ -453,7 +457,11 @@ class ClearFacing implements StateChange {
 
   @override
   mayApply(Memory memory) {
-    memory._eventState.clearFacing(obj);
+    try {
+      memory._eventState.clearFacing(obj);
+    } on ResolveException catch (_) {
+      // Fall through; object may not be relevant in this state
+    }
   }
 }
 
@@ -597,7 +605,11 @@ class SetPosition implements StateChange {
 
   @override
   mayApply(Memory memory) {
-    memory._eventState.positions[obj] = null;
+    try {
+      memory._eventState.positions[obj] = null;
+    } on ResolveException catch (_) {
+      // Fall through; object may not be relevant in this state
+    }
   }
 }
 
@@ -613,7 +625,13 @@ class AddAllPositions implements StateChange {
 
   @override
   mayApply(Memory memory) {
-    positions.forEach((obj, pos) => memory._eventState.positions[obj] = null);
+    positions.forEach((obj, pos) {
+      try {
+        memory._eventState.positions[obj] = null;
+      } on ResolveException catch (_) {
+        // Fall through; object may not be relevant in this state
+      }
+    });
   }
 }
 
@@ -695,6 +713,10 @@ class UpdateRoutine implements StateChange {
 
   @override
   mayApply(Memory memory) {
-    memory._eventState.setRoutine(obj, null);
+    try {
+      memory._eventState.setRoutine(obj, null);
+    } on ResolveException catch (_) {
+      // Fall through; object may not be relevant in this state
+    }
   }
 }
