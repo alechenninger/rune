@@ -729,8 +729,16 @@ Asm changeMap(
   return Asm([
     move.w(to, Field_Map_Index.w),
     if (from != null) move.w(from, Field_Map_Index_2.w),
-    move.w(startX, Map_Start_X_Pos.w),
-    move.w(startY, Map_Start_Y_Pos.w),
+    move.w(startX, Map_Start_X_Pos.w,
+        comment: switch (startX) {
+          Immediate i => Word(i.value * 8).toString(),
+          _ => null
+        }),
+    move.w(startY, Map_Start_Y_Pos.w,
+        comment: switch (startY) {
+          Immediate i => Word(i.value * 8).toString(),
+          _ => null
+        }),
     move.w(facingDir, Map_Start_Facing_Dir.w),
     move.w(partyArrangement, Map_Start_Char_Align.w),
     refreshMap(refreshObjects: true),

@@ -125,9 +125,12 @@ class DcMnemonic {
 class MoveMnemonic {
   const MoveMnemonic();
 
-  Asm b(Address from, Address to) => cmd('move.b', [from, to]);
-  Asm w(Address from, Address to) => cmd('move.w', [from, to]);
-  Asm l(Address from, Address to) => cmd('move.l', [from, to]);
+  Asm b(Address from, Address to, {String? comment}) =>
+      cmd('move.b', [from, to], comment: comment);
+  Asm w(Address from, Address to, {String? comment}) =>
+      cmd('move.w', [from, to], comment: comment);
+  Asm l(Address from, Address to, {String? comment}) =>
+      cmd('move.l', [from, to], comment: comment);
 }
 
 class MoveaMnemonic {

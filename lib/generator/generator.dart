@@ -1987,8 +1987,8 @@ class SceneAsmGenerator implements EventVisitor {
       return events_asm.changeMap(
           to: newId.i,
           from: currentId?.i,
-          startX: x.i,
-          startY: y.i,
+          startX: Word(x).i,
+          startY: Word(y).i,
           facingDir: facing.constant.i,
           partyArrangement: alignByte.i);
     });
