@@ -402,6 +402,10 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
                 //  we may need to wait for movements to finish.
                 if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
                 move.w(d, facing_dir(load)),
+                if (!scriptable) ...[
+                  move.w(curr_x_pos(load), dest_x_pos(load)),
+                  move.w(curr_y_pos(load), dest_y_pos(load)),
+                ]
               ]);
             }),
       );
