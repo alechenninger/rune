@@ -584,6 +584,67 @@ void main() {
               jsr(Label('Event_UpdateObjFacing').l),
             ]));
       });
+
+      test('mix of move, facing, delay, multiple objects', () {
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.positions[rika] = Position(0x280, 0x170);
+            ctx.positions[shay] = Position(0x240, 0x160);
+            ctx.positions[gryz] = Position(0x250, 0x150);
+            ctx.positions[demi] = Position(0x260, 0x190);
+          }),
+          IndividualMoves()
+            ..speed = StepSpeed.walk
+            ..moves[gryz] = (StepPaths()
+              ..step(StepPath()
+                ..distance = 3.steps
+                ..direction = Direction.right))
+            ..moves[shay] = (StepPaths()
+              ..step(StepPath()
+                ..distance = 4.steps
+                ..direction = Direction.right))
+            ..moves[demi] = (StepPaths()
+              ..step(StepPath()
+                ..delay = 1.step
+                ..facing = Direction.right)
+              ..step(StepPath()
+                ..delay = 2.steps
+                ..facing = Direction.up)
+              ..step(StepPath()
+                ..delay = 3.steps
+                ..facing = Direction.right))
+        ]);
+
+        var asm =
+            Program().addScene(SceneId('test'), scene).event.withoutComments();
+
+        print(asm);
+
+        expect(
+            asm,
+            Asm([
+              bset(0.toByte.i, Char_Move_Flags.w),
+              move.b(0x04.toByte.i, (FieldObj_Step_Offset).w),
+              characterByIdToA4(gryz.charIdAddress),
+              setDestination(x: Word(0x260).i, y: Word(0x150).i),
+              characterByIdToA4(shay.charIdAddress),
+              moveCharacter(x: Word(0x250).i, y: Word(0x160).i),
+              characterByIdToA4(demi.charIdAddress),
+              updateObjFacing(right.address),
+              characterByIdToA4(gryz.charIdAddress),
+              setDestination(x: Word(0x280).i, y: Word(0x150).i),
+              characterByIdToA4(shay.charIdAddress),
+              moveCharacter(x: Word(0x270).i, y: Word(0x160).i),
+              characterByIdToA4(demi.charIdAddress),
+              updateObjFacing(up.address),
+              characterByIdToA4(shay.charIdAddress),
+              moveCharacter(x: Word(0x280).i, y: Word(0x160).i),
+              doMapUpdateLoop((2 * 8 - 1).toWord),
+              characterByIdToA4(demi.charIdAddress),
+              updateObjFacing(right.address),
+              move.b(0x01.i, (FieldObj_Step_Offset).w),
+            ]));
+      });
     });
 
     group('npcs', () {

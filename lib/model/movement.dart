@@ -566,6 +566,9 @@ abstract class RelativeMovement extends ContextualMovement {
   /// If `null`, the object will face in the same direction as it last moved.
   DirectionExpression? get facing;
 
+  bool get willFace => facing != null;
+  bool get willNotFace => facing == null;
+
   /// If this movement represents an object standing still (doing nothing).
   bool get still => duration == 0.steps && facing == null;
 
@@ -757,7 +760,7 @@ class StepPaths extends RelativeMovement {
     } else {
       var last = _paths.last;
 
-      if (last.direction == step.direction) {
+      if (last.willNotFace && last.direction == step.direction) {
         if (step.delay == 0.steps) {
           _paths.removeLast();
           _paths.add(last

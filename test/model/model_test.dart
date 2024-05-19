@@ -53,6 +53,23 @@ void main() {
     });
   });
 
+  group('step paths', () {
+    test('keeps multiple facings with delays', () {
+      var step = StepPaths()
+        ..step(StepPath()
+          ..delay = 1.step
+          ..facing = Direction.right)
+        ..step(StepPath()
+          ..delay = 2.steps
+          ..facing = Direction.up)
+        ..step(StepPath()
+          ..delay = 3.steps
+          ..facing = Direction.right);
+
+      expect(step.delay, 1.step);
+    });
+  });
+
   group('2d math', () {
     test('steps along x returns x steps of positive x position', () {
       expect(Position.fromSteps(5.steps, 10.steps).pathAlong(Axis.x),
@@ -605,6 +622,7 @@ void main() {
             ]));
       });
 
+      // TODO: condenses some pauses to 1 frame for vint
       test('removes pauses', () {
         var scene = Scene([
           Dialog.parse('test'),
