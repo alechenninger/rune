@@ -319,6 +319,14 @@ class Slot extends SlotExpression {
   String toString() {
     return 'Slot{index: $index}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Slot && runtimeType == other.runtimeType && index == other.index;
+
+  @override
+  int get hashCode => index.hashCode;
 }
 
 class SlotOfCharacter extends SlotExpression {
