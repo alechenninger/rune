@@ -623,6 +623,8 @@ final class IfValue<T extends ModelExpression> extends Event {
 
   final _branches = <Branch>[];
 
+  late final bool boolean;
+
   /// Branch with no events, if there is one.
   BranchCondition? emptyBranch;
 
@@ -637,6 +639,7 @@ final class IfValue<T extends ModelExpression> extends Event {
     List<Event> lessOrEqual = const [],
     required T comparedTo,
   }) : operand2 = comparedTo {
+    var boolean = true;
     var conditions = <BranchCondition>{};
 
     void addBranch(BranchCondition condition, List<Event> events) {
@@ -645,6 +648,9 @@ final class IfValue<T extends ModelExpression> extends Event {
         if (!conditions.add(c)) {
           throw ModelException('condition already defined: $c');
         }
+      }
+      if (condition != BranchCondition.eq && condition != BranchCondition.neq) {
+        boolean = false;
       }
       _branches.add(Branch(condition, events));
     }
@@ -663,6 +669,8 @@ final class IfValue<T extends ModelExpression> extends Event {
     emptyBranch = BranchCondition.canonical
         .difference(conditions)
         .reduceOrNull((value, element) => value.or(element));
+
+    this.boolean = boolean;
   }
 
   /// Branches which have any events.

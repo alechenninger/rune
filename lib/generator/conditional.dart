@@ -14,47 +14,69 @@ extension IfValueAsm on IfValue {
   /// and x position will be the the destination,
   /// as in `cmpi.w #constant, curr_x_pos(a4)`
   Asm compare({required Memory memory}) {
-    Asm compareTo(Address src) {
-      var asm = Asm.empty();
-
-      switch (operand1) {
-        case PositionComponent c:
-          asm.add(c.withValue(
-              memory: memory, asm: (dst) => _cmp(src, dst, Size.w)));
-          break;
-        case PositionComponentOfObject c:
-          if (src is AddressRegister) {
-            asm.add(lea(Address.a(src.register).indirect, a3));
-            src = src.withRegister(3);
-          }
-
-          asm.add(c.withValue(
-              memory: memory, load: a4, asm: (dst) => _cmp(src, dst, Size.w)));
-
-          break;
-        case Slot s:
-          asm.add(_cmp(src, s.offset.i, Size.b));
-        case SlotOfCharacter s:
-          asm.add(s.withValue(
-              memory: memory, asm: (slot) => _cmp(src, slot, Size.b)));
-        case PositionExpression p:
-          throw 'todo';
-        case DirectionExpression d:
-          throw 'todo';
-      }
-
-      return asm;
-    }
-
+    var compareTo = _compare(operand1, memory);
+    // Compare operand2 to operand1
     return switch (operand2) {
       PositionComponentExpression c =>
         c.withValue(memory: memory, load: a4, asm: compareTo),
+      // TODO: Handle this case.
+      NotInParty() => compareTo(0xFF.i),
       Slot s => compareTo(s.offset.i),
       SlotOfCharacter s => s.withValue(memory: memory, asm: compareTo),
+      IsOffScreen o => o.withValue(memory: memory, asm: compareTo),
+      BooleanConstant b => b.withValue(memory: memory, asm: compareTo),
       PositionExpression p => throw 'todo',
       DirectionExpression d => throw 'todo',
     };
   }
+}
+
+Asm Function(Address src) _compare(ModelExpression operand1, Memory memory) {
+  // Compares [src] with [operand1] and sets the CCR.
+  // Called below.
+  return (Address src) {
+    var asm = Asm.empty();
+
+    switch (operand1) {
+      case PositionComponent c:
+        asm.add(
+            c.withValue(memory: memory, asm: (dst) => _cmp(src, dst, Size.w)));
+        break;
+      case PositionComponentOfObject c:
+        if (src is AddressRegister) {
+          asm.add(lea(Address.a(src.register).indirect, a3));
+          src = src.withRegister(3);
+        }
+
+        asm.add(c.withValue(
+            memory: memory, load: a4, asm: (dst) => _cmp(src, dst, Size.w)));
+
+        break;
+      case NotInParty():
+        asm.add(_cmp(src, 0xFF.i, Size.b));
+      case Slot s:
+        asm.add(_cmp(src, s.offset.i, Size.b));
+        break;
+      case SlotOfCharacter s:
+        asm.add(s.withValue(
+            memory: memory, asm: (slot) => _cmp(src, slot, Size.b)));
+        break;
+      case IsOffScreen o:
+        asm.add(o.withValue(
+            memory: memory, asm: (value) => _cmp(src, value, Size.b)));
+        break;
+      case BooleanConstant b:
+        asm.add(b.withValue(
+            memory: memory, asm: (value) => _cmp(src, value, Size.b)));
+        break;
+      case PositionExpression p:
+        throw 'todo';
+      case DirectionExpression d:
+        throw 'todo';
+    }
+
+    return asm;
+  };
 }
 
 Asm _cmp(Address src, Address dst, Size size, {DirectDataRegister dR = d0}) {
@@ -97,5 +119,24 @@ extension SlotOfCharacterExpressionAsm on SlotOfCharacter {
       jsr(FindCharacterSlot.l),
       asm(d1)
     ]);
+  }
+}
+
+extension OffScreenExpressionAsm on IsOffScreen {
+  Asm withValue(
+      {required Memory memory,
+      required Asm Function(Address value) asm,
+      DirectAddressRegister load = a4}) {
+    return Asm([
+      object.toA(load, memory),
+      asm(offscreen_flag(load)),
+    ]);
+  }
+}
+
+extension BooleanConstantAsm on BooleanConstant {
+  Asm withValue(
+      {required Memory memory, required Asm Function(Address value) asm}) {
+    return asm(value ? 1.i : 0.i);
   }
 }

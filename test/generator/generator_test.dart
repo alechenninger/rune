@@ -1323,6 +1323,71 @@ EventFlag_Test001 = $0001'''));
             label(Label('.1_continue')),
           ]));
     });
+
+    test('character is in party', () {
+      var scene = Scene([
+        IfValue(rune.slot(),
+            comparedTo: NotInParty(),
+            equal: [Face(up).move(rune)],
+            notEqual: [Face(down).move(rune)])
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            moveq(rune.charIdAddress, d0),
+            jsr(FindCharacterSlot.l),
+            cmpi.b(0xFF.i, d1),
+            beq.w(Label('.1_eq')),
+            // not equal branch
+            characterByIdToA4(rune.charIdAddress),
+            updateObjFacing(down.address),
+            bra.w(Label('.1_continue')),
+
+            // eq branch
+            label(Label('.1_eq')),
+            characterByIdToA4(rune.charIdAddress),
+            updateObjFacing(up.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('offscreen', () {
+      var scene = Scene([
+        IfValue(
+          IsOffScreen(rune),
+          comparedTo: BooleanConstant(true),
+          equal: [Face(up).move(rune)],
+          notEqual: [Face(down).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            cmpi.b(1.i, offscreen_flag(a4)),
+            beq.w(Label('.1_eq')),
+            // not equal branch
+            updateObjFacing(down.address),
+            bra.w(Label('.1_continue')),
+
+            // eq branch
+            label(Label('.1_eq')),
+            updateObjFacing(up.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
   });
 
   group('hide panels', () {

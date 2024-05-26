@@ -288,6 +288,22 @@ enum Direction implements DirectionExpression {
 
 sealed class SlotExpression extends ModelExpression {}
 
+class NotInParty extends SlotExpression {
+  NotInParty();
+
+  @override
+  String toString() {
+    return 'NotInParty{}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is NotInParty;
+
+  @override
+  int get hashCode => 'NotInParty{}'.hashCode;
+}
+
 class Slot extends SlotExpression {
   final int index;
   int get offset => index - 1;
@@ -324,4 +340,61 @@ class SlotOfCharacter extends SlotExpression {
 
   @override
   int get hashCode => character.hashCode;
+}
+
+sealed class BooleanExpression extends ModelExpression {
+  bool? known(EventState state);
+}
+
+class IsOffScreen extends BooleanExpression {
+  final FieldObject object;
+
+  IsOffScreen(this.object);
+
+  @override
+  bool? known(EventState state) {
+    // TODO: implement known
+    // Technically we could figure this out if we tracked camera position
+    // and knew object position.
+    return null;
+  }
+
+  @override
+  String toString() {
+    return 'IsOffScreen{object: $object}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IsOffScreen &&
+          runtimeType == other.runtimeType &&
+          object == other.object;
+
+  @override
+  int get hashCode => object.hashCode;
+}
+
+class BooleanConstant extends BooleanExpression {
+  final bool value;
+
+  BooleanConstant(this.value);
+
+  @override
+  bool known(EventState state) => value;
+
+  @override
+  String toString() {
+    return 'BooleanConstant{value: $value}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BooleanConstant &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
 }

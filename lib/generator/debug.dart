@@ -12,6 +12,7 @@ EventAsm debugStart({
   required List<model.EventFlag> flagsSet,
   required EventFlags eventFlags,
   required model.LoadMap loadMap,
+  // TODO: items! (e.g. for key items)
 }) {
   var startingMap = loadMap.map.id;
   var x = loadMap.startingPosition.x ~/ 8;
