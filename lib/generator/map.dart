@@ -901,7 +901,7 @@ void _compileMapAreaData(Asm asm, MapArea area, EventFlags eventFlags,
       var dialogId = compileScene(spec.onInteract);
 
       Expression flag;
-      var doNotInteractIf = spec.doNotInteractIf;
+      var doNotInteractIf = spec.oneTimeFlag;
       if (doNotInteractIf != null) {
         var value = eventFlags.toConstantValue(doNotInteractIf);
         if (value.value >= Byte.max) {
@@ -1227,7 +1227,7 @@ Future<MapArea> _buildArea(MapId map, _AsmArea area,
         at: position,
         range: range,
         spec: InteractiveAreaSpec(
-            doNotInteractIf: flag != Byte.zero ? toEventFlag(flag) : null,
+            oneTimeFlag: flag != Byte.zero ? toEventFlag(flag) : null,
             onInteract: scene));
   } else {
     return MapArea(

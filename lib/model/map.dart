@@ -875,23 +875,24 @@ class InteractiveAreaSpec extends AreaSpec
   // other flag types are modelable in ASM
   // however they are never used with interaction types we care about.
   // hence this is here and not in the MapArea model
-  /// Interactions may be conditional on whether [doNotInteractIf] is set.
+  /// Interactions may be one-time if the [oneTimeFlag] is set.
   ///
-  /// If set, the interaction won't take place.
-  final EventFlag? doNotInteractIf;
+  /// This is set by interacting with the area.
+  /// Once it is set, the interaction won't take place.
+  final EventFlag? oneTimeFlag;
 
   InteractiveAreaSpec(
-      {this.doNotInteractIf, Scene onInteract = const Scene.none()}) {
+      {this.oneTimeFlag, Scene onInteract = const Scene.none()}) {
     this.onInteract = onInteract;
   }
 
   @override
-  InteractiveAreaSpec withNewInteraction() => InteractiveAreaSpec(
-      doNotInteractIf: doNotInteractIf, onInteract: Scene.empty());
+  InteractiveAreaSpec withNewInteraction() =>
+      InteractiveAreaSpec(oneTimeFlag: oneTimeFlag, onInteract: Scene.empty());
 
   @override
   String toString() {
-    return 'InteractiveArea{doNotInteractIf: $doNotInteractIf, '
+    return 'InteractiveArea{doNotInteractIf: $oneTimeFlag, '
         'onInteract: $onInteract}';
   }
 
@@ -900,11 +901,11 @@ class InteractiveAreaSpec extends AreaSpec
       identical(this, other) ||
       other is InteractiveAreaSpec &&
           runtimeType == other.runtimeType &&
-          doNotInteractIf == other.doNotInteractIf &&
+          oneTimeFlag == other.oneTimeFlag &&
           onInteract == other.onInteract;
 
   @override
-  int get hashCode => doNotInteractIf.hashCode ^ onInteract.hashCode;
+  int get hashCode => oneTimeFlag.hashCode ^ onInteract.hashCode;
 }
 
 class AsmArea extends AreaSpec {

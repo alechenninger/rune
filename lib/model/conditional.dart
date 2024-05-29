@@ -113,6 +113,7 @@ const storyEvents = [
   EventFlag('AfterAlysDeath'),
   EventFlag('AfterAlysDeath2'),
   EventFlag('ZioFortBarrier'),
+  // The next three are essentially all triggered together
   EventFlag('ZioNurvus'),
   EventFlag('MotaSpaceport'),
   EventFlag('GryzGone'),
