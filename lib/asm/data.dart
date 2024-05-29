@@ -178,24 +178,24 @@ abstract class Expression {
   }
 
   Expression operator +(Expression other) {
-    return ArithmaticExpression('+', this, other);
+    return ArithmeticExpression(ArithmeticOperator.add, this, other);
   }
 
   Expression operator -(Expression other) {
-    return ArithmaticExpression('-', this, other);
+    return ArithmeticExpression(ArithmeticOperator.subtract, this, other);
   }
 
   Expression operator ~/(Expression other) {
-    return ArithmaticExpression('/', this, other);
+    return ArithmeticExpression(ArithmeticOperator.divide, this, other);
   }
 
   Expression operator <<(Expression other) {
     if (other.isKnownZero) return this;
-    return ArithmaticExpression('<<', this, other);
+    return ArithmeticExpression(ArithmeticOperator.shiftLeft, this, other);
   }
 
   Expression operator |(Expression other) {
-    return ArithmaticExpression('|', this, other);
+    return ArithmeticExpression(ArithmeticOperator.or, this, other);
   }
 
   /// Assembly representation of the expression.
@@ -226,20 +226,55 @@ class ParsedExpressions {
   ParsedExpressions(this.expressions, this.charactersParsed);
 }
 
-class ArithmaticExpression extends Expression {
-  final Expression operand1;
-  final Expression operand2;
-  final String operator;
+class ArithmeticExpression extends Expression {
+  final Expression left;
+  final Expression right;
+  final ArithmeticOperator operator;
 
-  ArithmaticExpression(this.operator, this.operand1, this.operand2);
+  ArithmeticExpression(this.operator, this.left, this.right);
 
   @override
-  bool get isKnownZero => operand1.isKnownZero && operand2.isKnownZero;
+  bool get isKnownZero => left.isKnownZero && right.isKnownZero;
+
+  String toStringOperand(ArithmeticOperator parent) {
+    return parent.rank < operator.rank ? '($this)' : toString();
+  }
 
   @override
   String toString() {
-    return '($operand1$operator$operand2)';
+    var left = switch (this.left) {
+      ArithmeticExpression a => a.toStringOperand(operator),
+      var l => l.toString()
+    };
+    var right = switch (this.right) {
+      ArithmeticExpression a => a.toStringOperand(operator),
+      var r => r.toString()
+    };
+    return '$left$operator$right';
   }
+}
+
+// See http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_2_10_6_
+// for precedence
+enum ArithmeticOperator {
+  add('+', 10),
+  subtract('-', 10),
+  multiply('*', 9),
+  divide('/', 9),
+  shiftLeft('<<', 3),
+  shiftRight('>>', 3),
+  and('&', 5),
+  or('|', 6);
+
+  final String operator;
+
+  /// Lower number means higher precedence.
+  final int rank;
+
+  const ArithmeticOperator(this.operator, this.rank);
+
+  @override
+  String toString() => operator;
 }
 
 class BooleanOperation extends Expression {

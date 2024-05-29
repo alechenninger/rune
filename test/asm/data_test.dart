@@ -155,4 +155,11 @@ void main() {
 
     group('trim', () {});
   });
+
+  group('arithmetic', () {
+    test('operator precedence', () {
+      expect(((Constant('some_value') + 2.toValue) ~/ 3.toValue).toString(),
+          '(some_value+2)/3');
+    });
+  });
 }

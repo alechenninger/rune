@@ -1475,7 +1475,7 @@ loc_742A4:
             asm.head(3),
             Asm([
               Instruction.parse(
-                  r'	move.l #((CharID_Rune<<24)|$FFFFFF), (Current_Party_Slots).w'),
+                  r'	move.l #CharID_Rune<<24|$FFFFFF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
               move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
             ]));
@@ -1500,7 +1500,7 @@ loc_742A4:
             asm.head(3),
             Asm([
               Instruction.parse(
-                  r'	move.l #(((CharID_Rune<<24)|(CharID_Alys<<16))|$FFFF), (Current_Party_Slots).w'),
+                  r'	move.l #CharID_Rune<<24|CharID_Alys<<16|$FFFF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
               move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
             ]));
@@ -1525,7 +1525,7 @@ loc_742A4:
             asm.head(3),
             Asm([
               Instruction.parse(
-                  r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|$FF), (Current_Party_Slots).w'),
+                  r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|$FF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
               move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
             ]));
@@ -1550,7 +1550,7 @@ loc_742A4:
             asm.head(3),
             Asm([
               Instruction.parse(
-                  r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+                  r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
               move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
             ]));
@@ -1575,7 +1575,7 @@ loc_742A4:
             asm.head(3),
             Asm([
               Instruction.parse(
-                  r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+                  r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
               move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
             ]));
@@ -1656,7 +1656,7 @@ loc_742A4:
               move.l(Current_Party_Slots.w, Constant('Saved_Char_ID_Mem_1').w),
               move.b(Current_Party_Slot_5.w, Constant('Saved_Char_ID_Mem_5').w),
               Instruction.parse(
-                  r'	move.l #((((CharID_Rune<<24)|(CharID_Alys<<16))|(CharID_Hahn<<8))|CharID_Wren), (Current_Party_Slots).w'),
+                  r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
               move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
             ]));

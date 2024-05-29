@@ -368,9 +368,19 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
 
               return Asm([
                 obj.toA(load, memory),
-                if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
+                if (!scriptable) ...[
+                  move.w(0x8194.toWord.i, load.indirect),
+                  move.l(0.i, x_step_constant(a4)),
+                  move.l(0.i, y_step_constant(a4)),
+                  move.w(0.i, x_step_duration(a4)),
+                  move.w(0.i, y_step_duration(a4)),
+                ],
                 move.w(x, curr_x_pos(load)),
+                // Ensure there is no fractional component
+                move.w(Word(0).i, load.plus(curr_x_pos + 2.toValue)),
                 move.w(y, curr_y_pos(load)),
+                // Ensure there is no fractional component
+                move.w(Word(0).i, load.plus(curr_y_pos + 2.toValue)),
                 move.w(x, dest_x_pos(load)),
                 move.w(y, dest_y_pos(load)),
               ]);
@@ -965,6 +975,8 @@ extension DirectionOfVectorAsm on DirectionOfVector {
 // rather than use a bunch of extension methods and switch statements
 
 extension PositionExpressionAsm on PositionExpression {
+  // TODO: technically position should return longwords,
+  //   but we treat as word only
   Asm withPosition(
       {required Memory memory,
       required Asm Function(Address x, Address y) asm,
