@@ -99,9 +99,9 @@ sealed class Register<T extends Register<T>> implements Address {
   RegisterList operator /(Register other);
 }
 
-abstract class AddressRegister implements Address {
+abstract class OfAddressRegister implements Address {
   int get register;
-  AddressRegister withRegister(int num);
+  OfAddressRegister withRegister(int num);
 }
 
 class _Address implements Address {
@@ -154,7 +154,7 @@ class Immediate extends _Address {
 
 /// Value in one of the address registers
 class DirectAddressRegister extends _Address
-    implements AddressRegister, Register<DirectAddressRegister> {
+    implements OfAddressRegister, Register<DirectAddressRegister> {
   @override
   final int register;
 
@@ -258,7 +258,7 @@ class OffsetRegister {
 }
 
 /// Value in memory at an address pointed to by an address register
-class IndirectAddressRegister extends _Address implements AddressRegister {
+class IndirectAddressRegister extends _Address implements OfAddressRegister {
   @override
   final int register;
   final Expression displacement;

@@ -106,6 +106,47 @@ class PositionOfXY extends PositionExpression {
   int get hashCode => x.hashCode ^ y.hashCode;
 }
 
+class OffsetPosition implements PositionExpression {
+  final PositionExpression base;
+  final Position offset;
+
+  factory OffsetPosition(PositionExpression base, {required Position offset}) {
+    return base is OffsetPosition
+        ? OffsetPosition._(base.base, base.offset + offset)
+        : OffsetPosition._(base, offset);
+  }
+
+  OffsetPosition._(this.base, this.offset);
+
+  @override
+  PositionComponentExpression component(Axis axis) => switch (axis.of(offset)) {
+        0 => base.component(axis),
+        var of => OffsetPositionComponent(base.component(axis), offset: of),
+      };
+
+  @override
+  Position? known(EventState state) => switch (base.known(state)) {
+        null => null,
+        var p => p + offset,
+      };
+
+  @override
+  String toString() {
+    return 'OffsetPosition{base: $base, offset: $offset}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OffsetPosition &&
+          runtimeType == other.runtimeType &&
+          base == other.base &&
+          offset == other.offset;
+
+  @override
+  int get hashCode => base.hashCode ^ offset.hashCode;
+}
+
 const unitsPerStep = 16;
 
 /// A fork of [Point] for our domain model.
@@ -136,6 +177,8 @@ class Position implements PositionExpression {
 
   List<int> get asList => [x, y];
 
+  Position abs() => Position(x.abs(), y.abs());
+
   Path pathAlong(Axis a) {
     var product = a * this;
 
@@ -162,6 +205,8 @@ class Position implements PositionExpression {
     return Position((x - other.x), (y - other.y));
   }
 
+  Position operator -() => Position(-x, -y);
+
   /// Scale this point by [factor] as if it were a vector.
   Position operator *(int factor) {
     return Position((x * factor), (y * factor));
@@ -182,6 +227,37 @@ class Position implements PositionExpression {
   String toString() {
     return '($x, $y)';
   }
+}
+
+class OffsetPositionComponent extends PositionComponentExpression {
+  final PositionComponentExpression base;
+  final int offset;
+
+  OffsetPositionComponent(this.base, {required this.offset});
+
+  @override
+  int? known(EventState state) {
+    return switch (base.known(state)) {
+      null => null,
+      var value => value + offset,
+    };
+  }
+
+  @override
+  String toString() {
+    return 'OffsetPositionComponent{base: $base, offset: $offset}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OffsetPositionComponent &&
+          runtimeType == other.runtimeType &&
+          base == other.base &&
+          offset == other.offset;
+
+  @override
+  int get hashCode => base.hashCode ^ offset.hashCode;
 }
 
 class PositionComponent extends PositionComponentExpression {

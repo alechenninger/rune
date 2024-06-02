@@ -43,7 +43,7 @@ Asm Function(Address src) _compare(ModelExpression operand1, Memory memory) {
             c.withValue(memory: memory, asm: (dst) => _cmp(src, dst, Size.w)));
         break;
       case PositionComponentOfObject c:
-        if (src is AddressRegister) {
+        if (src is OfAddressRegister) {
           asm.add(lea(Address.a(src.register).indirect, a3));
           src = src.withRegister(3);
         }
@@ -72,6 +72,8 @@ Asm Function(Address src) _compare(ModelExpression operand1, Memory memory) {
       case PositionExpression p:
         throw 'todo';
       case DirectionExpression d:
+        throw 'todo';
+      case OffsetPositionComponent():
         throw 'todo';
     }
 

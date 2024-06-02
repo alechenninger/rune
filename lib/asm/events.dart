@@ -555,8 +555,8 @@ Asm setDestination(
 /// [x] and [y] should be word size.
 Asm moveCharacter({required Address x, required Address y}) {
   return Asm([
-    if (!(x is DirectDataRegister && x.register == 0)) move.w(x, d0),
-    if (!(y is DirectDataRegister && y.register == 1)) move.w(y, d1),
+    if (x != d0) move.w(x, d0),
+    if (y != d1) move.w(y, d1),
     jsr(Label('Event_MoveCharacter').l),
   ]);
 }

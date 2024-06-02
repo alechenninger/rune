@@ -1310,6 +1310,86 @@ void main() {
               moveCharacter(x: curr_x_pos(a4), y: curr_y_pos(a2))
             ]));
       });
+
+      test('offset of character position both axis', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] =
+              OffsetPosition(demi.position(), offset: Position(-0x10, 0x10));
+        var asm = absoluteMovesToAsm(event, state);
+        print(asm);
+        expect(
+            asm,
+            Asm([
+              followLeader(false),
+              shay.toA4(testState),
+              demi.toA3(testState),
+              move.w(curr_x_pos(a3), d0),
+              subi.w(0x10.toWord.i, d0),
+              move.w(curr_y_pos(a3), d1),
+              addi.w(0x10.toWord.i, d1),
+              moveCharacter(x: d0, y: d1)
+            ]));
+      });
+
+      test('offset of character position one axis', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] = PositionOfXY(
+              OffsetPositionComponent(demi.position().component(Axis.x),
+                  offset: -0x10),
+              demi.position().component(Axis.y));
+
+        var asm = absoluteMovesToAsm(event, state);
+
+        print(asm);
+
+        expect(
+            asm,
+            Asm([
+              followLeader(false),
+              shay.toA4(testState),
+              demi.toA3(testState),
+              move.w(curr_x_pos(a3), d0),
+              subi.w(0x10.toWord.i, d0),
+              moveCharacter(x: d0, y: curr_y_pos(a3))
+            ]));
+      });
+
+      test('offset of character position both axis, one zero offset', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] =
+              OffsetPosition(demi.position(), offset: Position(-0x10, 0));
+        var asm = absoluteMovesToAsm(event, state);
+        expect(
+            asm,
+            Asm([
+              followLeader(false),
+              shay.toA4(testState),
+              demi.toA3(testState),
+              move.w(curr_x_pos(a3), d0),
+              subi.w(0x10.toWord.i, d0),
+              moveCharacter(x: d0, y: curr_y_pos(a3))
+            ]));
+      });
+
+      test('offset of slot position', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] = OffsetPosition(BySlot(1).position(),
+              offset: Position(-0x10, 0x10));
+        var asm = absoluteMovesToAsm(event, state);
+        print(asm);
+        expect(
+            asm,
+            Asm([
+              followLeader(false),
+              shay.toA4(testState),
+              BySlot(1).toA3(testState),
+              move.w(curr_x_pos(a3), d0),
+              subi.w(0x10.toWord.i, d0),
+              move.w(curr_y_pos(a3), d1),
+              addi.w(0x10.toWord.i, d1),
+              moveCharacter(x: d0, y: d1)
+            ]));
+      });
     });
 
     group('following leader', () {

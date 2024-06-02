@@ -980,6 +980,8 @@ extension PositionExpressionAsm on PositionExpression {
   Asm withPosition(
       {required Memory memory,
       required Asm Function(Address x, Address y) asm,
+      DirectDataRegister loadX = d0,
+      DirectDataRegister loadY = d1,
       DirectAddressRegister load = a4,
       DirectAddressRegister load2 = a3}) {
     return switch (this) {
@@ -988,28 +990,41 @@ extension PositionExpressionAsm on PositionExpression {
         p.withPosition(memory: memory, asm: asm, load: load),
       PositionOfXY p =>
         p.withPosition(memory: memory, asm: asm, loadX: load, loadY: load2),
+      OffsetPosition p => p.withPosition(
+          memory: memory,
+          asm: asm,
+          loadX: loadX,
+          loadY: loadY,
+          load: load,
+          load2: load2),
     };
   }
 
   Asm withX(
       {required Memory memory,
       required Asm Function(Address) asm,
+      DirectDataRegister loadX = d1,
       DirectAddressRegister load = a4}) {
     return switch (this) {
       Position p => asm(p.x.toWord.i),
       PositionOfObject p => p.withX(memory: memory, asm: asm, load: load),
       PositionOfXY p => p.withX(memory: memory, asm: asm, load: load),
+      OffsetPosition p =>
+        p.withX(memory: memory, asm: asm, loadX: loadX, load: load),
     };
   }
 
   Asm withY(
       {required Memory memory,
       required Asm Function(Address) asm,
+      DirectDataRegister loadY = d2,
       DirectAddressRegister load = a4}) {
     return switch (this) {
       Position p => asm(p.y.toWord.i),
       PositionOfObject p => p.withY(memory: memory, asm: asm, load: load),
       PositionOfXY p => p.withY(memory: memory, asm: asm, load: load),
+      OffsetPosition p =>
+        p.withY(memory: memory, asm: asm, loadY: loadY, load: load),
     };
   }
 }
@@ -1091,11 +1106,14 @@ extension PositionComponentExpressionAsm on PositionComponentExpression {
   Asm withValue(
       {required Memory memory,
       required Asm Function(Address c) asm,
+      DirectDataRegister loadVal = d0,
       DirectAddressRegister load = a4}) {
     return switch (this) {
       PositionComponent p => asm(Word(p.value).i),
       PositionComponentOfObject p =>
-        p.withValue(memory: memory, load: load, asm: asm)
+        p.withValue(memory: memory, load: load, asm: asm),
+      OffsetPositionComponent p =>
+        p.withValue(memory: memory, loadVal: loadVal, load: load, asm: asm),
     };
   }
 }
@@ -1113,5 +1131,152 @@ extension PositionComponentOfObjectAsm on PositionComponentOfObject {
       obj.toA(load, memory),
       asm(offset(load)),
     ]);
+  }
+}
+
+extension OffsetPositionAsm on OffsetPosition {
+  Asm withPosition(
+      {required Memory memory,
+      required Asm Function(Address x, Address y) asm,
+      DirectDataRegister loadX = d0,
+      DirectDataRegister loadY = d1,
+      DirectAddressRegister load = a4,
+      DirectAddressRegister load2 = a3}) {
+    if (known(memory) case var p?) {
+      return asm(p.x.toWord.i, p.y.toWord.i);
+    }
+
+    return base.withPosition(
+        memory: memory,
+        asm: (x, y) {
+          var computation = Asm.empty();
+
+          var xOp =
+              switch (offset.x) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          var yOp =
+              switch (offset.y) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          Address offsetX = loadX;
+          Address offsetY = loadY;
+
+          if (xOp != null) {
+            if (x is DirectDataRegister) {
+              offsetX = x;
+            } else {
+              computation.add(move.w(x, offsetX));
+            }
+            computation.add(xOp(offset.x.abs().toWord.i, offsetX));
+          } else {
+            offsetX = x;
+          }
+
+          if (yOp != null) {
+            if (y is DirectDataRegister) {
+              offsetY = y;
+            } else {
+              computation.add(move.w(y, offsetY));
+            }
+            computation.add(yOp(offset.y.abs().toWord.i, offsetY));
+          } else {
+            offsetY = y;
+          }
+
+          return Asm([computation, asm(offsetX, offsetY)]);
+        },
+        load: load,
+        load2: load2);
+  }
+
+  Asm withX(
+      {required Memory memory,
+      required Asm Function(Address x) asm,
+      DirectDataRegister loadX = d0,
+      DirectAddressRegister load = a4,
+      DirectAddressRegister load2 = a3}) {
+    return base.withX(
+        memory: memory,
+        asm: (x) {
+          var computation = Asm.empty();
+
+          var xOp =
+              switch (offset.x) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          Address offsetX = loadX;
+
+          if (xOp != null) {
+            if (x is DirectDataRegister) {
+              offsetX = x;
+            } else {
+              computation.add(move.w(x, offsetX));
+            }
+            computation.add(xOp(offset.x.abs().toWord.i, offsetX));
+          } else {
+            offsetX = x;
+          }
+
+          return Asm([computation, asm(offsetX)]);
+        },
+        load: load);
+  }
+
+  Asm withY(
+      {required Memory memory,
+      required Asm Function(Address x) asm,
+      DirectDataRegister loadY = d1,
+      DirectAddressRegister load = a4,
+      DirectAddressRegister load2 = a3}) {
+    return base.withY(
+        memory: memory,
+        asm: (y) {
+          var computation = Asm.empty();
+
+          var yOp =
+              switch (offset.y) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          Address offsetY = loadY;
+
+          if (yOp != null) {
+            if (y is DirectDataRegister) {
+              offsetY = y;
+            } else {
+              computation.add(move.w(y, offsetY));
+            }
+            computation.add(yOp(offset.y.abs().toWord.i, offsetY));
+          } else {
+            offsetY = y;
+          }
+
+          return Asm([computation, asm(offsetY)]);
+        },
+        load: load);
+  }
+}
+
+extension OffsetPositionComponentAsm on OffsetPositionComponent {
+  Asm withValue({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    DirectDataRegister loadVal = d0,
+    DirectAddressRegister load = a4,
+  }) {
+    return base.withValue(
+        memory: memory,
+        load: load,
+        asm: (b) {
+          var computation = Asm.empty();
+
+          var op = switch (offset) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          Address offsetVal = loadVal;
+
+          if (op != null) {
+            if (b is DirectDataRegister) {
+              offsetVal = b;
+            } else {
+              computation.add(move.w(b, offsetVal));
+            }
+            computation.add(op(offset.abs().toWord.i, offsetVal));
+          } else {
+            offsetVal = b;
+          }
+
+          return Asm([computation, asm(offsetVal)]);
+        });
   }
 }
