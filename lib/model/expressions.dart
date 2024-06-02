@@ -14,6 +14,8 @@ sealed class PositionExpression extends ModelExpression {
 }
 
 extension PositionExpressions on PositionExpression {
+  DirectionOfVector awayFrom(PositionExpression other) =>
+      DirectionOfVector(from: other, to: this);
   DirectionOfVector towards(PositionExpression other) =>
       DirectionOfVector(from: this, to: other);
 }
