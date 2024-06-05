@@ -145,7 +145,13 @@ extension IfValueAsm on IfValue {
         return b.withValue(memory: memory, asm: compareTo);
       // PositionEquals p => p.withValue(memory: memory, asm: compareTo),
       case PositionExpression p:
-        return p.withPosition(memory: memory, asm: compareTo);
+        return p.withPosition(
+            memory: memory,
+            load: a5,
+            load2: a6,
+            loadX: d2,
+            loadY: d3,
+            asm: compareTo);
       case DirectionExpression d:
         throw 'todo';
     }

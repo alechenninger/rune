@@ -1048,6 +1048,7 @@ extension PositionOfObjectAsm on PositionOfObject {
     }
 
     load = memory.addressRegisterFor(obj) ?? load;
+    
     // Evaluate at runtime
     return Asm([
       obj.toA(load, memory),

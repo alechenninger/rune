@@ -1516,6 +1516,135 @@ EventFlag_Test001 = $0001'''));
             label(Label('.1_continue')),
           ]));
     });
+
+    test('object is greater or less than absolute position', () {
+      var scene = Scene([
+        IfValue(
+          rune.position(),
+          comparedTo: Position(0x100, 0x200),
+          greater: [Face(up).move(rune)],
+          less: [Face(down).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            cmpi.w(0x100.toWord.i, curr_x_pos(a4)),
+            bhi(Label('.1_gt')),
+            bcs(Label('.1_lt')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            beq(Label('.1_continue')),
+            bhi(Label('.1_gt')),
+
+            // lt branch
+            label(Label('.1_lt')),
+            updateObjFacing(down.address),
+            bra(Label('.1_continue')),
+
+            // gt branch
+            label(Label('.1_gt')),
+            updateObjFacing(up.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('object is greater, less, or equal to absolute position', () {
+      var scene = Scene([
+        IfValue(
+          rune.position(),
+          comparedTo: Position(0x100, 0x200),
+          greater: [Face(up).move(rune)],
+          equal: [Face(right).move(rune)],
+          less: [Face(down).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            cmpi.w(0x100.toWord.i, curr_x_pos(a4)),
+            bhi(Label('.1_gt')),
+            bcs(Label('.1_lt')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            beq(Label('.1_eq')),
+            bhi(Label('.1_gt')),
+
+            // lt branch
+            label(Label('.1_lt')),
+            updateObjFacing(down.address),
+            bra(Label('.1_continue')),
+
+            // eq branch
+            label(Label('.1_eq')),
+            updateObjFacing(right.address),
+            bra(Label('.1_continue')),
+
+            // gt branch
+            label(Label('.1_gt')),
+            updateObjFacing(up.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('object position compared to other object position', () {
+      var scene = Scene([
+        IfValue(
+          rune.position(),
+          comparedTo: alys.position(),
+          greater: [Face(up).move(rune)],
+          equal: [Face(right).move(rune)],
+          less: [Face(down).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            alys.toA(a5, Memory()),
+            characterByIdToA4(rune.charIdAddress),
+            move.w(curr_x_pos(a4), d0),
+            cmp.w(curr_x_pos(a5), d0),
+            bhi(Label('.1_gt')),
+            bcs(Label('.1_lt')),
+            move.w(curr_y_pos(a4), d0),
+            cmp.w(curr_y_pos(a5), d0),
+            beq(Label('.1_eq')),
+            bhi(Label('.1_gt')),
+
+            // lt branch
+            label(Label('.1_lt')),
+            updateObjFacing(down.address),
+            bra(Label('.1_continue')),
+
+            // eq branch
+            label(Label('.1_eq')),
+            updateObjFacing(right.address),
+            bra(Label('.1_continue')),
+
+            // gt branch
+            label(Label('.1_gt')),
+            updateObjFacing(up.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
   });
 
   group('hide panels', () {
