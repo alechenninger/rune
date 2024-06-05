@@ -2,13 +2,30 @@ import 'package:quiver/check.dart';
 
 import 'model.dart';
 
-sealed class ModelExpression {}
+sealed class ModelExpression {
+  int get arity;
 
-sealed class PositionComponentExpression extends ModelExpression {
+  const ModelExpression();
+}
+
+sealed class UnaryExpression extends ModelExpression {
+  @override
+  final arity = 1;
+}
+
+sealed class BinaryExpression extends ModelExpression {
+  @override
+  final arity = 2;
+
+  const BinaryExpression();
+}
+
+sealed class PositionComponentExpression extends UnaryExpression {
   int? known(EventState state);
 }
 
-sealed class PositionExpression extends ModelExpression {
+sealed class PositionExpression extends BinaryExpression {
+  const PositionExpression();
   Position? known(EventState state);
   PositionComponentExpression component(Axis axis);
 }
@@ -108,7 +125,7 @@ class PositionOfXY extends PositionExpression {
   int get hashCode => x.hashCode ^ y.hashCode;
 }
 
-class OffsetPosition implements PositionExpression {
+class OffsetPosition extends PositionExpression {
   final PositionExpression base;
   final Position offset;
 
@@ -152,7 +169,7 @@ class OffsetPosition implements PositionExpression {
 const unitsPerStep = 16;
 
 /// A fork of [Point] for our domain model.
-class Position implements PositionExpression {
+class Position extends PositionExpression {
   final int x;
   final int y;
 
@@ -292,7 +309,7 @@ class PositionComponent extends PositionComponentExpression {
   int get hashCode => axis.hashCode ^ value.hashCode;
 }
 
-sealed class DirectionExpression extends ModelExpression {
+sealed class DirectionExpression extends UnaryExpression {
   DirectionExpression get opposite;
 }
 
@@ -332,6 +349,9 @@ enum Direction implements DirectionExpression {
   right(Position(1, 0)),
   down(Position(0, 1));
 
+  @override
+  final arity = 1;
+
   final Position normal;
   const Direction(this.normal);
 
@@ -364,7 +384,7 @@ enum Direction implements DirectionExpression {
   Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
 }
 
-sealed class SlotExpression extends ModelExpression {}
+sealed class SlotExpression extends UnaryExpression {}
 
 class NotInParty extends SlotExpression {
   NotInParty();
@@ -428,7 +448,7 @@ class SlotOfCharacter extends SlotExpression {
   int get hashCode => character.hashCode;
 }
 
-sealed class BooleanExpression extends ModelExpression {
+sealed class BooleanExpression extends UnaryExpression {
   bool? known(EventState state);
 }
 
@@ -460,6 +480,24 @@ class IsOffScreen extends BooleanExpression {
   @override
   int get hashCode => object.hashCode;
 }
+
+// class PositionEquals extends BooleanExpression {
+//   final PositionExpression left;
+//   final PositionExpression right;
+
+//   PositionEquals(this.left, this.right);
+
+//   @override
+//   bool? known(EventState state) {
+//     // Same expresion; same regardless of state
+//     if (left == right) return true;
+//     return switch ((left.known(state), right.known(state))) {
+//       // Known positions; might not be the same
+//       (var l?, var r?) => l == r,
+//       _ => null,
+//     };
+//   }
+// }
 
 class BooleanConstant extends BooleanExpression {
   final bool value;

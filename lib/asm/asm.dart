@@ -175,6 +175,10 @@ class BranchMnemonic {
   final String _branch;
   const BranchMnemonic(this._branch);
 
+  /// Branch, allowing the assembler to determine the size.
+  Asm call(Address to, {String? comment}) =>
+      cmd(_branch, [to], comment: comment);
+
   Asm s(Address to, {String? comment}) =>
       cmd('$_branch.s', [to], comment: comment);
   Asm w(Address to, {String? comment}) =>

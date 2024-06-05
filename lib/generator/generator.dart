@@ -1502,7 +1502,6 @@ class SceneAsmGenerator implements EventVisitor {
       // at code where expression is true, fork memory state,
       var parent = _memory;
       var startingMode = _gameMode;
-      var continued = false;
 
       // These branches are not added to state graph intentionally,
       // since we don't have ways to express these conditions in the graph
@@ -1529,49 +1528,52 @@ class SceneAsmGenerator implements EventVisitor {
         }
       }
 
-      asm.add(ifValue.compare(memory: _memory));
+      var branches = BranchLabels('.${i}_', ifValue);
 
-      Label branchTo(Branch b) {
-        var lbl = Label('.${i}_${b.condition.name}');
-        asm.add(b.condition.mnemonicUnsigned.w(lbl));
-        return lbl;
+      // Run comparisons, given branch labels
+      asm.add(ifValue.compare(memory: _memory, branches: branches));
+
+      // Add remaining branch instructions for final comparison
+      for (var (b, lbl) in branches.excludingFallThrough) {
+        asm.add(b.condition.mnemonicUnsigned(lbl));
       }
 
-      var continueLbl = Label('.${i}_continue');
+      // Now run branches, fall through first since it by definition
+      // doesn't rely on a branch instruction to "fall through"
 
-      var branches = ifValue.branches;
-      var emptyBranch = ifValue.emptyBranch;
-
-      if (emptyBranch != null) {
-        asm.add(emptyBranch.mnemonicUnsigned.w(continueLbl));
-        continued = true;
+      if (branches.labeledFallThrough case var lbl?) {
+        // Fall through may be labeled, however,
+        // in case there were multiple comparisons and
+        // one short-circuited to this.
+        asm.add(label(lbl));
       }
+      runBranch(branches.fallThrough.events);
 
-      var branched = branches
-          .sublist(0, branches.length - 1)
-          .map((b) => (b, branchTo(b)))
-          .toList();
+      for (var (b, lbl) in branches.excludingFallThrough) {
+        if (b.isEmpty) continue;
 
-      runBranch(branches.last.events);
-
-      for (var (b, lbl) in branched) {
         _gameMode = startingMode;
 
+        // If the prior branch didn't already return, we need to jump
+        // ahead to continue.
+        // This is not needed with the fallback branch,
+        // since there is no branch before it.
         // TODO(if value/run events): if we put value based states in condition
         //  graph, we could make this check less hacky
-        var isBranchFinished =
-            _gameMode is RunEventMode && asm.last == rts.single;
-        if (!isBranchFinished) {
-          asm.add(bra.w(continueLbl));
-          continued = true;
+        var lastBranchFinished =
+            _gameMode is RunEventMode && asm.lastOrNull == rts.single;
+        if (!lastBranchFinished) {
+          asm.add(bra(branches.labelContinue()));
         }
 
         asm.add(label(lbl));
         runBranch(b.events);
       }
 
-      if (continued) {
-        asm.add(label(continueLbl));
+      // If this the end (e.g. of a run event),
+      // then the continue label may not be needed.
+      if (branches.continued case var lbl?) {
+        asm.add(label(lbl));
       } else {
         _setCurrentStateFinished();
       }
@@ -2469,7 +2471,6 @@ class SceneAsmGenerator implements EventVisitor {
     var needToHidePanels =
         _memory.onExitRunBattle == false && (_memory.panelsShown ?? 0) > 0;
 
-    // switch ((_isProcessingInteraction, _eventType)) {
     switch (_gameMode) {
       case EventMode(priorMode: InteractionMode(), type: EventType.cutscene):
         if (needToShowField) {

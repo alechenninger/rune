@@ -624,6 +624,7 @@ final class IfValue<T extends ModelExpression> extends Event {
 
   final _branches = <Branch>[];
 
+  /// True if this is a simple equals or not comparison.
   late final bool boolean;
 
   /// Branch with no events, if there is one.
@@ -674,7 +675,7 @@ final class IfValue<T extends ModelExpression> extends Event {
     this.boolean = boolean;
   }
 
-  /// Branches which have any events.
+  /// Branches which have any events, "canonical" branches last.
   List<Branch> get branches => List.unmodifiable(_branches);
 
   @override
@@ -721,6 +722,9 @@ enum BranchCondition {
 
   static const canonical = {gt, eq, lt};
 
+  bool get isEqual => parts.contains(eq);
+  bool get isNotEqual => !isEqual;
+
   BranchCondition or(BranchCondition other) {
     var parts = {...this.parts, ...other.parts};
 
@@ -757,6 +761,9 @@ class Branch {
   final List<Event> events;
 
   Branch(this.condition, this.events);
+  Branch.empty(this.condition) : events = const [];
+
+  bool get isEmpty => events.isEmpty;
 
   @override
   bool operator ==(Object other) =>

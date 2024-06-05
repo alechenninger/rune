@@ -845,16 +845,16 @@ EventFlag_Test001 = $0001'''));
           Asm([
             characterByIdToA4(rune.charIdAddress),
             cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
-            beq.w(Label('.1_eq')),
-            bhi.w(Label('.1_gt')),
+            beq(Label('.1_eq')),
+            bhi(Label('.1_gt')),
             // lt branch
             updateObjFacing(right.address),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             // eq branch
             label(Label('.1_eq')),
             updateObjFacing(up.address),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             // gt branch
             label(Label('.1_gt')),
@@ -881,11 +881,11 @@ EventFlag_Test001 = $0001'''));
           Asm([
             characterByIdToA4(rune.charIdAddress),
             cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
-            bcc.w(Label('.1_gte')),
+            bcc(Label('.1_gte')),
 
             // lt branch
             updateObjFacing(right.address),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             // gte branch
             label(Label('.1_gte')),
@@ -913,7 +913,7 @@ EventFlag_Test001 = $0001'''));
           Asm([
             characterByIdToA4(rune.charIdAddress),
             cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
-            bcs.w(Label('.1_continue')),
+            bcs(Label('.1_continue')),
             // gte branch
             updateObjFacing(down.address),
             // continue
@@ -937,10 +937,10 @@ EventFlag_Test001 = $0001'''));
           Asm([
             characterByIdToA4(rune.charIdAddress),
             cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
-            bhi.w(Label('.1_gt')),
+            bhi(Label('.1_gt')),
             // lte branch
             updateObjFacing(right.address),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             // gt branch
             label(Label('.1_gt')),
@@ -967,11 +967,11 @@ EventFlag_Test001 = $0001'''));
           Asm([
             characterByIdToA4(rune.charIdAddress),
             cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
-            beq.w(Label('.1_continue')),
-            bhi.w(Label('.1_gt')),
+            beq(Label('.1_continue')),
+            bhi(Label('.1_gt')),
             // lt branch
             updateObjFacing(right.address),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             // gt branch
             label(Label('.1_gt')),
@@ -997,7 +997,7 @@ EventFlag_Test001 = $0001'''));
           Asm([
             characterByIdToA4(rune.charIdAddress),
             cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
-            bls.w(Label('.1_continue')),
+            bls(Label('.1_continue')),
 
             // gt branch
             updateObjFacing(down.address),
@@ -1023,7 +1023,7 @@ EventFlag_Test001 = $0001'''));
             characterByIdToA4(rune.charIdAddress),
             move.w(0x200.toWord.i, d0),
             cmp.w(curr_y_pos(a4), d0),
-            bls.w(Label('.1_continue')),
+            bls(Label('.1_continue')),
 
             // gt branch
             updateObjFacing(down.address),
@@ -1051,7 +1051,7 @@ EventFlag_Test001 = $0001'''));
             characterByIdToA4(alys.charIdAddress),
             move.w(curr_y_pos(a4), d0),
             cmp.w(curr_y_pos(a3), d0),
-            bls.w(Label('.1_continue')),
+            bls(Label('.1_continue')),
 
             // gt branch
             characterByIdToA4(rune.charIdAddress),
@@ -1079,12 +1079,12 @@ EventFlag_Test001 = $0001'''));
             characterByIdToA4(rune.charIdAddress),
             move.w(0x200.toWord.i, d0),
             cmp.w(curr_y_pos(a4), d0),
-            beq.w(Label('.1_continue')),
-            bhi.w(Label('.1_gt')),
+            beq(Label('.1_continue')),
+            bhi(Label('.1_gt')),
 
             // lt branch
             getAndRunDialog3LowDialogId(Byte.zero.i),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             label(Label('.1_gt')),
             // gt branch
@@ -1301,18 +1301,18 @@ EventFlag_Test001 = $0001'''));
             moveq(rune.charIdAddress, d0),
             jsr(FindCharacterSlot.l),
             cmpi.b(0.i, d1),
-            beq.w(Label('.1_eq')),
-            bhi.w(Label('.1_gt')),
+            beq(Label('.1_eq')),
+            bhi(Label('.1_gt')),
             // lt branch
             characterByIdToA4(rune.charIdAddress),
             updateObjFacing(right.address),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             // eq branch
             label(Label('.1_eq')),
             characterByIdToA4(rune.charIdAddress),
             updateObjFacing(up.address),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             // gt branch
             label(Label('.1_gt')),
@@ -1341,12 +1341,12 @@ EventFlag_Test001 = $0001'''));
             moveq(rune.charIdAddress, d0),
             jsr(FindCharacterSlot.l),
             cmpi.b(0xFF.i, d1),
-            beq.w(Label('.1_eq')),
+            beq(Label('.1_eq')),
             // not equal branch
             characterByIdToA4(rune.charIdAddress),
             updateObjFacing(down.address),
-            bra.w(Label('.1_continue')),
 
+            bra(Label('.1_continue')),
             // eq branch
             label(Label('.1_eq')),
             characterByIdToA4(rune.charIdAddress),
@@ -1357,7 +1357,7 @@ EventFlag_Test001 = $0001'''));
           ]));
     });
 
-    test('offscreen', () {
+    test('object is offscreen', () {
       var scene = Scene([
         IfValue(
           IsOffScreen(rune),
@@ -1375,13 +1375,141 @@ EventFlag_Test001 = $0001'''));
           Asm([
             characterByIdToA4(rune.charIdAddress),
             cmpi.b(1.i, offscreen_flag(a4)),
-            beq.w(Label('.1_eq')),
+            beq(Label('.1_eq')),
             // not equal branch
             updateObjFacing(down.address),
-            bra.w(Label('.1_continue')),
+            bra(Label('.1_continue')),
 
             // eq branch
             label(Label('.1_eq')),
+            updateObjFacing(up.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('object is at absolute position', () {
+      var scene = Scene([
+        IfValue(
+          rune.position(),
+          comparedTo: Position(0x100, 0x200),
+          equal: [Face(up).move(rune)],
+          notEqual: [Face(down).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            cmpi.w(0x100.toWord.i, curr_x_pos(a4)),
+            bne(Label('.1_neq')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            bne(Label('.1_neq')),
+
+            // Equal branch
+            updateObjFacing(up.address),
+            bra(Label('.1_continue')),
+
+            label(Label('.1_neq')),
+            updateObjFacing(down.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('object position is greater than absolute position', () {
+      var scene = Scene([
+        IfValue(
+          rune.position(),
+          comparedTo: Position(0x100, 0x200),
+          greater: [Face(up).move(rune)],
+          lessOrEqual: [Face(down).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            cmpi.w(0x100.toWord.i, curr_x_pos(a4)),
+            bhi(Label('.1_gt')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            bhi(Label('.1_gt')),
+
+            // Lte branch
+            updateObjFacing(down.address),
+            bra(Label('.1_continue')),
+
+            label(Label('.1_gt')),
+            updateObjFacing(up.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('object is at absolute position with empty branch uses continue', () {
+      var scene = Scene([
+        IfValue(
+          rune.position(),
+          comparedTo: Position(0x100, 0x200),
+          equal: [Face(up).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            cmpi.w(0x100.toWord.i, curr_x_pos(a4)),
+            bne(Label('.1_continue')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            bne(Label('.1_continue')),
+
+            // Equal branch
+            updateObjFacing(up.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('object is not at absolute position with empty branch uses continue',
+        () {
+      var scene = Scene([
+        IfValue(
+          rune.position(),
+          comparedTo: Position(0x100, 0x200),
+          notEqual: [Face(up).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            cmpi.w(0x100.toWord.i, curr_x_pos(a4)),
+            bne(Label('.1_neq')),
+            cmpi.w(0x200.toWord.i, curr_y_pos(a4)),
+            beq(Label('.1_continue')),
+
+            // Not equal branch
+            label(Label('.1_neq')),
             updateObjFacing(up.address),
 
             // continue
