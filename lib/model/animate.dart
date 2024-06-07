@@ -221,23 +221,27 @@ class JumpObject extends Event {
   /// jump (going up). But going down, the amount is `height + yMovement`.
   final int yMovement;
   final int height;
+  final bool animate;
 
   JumpObject(FieldObject object,
       {required Duration duration,
       required int height,
       int xMovement = 0,
-      int yMovement = 0})
+      int yMovement = 0,
+      bool animate = false})
       : this.all([object],
             duration: duration,
             height: height,
             xMovement: xMovement,
-            yMovement: yMovement);
+            yMovement: yMovement,
+            animate: animate);
 
   JumpObject.all(this.objects,
       {required this.duration,
       required this.height,
       this.xMovement = 0,
-      this.yMovement = 0}) {
+      this.yMovement = 0,
+      this.animate = false}) {
     checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
     checkArgument(duration > Duration.zero,
         message: 'Duration must be greater than 0.');
@@ -256,9 +260,9 @@ class JumpObject extends Event {
     var up = Point<double>(xPerFrame, -height / framesUp);
     return [
       StepObjects(objects,
-          stepPerFrame: up, frames: framesUp, onTop: true, animate: false),
+          stepPerFrame: up, frames: framesUp, onTop: true, animate: animate),
       StepObjects(objects,
-          stepPerFrame: down, frames: framesDown, onTop: true, animate: false)
+          stepPerFrame: down, frames: framesDown, onTop: true, animate: animate)
     ];
   }
 
@@ -274,7 +278,9 @@ class JumpObject extends Event {
     return 'JumpObject(objects: $objects, '
         'duration: $duration, '
         'height: $height, '
-        'xMovement: $xMovement)';
+        'xMovement: $xMovement, '
+        'yMovement: $yMovement, '
+        'animate: $animate)';
   }
 
   @override
@@ -284,7 +290,9 @@ class JumpObject extends Event {
         const ListEquality<FieldObject>().equals(other.objects, objects) &&
         other.duration == duration &&
         other.xMovement == xMovement &&
-        other.height == height;
+        other.height == height &&
+        other.yMovement == yMovement &&
+        other.animate == animate;
   }
 
   @override
@@ -292,7 +300,9 @@ class JumpObject extends Event {
       const ListEquality<FieldObject>().hash(objects) ^
       duration.hashCode ^
       height.hashCode ^
-      xMovement.hashCode;
+      xMovement.hashCode ^
+      yMovement.hashCode ^
+      animate.hashCode;
 }
 
 extension TruncatePoint on Point<double> {
