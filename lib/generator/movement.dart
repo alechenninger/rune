@@ -860,7 +860,13 @@ extension DirectionExpressionAsm on DirectionExpression {
         ),
       ObjectFaceDirection d =>
         d.withDirection(memory: memory, asm: asm, load: load1),
-      OffsetDirection() => throw UnimplementedError(),
+      OffsetDirection d => d.withDirection(
+          memory: memory,
+          asm: asm,
+          destination: destination,
+          load1: load1,
+          load2: load2,
+          labelSuffix: labelSuffix),
     };
   }
 }
