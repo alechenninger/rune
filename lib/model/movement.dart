@@ -469,6 +469,7 @@ abstract class FieldObject extends Moveable {
 
 extension ObjectExpressions on FieldObject {
   PositionOfObject position() => PositionOfObject(this);
+  ObjectFaceDirection facing() => ObjectFaceDirection(this);
   DirectionOfVector towards(FieldObject other) =>
       DirectionOfVector(from: position(), to: other.position());
 }

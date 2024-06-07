@@ -314,6 +314,7 @@ class PositionComponent extends PositionComponentExpression {
 sealed class DirectionExpression extends UnaryExpression {
   Direction? known(EventState memory);
   DirectionExpression get opposite;
+  OffsetDirection turn(int times) => OffsetDirection(this, turns: times);
 }
 
 class DirectionOfVector extends DirectionExpression {
@@ -429,6 +430,22 @@ class OffsetDirection extends DirectionExpression {
       _ => null,
     };
   }
+
+  @override
+  String toString() {
+    return 'OffsetDirection{base: $base, turns: $turns}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OffsetDirection &&
+          runtimeType == other.runtimeType &&
+          base == other.base &&
+          turns == other.turns;
+
+  @override
+  int get hashCode => base.hashCode ^ turns.hashCode;
 }
 
 const up = Direction.up;
