@@ -314,7 +314,7 @@ class PositionComponent extends PositionComponentExpression {
 sealed class DirectionExpression extends UnaryExpression {
   Direction? known(EventState memory);
   DirectionExpression get opposite;
-  OffsetDirection turn(int times) => OffsetDirection(this, turns: times);
+  DirectionExpression turn(int times) => OffsetDirection(this, turns: times);
 }
 
 class DirectionOfVector extends DirectionExpression {
