@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:quiver/check.dart';
 
 import 'model.dart';
@@ -310,6 +312,7 @@ class PositionComponent extends PositionComponentExpression {
 }
 
 sealed class DirectionExpression extends UnaryExpression {
+  Direction? known(EventState memory);
   DirectionExpression get opposite;
 }
 
@@ -318,6 +321,36 @@ class DirectionOfVector extends DirectionExpression {
   final PositionExpression to;
 
   DirectionOfVector({required this.from, required this.to});
+
+  @Deprecated("It's wrong if the player or object has moved")
+  bool get playerIsFacingFrom =>
+      from == const InteractionObject().position() &&
+      to == BySlot.one.position();
+
+  @override
+  Direction? known(EventState memory) {
+    var knownFrom = from.known(memory);
+    var knownTo = to.known(memory);
+    if (knownFrom == null || knownTo == null) {
+      // If we know the player is facing this object,
+      // try using the opposite direction of the player facing.
+      if (playerIsFacingFrom) {
+        var dir = memory.getFacing(BySlot.one)?.opposite;
+        if (dir is Direction) return dir;
+      }
+
+      return null;
+    }
+    var vector = knownTo - knownFrom;
+    if (vector.x == 0 && vector.y == 0) return Direction.up;
+    var angle = atan2(vector.y, vector.x) * 180 / pi;
+    return switch (angle) {
+      >= -45 && < 45 => Direction.right,
+      >= 45 && < 135 => Direction.down,
+      >= -135 && < -45 => Direction.up,
+      _ => Direction.left
+    };
+  }
 
   @override
   DirectionExpression get opposite => DirectionOfVector(from: to, to: from);
@@ -338,16 +371,77 @@ class DirectionOfVector extends DirectionExpression {
   int get hashCode => from.hashCode ^ to.hashCode;
 }
 
+class ObjectFaceDirection extends DirectionExpression {
+  final FieldObject obj;
+
+  ObjectFaceDirection(this.obj);
+
+  @override
+  DirectionExpression get opposite => OffsetDirection(this, turns: 2);
+
+  @override
+  Direction? known(EventState memory) {
+    return switch (memory.getFacing(obj)) {
+      Direction d => d,
+      DirectionExpression d when d != this => d.known(memory),
+      _ => null,
+    };
+  }
+
+  @override
+  String toString() {
+    return 'ObjectFaceDirection{obj: $obj}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ObjectFaceDirection &&
+          runtimeType == other.runtimeType &&
+          obj == other.obj;
+
+  @override
+  int get hashCode => obj.hashCode;
+}
+
+class OffsetDirection extends DirectionExpression {
+  final DirectionExpression base;
+
+  /// Number of turns 90 degrees to the right.
+  final int turns;
+
+  factory OffsetDirection(DirectionExpression base, {required int turns}) {
+    return base is OffsetDirection
+        ? OffsetDirection._(base.base, turns: base.turns + turns)
+        : OffsetDirection._(base, turns: turns);
+  }
+  OffsetDirection._(this.base, {required int turns})
+      : turns = turns.isNegative ? (turns + 4) % 4 : turns % 4;
+
+  @override
+  DirectionExpression get opposite =>
+      OffsetDirection(base.opposite, turns: turns);
+
+  @override
+  Direction? known(EventState memory) {
+    return switch (base.known(memory)) {
+      Direction d => d.turn(turns),
+      _ => null,
+    };
+  }
+}
+
 const up = Direction.up;
 const down = Direction.down;
 const left = Direction.left;
 const right = Direction.right;
 
 enum Direction implements DirectionExpression {
+  // NOTE: maintain this order (consecutive right turns)
   up(Position(0, -1)),
-  left(Position(-1, 0)),
   right(Position(1, 0)),
-  down(Position(0, 1));
+  down(Position(0, 1)),
+  left(Position(-1, 0));
 
   @override
   final arity = 1;
@@ -370,6 +464,14 @@ enum Direction implements DirectionExpression {
     }
     return up;
   }
+
+  Direction turn(int times) {
+    var normalized = times.isNegative ? (times + 4) % 4 : times % 4;
+    return Direction.values[(index + normalized) % 4];
+  }
+
+  @override
+  Direction? known(EventState memory) => this;
 
   @override
   Direction get opposite => switch (this) {

@@ -841,11 +841,6 @@ PartyArrangement? asmToArrangement(Byte b) {
 }
 
 extension DirectionExpressionAsm on DirectionExpression {
-  Direction? known(Memory memory) => switch (this) {
-        Direction d => d,
-        DirectionOfVector d => d.known(memory),
-      };
-
   Asm withDirection(
       {required Memory memory,
       required Asm Function(Address) asm,
@@ -863,46 +858,14 @@ extension DirectionExpressionAsm on DirectionExpression {
           load1: load1,
           load2: load2,
         ),
-    };
-  }
-
-  Asm load(Address to, Memory memory) {
-    return switch (this) {
-      Direction d => move.b(d.constant.i, to),
-      DirectionOfVector d => d.load(to, memory),
+      ObjectFaceDirection d =>
+        d.withDirection(memory: memory, asm: asm, load: load1),
+      OffsetDirection() => throw UnimplementedError(),
     };
   }
 }
 
 extension DirectionOfVectorAsm on DirectionOfVector {
-  bool get playerIsFacingFrom =>
-      from == const InteractionObject().position() &&
-      to == BySlot.one.position();
-
-  Direction? known(Memory mem) {
-    var knownFrom = from.known(mem);
-    var knownTo = to.known(mem);
-    if (knownFrom == null || knownTo == null) {
-      // If we know the player is facing this object,
-      // try using the opposite direction of the player facing.
-      if (playerIsFacingFrom) {
-        var dir = mem.getFacing(BySlot.one)?.opposite;
-        if (dir is Direction) return dir;
-      }
-
-      return null;
-    }
-    var vector = knownTo - knownFrom;
-    if (vector.x == 0 && vector.y == 0) return Direction.up;
-    var angle = math.atan2(vector.y, vector.x) * 180 / math.pi;
-    return switch (angle) {
-      >= -45 && < 45 => Direction.right,
-      >= 45 && < 135 => Direction.down,
-      >= -135 && < -45 => Direction.up,
-      _ => Direction.left
-    };
-  }
-
   Asm withDirection(
       {required Memory memory,
       required Asm Function(Address) asm,
@@ -966,6 +929,66 @@ extension DirectionOfVectorAsm on DirectionOfVector {
       memory: memory,
       asm: (d) => d == addr ? Asm.empty() : move.b(d, addr),
       destination: addr);
+}
+
+extension ObjectFaceDirectionAsm on ObjectFaceDirection {
+  Asm withDirection(
+          {required Memory memory,
+          required Asm Function(Address) asm,
+          DirectAddressRegister load = a4}) =>
+      Asm([
+        obj.toA(load, memory),
+        asm(facing_dir(load)),
+      ]);
+}
+
+extension OffsetDirectionAsm on OffsetDirection {
+  Asm withDirection(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      Address destination = d0,
+      DirectAddressRegister load1 = a4,
+      DirectAddressRegister load2 = a3,
+      String? labelSuffix}) {
+    return Asm([
+      base.withDirection(
+        memory: memory,
+        destination: destination,
+        load1: load1,
+        load2: load2,
+        labelSuffix: labelSuffix,
+        asm: turns == 0
+            ? asm
+            : (d) {
+                var skip = Label('.skip${labelSuffix ?? ''}');
+                return Asm([
+                  ...(switch (turns) {
+                    1 => [
+                        move.w(d, destination),
+                        bchg(3.i, destination),
+                        bne(skip),
+                        bchg(2.i, destination),
+                        label(skip),
+                      ],
+                    2 => [
+                        move.w(d, destination),
+                        bchg(2.i, destination),
+                      ],
+                    3 => [
+                        move.w(d, destination),
+                        bchg(3.i, destination),
+                        beq(skip),
+                        bchg(2.i, destination),
+                        label(skip),
+                      ],
+                    _ => []
+                  }),
+                  asm(destination)
+                ]);
+              },
+      ),
+    ]);
+  }
 }
 
 // TODO(refactor): separate class hierarchy for asm?
@@ -1048,7 +1071,7 @@ extension PositionOfObjectAsm on PositionOfObject {
     }
 
     load = memory.addressRegisterFor(obj) ?? load;
-    
+
     // Evaluate at runtime
     return Asm([
       obj.toA(load, memory),
