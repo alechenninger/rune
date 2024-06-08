@@ -1076,6 +1076,8 @@ extension ToValue on int {
 }
 
 extension ToExpression on String {
+  Absolute get w => Absolute.word(LabelOrConstant(this));
+  Absolute get l => Absolute.long(LabelOrConstant(this));
   Constant get toConstant => Constant(this);
   Label get toLabel => Label(this);
 }
