@@ -269,7 +269,9 @@ main() {
         ]));
   });
 
-  test('after fading out, fade in field needs to refreshmap', () {
+  test(
+      'if no panels, fade in field only needs to reload map palette (not refreshmap)',
+      () {
     var scene = Scene([FadeOut(), FadeInField()]);
 
     var program = Program();
@@ -278,10 +280,11 @@ main() {
     expect(
         asm.event.withoutComments().withoutEmptyLines(),
         Asm([
-          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
-          bset(3.i, (Map_Load_Flags).w),
-          jsr(Label('RefreshMap').l),
-          jsr(Label('Pal_FadeIn').l),
+          jsr('PalFadeOut_ClrSpriteTbl'.l),
+          // This avoids moving the camera.
+          movea.l('Map_Palettes_Addr'.w, a0),
+          jsr('LoadMapPalette'.l),
+          jsr('Pal_FadeIn'.l),
         ]));
   });
 
@@ -786,10 +789,33 @@ EventFlag_Test001 = $0001'''));
           ]));
     });
 
-    test('if locked, unlocks then relocks', () {
+    test('if locked, unlocks then relocks before next event', () {
       var scene = Scene([
         LockCamera(),
         MoveCamera(Position(0x1b0, 0x2a0)),
+        Pause(1.second),
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      var expected = Asm([
+        lockCamera(true),
+        lockCamera(false),
+        move.w(0x1b0.toWord.i, d0),
+        move.w(0x2a0.toWord.i, d1),
+        move.w(1.i, d2),
+        jsr(Label('Event_MoveCamera').l),
+        lockCamera(true),
+        generateEventAsm([Pause(1.second)]),
+      ]);
+      expect(asm.event.withoutComments().head(expected.length), expected);
+    });
+
+    test('if locked, unlocks on scene end', () {
+      var scene = Scene([
+        LockCamera(),
+        Pause(1.second),
       ]);
 
       var asm =
@@ -799,12 +825,8 @@ EventFlag_Test001 = $0001'''));
           asm.event.withoutComments(),
           Asm([
             lockCamera(true),
+            generateEventAsm([Pause(1.second)]),
             lockCamera(false),
-            move.w(0x1b0.toWord.i, d0),
-            move.w(0x2a0.toWord.i, d1),
-            move.w(1.i, d2),
-            jsr(Label('Event_MoveCamera').l),
-            lockCamera(true),
           ]));
     });
 

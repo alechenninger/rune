@@ -1152,14 +1152,22 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void lockCamera(LockCamera lock) {
-    _addToEvent(lock,
-        (i) => EventAsm.of(events_asm.lockCamera(_memory.cameraLock = true)));
+    _addToEvent(lock, (i) {
+      if (_memory.cameraLock == true) {
+        return EventAsm.empty();
+      }
+      return EventAsm.of(events_asm.lockCamera(_memory.cameraLock = true));
+    });
   }
 
   @override
   void unlockCamera(UnlockCamera unlock) {
-    _addToEvent(unlock,
-        (i) => EventAsm.of(events_asm.lockCamera(_memory.cameraLock = false)));
+    _addToEvent(unlock, (i) {
+      if (_memory.cameraLock == false) {
+        return EventAsm.empty();
+      }
+      return EventAsm.of(events_asm.lockCamera(_memory.cameraLock = false));
+    });
   }
 
   @override
@@ -1727,9 +1735,17 @@ class SceneAsmGenerator implements EventVisitor {
 
     _addToEvent(fadeIn, (eventIndex) {
       var wasFieldShown = _memory.isFieldShown;
-      var needsRefresh = _memory.isMapInCram != true ||
-          _memory.isMapInVram != true ||
-          _memory.isDialogInCram != true;
+      // TODO(optimization): if reload palette only needed,
+      // might be able to do:
+      // lea	(Palette_Table_Buffer_2).w, a0
+      // lea	(Palette_Table_Buffer).w, a1
+      // move.w	#$3F, d7
+      // trap	#1
+      // Though this assumes buffer 2 is what we want.
+      // Could we use LoadMapPalette and MapPaletteAddr?
+      var reloadPalette =
+          _memory.isMapInCram != true || _memory.isDialogInCram != true;
+      var needsRefresh = _memory.isMapInVram != true;
       var panelsShown = _memory.panelsShown;
 
       _memory.isDisplayEnabled = true;
@@ -1738,6 +1754,7 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.isMapInCram = true;
       _memory.isDialogInCram = true;
       _memory.panelsShown = 0;
+      _memory.unknownAddressRegisters();
 
       return Asm([
         if (wasFieldShown == false && (panelsShown ?? 0) > 0) ...[
@@ -1753,7 +1770,12 @@ class SceneAsmGenerator implements EventVisitor {
         // I guess we assume map was the same as before
         // so no need to reload secondary objects
         // LoadMap events take care of that
-        if (needsRefresh) refreshMap(refreshObjects: false),
+        if (needsRefresh)
+          refreshMap(refreshObjects: false)
+        else if (reloadPalette) ...[
+          movea.l('Map_Palettes_Addr'.w, a0),
+          jsr('LoadMapPalette'.l)
+        ],
         if (fadeIn.instantly)
           jsr(Label('VDP_EnableDisplay').l)
         else
@@ -2491,6 +2513,10 @@ class SceneAsmGenerator implements EventVisitor {
 
         _terminateDialog();
 
+        if (_memory.cameraLock == true) {
+          unlockCamera(UnlockCamera());
+        }
+
         // clears z bit so we don't reload the map from cutscene
         _eventAsm.add(comment('Finish'));
         _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
@@ -2507,6 +2533,10 @@ class SceneAsmGenerator implements EventVisitor {
           hideAllPanels(HideAllPanels());
         }
 
+        if (_memory.cameraLock == true) {
+          unlockCamera(UnlockCamera());
+        }
+
         _eventAsm.add(comment('Finish'));
         _eventAsm.add(returnFromInteractionEvent());
 
@@ -2520,6 +2550,10 @@ class SceneAsmGenerator implements EventVisitor {
         } else if (needToHidePanels) {
           // unfortunately this will produce unwanted interrupt
           hideAllPanels(HideAllPanels());
+        }
+
+        if (_memory.cameraLock == true) {
+          unlockCamera(UnlockCamera());
         }
 
         if (type == EventType.cutscene) {
