@@ -26,11 +26,8 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 8,
       vramAnimated: true,
       SpecFactory((_) => AlysWaiting(), forSpec: AlysWaiting)),
-  FieldRoutine.asm(
-      Word(0xF0),
-      Label('FieldObj_NPCGryz'),
-      spriteMappingTiles: 8,
-      vramAnimated: true),
+  FieldRoutine.asm(Word(0xF0), Label('FieldObj_NPCGryz'),
+      spriteMappingTiles: 8, vramAnimated: true),
   FieldRoutine(
       Word(0x138),
       Label('loc_490B8'),
@@ -57,93 +54,56 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 0,
       SpecFactory((_) => InvisibleBlock(), forSpec: InvisibleBlock)),
   FieldRoutine(Word(0x38), Label('FieldObj_NPCType1'),
-      SpecFactory.npc((s, _) => Npc(s, FaceDown()), forBehavior: FaceDown)),
+      SpecFactory.npc((s, _) => Npc(s, FaceDown()))),
   FieldRoutine(
       Word(0x134),
       Label('FieldObj_Pana'),
       spriteMappingTiles: 18,
-      SpecFactory.npc((s, _) => Npc(s, FaceDownSimpleSprite()),
-          forBehavior: FaceDownSimpleSprite)),
-  FieldRoutine(
-      Word(0x3C),
-      Label('FieldObj_NPCType2'),
-      SpecFactory.npc((s, d) => Npc(s, WanderAround(d)),
-          forBehavior: WanderAround)),
-  FieldRoutine(
-      Word(0x40),
-      Label('FieldObj_NPCType3'),
-      SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)),
-          forBehavior: SlowlyWanderAround)),
+      SpecFactory.npc((s, _) => Npc(s, FaceDownSimpleSprite()))),
+  FieldRoutine(Word(0x3C), Label('FieldObj_NPCType2'),
+      SpecFactory.npc((s, d) => Npc(s, WanderAround(d)))),
+  FieldRoutine(Word(0x40), Label('FieldObj_NPCType3'),
+      SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)))),
   FieldRoutine(Word(0x58), Label('FieldObj_NPCType9'),
-      SpecFactory.npc((s, d) => Npc(s, FaceUp()), forBehavior: FaceUp)),
+      SpecFactory.npc((s, d) => Npc(s, FaceUp()))),
   FieldRoutine(
       Word(0x140),
       Label('loc_49502'),
       spriteMappingTiles: 8,
-      SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNonInteractive()),
-          forBehavior: FaceDownLegsHiddenNonInteractive)),
+      SpecFactory.npc((s, _) => Npc(s, FaceDownLegsHiddenNonInteractive()))),
   FieldRoutine(
       Word(0x108),
       Label('FieldObj_NPCType32'),
       spriteMappingTiles: 0x38,
-      SpecFactory.npc((s, _) => Npc(s, FaceDownOrUpLegsHidden()),
-          forBehavior: FaceDownOrUpLegsHidden)),
+      SpecFactory.npc((s, _) => Npc(s, FaceDownOrUpLegsHidden()))),
   FieldRoutine(
       Word(0x14C),
       Label('loc_49502'),
       spriteMappingTiles: 8,
-      SpecFactory.npc((s, _) => Npc(s, FixedFaceRight()),
-          forBehavior: FixedFaceRight)),
-  FieldRoutine.asm(
-      Word(0xF8),
-      Label('FieldObj_NPCType28'),
+      SpecFactory.npc((s, _) => Npc(s, FixedFaceRight()))),
+  FieldRoutine.asm(Word(0xF8), Label('FieldObj_NPCType28'),
       spriteMappingTiles: 6,
       ramArt: RamArt(address: Word(0)),
       vramAnimated: true),
-  FieldRoutine.asm(
-      Word(0x174),
-      Label('FieldObj_BigDuck'),
+  FieldRoutine.asm(Word(0x174), Label('FieldObj_BigDuck'),
       spriteMappingTiles: 0x20),
-  FieldRoutine.asm(
-      Word(0x178),
-      Label('FieldObj_SmallWhiteDuck'),
+  FieldRoutine.asm(Word(0x178), Label('FieldObj_SmallWhiteDuck'),
       spriteMappingTiles: 0x20),
-  FieldRoutine.asm(
-      Word(0x17c),
-      Label('FieldObj_SmallBrownDuck'),
+  FieldRoutine.asm(Word(0x17c), Label('FieldObj_SmallBrownDuck'),
       spriteMappingTiles: 0x20),
-  FieldRoutine.asm(
-      Word(0x144),
-      Label('loc_49192'),
-      spriteMappingTiles: 0x36),
-  FieldRoutine.asm(
-      Word(0x170),
-      Label('FieldObj_Butterfly'),
+  FieldRoutine.asm(Word(0x144), Label('loc_49192'), spriteMappingTiles: 0x36),
+  FieldRoutine.asm(Word(0x170), Label('FieldObj_Butterfly'),
       spriteMappingTiles: 2),
-  FieldRoutine.asm(
-      Word(0x2F4),
-      Label('FieldObj_StrayRocky'),
+  FieldRoutine.asm(Word(0x2F4), Label('FieldObj_StrayRocky'),
       // TODO(field routines): this can probably be less
       spriteMappingTiles: 0x40),
-  FieldRoutine.asm(
-      Word(0x1B0),
-      Label('FieldObj_DorinChair'),
+  FieldRoutine.asm(Word(0x1B0), Label('FieldObj_DorinChair'),
       spriteMappingTiles: 0x15),
-  FieldRoutine.asm(
-    Word(0x12C),
-    Label('loc_48F96'),
-    spriteMappingTiles: 24,
-  ),
-  FieldRoutine.asm(
-    Word(0x298),
-    Label('FieldObj_NPCAlysInBed'),
-    spriteMappingTiles: 7,
-  ),
-  FieldRoutine.asm(
-    Word(0xEC),
-    Label('FieldObj_NPCHahn'),
-    spriteMappingTiles: 8,
-  ),
+  FieldRoutine.asm(Word(0x12C), Label('loc_48F96'), spriteMappingTiles: 24),
+  FieldRoutine.asm(Word(0x298), Label('FieldObj_NPCAlysInBed'),
+      spriteMappingTiles: 7),
+  FieldRoutine.asm(Word(0xEC), Label('FieldObj_NPCHahn'),
+      spriteMappingTiles: 8),
 ]);
 
 class FieldRoutineRepository {
@@ -204,9 +164,8 @@ abstract class SpecFactory {
   MapObjectSpec call(Sprite? sprite, Direction facing);
 
   static SpecFactory npc<T extends NpcBehavior>(
-      Npc<T> Function(Sprite sprite, Direction facing) factory,
-      {required Type forBehavior}) {
-    return _NpcFactory(factory, forBehavior);
+      Npc<T> Function(Sprite sprite, Direction facing) factory) {
+    return _NpcFactory(factory, T);
   }
 
   factory SpecFactory(MapObjectSpec Function(Direction facing) factory,

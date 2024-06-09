@@ -1150,7 +1150,7 @@ class Npc<T extends NpcBehavior> extends MapObjectSpec
   @override
   Direction get startFacing => behavior.startFacing;
 
-  factory Npc(Sprite sprite, NpcBehavior behavior) {
+  factory Npc(Sprite sprite, T behavior) {
     if (behavior is InteractiveNpcBehavior) {
       return InteractiveNpc._(sprite, behavior);
     }
@@ -1183,8 +1183,8 @@ class InteractiveNpc<T extends NpcBehavior> extends Npc<T>
   @override
   set onInteract(Scene onInteract) => behavior.onInteract = onInteract;
 
-  InteractiveNpc._(Sprite sprite, InteractiveNpcBehavior behavior)
-      : super._(sprite, behavior);
+  InteractiveNpc._(super.sprite, InteractiveNpcBehavior super.behavior)
+      : super._();
 
   @override
   InteractiveNpc withNewInteraction() {
