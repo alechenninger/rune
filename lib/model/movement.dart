@@ -157,7 +157,7 @@ class FacePlayer extends Event {
 /// The party follows the leader
 class RelativePartyMove extends Event {
   RelativeMovement movement;
-  StepSpeed? speed;
+  StepSpeed speed = StepSpeed.fast;
   Axis startingAxis = Axis.x;
 
   RelativePartyMove(this.movement);
@@ -264,6 +264,7 @@ class IndividualMoves extends Event {
   // TODO: what if Slot and Character moveables refer to same Character?
   Map<FieldObject, RelativeMovement> moves = {};
   StepSpeed speed = StepSpeed.fast;
+  bool collideLead = false;
 
   Map<FieldObject, DirectionExpression>? justFacing() {
     var result = <FieldObject, DirectionExpression>{};

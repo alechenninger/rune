@@ -1870,9 +1870,22 @@ loc_742A4:
               arrangement: PartyArrangement.belowLead,
               updateParty: ChangePartyOrder([rune, alys, hahn, wren, raja],
                   saveCurrentParty: false)),
-          RelativePartyMove(StepPath()
-            ..distance = 1.step
-            ..direction = up),
+          IndividualMoves()
+            ..moves[BySlot(1)] = (StepPath()
+              ..distance = 1.step
+              ..direction = up)
+            ..moves[BySlot(2)] = (StepPath()
+              ..distance = 1.step
+              ..direction = up)
+            ..moves[BySlot(3)] = (StepPath()
+              ..distance = 1.step
+              ..direction = up)
+            ..moves[BySlot(4)] = (StepPath()
+              ..distance = 1.step
+              ..direction = up)
+            ..moves[BySlot(5)] = (StepPath()
+              ..distance = 1.step
+              ..direction = up)
         ]);
 
         var asm = Program()

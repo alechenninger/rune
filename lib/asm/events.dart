@@ -43,6 +43,7 @@ x_move_boundary = $3E	; byte ; number of steps NPC's can take between 0 and the 
 y_move_boundary = $3F	; byte ; number of steps NPC's can take between 0 and the max boundary (y position)
  */
 
+const priority_flag = Constant('priority_flag');
 const facing_dir = Constant('facing_dir');
 const offscreen_flag = Constant('offscreen_flag');
 const dialogue_id = Constant('dialogue_id');

@@ -1204,11 +1204,13 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void partyMove(RelativePartyMove move) {
-    _addToEvent(
-        move,
-        (i) => move
-            .toIndividualMoves(_memory)
-            .toAsm(_memory, eventIndex: i, fieldRoutines: _fieldRoutines));
+    _addToEvent(move, (i) {
+      var moves = IndividualMoves()
+        ..moves[BySlot(1)] = move.movement
+        ..speed = move.speed;
+      return moves.toAsm(_memory,
+          eventIndex: i, fieldRoutines: _fieldRoutines, followLead: true);
+    });
   }
 
   @override

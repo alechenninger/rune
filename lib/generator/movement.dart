@@ -40,7 +40,9 @@ if independent moves == follow lead moves, just use follow lead flag
 
 extension IndividualMovesToAsm on IndividualMoves {
   EventAsm toAsm(Memory ctx,
-      {int? eventIndex, FieldRoutineRepository? fieldRoutines}) {
+      {int? eventIndex,
+      FieldRoutineRepository? fieldRoutines,
+      bool followLead = false}) {
     fieldRoutines ??= defaultFieldRoutines;
 
     var asm = EventAsm.empty();
@@ -51,13 +53,20 @@ extension IndividualMovesToAsm on IndividualMoves {
     var remainingMoves = Map.of(moves.map(
         (moveable, movement) => MapEntry(moveable.resolve(ctx), movement)));
 
-    if (ctx.followLead != false &&
+    if (ctx.followLead != followLead &&
         remainingMoves.entries.any((move) =>
             move.key.resolve(ctx) is! MapObject &&
             move.value.distance > 0.steps)) {
-      asm.add(followLeader(ctx.followLead = false));
+      asm.add(followLeader(ctx.followLead = followLead));
     }
     generator.setSpeed(speed);
+
+    if (collideLead) {
+      asm.add(Asm([
+        BySlot(1).toA4(ctx),
+        bset(2.i, priority_flag(a4)),
+      ]));
+    }
 
     while (remainingMoves.isNotEmpty) {
       // I tried using a sorted set but iterator was bugged and skipped elements
@@ -176,6 +185,13 @@ extension IndividualMovesToAsm on IndividualMoves {
     }
 
     generator.resetSpeedFrom(speed);
+
+    if (collideLead) {
+      asm.add(Asm([
+        BySlot(1).toA4(ctx),
+        bclr(2.i, priority_flag(a4)),
+      ]));
+    }
 
     return asm;
   }
