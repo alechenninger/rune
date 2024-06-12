@@ -3184,6 +3184,8 @@ Asm? _faceInDialog(Map<FieldObject, DirectionExpression> facing,
           int id => Word(id | 0x100),
           _ => null
         },
+      // TODO: we could support position by using bit 15 to flag, 
+      // and storing x and y as bytes (would max out at 7F0, FF0).
       _ => null,
     };
 

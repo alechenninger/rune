@@ -1,7 +1,5 @@
 // ignore_for_file: constant_identifier_names
 
-import 'dart:math' as math;
-
 import 'package:collection/collection.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/generator.dart';
