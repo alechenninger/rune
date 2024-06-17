@@ -77,7 +77,7 @@ const _eventPtrs = Array.wrap(Size.l, [
   Label.known('Event_GettingLandRover'),
   Label.known('Event_MonsenEarthquake'),
   Label.known('Event_PlateSysEngine'),
-  Label.known('Event_RuneLadaeTower'),
+  Label.known('Event_RuneLadeaTower'),
   Label.known('Event_PsycoWandChest'),
   Label.known('Event_ZioFortBarrier'),
   Label.known('Event_ZioFanatic'),
