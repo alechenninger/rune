@@ -958,6 +958,11 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(face, (i) {
       var asm = EventAsm.empty();
 
+      // TODO: since we try to track withObject now,
+      // maybe InteractionObject should point to that?
+      // It's not exactly the same in case there are multiple objects
+      // which share the same interaction scene.
+
       if (_memory.inAddress(a3) == AddressOf(face.object) &&
           face.object == const InteractionObject()) {
         asm.add(jsr(Label('Interaction_UpdateObj').l));
@@ -3184,7 +3189,7 @@ Asm? _faceInDialog(Map<FieldObject, DirectionExpression> facing,
           int id => Word(id | 0x100),
           _ => null
         },
-      // TODO: we could support position by using bit 15 to flag, 
+      // TODO: we could support position by using bit 15 to flag,
       // and storing x and y as bytes (would max out at 7F0, FF0).
       _ => null,
     };
@@ -3677,6 +3682,7 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_ZioFortJuzaRoom'): Word(0x313),
   Label('Map_ZioFort_F3'): Word(0x313),
   Label('Map_ZioFort_F4'): Word(0x313),
+  Label('Map_LadeaTower_F2'): Word(0x2e6),
   Label('Map_LadeaTower_F5'): Word(0x2e6),
   Label('Map_IslandCave'): Word(0x192),
   Label('Map_BioPlant_B4_Part2'): Word(0x222),
