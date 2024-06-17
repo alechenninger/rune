@@ -25,8 +25,10 @@ final defaultFieldRoutines = FieldRoutineRepository([
       Label('FieldObj_NPCAlysPiata'),
       spriteMappingTiles: 8,
       vramAnimated: true,
-      SpecFactory((_) => AlysWaiting(), forSpec: AlysWaiting)),
+      SpecFactory<AlysWaiting>((_) => AlysWaiting())),
   FieldRoutine.asm(Word(0xF0), Label('FieldObj_NPCGryz'),
+      spriteMappingTiles: 8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x70), Label('FieldObj_NPCRune'),
       spriteMappingTiles: 8, vramAnimated: true),
   FieldRoutine(
       Word(0x138),
@@ -34,8 +36,7 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 8,
       ramArt: RamArt(address: Word(0)),
       vramAnimated: true,
-      SpecFactory((d) => AiedoShopperWithBags(d),
-          forSpec: AiedoShopperWithBags)),
+      SpecFactory<AiedoShopperWithBags>((d) => AiedoShopperWithBags(d))),
   FieldRoutine(
       Word(0x13C),
       Label('loc_49128'),
@@ -156,7 +157,7 @@ class FieldRoutineRepository {
 
 /// Used to parse the ASM into the model
 /// as well as store necessary information for generation.
-abstract class SpecFactory {
+abstract class SpecFactory<T extends MapObjectSpec> {
   bool get requiresSprite;
 
   SpecModel get routineModel;
@@ -168,12 +169,11 @@ abstract class SpecFactory {
     return _NpcFactory(factory, T);
   }
 
-  factory SpecFactory(MapObjectSpec Function(Direction facing) factory,
-      {required Type forSpec}) {
-    return _SpecFactory(factory, forSpec);
+  factory SpecFactory(T Function(Direction facing) factory, {Type? forSpec}) {
+    return _SpecFactory(factory, forSpec ?? T);
   }
 
-  factory SpecFactory.asm(Word routine) {
+  static SpecFactory<AsmSpec> asm(Word routine) {
     return _AsmSpecFactory(routine);
   }
 }
@@ -190,7 +190,7 @@ class _NpcFactory<T extends NpcBehavior> implements SpecFactory {
   Npc<T> call(Sprite? sprite, Direction facing) => _factory(sprite!, facing);
 }
 
-class _SpecFactory<T extends MapObjectSpec> implements SpecFactory {
+class _SpecFactory<T extends MapObjectSpec> implements SpecFactory<T> {
   @override
   final requiresSprite = false;
   @override
@@ -202,7 +202,7 @@ class _SpecFactory<T extends MapObjectSpec> implements SpecFactory {
   T call(Sprite? sprite, Direction facing) => _factory(facing);
 }
 
-class _AsmSpecFactory implements SpecFactory {
+class _AsmSpecFactory implements SpecFactory<AsmSpec> {
   @override
   final requiresSprite = false;
   @override
