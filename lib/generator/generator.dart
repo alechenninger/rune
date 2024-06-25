@@ -1327,8 +1327,8 @@ class SceneAsmGenerator implements EventVisitor {
           _gameMode = startingMode;
         }
 
-        _resetCurrentDialog(id: ifSetId, asm: ifSet);
         _flagIsSet(flag, parent: parent);
+        _resetCurrentDialog(id: ifSetId, asm: ifSet);
 
         runEventIfNeeded(ifFlag.isSet, nameSuffix: '${ifFlag.flag.name}_set');
 
@@ -1354,12 +1354,14 @@ class SceneAsmGenerator implements EventVisitor {
         // TODO(ifflag): should we update state graph here?
 
         break;
-      case EventMode() || RunEventMode():
+      case EventMode(isInDialogLoop: true):
         // TODO(ifflag): if we're in dialog loop,
         //  we can check event flag in dialog
         // This would however make running common events
         // after the check more difficult.
+        
 
+      case EventMode() || RunEventMode():
         _addToEventOrRunEvent(ifFlag, (i, asm) {
           // note that if we need to move further than beq.w
           // we will need to branch to subroutine
@@ -1384,6 +1386,8 @@ class SceneAsmGenerator implements EventVisitor {
 
           // If we came here from dialog, terminate it.
           _terminateDialog();
+          // Update child states to reflect termination
+          _updateStateGraph();
 
           // Save the current mode now to be restored later
           // when processing the alternate branch (if needed).
