@@ -816,7 +816,7 @@ ${dialog2.toAsm()}
           dialog.forMap(map.id).toAsm(),
           containsAllInOrder(Asm([
             dc.b(hello[0].toAscii()),
-            terminateDialog(),
+            terminateDialog(keepDialog: true),
             dc.b(greetings[0].toAscii()),
             terminateDialog()
           ])));
@@ -855,9 +855,9 @@ ${dialog2.toAsm()}
           dialog.forMap(map.id).toAsm(),
           containsAllInOrder(Asm([
             dc.b(hello[0].toAscii()),
-            terminateDialog(),
+            terminateDialog(keepDialog: true),
             dc.b(hello2[0].toAscii()),
-            terminateDialog(),
+            terminateDialog(keepDialog: true),
             dc.b(greetings[0].toAscii()),
             terminateDialog()
           ])));
@@ -906,11 +906,11 @@ ${dialog2.toAsm()}
               .withoutEmptyLines(),
           Asm([
             dc.b(prior[0].toAscii()),
-            terminateDialog(),
+            terminateDialog(keepDialog: true),
             dc.b(hello[0].toAscii()),
-            terminateDialog(),
+            terminateDialog(keepDialog: true),
             dc.b(hello2[0].toAscii()),
-            terminateDialog(),
+            terminateDialog(keepDialog: true),
             dc.b(greetings[0].toAscii()),
             terminateDialog()
           ]));
@@ -1006,7 +1006,9 @@ ${dialog2.toAsm()}
               ..direction = Direction.right
               ..distance = 2.steps)
         ]))
-        ..dialog(Dialog.parse('Hi'))
+        // In parent branch, overwrite address register
+        ..individualMoves(
+            IndividualMoves()..moves[shay] = (StepPath()..distance = 2.steps))
         ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
           IndividualMoves()
             ..moves[alys] = (StepPath()
@@ -1019,6 +1021,8 @@ ${dialog2.toAsm()}
               ..distance = 2.steps)
         ]))
         ..finish();
+
+      print(eventAsm);
 
       expect(
           eventAsm.withoutComments().tail(16),

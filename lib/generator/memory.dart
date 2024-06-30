@@ -38,10 +38,10 @@ class SystemState {
   bool? _isDialogInCram = true;
   bool? _displayEnabled = true;
 
-  void _refreshMap(MapId map, DialogTrees trees) {
-    _loadedDialogTree = trees.forMap(map);
-    //_loadedMapPalette = map;
-  }
+  // void _refreshMap(MapId map, DialogTrees trees) {
+  //   _loadedDialogTree = trees.forMap(map);
+  //   //_loadedMapPalette = map;
+  // }
 
   void _putInAddress(DirectAddressRegister a, Object? obj) {
     if (obj == null) {
@@ -188,6 +188,13 @@ class Memory implements EventState {
       speaker,
       (m) => m._eventState.dialogPortrait,
       (s, m) => m._eventState.dialogPortrait = s));
+
+  @override
+  bool? get keepDialog => _eventState.keepDialog;
+
+  @override
+  set keepDialog(bool? keep) => _apply(SetValue<bool>(keep,
+      (m) => m._eventState.keepDialog, (k, m) => m._eventState.keepDialog = k));
 
   @override
   DirectionExpression? getFacing(FieldObject obj) => _eventState.getFacing(obj);
@@ -376,7 +383,7 @@ class _Slots implements Slots {
 // TODO: if prior value is same, then "may apply" can keep same value
 //  in most cases
 
-class SetSavedDialogPosition implements StateChange {
+class SetSavedDialogPosition extends StateChange {
   final bool saved;
 
   SetSavedDialogPosition(this.saved);
@@ -393,7 +400,7 @@ class SetSavedDialogPosition implements StateChange {
   }
 }
 
-class PutInAddress implements StateChange {
+class PutInAddress extends StateChange {
   final DirectAddressRegister register;
   final Object? obj;
 
@@ -412,7 +419,7 @@ class PutInAddress implements StateChange {
   }
 }
 
-class UnknownAddressRegisters implements StateChange {
+class UnknownAddressRegisters extends StateChange {
   @override
   apply(Memory memory) {
     memory._sysState._inAddress.clear();
@@ -424,7 +431,7 @@ class UnknownAddressRegisters implements StateChange {
   }
 }
 
-class SetFacing implements StateChange {
+class SetFacing extends StateChange {
   final FieldObject obj;
   final Direction dir;
 
@@ -445,7 +452,7 @@ class SetFacing implements StateChange {
   }
 }
 
-class ClearFacing implements StateChange {
+class ClearFacing extends StateChange {
   final FieldObject obj;
 
   ClearFacing(this.obj);
@@ -465,7 +472,7 @@ class ClearFacing implements StateChange {
   }
 }
 
-class SetSlot implements StateChange {
+class SetSlot extends StateChange {
   final int slot;
   final Character? char;
 
@@ -487,7 +494,7 @@ class SetSlot implements StateChange {
   }
 }
 
-class AddAllSlots implements StateChange {
+class AddAllSlots extends StateChange {
   final Slots slots;
 
   AddAllSlots(this.slots);
@@ -503,7 +510,7 @@ class AddAllSlots implements StateChange {
   }
 }
 
-class SetPartyOrder implements StateChange {
+class SetPartyOrder extends StateChange {
   final List<Character?> party;
   final bool saveCurrent;
 
@@ -532,7 +539,7 @@ class SetPartyOrder implements StateChange {
   }
 }
 
-class UnknownPartyOrder implements StateChange {
+class UnknownPartyOrder extends StateChange {
   @override
   apply(Memory memory) {
     memory._eventState.slots.unknownPartyOrder();
@@ -544,7 +551,7 @@ class UnknownPartyOrder implements StateChange {
   }
 }
 
-class ReloadObjectsInSlots implements StateChange {
+class ReloadObjectsInSlots extends StateChange {
   @override
   apply(Memory memory) {
     memory._eventState.slots.reloadObjects();
@@ -559,7 +566,7 @@ class ReloadObjectsInSlots implements StateChange {
   }
 }
 
-class RestoreSavedPartyInSlots implements StateChange {
+class RestoreSavedPartyInSlots extends StateChange {
   Function(int index, Character? prior, Character? current)? onRestore;
 
   RestoreSavedPartyInSlots([this.onRestore]);
@@ -580,7 +587,7 @@ class RestoreSavedPartyInSlots implements StateChange {
   }
 }
 
-class UnknownPriorPartyOrder implements StateChange {
+class UnknownPriorPartyOrder extends StateChange {
   @override
   apply(Memory memory) {
     memory._eventState.slots.unknownPriorPartyOrder();
@@ -592,7 +599,7 @@ class UnknownPriorPartyOrder implements StateChange {
   }
 }
 
-class SetPosition implements StateChange {
+class SetPosition extends StateChange {
   final FieldObject obj;
   final Position? pos;
 
@@ -613,7 +620,7 @@ class SetPosition implements StateChange {
   }
 }
 
-class AddAllPositions implements StateChange {
+class AddAllPositions extends StateChange {
   final Positions positions;
 
   AddAllPositions(this.positions);
@@ -635,7 +642,7 @@ class AddAllPositions implements StateChange {
   }
 }
 
-class SetStartingAxis implements StateChange {
+class SetStartingAxis extends StateChange {
   final Axis? axis;
 
   SetStartingAxis(this.axis);
@@ -651,7 +658,7 @@ class SetStartingAxis implements StateChange {
   }
 }
 
-class SetValue<T> implements StateChange {
+class SetValue<T> extends StateChange {
   final T? _val;
   final T? Function(Memory mem) _get;
   final void Function(T? val, Memory mem) _set;
@@ -672,7 +679,7 @@ class SetValue<T> implements StateChange {
   }
 }
 
-class AddPanel implements StateChange {
+class AddPanel extends StateChange {
   @override
   apply(Memory memory) {
     memory._eventState.addPanel();
@@ -684,7 +691,7 @@ class AddPanel implements StateChange {
   }
 }
 
-class RemovePanels implements StateChange {
+class RemovePanels extends StateChange {
   final int n;
 
   RemovePanels(this.n);
@@ -700,7 +707,7 @@ class RemovePanels implements StateChange {
   }
 }
 
-class UpdateRoutine implements StateChange {
+class UpdateRoutine extends StateChange {
   final FieldObject obj;
   final SpecModel? routine;
 

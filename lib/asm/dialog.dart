@@ -11,6 +11,7 @@ class ControlCodes {
   static final yesNo = Bytes.list(const [0xF5]);
   static final event = Bytes.list(const [0xF6]);
   static final eventBreak = Bytes.list(const [0xF7]); // same as FE
+  static final keepDialog = Bytes.list(const [0xF8]);
   /*
 TextCtrlCode_Delay:
 	moveq	#0, d7
@@ -29,12 +30,20 @@ loc_6A39E:
   static final terminate = Bytes.hex('FF');
 }
 
-Asm eventBreak() {
-  return dc.b(ControlCodes.eventBreak);
+Asm keepDialog() {
+  return dc.b(ControlCodes.keepDialog);
 }
 
-Asm terminateDialog() {
-  return dc.b(ControlCodes.terminate);
+Asm eventBreak({bool keepDialog = false}) {
+  return keepDialog
+      ? Asm([dc.b(ControlCodes.keepDialog), dc.b(ControlCodes.eventBreak)])
+      : dc.b(ControlCodes.eventBreak);
+}
+
+Asm terminateDialog({bool keepDialog = false}) {
+  return keepDialog
+      ? Asm([dc.b(ControlCodes.keepDialog), dc.b(ControlCodes.terminate)])
+      : dc.b(ControlCodes.terminate);
 }
 
 Asm interrupt() {

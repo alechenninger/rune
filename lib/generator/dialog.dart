@@ -83,14 +83,15 @@ class DialogAsm extends Asm {
 
 extension DialogToAsm on Dialog {
   DialogAsm toAsm([EventState? state]) {
+    state ??= EventState();
     var asm = DialogAsm.empty();
     var quotes = Quotes();
 
     // i think byte zero removes portrait if already present.
     // todo: could optimize if we know there is no portrait
-    if (state?.dialogPortrait != speaker.portrait) {
+    if (state.dialogPortrait != speaker.portrait) {
       asm.add(portrait(toPortraitCode(speaker.portrait)));
-      state?.dialogPortrait = speaker.portrait;
+      state.dialogPortrait = speaker.portrait;
     }
 
     var ascii = BytesAndAscii([]);
@@ -111,7 +112,7 @@ extension DialogToAsm on Dialog {
 
       var panel = span.panel;
       if (panel != null) {
-        state?.addPanel();
+        state.addPanel();
         codePoints.length = ascii.length + 1;
         var codes = codePoints[ascii.length] ?? [];
         codes.add(PanelCode(panel.panelIndex.toWord));

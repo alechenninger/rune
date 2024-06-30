@@ -252,6 +252,7 @@ class EventState {
       ..cameraLock = cameraLock
       ..isFieldShown = isFieldShown
       ..dialogPortrait = dialogPortrait
+      ..keepDialog = keepDialog
       ..currentMap = currentMap
       ..panelsShown = panelsShown
       .._routines.addAll(_routines);
@@ -274,7 +275,10 @@ class EventState {
 
   bool? onExitRunBattle = false;
 
-  Portrait? dialogPortrait;
+  Portrait? dialogPortrait = Portrait.none;
+
+  /// Whether or not dialog windows are kept during event loop.
+  bool? keepDialog = false;
 
   GameMap? currentMap;
 

@@ -1354,13 +1354,6 @@ class SceneAsmGenerator implements EventVisitor {
         // TODO(ifflag): should we update state graph here?
 
         break;
-      case EventMode(isInDialogLoop: true):
-        // TODO(ifflag): if we're in dialog loop,
-        //  we can check event flag in dialog
-        // This would however make running common events
-        // after the check more difficult.
-        
-
       case EventMode() || RunEventMode():
         _addToEventOrRunEvent(ifFlag, (i, asm) {
           // note that if we need to move further than beq.w
@@ -1385,7 +1378,11 @@ class SceneAsmGenerator implements EventVisitor {
           var parent = _memory;
 
           // If we came here from dialog, terminate it.
-          _terminateDialog();
+          // Keep dialog though,
+          // in case either branch goes right back into dialog.
+          // TODO: this is probably always a no-op because running in an
+          // event already terminates dialog
+          _terminateDialog(keepDialog: true);
           // Update child states to reflect termination
           _updateStateGraph();
 
@@ -1424,7 +1421,8 @@ class SceneAsmGenerator implements EventVisitor {
               // If we need an event at this point it will be a new event.
               finish(appendNewline: true, allowIncompleteDialogTrees: true);
             } else {
-              _terminateDialog();
+              // Keep dialog in case event after IfFlag is still dialog
+              _terminateDialog(keepDialog: true);
 
               // skip past unset events
               if (ifFlag.isUnset.isNotEmpty && !_isFinished) {
@@ -1443,7 +1441,7 @@ class SceneAsmGenerator implements EventVisitor {
               asm.add(setLabel(ifUnset.name));
             }
 
-            runEventIfNeeded(ifFlag.isSet,
+            runEventIfNeeded(ifFlag.isUnset,
                 nameSuffix: '_${ifFlag.flag.name}_unset');
 
             for (var event in ifFlag.isUnset) {
@@ -1455,7 +1453,8 @@ class SceneAsmGenerator implements EventVisitor {
               // If we need an event at this point it will be a new event.
               finish(appendNewline: true, allowIncompleteDialogTrees: true);
             } else {
-              _terminateDialog();
+              // Keep dialog in case event after IfFlag is still dialog
+              _terminateDialog(keepDialog: true);
             }
           }
 
@@ -1478,7 +1477,7 @@ class SceneAsmGenerator implements EventVisitor {
           } else {
             asm.add(setLabel(continueScene.name));
           }
-        });
+        }, keepDialog: true);
 
         break;
     }
@@ -2934,18 +2933,20 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _memory.unknownAddressRegisters();
+    _memory.keepDialog = false;
 
     _gameMode = mode.enterDialogLoop();
   }
 
   /// Terminates the current dialog, if there is any,
   /// regardless of whether current generating within dialog loop or not.
-  void _terminateDialog({bool? hidePanels}) {
+  void _terminateDialog({bool? hidePanels, bool keepDialog = false}) {
     switch (_gameMode) {
       case DialogCapableMode m when m.isInDialogLoop:
         switch (m) {
           case EventMode m:
             _gameMode = m.exitDialogLoop();
+
             break;
           case InteractionMode():
             // We can't run in event (because we're not in one),
@@ -2955,13 +2956,19 @@ class SceneAsmGenerator implements EventVisitor {
         }
 
         if (_currentDialog != null) {
-          _addToDialog(terminateDialog());
+          _addToDialog(terminateDialog(keepDialog: keepDialog));
+          _memory.keepDialog = keepDialog;
+          if (!keepDialog) {
+            _memory.dialogPortrait = Portrait.none;
+          }
         }
 
         break;
       default:
         if (_lastEventBreak >= 0) {
           // i think this is only ever the last line so could simplify
+          // Do not keepDialog; we rely on event break having already set
+          // the appropriate control code at that time
           _currentDialog!.replace(_lastEventBreak, terminateDialog());
         }
         break;
@@ -2980,8 +2987,6 @@ class SceneAsmGenerator implements EventVisitor {
       throw StateError('ending interaction without event cannot keep panels, '
           'but hidePanels == false');
     }
-
-    _memory.dialogPortrait = null;
 
     _resetCurrentDialog();
 
@@ -3054,7 +3059,8 @@ class SceneAsmGenerator implements EventVisitor {
   ///
   /// [generate] may update [_eventAsm] directly, and/or it may return
   /// [Asm] to be added to `_eventAsm`.
-  void _addToEvent(Event event, dynamic Function(int eventIndex) generate) {
+  void _addToEvent(Event event, dynamic Function(int eventIndex) generate,
+      {bool keepDialog = false}) {
     _checkNotFinished();
 
     var eventIndex = _context.getAndIncrementEventCount();
@@ -3066,15 +3072,40 @@ class SceneAsmGenerator implements EventVisitor {
       case EventMode m:
         if (m.isInDialogLoop) {
           _addToDialog(comment('scene event $eventIndex'));
+
+          if (keepDialog) {
+            _addToDialog(dc.b(ControlCodes.keepDialog));
+          }
+
           _lastEventBreak = _addToDialog(eventBreak());
+
           _memory.hasSavedDialogPosition = true;
-          _memory.dialogPortrait = null;
+          if (!keepDialog) {
+            _memory.dialogPortrait = Portrait.none;
+          }
+          _memory.keepDialog = keepDialog;
+
           _gameMode = m.exitDialogLoop();
 
           // If any events which could've gone either way,
           // generate in event mode now
           _generateQueueInCurrentMode();
         }
+
+        // It's possible some child branch kept dialog but one didn't,
+        // so be defensive here and close if not certain.
+        if (_memory.keepDialog != false && !keepDialog) {
+          // Need to close dialog window properly now
+          _memory.keepDialog = false;
+          _memory.dialogPortrait = Portrait.none;
+
+          // This is a no-op if dialog not actually kept.
+          _eventAsm.add(jsr('Event_CloseDialog'.l));
+
+          // Close window, map chunk loads both mess with registers
+          _memory.unknownAddressRegisters();
+        }
+
         // Otherwise do nothing
         // Keep this state so switch is comprehensive
         break;
@@ -3105,7 +3136,8 @@ class SceneAsmGenerator implements EventVisitor {
   /// Regardless, any returned assembly will be added
   /// to the appropriate assembly.
   void _addToEventOrRunEvent(
-      Event event, dynamic Function(int eventIndex, Asm asm) generate) {
+      Event event, dynamic Function(int eventIndex, Asm asm) generate,
+      {bool keepDialog = false}) {
     switch (_gameMode) {
       case RunEventMode():
         _checkNotFinished();
@@ -3115,7 +3147,8 @@ class SceneAsmGenerator implements EventVisitor {
           _context.runEventAsm.add(asm);
         }
       default:
-        _addToEvent(event, (i) => generate(i, _eventAsm));
+        _addToEvent(event, (i) => generate(i, _eventAsm),
+            keepDialog: keepDialog);
     }
   }
 
@@ -3131,7 +3164,8 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
 
     generateEvent() {
-      _addToEvent(event, inEvent);
+      // Keep dialog if open since this event could've been in dialog
+      _addToEvent(event, inEvent, keepDialog: true);
       after?.call();
     }
 

@@ -6,7 +6,7 @@ import 'model.dart';
 
 class Dialog extends Event {
   Speaker speaker;
-  Portrait? get portrait => speaker.portrait;
+  Portrait get portrait => speaker.portrait;
   // fixme: toString/==/etc
   bool hidePanelsOnClose = false;
   final List<DialogSpan> _spans = [];
@@ -221,7 +221,7 @@ class Span {
 
 abstract mixin class Speaker {
   String get name;
-  Portrait? get portrait;
+  Portrait get portrait;
 
   /// Returns the [Speaker] if they have a well known [name].
   ///
@@ -306,7 +306,7 @@ class UnnamedSpeaker with Speaker {
   final name = 'Unnamed Speaker';
 
   @override
-  final portrait = null;
+  final portrait = Portrait.none;
 
   @override
   bool operator ==(Object other) =>
@@ -319,7 +319,7 @@ class UnnamedSpeaker with Speaker {
 
 class NoPortraitSpeaker with Speaker {
   @override
-  final portrait = null;
+  final portrait = Portrait.none;
   @override
   final String name;
 
@@ -336,6 +336,7 @@ class NpcSpeaker with Speaker {
 }
 
 enum Portrait {
+  none,
   Shay,
   Alys,
   Hahn,
