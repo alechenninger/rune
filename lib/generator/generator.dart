@@ -2940,9 +2940,14 @@ class SceneAsmGenerator implements EventVisitor {
 
   /// Terminates the current dialog, if there is any,
   /// regardless of whether current generating within dialog loop or not.
-  void _terminateDialog({bool? hidePanels, bool keepDialog = false}) {
+  void _terminateDialog(
+      {bool? hidePanels, bool keepDialog = false, int? forEventBreak}) {
+    var wasInDialog = false;
+
     switch (_gameMode) {
       case DialogCapableMode m when m.isInDialogLoop:
+        wasInDialog = true;
+
         switch (m) {
           case EventMode m:
             _gameMode = m.exitDialogLoop();
@@ -2956,16 +2961,29 @@ class SceneAsmGenerator implements EventVisitor {
         }
 
         if (_currentDialog != null) {
-          _addToDialog(terminateDialog(keepDialog: keepDialog));
-          _memory.keepDialog = keepDialog;
-          if (!keepDialog) {
+          if (keepDialog) {
+            _addToDialog(dc.b(ControlCodes.keepDialog));
+            _memory.keepDialog = true;
+          } else {
+            _memory.keepDialog = false;
             _memory.dialogPortrait = Portrait.none;
+          }
+
+          if (forEventBreak != null) {
+            _addToDialog(comment('scene event $forEventBreak'));
+            _lastEventBreak = _addToDialog(eventBreak());
+            _memory.hasSavedDialogPosition = true;
+          } else {
+            _addToDialog(terminateDialog());
           }
         }
 
         break;
       default:
-        if (_lastEventBreak >= 0) {
+        // If this isn't for an event break, but we're in an event break,
+        // need to go back and terminate for real.
+        // Otherwise, ignore–if we're already in an event break, nothing to do.
+        if (_lastEventBreak >= 0 && forEventBreak == null) {
           // i think this is only ever the last line so could simplify
           // Do not keepDialog; we rely on event break having already set
           // the appropriate control code at that time
@@ -2973,6 +2991,8 @@ class SceneAsmGenerator implements EventVisitor {
         }
         break;
     }
+
+    // TODO: these may need to be conditional on forEventBreak == null
 
     // fixme: hidePanels tracking not implemented yet
     //   (remember from last dialog event?)
@@ -2988,15 +3008,32 @@ class SceneAsmGenerator implements EventVisitor {
           'but hidePanels == false');
     }
 
-    _resetCurrentDialog();
+    if (forEventBreak == null) {
+      _resetCurrentDialog();
+    }
 
     if (_gameMode case EventMode()) {
-      // Now that we're not in dialog loop, generate in event
-      // so we don't run events out of order.
-      // We prefer to generate in event rather than dialog,
-      // because dialog can only work if there is an event
-      // which should preceed a terminate cursor.
-      _generateQueueInCurrentMode();
+      // If we meant not to keep dialog,
+      // ensure it's closed now as it may have been left open.
+      if (!keepDialog && _memory.keepDialog != false) {
+        _memory.keepDialog = false;
+        _memory.dialogPortrait = Portrait.none;
+
+        // This is a no-op if dialog not actually kept.
+        _eventAsm.add(jsr('Event_CloseDialog'.l));
+
+        // Close window, map chunk loads both mess with registers
+        _memory.unknownAddressRegisters();
+      }
+
+      if (wasInDialog) {
+        // Now that we're not in dialog loop, generate in event
+        // so we don't run events out of order.
+        // We prefer to generate in event rather than dialog,
+        // because dialog can only work if there is an event
+        // which should preceed a terminate cursor.
+        _generateQueueInCurrentMode();
+      }
     }
   }
 
@@ -3069,45 +3106,11 @@ class SceneAsmGenerator implements EventVisitor {
       case RunEventMode():
         runEvent();
         break;
-      case EventMode m:
-        if (m.isInDialogLoop) {
-          _addToDialog(comment('scene event $eventIndex'));
-
-          if (keepDialog) {
-            _addToDialog(dc.b(ControlCodes.keepDialog));
-          }
-
-          _lastEventBreak = _addToDialog(eventBreak());
-
-          _memory.hasSavedDialogPosition = true;
-          if (!keepDialog) {
-            _memory.dialogPortrait = Portrait.none;
-          }
-          _memory.keepDialog = keepDialog;
-
-          _gameMode = m.exitDialogLoop();
-
-          // If any events which could've gone either way,
-          // generate in event mode now
-          _generateQueueInCurrentMode();
-        }
-
-        // It's possible some child branch kept dialog but one didn't,
-        // so be defensive here and close if not certain.
-        if (_memory.keepDialog != false && !keepDialog) {
-          // Need to close dialog window properly now
-          _memory.keepDialog = false;
-          _memory.dialogPortrait = Portrait.none;
-
-          // This is a no-op if dialog not actually kept.
-          _eventAsm.add(jsr('Event_CloseDialog'.l));
-
-          // Close window, map chunk loads both mess with registers
-          _memory.unknownAddressRegisters();
-        }
-
-        // Otherwise do nothing
-        // Keep this state so switch is comprehensive
+      case EventMode():
+        _terminateDialog(
+            hidePanels: false,
+            keepDialog: keepDialog,
+            forEventBreak: eventIndex);
         break;
       case InteractionMode():
         throw StateError("can't add event from interaction "
