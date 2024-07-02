@@ -571,6 +571,119 @@ void main() {
           ]));
     });
 
+    test('assumes condition, removing unreachable outer branch', () {
+      var scene = Scene([
+        IfFlag(EventFlag('HahnJoined'), isSet: [
+          Dialog(spans: [DialogSpan('Hi after Hahn joined')])
+        ], isUnset: [
+          IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'), isSet: [
+            Dialog(spans: [DialogSpan('Hi again')])
+          ], isUnset: [
+            IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+              SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+              Dialog(spans: [DialogSpan('Hi after meeting principal')])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Hello world.')])
+            ])
+          ])
+        ])
+      ]);
+
+      scene.assume(Condition({EventFlag('HahnJoined'): false}));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'),
+                isSet: [
+                  Dialog(spans: [DialogSpan('Hi again')])
+                ],
+                isUnset: [
+                  IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+                    SetFlag(
+                        EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+                    Dialog(spans: [DialogSpan('Hi after meeting principal')])
+                  ], isUnset: [
+                    Dialog(spans: [DialogSpan('Hello world.')])
+                  ])
+                ])
+          ]));
+    });
+
+    test('assumes condition, removing unreachable inner branch', () {
+      var scene = Scene([
+        IfFlag(EventFlag('HahnJoined'), isSet: [
+          Dialog(spans: [DialogSpan('Hi after Hahn joined')])
+        ], isUnset: [
+          IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'), isSet: [
+            Dialog(spans: [DialogSpan('Hi again')])
+          ], isUnset: [
+            IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+              SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+              Dialog(spans: [DialogSpan('Hi after meeting principal')])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Hello world.')])
+            ])
+          ])
+        ])
+      ]);
+
+      scene.assume(Condition({EventFlag('PrincipalMeeting'): false}));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('HahnJoined'), isSet: [
+              Dialog(spans: [DialogSpan('Hi after Hahn joined')])
+            ], isUnset: [
+              IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'),
+                  isSet: [
+                    Dialog(spans: [DialogSpan('Hi again')])
+                  ],
+                  isUnset: [
+                    Dialog(spans: [DialogSpan('Hello world.')])
+                  ])
+            ])
+          ]));
+    });
+
+    test('assumes complex condition, removing unreachable branches', () {
+      var scene = Scene([
+        IfFlag(EventFlag('HahnJoined'), isSet: [
+          Dialog(spans: [DialogSpan('Hi after Hahn joined')])
+        ], isUnset: [
+          IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'), isSet: [
+            Dialog(spans: [DialogSpan('Hi again')])
+          ], isUnset: [
+            IfFlag(EventFlag('PrincipalMeeting'), isSet: [
+              SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+              Dialog(spans: [DialogSpan('Hi after meeting principal')])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Hello world.')])
+            ])
+          ])
+        ])
+      ]);
+
+      scene.assume(Condition({
+        EventFlag('PrincipalMeeting'): true,
+        EventFlag('HahnJoined'): false
+      }));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'),
+                isSet: [
+                  Dialog(spans: [DialogSpan('Hi again')])
+                ],
+                isUnset: [
+                  SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
+                  Dialog(spans: [DialogSpan('Hi after meeting principal')])
+                ])
+          ]));
+    });
+
     group('condense', () {
       test('top level', () {
         var scene = Scene([

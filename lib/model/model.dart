@@ -532,6 +532,17 @@ class Scene extends IterableBase<Event> {
     return Scene(_asOf(_events, asOf, Condition.empty()));
   }
 
+  /// Advances the scene in place by assuming the given [condition].
+  ///
+  /// Branches which conflict with the condition are pruned.
+  void assume(Condition condition) {
+    // Copy to avoid concurrent modification
+    var asOf =
+        _asOf(_events, condition, Condition.empty()).toList(growable: false);
+    _events.clear();
+    _events.addAll(asOf);
+  }
+
   Iterable<Event> _asOf(
       Iterable<Event> events, Condition asOf, Condition current) sync* {
     for (var event in events) {
