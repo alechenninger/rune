@@ -124,8 +124,8 @@ MapAsm compileMap(GameMap map, ProgramConfiguration config) {
       objects, spritesAsm, spriteVramOffset?.value,
       builtIns: builtInSprites, fieldRoutines: fieldRoutines);
 
-  var sceneIds = Map<MapObject, Byte>.identity();
-  var objectsByScene = Map<Scene, List<MapObject>>.identity();
+  var sceneIds = Map<MapElement, Byte>.identity();
+  var elementsByScene = Map<Scene, List<MapObjectOrArea>>.identity();
 
   Byte compileInteraction(Scene scene, SceneId id, {FieldObject? withObject}) {
     return _compileInteractionScene(
@@ -133,33 +133,50 @@ MapAsm compileMap(GameMap map, ProgramConfiguration config) {
         withObject: withObject, fieldRoutines: fieldRoutines);
   }
 
-  for (var obj in objects) {
-    objectsByScene.putIfAbsent(obj.onInteract, () => []).add(obj);
+  for (var element in <MapObjectOrArea>[...objects, ...map.areas]) {
+    if (element case InteractiveMapElement e) {
+      elementsByScene.putIfAbsent(e.onInteract, () => []).add(element);
+    }
   }
 
-  for (var MapEntry(key: scene, value: objects) in objectsByScene.entries) {
-    var first = objects.first;
-    var dialogId = compileInteraction(
-        scene, SceneId('${map.id.name}_${first.id}'),
-        withObject: objects.singleOrNull ?? const InteractionObject());
-    for (var obj in objects) {
+  for (var MapEntry(key: scene, value: elements) in elementsByScene.entries) {
+    var first = elements.first;
+    var (id, withObject) = switch (first) {
+      MapObject o => (
+          SceneId('${map.id.name}_${o.id}'),
+          elements.cast<MapObject>().singleOrNull ?? const InteractionObject()
+        ),
+      MapArea a => (SceneId('${map.id.name}_${a.id}'), null),
+    };
+    var dialogId = compileInteraction(scene, id, withObject: withObject);
+    for (var obj in elements) {
       sceneIds[obj] = dialogId;
     }
   }
 
   for (var obj in objects) {
     var tileNumber = objectsTileNumbers[obj.id] ?? Word(0);
+    // If no ID, it must not be interactive.
     var dialogId = sceneIds[obj];
     if (dialogId == null) {
-      throw Exception('no dialog id for object ${obj.id}');
+      if (obj is InteractiveMapObject) {
+        throw Exception('no dialog id for interactive object ${obj.id}');
+      }
+      // Doesn't matter – never used
+      dialogId = Byte(0);
     }
     _compileMapObjectData(objectsAsm, obj, tileNumber, dialogId,
         fieldRoutines: fieldRoutines);
   }
 
   for (var area in map.areas) {
-    _compileMapAreaData(areasAsm, area, eventFlags,
-        (s) => compileInteraction(s, SceneId('${map.id.name}_${area.id}')));
+    _compileMapAreaData(areasAsm, area, eventFlags, (s) {
+      var dialogId = sceneIds[area];
+      if (dialogId == null) {
+        throw Exception('no dialog id for area ${area.id}');
+      }
+      return dialogId;
+    });
   }
 
   for (var (id, scene) in map.events) {

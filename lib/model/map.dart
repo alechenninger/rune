@@ -756,7 +756,9 @@ sealed class MapElementId {
 sealed class InteractiveMapElement
     implements MapElement, Interactive<InteractiveMapElement> {}
 
-class MapArea extends MapElement {
+sealed class MapObjectOrArea extends MapElement {}
+
+class MapArea extends MapObjectOrArea {
   factory MapArea(
       {required MapAreaId id,
       required Position at,
@@ -947,7 +949,7 @@ class AsmArea extends AreaSpec {
 }
 
 // todo: 'with UnnamedSpeaker' – aren't some objects named speakers?
-class MapObject extends FieldObject implements MapElement, UnnamedSpeaker {
+class MapObject extends FieldObject implements UnnamedSpeaker, MapObjectOrArea {
   final MapObjectId id;
   // note: can only be in multiples of 8 pixels
   final Position startPosition;
@@ -1133,7 +1135,7 @@ abstract class MayConfigureSprite {
 }
 
 abstract mixin class Interactive<T extends Interactive<T>> {
-  Scene onInteract = Scene.none();
+  Scene onInteract = const Scene.none();
   T withNewInteraction();
 }
 
