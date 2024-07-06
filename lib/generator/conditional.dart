@@ -133,8 +133,12 @@ extension IfValueAsm on IfValue {
     switch (operand2) {
       case PositionComponentExpression c:
         return c.withValue(memory: memory, load: a4, asm: compareTo);
-      case NotInParty():
+      case NullSlot():
         return compareTo(0xFF.i);
+      case RoutineIdOfSlot r:
+        return r.withValue(memory: memory, load: d2, asm: compareTo);
+      case NullObjectRoutineId():
+        return compareTo(Word(0).i);
       case Slot s:
         return compareTo(s.offset.i);
       case SlotOfCharacter s:
@@ -180,7 +184,7 @@ Asm Function(Address src, [Address? src2]) _compare(
             memory: memory, load: a4, asm: (dst) => _cmp(src, dst, Size.w)));
 
         break;
-      case NotInParty():
+      case NullSlot():
         asm.add(_cmp(src, 0xFF.i, Size.b));
       case Slot s:
         asm.add(_cmp(src, s.offset.i, Size.b));
@@ -188,6 +192,13 @@ Asm Function(Address src, [Address? src2]) _compare(
       case SlotOfCharacter s:
         asm.add(s.withValue(
             memory: memory, asm: (slot) => _cmp(src, slot, Size.b)));
+        break;
+      case RoutineIdOfSlot r:
+        asm.add(r.withValue(
+            memory: memory, load: d2, asm: (slot) => _cmp(src, slot, Size.w)));
+        break;
+      case NullObjectRoutineId():
+        asm.add(_cmp(src, Word(0).i, Size.w));
         break;
       case IsOffScreen o:
         asm.add(o.withValue(
@@ -280,6 +291,23 @@ extension BooleanConstantAsm on BooleanConstant {
   Asm withValue(
       {required Memory memory, required Asm Function(Address value) asm}) {
     return asm(value ? 1.i : 0.i);
+  }
+}
+
+extension RoutineOfSlotAsm on RoutineIdOfSlot {
+  Asm withValue(
+      {required Memory memory,
+      DirectDataRegister load = d2,
+      required Asm Function(Address slot) asm}) {
+    if (known(memory) case Character c) {
+      asm((c.charIdValue.value + 1 * 4).toWord.i);
+    }
+
+    return Asm([
+      move.w('Character_$slot'.w, load),
+      andi.w(0x7fff.i, load),
+      asm(load),
+    ]);
   }
 }
 

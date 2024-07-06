@@ -772,9 +772,8 @@ const _charIds = [
 
 extension CharacterData on Character {
   Expression get charId {
-    switch (runtimeType) {
-      // ignore: type_literal_in_constant_pattern
-      case Shay:
+    switch (this) {
+      case Shay():
         return Constant('CharID_Chaz');
       default:
         return Constant('CharID_$this');
@@ -784,8 +783,8 @@ extension CharacterData on Character {
   Address get charIdAddress => charId.i;
 
   Address get routineAddress {
-    switch (runtimeType) {
-      case Shay:
+    switch (this) {
+      case Shay():
         return Label('FieldObj_Chaz').l;
       default:
         return Label('FieldObj_$this').l;

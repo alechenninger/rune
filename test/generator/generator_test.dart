@@ -1349,7 +1349,7 @@ EventFlag_Test001 = $0001'''));
     test('character is in party', () {
       var scene = Scene([
         IfValue(rune.slot(),
-            comparedTo: NotInParty(),
+            comparedTo: NullSlot(),
             equal: [Face(up).move(rune)],
             notEqual: [Face(down).move(rune)])
       ]);
@@ -1663,6 +1663,39 @@ EventFlag_Test001 = $0001'''));
             label(Label('.1_gt')),
             updateObjFacing(up.address),
 
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('slot routine compared to null', () {
+      var scene = Scene([
+        IfValue(
+          RoutineIdOfSlot(5),
+          comparedTo: NullObjectRoutineId(),
+          equal: [Face(up).move(rune)],
+          notEqual: [Face(down).move(BySlot(5))],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            move.w('Character_5'.w, d2),
+            andi.w(0x7fff.i, d2),
+            cmpi.w(Word(0).i, d2),
+            beq(Label('.1_eq')),
+            // not equal branch
+            lea('Character_5'.w, a4),
+            updateObjFacing(down.address),
+            bra(Label('.1_continue')),
+            // eq branch
+            label(Label('.1_eq')),
+            characterByIdToA4(rune.charIdAddress),
+            updateObjFacing(up.address),
             // continue
             label(Label('.1_continue')),
           ]));

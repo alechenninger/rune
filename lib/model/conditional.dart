@@ -233,7 +233,7 @@ final subplots = {
   stainInLifeEvents,
   dyingBoyEvents,
   manWithTwistEvents,
-  silverSoliderEvents,
+  silverSoldierEvents,
   // Treat these as subplots since they are optional
   [EventFlag('HahnPicked')],
   [EventFlag('GryzPicked')],
@@ -309,7 +309,7 @@ final manWithTwistEvents = [
   EventFlag('ManWithTwistFee'),
 ];
 
-final silverSoliderEvents = [
+final silverSoldierEvents = [
   EventFlag('SilverSoldier'),
   EventFlag('Servants'),
   EventFlag('ZemaOldMan'),

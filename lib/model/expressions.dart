@@ -11,6 +11,8 @@ sealed class ModelExpression {
 }
 
 sealed class UnaryExpression extends ModelExpression {
+  const UnaryExpression();
+
   @override
   final arity = 1;
 }
@@ -503,22 +505,22 @@ enum Direction implements DirectionExpression {
   Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
 }
 
+/// An expression which evaluates to a character slot index (or null).
 sealed class SlotExpression extends UnaryExpression {}
 
-class NotInParty extends SlotExpression {
-  NotInParty();
+class NullSlot extends SlotExpression {
+  NullSlot();
 
   @override
   String toString() {
-    return 'NotInParty{}';
+    return 'NullSlot{}';
   }
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) || other is NotInParty;
+  bool operator ==(Object other) => identical(this, other) || other is NullSlot;
 
   @override
-  int get hashCode => 'NotInParty{}'.hashCode;
+  int get hashCode => 'NullSlot{}'.hashCode;
 }
 
 class Slot extends SlotExpression {
@@ -640,4 +642,59 @@ class BooleanConstant extends BooleanExpression {
 
   @override
   int get hashCode => value.hashCode;
+}
+
+/// An expression which evaluates to an object routine index.
+sealed class ObjectRoutineIdExpression extends UnaryExpression {
+  const ObjectRoutineIdExpression();
+
+  // Some FieldObjects imply a routine
+  FieldObject? known(EventState state);
+}
+
+/// Evaluates to what character routine is loaded into a party slot.
+/// If the slot is empty, evaluates to 0 (see [NullObjectRoutineId]).
+class RoutineIdOfSlot extends ObjectRoutineIdExpression {
+  final int slot;
+
+  RoutineIdOfSlot(this.slot);
+
+  @override
+  FieldObject? known(EventState state) {
+    return state.slots.party(slot);
+  }
+
+  @override
+  String toString() {
+    return 'RoutineOfSlot{slot: $slot}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RoutineIdOfSlot &&
+          runtimeType == other.runtimeType &&
+          slot == other.slot;
+
+  @override
+  int get hashCode => slot.hashCode;
+}
+
+class NullObjectRoutineId extends ObjectRoutineIdExpression {
+  const NullObjectRoutineId();
+
+  @override
+  FieldObject? known(EventState state) => null;
+
+  @override
+  String toString() {
+    return 'NullObjectRoutineId{}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is NullObjectRoutineId;
+
+  @override
+  int get hashCode => 'NullObjectRoutineId{}'.hashCode;
 }
