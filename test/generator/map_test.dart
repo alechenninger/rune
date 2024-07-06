@@ -2179,6 +2179,7 @@ void main() {
               beq.w(Label('.testflag2_unset3')),
               getAndRunDialog3LowDialogId(1.toByte.i),
               label(Label('.testflag2_unset3')),
+              jsr('Event_CloseDialog'.l),
               rts,
             ]));
       });
