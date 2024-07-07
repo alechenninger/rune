@@ -561,6 +561,29 @@ main() {
 EventFlag_Test001 = $0001'''));
   });
 
+  test(
+      'custom event flags produce constants beyond normal event flag range, but not including 0xFF bytes',
+      () {
+    var program = Program();
+    // Max is extended total minus how many are already defined in the game
+    // 2 are additionally excluded
+    // due to conflicting with dialog terminator byte (0xff)
+    var maxCustom = 0x1ff - eventFlags.length - 2;
+    for (var i = 0; i < maxCustom; i++) {
+      program.addScene(SceneId('test$i'), Scene([SetFlag(EventFlag('Test$i'))]),
+          startingMap: map);
+    }
+    // Now iterate through constants, parse out word values,
+    // and ensure neither byte is 0xFF
+    var constants = program.extraConstants();
+    var bytes = constants
+        .map((line) => '$line'.split('=').last.trim())
+        .map((word) => Expression.parseSingleExpression(word, size: Size.w))
+        .cast<Word>()
+        .expand((word) => word.splitToBytes());
+    expect(bytes, isNot(contains(Byte(0xff))));
+  });
+
   test('same speaker dialog after show panel shows portrait', () {
     var scene = Scene([
       Dialog(speaker: alys, spans: DialogSpan.parse('Hello')),

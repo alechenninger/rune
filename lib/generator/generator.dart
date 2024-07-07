@@ -3858,6 +3858,11 @@ Queue<Word> freeEventFlags() {
   // 1ff with extension
   // we can free up more from other flag type ram if needed
   // (chest and town flags have plenty of headroom)
-  q.addAll([for (; next <= 0x1ff; next++) Word(next)]);
+  q.addAll([
+    for (; next <= 0x1ff; next++)
+      // Ensure there are no 0xff bytes within the word,
+      // since this is interpetted as a dialog terminator
+      if (next & 0xff != 0xff) Word(next)
+  ]);
   return q;
 }
