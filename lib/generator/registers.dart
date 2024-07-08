@@ -1,87 +1,78 @@
-import 'dart:collection';
-
 import 'package:rune/asm/asm.dart';
+import 'package:rune/generator/stack.dart';
 
 /// Tracks free registers for the use of a single computation involving many
 /// registers.
 class Registers {
-  var _data = Queue<DirectDataRegister>.of({d0, d1, d2, d3, d4, d5, d6, d7});
-  var _address = Queue<DirectAddressRegister>.of({a0, a1, a2, a3, a4, a5, a6});
+  final _kept = <PushOneToStack>[];
 
-  void releaseAddress(DirectAddressRegister a) {
-    if (!_address.contains(a)) {
-      _address.add(a);
+  Registers();
+
+  Registers branch() {
+    return Registers().._kept.addAll(_kept);
+  }
+
+  Asm keep(PushToStack registers, {required Asm Function() around}) {
+    switch (registers) {
+      case NoneToPush():
+        return around();
+      case PushOneToStack one:
+        _kept.insert(0, one);
+        var asm = around();
+        release(one.register);
+        return asm;
+      case PushManyToStack many:
+        for (var r in many.registers) {
+          _kept.insert(0, PushOneToStack(r, many.size));
+        }
+        var asm = around();
+        release(many.registers);
+        return asm;
     }
   }
 
-  void releaseData(DirectDataRegister d) {
-    if (!_data.contains(d)) {
-      _data.add(d);
+  void release(RegisterListOrRegister registers) {
+    var toRelease = Set.of(switch (registers) {
+      RegisterList many => many,
+      Register register => [register]
+    });
+
+    for (var i = 0; i < _kept.length; i++) {
+      var kept = _kept[i];
+      if (toRelease.remove(kept.register)) {
+        _kept.removeAt(i);
+      }
     }
   }
 
-  void releaseAll() {
-    _data = Queue<DirectDataRegister>.of({d0, d1, d2, d3, d4, d5, d6, d7});
-    _address = Queue<DirectAddressRegister>.of({a0, a1, a2, a3, a4, a5, a6});
-  }
-
-  bool addressUsed(DirectAddressRegister a) {
-    return !_address.contains(a);
-  }
-
-  bool dataUsed(DirectDataRegister d) {
-    return !_data.contains(d);
-  }
-
-  Asm moveToData(Size size, DirectAddressRegister a,
-      {List<DirectDataRegister> preferring = const []}) {
-    releaseAddress(a);
-    var d = data(preferring: preferring);
-    return switch (size) {
-      byte => move.b(a, d),
-      word => move.w(a, d),
-      long => move.l(a, d),
-    };
-  }
-
-  DirectAddressRegister address(
-      {List<DirectAddressRegister> preferring = const []}) {
-    var a = tryAddress(preferring: preferring);
-    if (a == null) {
-      throw StateError('no free address registers');
+  PushToStack _keep(Register r) {
+    for (var kept in _kept) {
+      if (kept.register == r) {
+        return kept;
+      }
     }
-    return a;
+    return NoneToPush();
   }
 
-  DirectAddressRegister? tryAddress(
-      {List<DirectAddressRegister> preferring = const []}) {
-    for (var pref in preferring) {
-      if (_address.remove(pref)) return pref;
+  /// Wraps [inner] while maintaining register state via the stack
+  /// for any [registers] which have been previously kept via [keep].
+  Asm maintain(RegisterListOrRegister registers, Asm asm) {
+    // TODO: merge multiple pushes IF
+    // - register list offered here
+    // - multiple of those registers are kept
+    // - all kept registers are of the same size
+
+    // If any of these registers are kept,
+    // wrap `asm` with push/pop.
+    switch (registers) {
+      case Register r:
+        return _keep(r).wrap(asm);
+      case RegisterList many:
+        // TODO: could do merge logic here as optimization
+        for (var r in many) {
+          asm = _keep(r).wrap(asm);
+        }
+        return asm;
     }
-    if (_address.isEmpty) return null;
-    return _address.removeFirst();
-  }
-
-  DirectDataRegister data({List<DirectDataRegister> preferring = const []}) {
-    var d = tryData(preferring: preferring);
-    if (d == null) {
-      throw StateError('no free data registers');
-    }
-    return d;
-  }
-
-  /// Returns a free data register, but considers it still free.
-  DirectDataRegister temporaryData() {
-    if (_data.isEmpty) throw StateError('no free data registers');
-    return _data.first;
-  }
-
-  DirectDataRegister? tryData(
-      {List<DirectDataRegister> preferring = const []}) {
-    for (var pref in preferring) {
-      if (_data.remove(pref)) return pref;
-    }
-    if (_data.isEmpty) return null;
-    return _data.removeFirst();
   }
 }

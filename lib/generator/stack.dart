@@ -1,6 +1,6 @@
 import '../asm/asm.dart';
 
-abstract class PushToStack {
+sealed class PushToStack {
   factory PushToStack.none() => const NoneToPush();
   factory PushToStack.one(Register register, Size size) =>
       PushOneToStack(register, size);
@@ -22,6 +22,16 @@ abstract class PushToStack {
 
   PopFromStack pop();
   Asm asm();
+
+  /// Merges two [PushOneToStack] instances into a [PushManyToStack]
+  /// if they are of the same size. Otherwise, returns `null`.
+  PushToStack? mergeOne(PushOneToStack other);
+
+  /// Merges this [PushOneToStack] with [other] [PushManyToStack].
+  PushManyToStack? mergeMany(PushManyToStack other);
+
+  /// Wraps [inner] while maintaining register state via the stack
+  /// (pushes before, and pops after `inner` asm).
   Asm wrap(Asm inner) {
     return Asm([
       asm(),
@@ -54,6 +64,16 @@ class NoneToPush implements PushToStack, PopFromStack {
 
   @override
   Asm wrap(Asm inner) => inner;
+
+  @override
+  PushManyToStack? mergeMany(PushManyToStack other) {
+    return other;
+  }
+
+  @override
+  PushManyToStack? mergeOne(PushOneToStack other) {
+    return PushManyToStack(RegisterList.of([other.register]), other.size);
+  }
 }
 
 class PushManyToStack extends PushToStack {
@@ -73,6 +93,19 @@ class PushManyToStack extends PushToStack {
         Size.w => movem.w(registers, -(sp)),
         Size.l => movem.l(registers, -(sp)),
       };
+
+  @override
+  PushManyToStack? mergeMany(PushManyToStack other) {
+    if (size != other.size) return null;
+    return PushManyToStack(
+        RegisterList.of([...registers, ...other.registers]), size);
+  }
+
+  @override
+  PushManyToStack? mergeOne(PushOneToStack other) {
+    return PushManyToStack(
+        RegisterList.of([...registers, other.register]), other.size);
+  }
 }
 
 class PushOneToStack extends PushToStack {
@@ -80,6 +113,20 @@ class PushOneToStack extends PushToStack {
   final Size size;
 
   PushOneToStack(this.register, this.size);
+
+  /// Merges two [PushOneToStack] instances into a [PushManyToStack]
+  /// if they are of the same size. Otherwise, returns `null`.
+  PushManyToStack? mergeOne(PushOneToStack other) {
+    if (size != other.size) return null;
+    return PushManyToStack(RegisterList.of([register, other.register]), size);
+  }
+
+  /// Merges this [PushOneToStack] with [other] [PushManyToStack].
+  PushManyToStack? mergeMany(PushManyToStack other) {
+    if (size != other.size) return null;
+    return PushManyToStack(
+        RegisterList.of([register, ...other.registers]), size);
+  }
 
   @override
   PopFromStack pop() {

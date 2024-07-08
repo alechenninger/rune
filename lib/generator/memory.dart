@@ -2,6 +2,8 @@ import 'package:collection/collection.dart';
 
 import '../model/model.dart';
 import 'generator.dart';
+import 'registers.dart';
+import 'stack.dart';
 
 abstract class StateChange<T> {
   T apply(Memory memory);
@@ -30,6 +32,7 @@ class AddressOf {
 }
 
 class SystemState {
+  final Registers _registers;
   final _inAddress = <DirectAddressRegister, AddressOf>{};
   bool _hasSavedDialogPosition = false;
   DialogTree? _loadedDialogTree;
@@ -37,6 +40,9 @@ class SystemState {
   bool? _isMapInCram = true;
   bool? _isDialogInCram = true;
   bool? _displayEnabled = true;
+
+  SystemState() : _registers = Registers();
+  SystemState.withRegisters(this._registers);
 
   // void _refreshMap(MapId map, DialogTrees trees) {
   //   _loadedDialogTree = trees.forMap(map);
@@ -51,7 +57,7 @@ class SystemState {
     }
   }
 
-  SystemState branch() => SystemState()
+  SystemState branch() => SystemState.withRegisters(_registers.branch())
     .._inAddress.addAll(_inAddress)
     .._hasSavedDialogPosition = _hasSavedDialogPosition
     .._loadedDialogTree = _loadedDialogTree
@@ -99,6 +105,18 @@ class Memory implements EventState {
   void putInAddress(DirectAddressRegister a, Object? obj) {
     _apply(PutInAddress(a, obj));
   }
+
+  @Deprecated('untested')
+  Asm keep(PushToStack registers, {required Asm Function() around}) =>
+      // For now intentionally omit from changes
+      // Every branch must manage its own push/pop anyway
+      _sysState._registers.keep(registers, around: around);
+
+  @Deprecated('untested')
+  Asm maintain(RegisterListOrRegister registers, Asm asm) =>
+      // For now intentionally omit from changes
+      // Every branch must manage its own push/pop anyway
+      _sysState._registers.maintain(registers, asm);
 
   // todo: maybe not actually needed?
   DialogTree? get loadedDialogTree => _sysState._loadedDialogTree;

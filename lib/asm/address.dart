@@ -30,13 +30,16 @@ abstract class Address implements RegisterListOrAddress {
 
 sealed class RegisterListOrAddress {}
 
-class RegisterList extends Iterable<Register> implements RegisterListOrAddress {
+sealed class RegisterListOrRegister implements RegisterListOrAddress {}
+
+class RegisterList extends Iterable<Register>
+    implements RegisterListOrRegister {
   final Set<Register> _registers;
 
   const RegisterList.empty() : _registers = const {};
 
   RegisterList.of(Iterable<Register> registers)
-      : _registers = TreeSet<Register>(comparator: (a, b) {
+      : _registers = TreeSet(comparator: (a, b) {
           return switch ((a, b)) {
             (DirectDataRegister(), DirectAddressRegister()) => -1,
             (DirectAddressRegister(), DirectDataRegister()) => 1,
@@ -92,11 +95,12 @@ class RegisterList extends Iterable<Register> implements RegisterListOrAddress {
   Iterator<Register> get iterator => _registers.iterator;
 }
 
-sealed class Register<T extends Register<T>> implements Address {
+sealed class Register<T extends Register<T>>
+    implements Address, RegisterListOrRegister {
   int get register;
   T? get next;
   RegisterList operator -(T other);
-  RegisterList operator /(Register other);
+  RegisterList operator /(Register<T> other);
 }
 
 abstract class OfAddressRegister implements Address {
