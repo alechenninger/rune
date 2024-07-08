@@ -288,6 +288,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
 
   moves.destinations.entries.forEachIndexed((i, dest) {
     var obj = dest.key.resolve(state);
+    var pos = dest.value;
 
     if (moves.followLeader &&
         (obj is Character && obj.slotAsOf(state) != 1 ||
@@ -295,8 +296,6 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
       throw StateError(
           'cannot move $obj independently when follow leader flag is set');
     }
-
-    var pos = dest.value;
 
     generator.asm.add(obj.toA4(generator._mem));
     // TODO: may need to wait for object to be done moving
@@ -931,11 +930,13 @@ extension DirectionOfVectorAsm on DirectionOfVector {
       move.w(FacingDir_Up.i, destination),
       bra.s(Label(r'.keep' + labelSuffix)), // keep
       label(Label(r'.checkx' + labelSuffix)),
-      move.w(FacingDir_Right.i, destination),
       to.withX(memory: memory, asm: (x) => move.w(x, d2), load: load2),
       from.withX(
           memory: memory,
-          asm: (x) => x is Immediate ? cmpi.w(x, d2) : cmp.w(x, d2),
+          asm: (x) => Asm([
+                move.w(FacingDir_Right.i, destination),
+                x is Immediate ? cmpi.w(x, d2) : cmp.w(x, d2)
+              ]),
           load: load1),
       bcc.s(Label(r'.keep' + labelSuffix)), // keep up
       move.w(FacingDir_Left.i, destination),
