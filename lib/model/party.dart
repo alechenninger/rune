@@ -19,7 +19,10 @@ class ChangePartyOrder extends PartyEvent {
   /// Allows the current party to be later restored via [RestoreSavedPartyOrder].
   final bool saveCurrentParty;
 
-  ChangePartyOrder(this.party, {this.saveCurrentParty = true}) {
+  final bool maintainOrder;
+
+  ChangePartyOrder(this.party,
+      {this.saveCurrentParty = true, this.maintainOrder = false}) {
     checkArgument(party.isNotEmpty && party.length <= 5,
         message: 'Party must have between 1 and 5 characters');
     checkArgument(

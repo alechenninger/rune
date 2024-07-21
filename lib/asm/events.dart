@@ -650,6 +650,30 @@ Asm restoreSavedPartySlots() {
   ]);
 }
 
+Asm loadPartySlots(List<Expression> party, Address firstFour, Address last) {
+  var first = party.first;
+
+  Expression firstFourSlots = first << 24.toValue;
+  Expression fifthSlot = 0xFF.toByte;
+
+  for (var i = 1; i < party.length; i++) {
+    var member = party[i];
+    if (i < 4) {
+      firstFourSlots = firstFourSlots | (member << (24 - (i * 8)).toValue);
+    } else {
+      fifthSlot = member;
+    }
+  }
+
+  if (party.length < 4) {
+    // Fill remaining slots with bytes (8 bits each)
+    var shift = (party.length - 1) * 8;
+    firstFourSlots = firstFourSlots | (0xFFFFFF >> shift).toValue;
+  }
+  
+  return Asm([move.l(firstFourSlots.i, firstFour), move.b(fifthSlot.i, last)]);
+}
+
 /// Clear the addresses from [clear] to [clear] plus [range] (not inclusive I
 /// think).
 Asm clearUninterrupted({required Address clear, required Address range}) {

@@ -1960,39 +1960,16 @@ class SceneAsmGenerator implements EventVisitor {
           }
 
           var newParty = changeParty.party;
-
-          var first = newParty.first;
-
-          if (first == null) {
-            throw UnimplementedError(
-                'party update on load map cannot be sparse');
-          }
-
-          Expression firstFourSlots = first.charId << 24.toValue;
-          Expression fifthSlot = 0xFF.toByte;
-
-          for (var i = 1; i < newParty.length; i++) {
-            var member = newParty[i];
-            if (member == null) {
+          var partyIds = newParty.map((c) {
+            if (c == null) {
               throw UnimplementedError(
                   'party update on load map cannot be sparse');
             }
-            if (i < 4) {
-              firstFourSlots =
-                  firstFourSlots | (member.charId << (24 - (i * 8)).toValue);
-            } else {
-              fifthSlot = member.charId;
-            }
-          }
+            return c.charId;
+          }).toList(growable: false);
 
-          if (newParty.length < 4) {
-            // Fill remaining slots with bytes (8 bits each)
-            var shift = (newParty.length - 1) * 8;
-            firstFourSlots = firstFourSlots | (0xFFFFFF >> shift).toValue;
-          }
-
-          _eventAsm.add(move.l(firstFourSlots.i, Current_Party_Slots.w));
-          _eventAsm.add(move.b(fifthSlot.i, Current_Party_Slot_5.w));
+          _eventAsm.add(loadPartySlots(
+              partyIds, Current_Party_Slots.w, Current_Party_Slot_5.w));
 
           _memory.slots.setPartyOrder(newParty,
               saveCurrent: changeParty.saveCurrentParty);
@@ -2351,26 +2328,42 @@ class SceneAsmGenerator implements EventVisitor {
 
       var newParty = changeParty.party;
 
-      bool partial = false;
-      for (var i = 0; i < newParty.length; i++) {
-        var member = newParty[i];
-        if (member == null) {
-          partial = true;
-          continue;
-        }
-        if (!partial && i == 4) {
-          // Last party member can be skipped.
-          // Due to swapping, the last member
-          // must already be in the right place.
-          // TODO: if we know actual party length,
-          //  we can make this a little smarter.
-          continue;
-        }
+      if (changeParty.maintainOrder) {
         _eventAsm.add(Asm([
-          moveq(member.charId.i, d0),
-          moveq(i.i, d1),
-          jsr(Label('Event_SwapCharacter').l),
+          loadPartySlots(
+              newParty
+                  .map((c) => c?.charId ?? Byte.max)
+                  .toList(growable: false),
+              d0,
+              d1),
+          jsr('Event_OrderParty'.l),
         ]));
+
+        _memory.putInAddress(a0, null);
+        _memory.putInAddress(a3, null);
+        _memory.putInAddress(a4, null);
+      } else {
+        bool partial = false;
+        for (var i = 0; i < newParty.length; i++) {
+          var member = newParty[i];
+          if (member == null) {
+            partial = true;
+            continue;
+          }
+          if (!partial && i == 4) {
+            // Last party member can be skipped.
+            // Due to swapping, the last member
+            // must already be in the right place.
+            // TODO: if we know actual party length,
+            //  we can make this a little smarter.
+            continue;
+          }
+          _eventAsm.add(Asm([
+            moveq(member.charId.i, d0),
+            moveq(i.i, d1),
+            jsr(Label('Event_SwapCharacter').l),
+          ]));
+        }
       }
 
       _memory.slots
