@@ -332,6 +332,10 @@ class _Slots implements Slots {
   _Slots(this._memory);
 
   @override
+  bool get partyOrderMaintained =>
+      _memory._eventState.slots.partyOrderMaintained;
+
+  @override
   Character? operator [](int slot) => _memory._eventState.slots[slot];
 
   @override
@@ -358,8 +362,10 @@ class _Slots implements Slots {
   Character? party(int slot) => _memory._eventState.slots.party(slot);
 
   @override
-  void setPartyOrder(List<Character?> party, {bool saveCurrent = false}) {
-    _memory._apply(SetPartyOrder(party, saveCurrent: saveCurrent));
+  void setPartyOrder(List<Character?> party,
+      {bool saveCurrent = false, bool maintainOrder = false}) {
+    _memory._apply(SetPartyOrder(party,
+        saveCurrent: saveCurrent, maintainOrder: maintainOrder));
   }
 
   @override
@@ -531,12 +537,15 @@ class AddAllSlots extends StateChange {
 class SetPartyOrder extends StateChange {
   final List<Character?> party;
   final bool saveCurrent;
+  final bool maintainOrder;
 
-  SetPartyOrder(this.party, {required this.saveCurrent});
+  SetPartyOrder(this.party,
+      {required this.saveCurrent, required this.maintainOrder});
 
   @override
   apply(Memory memory) {
-    memory._eventState.slots.setPartyOrder(party, saveCurrent: saveCurrent);
+    memory._eventState.slots.setPartyOrder(party,
+        saveCurrent: saveCurrent, maintainOrder: maintainOrder);
   }
 
   @override

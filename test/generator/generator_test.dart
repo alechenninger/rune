@@ -2083,6 +2083,27 @@ loc_742A4:
             ]));
       });
 
+      test('swaps sparse update while maintaining order', () {
+        var scene = Scene([
+          ChangePartyOrder([rune, null, shay],
+              saveCurrentParty: false, maintainOrder: true)
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(
+            asm,
+            Asm([
+              Instruction.parse(
+                  r'	move.l #CharID_Rune<<24|$FF<<16|CharID_Chaz<<8|$FF, d0'),
+              move.b(Byte.max.i, d1),
+              jsr(Label('Event_OrderParty').l),
+            ]));
+      });
+
       test('restore saved party swaps only necessary members when known', () {
         var scene = Scene([
           SetContext((ctx) {
@@ -2113,6 +2134,46 @@ loc_742A4:
               jsr(Label('Event_SwapCharacter').l),
               move.b(Constant('Saved_Char_ID_Mem_3').w, d0),
               moveq(2.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+            ]));
+      });
+
+      test('restore saved party swaps all members when order was maintained',
+          () {
+        // This is because when order is maintained,
+        // swapping won't put characters in the right place.
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.slots[1] = rune;
+            ctx.slots[2] = alys;
+            ctx.slots[3] = hahn;
+            ctx.slots[4] = wren;
+            ctx.slots[5] = raja;
+            ctx.slots.setPartyOrder([alys, hahn, rune, wren, raja],
+                saveCurrent: true, maintainOrder: true);
+          }),
+          RestoreSavedPartyOrder()
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        expect(
+            asm,
+            Asm([
+              move.b(Constant('Saved_Char_ID_Mem_1').w, d0),
+              moveq(0.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+              move.b(Constant('Saved_Char_ID_Mem_2').w, d0),
+              moveq(1.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+              move.b(Constant('Saved_Char_ID_Mem_3').w, d0),
+              moveq(2.i, d1),
+              jsr(Label('Event_SwapCharacter').l),
+              move.b(Constant('Saved_Char_ID_Mem_4').w, d0),
+              moveq(3.i, d1),
               jsr(Label('Event_SwapCharacter').l),
             ]));
       });

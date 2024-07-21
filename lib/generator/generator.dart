@@ -2366,8 +2366,9 @@ class SceneAsmGenerator implements EventVisitor {
         }
       }
 
-      _memory.slots
-          .setPartyOrder(newParty, saveCurrent: changeParty.saveCurrentParty);
+      _memory.slots.setPartyOrder(newParty,
+          saveCurrent: changeParty.saveCurrentParty,
+          maintainOrder: changeParty.maintainOrder);
 
       return null;
     });
@@ -2378,7 +2379,11 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
     _addToEvent(restoreParty, (_) {
       _memory.slots.restorePreviousParty((i, prior, current) {
-        if (prior == current) return;
+        if (_memory.slots.partyOrderMaintained) {
+          if (i == 5) return;
+        } else if (prior == current) {
+          return;
+        }
         _eventAsm.add(Asm([
           move.b((Constant('Saved_Char_ID_Mem_$i').w), d0),
           moveq((i - 1).i, d1),

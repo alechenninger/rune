@@ -371,6 +371,8 @@ class Slots {
   /// Party order (not necessarily the same as field objects).
   final _party = BiMap<int, Character>();
   IMap<int, Character>? _priorParty;
+  bool get partyOrderMaintained => _partyOrderMaintained;
+  bool _partyOrderMaintained = false;
 
   static const all = [1, 2, 3, 4, 5];
 
@@ -394,23 +396,18 @@ class Slots {
 
   Character? party(int slot) => _party[slot];
 
-  void setPartyOrder(List<Character?> party, {bool saveCurrent = false}) {
+  void setPartyOrder(List<Character?> party,
+      {bool saveCurrent = false, bool maintainOrder = false}) {
     if (saveCurrent) {
       _priorParty = _party.toIMap();
     }
 
     _party.clear();
+    _partyOrderMaintained = maintainOrder;
 
     for (var i = 0; i < party.length; i++) {
       var member = party[i];
       if (member == null) continue;
-      var slot = _party.inverse.remove(member);
-      if (slot != null) {
-        var swapped = _party[i + 1];
-        if (swapped != null) {
-          _party[slot] = swapped;
-        }
-      }
       _party[i + 1] = member;
     }
   }
