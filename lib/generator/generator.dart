@@ -23,10 +23,12 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
+import 'package:logging/logging.dart';
 import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/guild.dart';
+import 'package:rune/src/logging.dart';
 
 import '../asm/asm.dart';
 import '../asm/dialog.dart';
@@ -60,6 +62,8 @@ typedef DebugOptions = ({
   List<Character> party,
   LoadMap loadMap,
 });
+
+final _log = Logger('generator');
 
 // tracks global state about the program code
 // e.g. event pointers
@@ -148,17 +152,27 @@ class Program {
         break;
     }
 
-    var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
-        startingMap: startingMap,
-        eventFlags: _eventFlags,
-        eventType: eventType,
-        fieldRoutines: _fieldRoutines);
+    try {
+      var generator = SceneAsmGenerator.forEvent(id, dialogTrees, eventAsm,
+          startingMap: startingMap,
+          eventFlags: _eventFlags,
+          eventType: eventType,
+          fieldRoutines: _fieldRoutines);
 
-    for (var event in scene.events) {
-      event.visit(generator);
+      for (var event in scene.events) {
+        event.visit(generator);
+      }
+
+      generator.finish();
+    } catch (err, s) {
+      _log.e(
+          e('add_scene', {
+            'scene_id': id.toString(),
+          }),
+          err,
+          s);
+      rethrow;
     }
-
-    generator.finish();
 
     return _scenes[id] = SceneAsm(event: eventAsm);
   }
