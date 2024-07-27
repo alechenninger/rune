@@ -1821,13 +1821,23 @@ class SceneAsmGenerator implements EventVisitor {
       // e.g. if after fading out, we want to show a panel,
       // the swap it to initvramandcram & fadein
 
-      if (fadeOut.speed case var s?) {
-        _eventAsm.add(Asm([
-          move.b(s.i, 0xffffed52.w),
-          jsr(Label('Pal_VariableFadeOut').l),
-        ]));
-      } else {
-        _eventAsm.add(events_asm.fadeOut(initVramAndCram: false));
+      switch (fadeOut.speed) {
+        case VariableSpeed s:
+          _eventAsm.add(Asm([
+            move.b(s.value.i, 0xffffed52.w),
+            jsr(Label('Pal_VariableFadeOut').l),
+          ]));
+        case Normal():
+          _eventAsm.add(events_asm.fadeOut(initVramAndCram: false));
+        case Instantly():
+          _eventAsm.add(Asm([
+            lea((Palette_Table_Buffer).w, a0),
+            move.w(0x1F.i, d7),
+            trap(0.i),
+            move.b(1.i, ('CRAM_Update_Flag').w),
+            jsr((VInt_Prepare).l),
+            jsr(('ClearSpriteTableBuf').l)
+          ]));
       }
 
       if ((_memory.panelsShown ?? 0) > 0) {

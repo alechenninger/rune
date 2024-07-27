@@ -85,14 +85,63 @@ class HideAllPanels extends Event {
   int get hashCode => 0;
 }
 
-class FadeOut extends Event {
-  final int? speed;
+sealed class FadeOutSpeed {
+  const FadeOutSpeed();
+}
 
-  const FadeOut() : speed = null;
+class VariableSpeed extends FadeOutSpeed {
+  final int value;
 
-  FadeOut.withSpeed(int this.speed) {
-    checkArgument(speed! >= 0, message: 'speed must be >= 0');
+  VariableSpeed(this.value) {
+    checkArgument(value >= 0, message: 'speed must be >= 0');
   }
+
+  @override
+  String toString() => 'VariableSpeed{$value}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VariableSpeed &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
+}
+
+class Instantly extends FadeOutSpeed {
+  const Instantly();
+  @override
+  String toString() => 'Instantly';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Instantly && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => toString().hashCode;
+}
+
+class Normal extends FadeOutSpeed {
+  const Normal();
+  @override
+  String toString() => 'Normal';
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Normal && runtimeType == other.runtimeType;
+  @override
+  int get hashCode => toString().hashCode;
+}
+
+class FadeOut extends Event {
+  final FadeOutSpeed speed;
+
+  const FadeOut() : speed = const Normal();
+
+  FadeOut.withSpeed(int speed) : speed = VariableSpeed(speed);
+
+  const FadeOut.instantly() : speed = const Instantly();
 
   @override
   void visit(EventVisitor visitor) {
@@ -101,16 +150,18 @@ class FadeOut extends Event {
 
   @override
   String toString() {
-    return 'FadeOutField{}';
+    return 'FadeOutField{$speed}';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FadeOut && runtimeType == other.runtimeType;
+      other is FadeOut &&
+          runtimeType == other.runtimeType &&
+          speed == other.speed;
 
   @override
-  int get hashCode => 0;
+  int get hashCode => speed.hashCode;
 }
 
 class FadeInField extends Event {
