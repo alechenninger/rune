@@ -2046,17 +2046,14 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.positions.clear();
     _memory.slots.reloadObjects();
 
+    // TODO(optimization): if we tracked party in memory, we could set positions
+    //  regardless of slot
+    //if (arrangement == PartyArrangement.overlapping) {}
+
     for (var i = 1; i <= 5; i++) {
-      // If party slots are known, reposition party in memory using
-      // the new position and arrangement.
-      var obj = switch (_memory.slots[i]) {
-        Character c => c,
-        // TODO(loadmap): take into account num characters
-        null when i == 1 => BySlot(i),
-        null => null,
-      };
-      if (obj == null) continue;
-      _memory.positions[obj] = arrangement.offsets[i - 1] + startPos;
+      // Reposition party in memory using the new position and arrangement.
+      // TODO(loadmap): take into account num characters
+      _memory.positions[BySlot(i)] = arrangement.offsets[i - 1] + startPos;
     }
   }
 
