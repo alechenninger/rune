@@ -390,10 +390,14 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
                 ],
                 move.w(x, curr_x_pos(load)),
                 // Ensure there is no fractional component
+                // We can't extend x or y to long
+                // because we only have an address, not the actual value
                 move.w(Word(0).i, load.plus(curr_x_pos + 2.toValue)),
                 move.w(y, curr_y_pos(load)),
                 // Ensure there is no fractional component
                 move.w(Word(0).i, load.plus(curr_y_pos + 2.toValue)),
+                // There is no fractional component to destination values
+                // (they are just words)
                 move.w(x, dest_x_pos(load)),
                 move.w(y, dest_y_pos(load)),
               ]);
