@@ -484,6 +484,7 @@ enum Direction implements DirectionExpression {
     return up;
   }
 
+  @override
   Direction turn(int times) {
     var normalized = times.isNegative ? (times + 4) % 4 : times % 4;
     return Direction.values[(index + normalized) % 4];

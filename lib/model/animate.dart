@@ -134,15 +134,25 @@ class StepObjects extends Event {
       frames;
 }
 
+enum ShutterStart {
+  up(Point(0, -1)),
+  down(Point(0, 1));
+
+  final Point<double> step;
+
+  const ShutterStart(this.step);
+}
+
 class ShutterObjects extends Event {
   final List<FieldObject> objects;
   final Duration duration;
   final int times;
+  final ShutterStart start;
 
-  static const _up = Point<double>(0, -1);
-  static const _down = Point<double>(0, 1);
-
-  ShutterObjects(this.objects, {required this.duration, required this.times}) {
+  ShutterObjects(this.objects,
+      {required this.duration,
+      required this.times,
+      this.start = ShutterStart.down}) {
     checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
     checkArgument(duration > Duration.zero,
         message: 'Duration must be greater than 0.');
@@ -172,15 +182,15 @@ class ShutterObjects extends Event {
   }
 
   _addEventsWithPause(List events, Duration pause) {
-    events.add(StepObjects(objects, stepPerFrame: _down, frames: 1));
+    events.add(StepObjects(objects, stepPerFrame: start.step, frames: 1));
     events.add(Pause(pause));
-    events.add(StepObjects(objects, stepPerFrame: _up, frames: 1));
+    events.add(StepObjects(objects, stepPerFrame: start.step * -1, frames: 1));
     events.add(Pause(pause));
   }
 
   _addEventsWithoutPause(List events) {
-    events.add(StepObjects(objects, stepPerFrame: _up, frames: 1));
-    events.add(StepObjects(objects, stepPerFrame: _down, frames: 1));
+    events.add(StepObjects(objects, stepPerFrame: start.step, frames: 1));
+    events.add(StepObjects(objects, stepPerFrame: start.step * -1, frames: 1));
   }
 
   @override

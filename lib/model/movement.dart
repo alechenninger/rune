@@ -480,6 +480,8 @@ class MapObjectById extends FieldObject {
 
   MapObjectById(this.id);
 
+  MapObjectById.of(String id) : id = MapObjectId(id);
+
   MapObject? inMap(GameMap map) => map.object(id);
 
   @override

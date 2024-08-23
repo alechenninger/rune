@@ -973,4 +973,46 @@ void main() {
       expect(Condition.empty().conflictsWith(Condition.empty()), isFalse);
     });
   });
+
+  group('shutter objects', () {
+    test('starts down by default', () {
+      var shutter = ShutterObjects([MapObjectById.of('test')],
+          duration: 1.second, times: 2);
+      var pause = Pause(((60 - 2) / 2).truncate().framesToDuration());
+      expect(shutter.toEvents(), [
+        StepObjects([MapObjectById.of('test')],
+            animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, 1)),
+        pause,
+        StepObjects([MapObjectById.of('test')],
+            animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, -1)),
+        pause,
+        StepObjects([MapObjectById.of('test')],
+            animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, 1)),
+        pause,
+        StepObjects([MapObjectById.of('test')],
+            animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, -1)),
+        pause,
+      ]);
+    });
+
+    test('can start up', () {
+      var shutter = ShutterObjects([MapObjectById.of('test')],
+          duration: 1.second, times: 2, start: ShutterStart.up);
+      var pause = Pause(((60 - 2) / 2).truncate().framesToDuration());
+      expect(shutter.toEvents(), [
+        StepObjects([MapObjectById.of('test')],
+            animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, -1)),
+        pause,
+        StepObjects([MapObjectById.of('test')],
+            animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, 1)),
+        pause,
+        StepObjects([MapObjectById.of('test')],
+            animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, -1)),
+        pause,
+        StepObjects([MapObjectById.of('test')],
+            animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, 1)),
+        pause,
+      ]);
+    });
+  });
 }
