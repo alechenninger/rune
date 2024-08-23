@@ -20,6 +20,7 @@ Sprite spriteForLabel(Label label) {
 }
 
 final defaultFieldRoutines = FieldRoutineRepository([
+  FieldRoutine.asm(Word(0), Label('FieldObj_None'), spriteMappingTiles: 0),
   FieldRoutine(
       Word(0x68),
       Label('FieldObj_NPCAlysPiata'),
@@ -43,12 +44,12 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 8,
       ramArt: RamArt(address: Word(0x0900)),
       vramAnimated: true,
-      SpecFactory((_) => AiedoShopperMom(), forSpec: AiedoShopperMom)),
+      SpecFactory<AiedoShopperMom>((_) => AiedoShopperMom())),
   FieldRoutine(
       Word(0x120),
       Label('FieldObj_Elevator'),
       spriteMappingTiles: 0,
-      SpecFactory((d) => Elevator(d), forSpec: Elevator)),
+      SpecFactory<Elevator>((d) => Elevator(d))),
   FieldRoutine(
       Word(0x74),
       Label('FieldObj_InvisibleBlock'),
