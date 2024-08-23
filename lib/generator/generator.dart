@@ -1118,7 +1118,8 @@ class SceneAsmGenerator implements EventVisitor {
       // Adjust each object for each loop iteration (frame)
       for (var obj in step.objects) {
         _eventAsm.add(Asm([
-          obj.toA4(_memory),
+          // Force due to loop
+          obj.toA4(_memory, force: true),
           if (step.onTop) move.b(1.i, 5(a4)),
           if (Size.b.fitsSigned(x))
             moveq(x.toSignedByte.i, d0)
