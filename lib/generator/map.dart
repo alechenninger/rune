@@ -238,12 +238,13 @@ Map<MapObjectId, Word> _compileMapSpriteData(
   // in VRAM.
   _VramTiles? vram;
 
-  for (var (mapping, _) in sprites.mappings()) {
+  for (var (mapping, objects) in sprites.mappings()) {
     if (mapping.tiles == 0) continue;
 
     if (spriteVramOffset == null) {
       throw Exception('no vram offsets defined but map has sprites. '
-          'mapping=$mapping');
+          'mapping=$mapping '
+          'objects=$objects');
     } else {
       vram ??= _VramTiles(start: spriteVramOffset, fixed: sprites.fixed());
     }
