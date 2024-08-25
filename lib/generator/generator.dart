@@ -2144,22 +2144,21 @@ class SceneAsmGenerator implements EventVisitor {
   void hideTopPanels(HideTopPanels hidePanels) {
     _checkNotFinished();
 
-    var panels = hidePanels.panelsToHide;
-    // FIXME: state check is broken due to possibly queued generations
-    var panelsShown = _memory.panelsShown;
-
-    if (panelsShown == 0) return;
-
-    if (panelsShown != null) {
-      panels = min(panels, panelsShown);
-    }
-
     // todo(hide top panels): support instantly
     if (hidePanels.instantly) {
       throw UnimplementedError('HideTopPanels.instantly');
     }
 
     _addToEventOrDialog(hidePanels, inDialog: () {
+      var panels = hidePanels.panelsToHide;
+      var panelsShown = _memory.panelsShown;
+
+      if (panelsShown == 0) return;
+
+      if (panelsShown != null) {
+        panels = min(panels, panelsShown);
+      }
+
       _memory.removePanels(panels);
 
       _addToDialog(Asm([
@@ -2169,9 +2168,18 @@ class SceneAsmGenerator implements EventVisitor {
         if (_memory.isFieldShown == true) dc.b([Byte(0xf2), Byte(6)]),
       ]));
     }, inEvent: (eventIndex) {
+      var panels = hidePanels.panelsToHide;
+      var panelsShown = _memory.panelsShown;
+
+      if (panelsShown == 0) return Asm.empty();
+
+      if (panelsShown != null) {
+        panels = min(panels, panelsShown);
+      }
       _memory.removePanels(panels);
 
       var skip = '.skipHidePanel$eventIndex';
+      
       return Asm([
         for (var i = 0; i < panels; i++) ...[
           if (panelsShown == null)
