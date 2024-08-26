@@ -602,6 +602,21 @@ class Scene extends IterableBase<Event> {
     }, Condition.empty(), condition);
   }
 
+  bool hasBranchOn(EventFlag flag) {
+    bool findBranch(List<Event> events) {
+      for (var e in events) {
+        if (e is IfFlag) {
+          if (e.flag == flag) return true;
+          if (findBranch(e.isSet)) return true;
+          if (findBranch(e.isUnset)) return true;
+        }
+      }
+      return false;
+    }
+
+    return findBranch(_events);
+  }
+
   /// Recurses through all branches and hastens the scene by...
   ///
   /// - Removing pauses
