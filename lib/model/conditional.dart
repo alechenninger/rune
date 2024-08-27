@@ -543,8 +543,10 @@ class IfFlag extends Event {
 
   IfFlag(this.flag,
       {Iterable<Event> isSet = const [], Iterable<Event> isUnset = const []})
-      : isSet = Scene(isSet).asOf(Condition({flag: true})).events,
-        isUnset = Scene(isUnset).asOf(Condition({flag: false})).events;
+      : isSet = List.unmodifiable(
+            Scene(isSet).asOf(Condition({flag: true})).events),
+        isUnset = List.unmodifiable(
+            Scene(isUnset).asOf(Condition({flag: false})).events);
 
   @override
   void visit(EventVisitor visitor) {

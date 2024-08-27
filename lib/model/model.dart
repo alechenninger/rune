@@ -168,6 +168,7 @@ abstract class FindsGameElement {
   MapElement? findInGame(Game game);
 }
 
+/// Events should never be mutated once included in a Scene.
 abstract class Event {
   const Event();
 
@@ -527,6 +528,10 @@ class Scene extends IterableBase<Event> {
 
   Scene asOf(Condition asOf) {
     return Scene(_asOf(_events, asOf, Condition.empty()));
+  }
+
+  Scene copy() {
+    return Scene([..._events]);
   }
 
   /// Advances the scene in place by assuming the given [condition].
