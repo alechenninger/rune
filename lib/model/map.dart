@@ -949,7 +949,8 @@ class AsmArea extends AreaSpec {
 }
 
 // todo: 'with UnnamedSpeaker' – aren't some objects named speakers?
-class MapObject extends FieldObject implements UnnamedSpeaker, MapObjectOrArea {
+class MapObject extends ResolvedFieldObject
+    implements UnnamedSpeaker, MapObjectOrArea {
   final MapObjectId id;
   // note: can only be in multiples of 8 pixels
   final Position startPosition;

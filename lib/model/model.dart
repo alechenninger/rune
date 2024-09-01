@@ -283,6 +283,11 @@ class EventState {
 
   GameMap? currentMap;
 
+  Iterable<Character> get possibleCharacters {
+    // TODO: correct this based on story state
+    return Character.allCharacters;
+  }
+
   int? panelsShown = 0;
   void addPanel() {
     if (panelsShown != null) panelsShown = panelsShown! + 1;
@@ -294,10 +299,24 @@ class EventState {
 
   final _facing = <FieldObject, Direction>{};
   DirectionExpression? getFacing(FieldObject obj) => _facing[obj.resolve(this)];
-  void setFacing(FieldObject obj, Direction dir) =>
-      _facing[obj.resolve(this)] = dir;
+  void setFacing(FieldObject obj, Direction dir) {
+    for (var obj in obj.knownObjects(this)) {
+      _facing[obj] = dir;
+    }
 
-  void clearFacing(FieldObject obj) => _facing.remove(obj.resolve(this));
+    for (var obj in obj.unknownObjects(this)) {
+      _facing.remove(obj);
+    }
+  }
+
+  void clearFacing(FieldObject obj) {
+    for (var obj in obj.knownObjects(this)) {
+      _facing.remove(obj);
+    }
+    for (var obj in obj.unknownObjects(this)) {
+      _facing.remove(obj);
+    }
+  }
 
   /// 1-indexed (first slot is 1, there is no slot 0).
   int? slotFor(Character c) => slots.slotFor(c);
@@ -324,9 +343,19 @@ class EventState {
 
   final _routines = <FieldObject, SpecModel>{};
   SpecModel? getRoutine(FieldObject obj) => _routines[obj.resolve(this)];
-  void setRoutine(FieldObject obj, SpecModel? r) => r == null
-      ? _routines.remove(obj.resolve(this))
-      : _routines[obj.resolve(this)] = r;
+  void setRoutine(FieldObject obj, SpecModel? r) {
+    var update = r == null
+        ? (obj) => _routines.remove(obj)
+        : (obj) => _routines[obj] = r;
+
+    for (var obj in obj.knownObjects(this)) {
+      update(obj);
+    }
+
+    for (var obj in obj.unknownObjects(this)) {
+      _routines.remove(obj);
+    }
+  }
 }
 
 class Positions {
@@ -356,19 +385,21 @@ class Positions {
   }
 
   void operator []=(FieldObject obj, Position? p) {
-    obj = obj.resolve(_ctx);
-    if (p == null) {
+    var update = p == null
+        ? (obj) => _positions.remove(obj)
+        : (obj) => _positions[obj] = p;
+
+    for (var obj in obj.knownObjects(_ctx)) {
+      update(obj);
+    }
+
+    for (var obj in obj.unknownObjects(_ctx)) {
       _positions.remove(obj);
-    } else {
-      _positions[obj] = p;
     }
   }
 }
 
 class Slots {
-  /// 1-indexed (first is 1; 0 is invalid)
-  final _fieldObjects = BiMap<int, Character>();
-
   /// Party order (not necessarily the same as field objects).
   final _party = BiMap<int, Character>();
   IMap<int, Character>? _priorParty;
@@ -379,21 +410,16 @@ class Slots {
 
   Slots._();
 
-  /// Whether or not field objects order is consistent with party order.
-  bool get isConsistent =>
-      const MapEquality<int, Character>().equals(_fieldObjects, _party);
-  bool get isNotConsistent => !isConsistent;
-
   void addAll(Slots slots) {
-    _fieldObjects.addAll(slots._fieldObjects);
+    _party.addAll(slots._party);
   }
 
   void forEach(Function(int, Character) func) {
-    _fieldObjects.forEach(func);
+    _party.forEach(func);
   }
 
   /// 1-indexed (first slot is 1, there is no slot 0).
-  Character? operator [](int slot) => _fieldObjects[slot];
+  Character? operator [](int slot) => _party[slot];
 
   Character? party(int slot) => _party[slot];
 
@@ -434,18 +460,16 @@ class Slots {
   /// 1-indexed (first slot is 1, there is no slot 0).
   void operator []=(int slot, Character? c) {
     if (c == null) {
-      _fieldObjects.remove(slot);
       _party.remove(slot);
     } else {
-      _fieldObjects[slot] = c;
       _party[slot] = c;
     }
   }
 
   /// 1-indexed (first slot is 1, there is no slot 0).
-  int? slotFor(Character c) => _fieldObjects.inverse[c];
+  int? slotFor(Character c) => _party.inverse[c];
 
-  int get numCharacters => _fieldObjects.keys.reduce(max);
+  int get numCharacters => _party.keys.reduce(max);
 
   void unknownPartyOrder() {
     _party.clear();
@@ -467,12 +491,6 @@ class Slots {
     if (_priorParty!.length != _party.length) return false;
     return const MapEquality<int, Character>()
         .equals(_priorParty!.unlockView, _party);
-  }
-
-  /// Resets character objects from party order.
-  void reloadObjects() {
-    _fieldObjects.clear();
-    _fieldObjects.addAll(_party);
   }
 }
 
@@ -983,6 +1001,19 @@ class BySlot extends FieldObject {
   }
 
   @override
+  Iterable<FieldObject> unknownObjects(EventState state) sync* {
+    // If this slot is not known
+    if (state.slots[index] == null) {
+      // Include all characters whose slot is not known
+      for (var c in state.possibleCharacters) {
+        if (state.slotFor(c) == null) {
+          yield c;
+        }
+      }
+    }
+  }
+
+  @override
   String toString() {
     return 'Slot{$index}';
   }
@@ -1001,7 +1032,7 @@ class BySlot extends FieldObject {
   int get hashCode => index.hashCode;
 }
 
-sealed class Character extends FieldObject with Speaker {
+sealed class Character extends ResolvedFieldObject with Speaker {
   const Character();
 
   static Character? byName(String name) {

@@ -706,11 +706,14 @@ extension FieldObjectAsm on FieldObject {
         asm = lea(Constant('Character_${obj.index}').w, a);
       case InteractionObject() when memory.inAddress(a3)?.obj == obj:
         asm = (a == a3) ? Asm.empty() : lea(a3.indirect, a);
-      case Character():
-        asm = Asm([
-          moveq(obj.charIdAddress, d0),
-          Asm.fromRaw('	getcharacter	$a'),
-        ]);
+      case Character c:
+        asm = switch (c.slotAsOf(memory)) {
+          var slot? => lea(Constant('Character_$slot').w, a),
+          null => Asm([
+              moveq(c.charIdAddress, d0),
+              Asm.fromRaw('	getcharacter	$a'),
+            ])
+        };
       default:
         // Does this branch ever get reached?
         var inA4 = memory.inAddress(a4)?.obj;

@@ -450,6 +450,9 @@ class ResolveException implements Exception {
 abstract class FieldObject extends Moveable {
   const FieldObject();
 
+  bool get isResolved => false;
+  bool get isNotResolved => !isResolved;
+
   int compareTo(FieldObject other, EventState ctx) {
     var thisSlot = slotAsOf(ctx);
     var otherSlot = other.slotAsOf(ctx);
@@ -464,8 +467,41 @@ abstract class FieldObject extends Moveable {
   int? slotAsOf(EventState c);
 
   // TODO(refactor): this api stinks; should not be on same type as "real" thing
+  //   consider removing this or return null if we cannot resovle.
   @override
   FieldObject resolve(EventState state) => this;
+
+  /// All `FieldObject` instances which we _know_ this refers to.
+  ///
+  /// Includes the reference object itself even if it is not resolved.
+  /// Additionally includes the resolved object if known.
+  /// That is, this only ever returns 1 or 2 objects.
+  Iterable<FieldObject> knownObjects(EventState state) sync* {
+    yield this;
+    if (isNotResolved) {
+      var obj = resolve(state);
+      if (obj.isResolved) {
+        yield obj;
+      }
+    }
+  }
+
+  /// All `FieldObject` instances which this _may_ refer to.
+  ///
+  /// Does not include objects we know it cannot refer to.
+  ///
+  /// Does not include the reference object itself if it is not resolved.
+  Iterable<FieldObject> unknownObjects(EventState state);
+}
+
+abstract class ResolvedFieldObject extends FieldObject {
+  const ResolvedFieldObject();
+  @override
+  bool get isResolved => true;
+  @override
+  Iterable<FieldObject> unknownObjects(EventState state) => const [];
+  @override
+  ResolvedFieldObject resolve(EventState state) => this;
 }
 
 extension ObjectExpressions on FieldObject {
@@ -500,6 +536,17 @@ class MapObjectById extends FieldObject {
   }
 
   @override
+  Iterable<FieldObject> unknownObjects(EventState state) {
+    var map = state.currentMap;
+    if (map == null) {
+      throw ResolveException('got field obj in map, but map was null. '
+          'this=$this');
+    }
+    // Either it resolves to a known object or fails.
+    return const [];
+  }
+
+  @override
   int? slotAsOf(EventState c) => null;
 
   @override
@@ -523,6 +570,23 @@ class InteractionObject extends FieldObject {
   const InteractionObject();
 
   static FacePlayer facePlayer() => FacePlayer(const InteractionObject());
+
+  @override
+  Iterable<FieldObject> unknownObjects(EventState state) sync* {
+    var map = state.currentMap;
+    if (map == null) {
+      throw ResolveException('got field obj in map, but map was null. '
+          'this=$this');
+    }
+    // All objects we might have interacted with.
+    // TODO(interactions): we might want to save interacted object in event state
+    // when it is known.
+    // We also know to limit the objects by the scene they share.
+    // So many times this can actually be known.
+    for (var obj in map.objects) {
+      if (obj.isInteractive) yield obj;
+    }
+  }
 
   @override
   int? slotAsOf(EventState c) => null;

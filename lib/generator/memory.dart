@@ -199,6 +199,9 @@ class Memory implements EventState {
       (map, m) => m._eventState.currentMap = map));
 
   @override
+  Iterable<Character> get possibleCharacters => _eventState.possibleCharacters;
+
+  @override
   Portrait? get dialogPortrait => _eventState.dialogPortrait;
 
   @override
@@ -377,17 +380,6 @@ class _Slots implements Slots {
   void unknownPartyOrder() {
     _memory._apply(UnknownPartyOrder());
   }
-
-  @override
-  void reloadObjects() {
-    _memory._apply(ReloadObjectsInSlots());
-  }
-
-  @override
-  bool get isConsistent => _memory._eventState.slots.isConsistent;
-
-  @override
-  bool get isNotConsistent => _memory._eventState.slots.isNotConsistent;
 
   @override
   bool priorSameAsCurrent() => _memory._eventState.slots.priorSameAsCurrent();
@@ -575,21 +567,6 @@ class UnknownPartyOrder extends StateChange {
   @override
   mayApply(Memory memory) {
     memory._eventState.slots.unknownPartyOrder();
-  }
-}
-
-class ReloadObjectsInSlots extends StateChange {
-  @override
-  apply(Memory memory) {
-    memory._eventState.slots.reloadObjects();
-  }
-
-  @override
-  mayApply(Memory memory) {
-    var slots = memory._eventState.slots;
-    if (slots.isNotConsistent) {
-      slots.forEach((slot, c) => slots[slot] = null);
-    }
   }
 }
 

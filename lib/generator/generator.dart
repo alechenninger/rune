@@ -2045,7 +2045,6 @@ class SceneAsmGenerator implements EventVisitor {
     // Due to new map, clear known positions.
     //TODO: _memory.clearAllFacing();
     _memory.positions.clear();
-    _memory.slots.reloadObjects();
 
     // TODO(optimization): if we tracked party in memory, we could set positions
     //  regardless of slot
