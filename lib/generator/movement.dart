@@ -262,7 +262,8 @@ int Function(RelativeMove<FieldObject>, RelativeMove<FieldObject>)
   };
 }
 
-EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state) {
+EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
+    {int? eventIndex}) {
   // We assume we don't know the current positions,
   // so we don't know which move is longer.
   // Just start all in parallel.
@@ -519,7 +520,7 @@ class _MovementGenerator {
       _eventIndex,
       _labelSafeString(obj),
       moveIndex
-    ].whereNotNull().join('_')}';
+    ].nonNulls.join('_')}';
 
     // This ensures facing doesn't change during subsequent movements.
     if (!scriptable(obj)) {

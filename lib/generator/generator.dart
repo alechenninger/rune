@@ -1030,7 +1030,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void absoluteMoves(AbsoluteMoves moves) {
-    _addToEvent(moves, (i) => absoluteMovesToAsm(moves, _memory));
+    _addToEvent(moves, (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
   }
 
   @override
@@ -2179,7 +2179,7 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.removePanels(panels);
 
       var skip = '.skipHidePanel$eventIndex';
-      
+
       return Asm([
         for (var i = 0; i < panels; i++) ...[
           if (panelsShown == null)
