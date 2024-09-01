@@ -1107,7 +1107,7 @@ EventFlag_Test001 = $0001'''));
           ]));
     });
 
-    test('terminates dialog', () {
+    test('terminates dialog when only event', () {
       var scene = Scene([
         IfValue(PositionComponent(0x200, Axis.y),
             comparedTo: rune.position().component(Axis.y),
@@ -1137,6 +1137,9 @@ EventFlag_Test001 = $0001'''));
 
             // continue
             label(Label('.1_continue')),
+
+            // Close dialog
+            jsr('Event_CloseDialog'.l),
           ]));
 
       expect(
@@ -1144,10 +1147,127 @@ EventFlag_Test001 = $0001'''));
           DialogTree()
             ..add(DialogAsm([
               dc.b(Bytes.ascii('ho')),
+              // Keep dialog until next event is compiled
+              dc.b([Byte(0xf8)]),
               dc.b([Byte(0xff)])
             ]))
             ..add(DialogAsm([
               dc.b(Bytes.ascii('howdy')),
+              // Keep dialog until next event is compiled
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xff)])
+            ])));
+    });
+
+    test('terminates dialog when followed by a non-dialog event', () {
+      var scene = Scene([
+        IfValue(PositionComponent(0x200, Axis.y),
+            comparedTo: rune.position().component(Axis.y),
+            greater: [Dialog.parse('howdy')],
+            less: [Dialog.parse('ho')]),
+        Pause(1.second),
+      ]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            move.w(0x200.toWord.i, d0),
+            cmp.w(curr_y_pos(a4), d0),
+            beq(Label('.1_continue')),
+            bhi(Label('.1_gt')),
+
+            // lt branch
+            getAndRunDialog3LowDialogId(Byte.zero.i),
+            bra(Label('.1_continue')),
+
+            label(Label('.1_gt')),
+            // gt branch
+            getAndRunDialog3LowDialogId(Byte.one.i),
+
+            // continue
+            label(Label('.1_continue')),
+
+            // Close dialog
+            jsr('Event_CloseDialog'.l),
+
+            // Pause
+            generateEventAsm([Pause(1.second)]),
+          ]));
+
+      expect(
+          program.dialogTrees.forMap(map.id),
+          DialogTree()
+            ..add(DialogAsm([
+              dc.b(Bytes.ascii('ho')),
+              // Keep dialog until next event is compiled
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xff)])
+            ]))
+            ..add(DialogAsm([
+              dc.b(Bytes.ascii('howdy')),
+              // Keep dialog until next event is compiled
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xff)])
+            ])));
+    });
+
+    test('keeps dialog when followed by dialog', () {
+      var scene = Scene([
+        IfValue(PositionComponent(0x200, Axis.y),
+            comparedTo: rune.position().component(Axis.y),
+            greater: [Dialog.parse('howdy')],
+            less: [Dialog.parse('ho')]),
+        Dialog.parse('hello'),
+      ]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            move.w(0x200.toWord.i, d0),
+            cmp.w(curr_y_pos(a4), d0),
+            beq(Label('.1_continue')),
+            bhi(Label('.1_gt')),
+
+            // lt branch
+            getAndRunDialog3LowDialogId(Byte.zero.i),
+            bra(Label('.1_continue')),
+
+            label(Label('.1_gt')),
+            // gt branch
+            getAndRunDialog3LowDialogId(Byte.one.i),
+
+            // continue
+            label(Label('.1_continue')),
+
+            // Run next dialog
+            getAndRunDialog3LowDialogId(Byte.two.i),
+          ]));
+
+      expect(
+          program.dialogTrees.forMap(map.id),
+          DialogTree()
+            ..add(DialogAsm([
+              dc.b(Bytes.ascii('ho')),
+              // Keep dialog until next event is compiled
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xff)])
+            ]))
+            ..add(DialogAsm([
+              dc.b(Bytes.ascii('howdy')),
+              // Keep dialog until next event is compiled
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xff)])
+            ]))
+            ..add(DialogAsm([
+              dc.b(Bytes.ascii('hello')),
               dc.b([Byte(0xff)])
             ])));
     });

@@ -1030,7 +1030,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void absoluteMoves(AbsoluteMoves moves) {
-    _addToEvent(moves, (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
+    _addToEvent(
+        moves, (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
   }
 
   @override
@@ -1557,7 +1558,8 @@ class SceneAsmGenerator implements EventVisitor {
           //  in condition graph, we would use finish()
           _finish(appendNewline: true);
         } else {
-          _terminateDialog();
+          // Keep dialog in case next event is dialog.
+          _terminateDialog(keepDialog: true);
         }
       }
 
@@ -1632,7 +1634,7 @@ class SceneAsmGenerator implements EventVisitor {
       }
 
       return null;
-    });
+    }, keepDialog: true);
   }
 
   @override
@@ -2967,6 +2969,9 @@ class SceneAsmGenerator implements EventVisitor {
 
   /// Terminates the current dialog, if there is any,
   /// regardless of whether current generating within dialog loop or not.
+  ///
+  /// May keep the dialog open if [keepDialog] is true
+  /// (and there is currently a dialog window open).
   void _terminateDialog(
       {bool? hidePanels, bool keepDialog = false, int? forEventBreak}) {
     var wasInDialog = false;

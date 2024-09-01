@@ -864,6 +864,58 @@ ${dialog2.toAsm()}
     });
 
     test(
+      'dialog in consecutive if value followed by dialog keeps dialog',
+      () {
+        var eventAsm = EventAsm.empty();
+        var dialog = DialogTrees();
+
+        var dialog1 = DialogSpan.parse('Dialog 1');
+        var dialog2 = DialogSpan.parse('Dialog 2');
+        var dialog3 = DialogSpan.parse('Dialog 3');
+
+        SceneAsmGenerator.forEvent(sceneId, dialog, eventAsm, startingMap: map)
+          ..ifValue(IfValue(hahn.slot(),
+              comparedTo: NullSlot(), notEqual: [Dialog(spans: dialog1)]))
+          ..ifValue(IfValue(alys.slot(),
+              comparedTo: NullSlot(), notEqual: [Dialog(spans: dialog2)]))
+          ..dialog(Dialog(spans: dialog3))
+          ..finish();
+
+        expect(
+            eventAsm.withoutComments(),
+            EventAsm([
+              moveq(hahn.charIdAddress, d0),
+              jsr(('FindCharacterSlot').l),
+              cmpi.b(0xFF.i, d1),
+              beq(Label('.1_continue')),
+              getAndRunDialog3LowDialogId(Byte.zero.i),
+              setLabel('.1_continue'),
+              // Should not close dialog!
+              // jsr(('Event_CloseDialog').l),
+              moveq(alys.charIdAddress, d0),
+              jsr(('FindCharacterSlot').l),
+              cmpi.b(0xFF.i, d1),
+              beq(Label('.3_continue')),
+              getAndRunDialog3LowDialogId(Byte.one.i),
+              setLabel('.3_continue'),
+              getAndRunDialog3LowDialogId(Byte.two.i),
+            ]).withoutComments());
+
+        expect(
+          dialog.forMap(map.id).toAsm(),
+          containsAllInOrder(Asm([
+            dc.b(dialog1[0].toAscii()),
+            terminateDialog(keepDialog: true),
+            dc.b(dialog2[0].toAscii()),
+            terminateDialog(keepDialog: true),
+            dc.b(dialog3[0].toAscii()),
+            terminateDialog(),
+          ])),
+        );
+      },
+    );
+
+    test(
         'dialog in both branches terminates and clears saved dialog state with prior dialog',
         () {
       var prior = DialogSpan.parse('Prior');
