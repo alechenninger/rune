@@ -702,7 +702,6 @@ extension FieldObjectAsm on FieldObject {
         var address = obj.address(memory);
         asm = lea(Absolute.long(address), a);
       case BySlot():
-        // why word? this is what asm appears to do
         asm = lea(Constant('Character_${obj.index}').w, a);
       case InteractionObject() when memory.inAddress(a3)?.obj == obj:
         asm = (a == a3) ? Asm.empty() : lea(a3.indirect, a);

@@ -441,9 +441,9 @@ class Slots {
 
   void restorePreviousParty(
       [Function(int index, Character? prior, Character? current)? onRestore]) {
-    if (_priorParty != null) {
+    if (_priorParty case var priorParty?) {
       for (var i = 1; i <= 5; i++) {
-        var prior = _priorParty![i];
+        var prior = priorParty[i];
         var current = _party[i];
         onRestore?.call(i, prior, current);
         if (prior == null) {

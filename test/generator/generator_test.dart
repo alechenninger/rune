@@ -13,10 +13,12 @@ import '../fixtures.dart';
 main() {
   late GameMap map;
   late GameMap map2;
+  late Memory testMemory;
 
   setUp(() {
     map = GameMap(MapId.Test);
     map2 = GameMap(MapId.Test_Part2);
+    testMemory = Memory();
   });
 
   test('cutscene pointers are offset by 0x8000', () {
@@ -853,9 +855,16 @@ EventFlag_Test001 = $0001'''));
           ]));
     });
 
-    test('requries reloading address registers after', () {
+    test('requires reloading address registers after', () {
+      var firstMove = AbsoluteMoves()
+        ..destinations[shay] = Position(0x100, 0x200);
+      var secondMove = AbsoluteMoves()
+        ..destinations[shay] = Position(0x110, 0x200);
+
       var scene = Scene([
+        firstMove,
         MoveCamera(Position(0x1b0, 0x2a0)),
+        secondMove,
       ]);
 
       var asm =
@@ -864,12 +873,39 @@ EventFlag_Test001 = $0001'''));
       expect(
           asm.event.withoutComments(),
           Asm([
+            absoluteMovesToAsm(firstMove, testMemory),
             move.w(0x1b0.toWord.i, d0),
             move.w(0x2a0.toWord.i, d1),
             move.w(1.i, d2),
             jsr(Label('Event_MoveCamera').l),
+            absoluteMovesToAsm(
+                secondMove, testMemory..unknownAddressRegisters()),
           ]));
-    }, skip: 'TODO');
+    });
+
+    test('requires reloading address registers after moving to object', () {
+      var moveShay = AbsoluteMoves()
+        ..destinations[shay] = Position(0x110, 0x200);
+
+      var scene = Scene([
+        MoveCamera(shay.position()),
+        moveShay,
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            shay.toA4(testMemory),
+            move.w(curr_x_pos(a4), d0),
+            move.w(curr_y_pos(a4), d1),
+            move.w(1.i, d2),
+            jsr(Label('Event_MoveCamera').l),
+            absoluteMovesToAsm(moveShay, testMemory..unknownAddressRegisters()),
+          ]));
+    });
   });
 
   group('if value', () {

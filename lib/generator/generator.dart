@@ -661,6 +661,8 @@ class SceneAsmGenerator implements EventVisitor {
   ProgramConfiguration get _config => _context.config;
   DialogTrees get _dialogTrees => _config.dialogTrees;
   EventFlags get _eventFlags => _config.eventFlags;
+
+  /// Free to modify during [_addToEvent].
   EventAsm get _eventAsm => _context.eventAsm;
 
   /// Additional assembly segments, labelled, which are added after generation.
@@ -1194,8 +1196,6 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void moveCamera(MoveCamera move) {
     _addToEvent(move, (i) {
-      _memory.unknownAddressRegisters();
-
       var panels = _memory.panelsShown;
       if (panels != null && panels > 0) {
         throw StateError('moving camera while panels are shown '
@@ -1221,6 +1221,8 @@ class SceneAsmGenerator implements EventVisitor {
                 if (_memory.cameraLock == true) events_asm.lockCamera(true),
               ])));
     });
+
+    _memory.unknownAddressRegisters();
   }
 
   @override
@@ -2408,6 +2410,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void restoreSavedParty(RestoreSavedPartyOrder restoreParty) {
     _checkNotFinished();
+
     _addToEvent(restoreParty, (_) {
       _memory.slots.restorePreviousParty((i, prior, current) {
         if (_memory.slots.partyOrderMaintained) {
@@ -2421,7 +2424,6 @@ class SceneAsmGenerator implements EventVisitor {
           jsr(Label('Event_SwapCharacter').l),
         ]));
       });
-      return null;
     });
   }
 
@@ -2808,6 +2810,10 @@ class SceneAsmGenerator implements EventVisitor {
           break;
         case _Reachability.unreachable:
           break;
+        case _Reachability.current:
+          // Do nothing in this case
+          // (we don't want to apply changes twice)
+          break;
       }
     }
     _memory.clearChanges();
@@ -2815,7 +2821,9 @@ class SceneAsmGenerator implements EventVisitor {
 
   Iterable<(_Reachability, Memory)> _allStates() sync* {
     for (var MapEntry(key: condition, value: state) in _stateGraph.entries) {
-      if (_currentCondition.conflictsWith(condition)) {
+      if (_currentCondition == condition) {
+        yield (_Reachability.current, state);
+      } else if (_currentCondition.conflictsWith(condition)) {
         yield (_Reachability.unreachable, state);
       } else if (_currentCondition.isSatisfiedBy(condition)) {
         yield (_Reachability.child, state);
@@ -3124,10 +3132,17 @@ class SceneAsmGenerator implements EventVisitor {
     return _dialogTree!;
   }
 
-  /// Add to event code, switching to event from dialog if needed.
+  /// Immediately add to event code, switching to event from dialog if needed.
   ///
   /// [generate] may update [_eventAsm] directly, and/or it may return
   /// [Asm] to be added to `_eventAsm`.
+  ///
+  /// Any [_memory] interactions MUST happen either within [generate]
+  /// or AFTER this method has returned.
+  /// This is because there may be queued events
+  /// that have not run yet (but will run when this is called).
+  ///
+  /// See: [_addToEventOrDialog].
   void _addToEvent(Event event, dynamic Function(int eventIndex) generate,
       {bool keepDialog = false}) {
     _checkNotFinished();
@@ -3642,7 +3657,7 @@ class AsmGenerationException {
   }
 }
 
-enum _Reachability { child, reachable, unreachable }
+enum _Reachability { child, reachable, unreachable, current }
 
 // These offsets are used to account for assembly specifics, which allows for
 // variances in maps to be coded manually (such as objects).

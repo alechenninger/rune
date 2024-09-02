@@ -6,8 +6,10 @@ class ShowPanel extends Event {
   final Panel panel;
   final Portrait? portrait;
   final bool showDialogBox;
+  final bool runMapUpdates;
 
-  const ShowPanel(this.panel, {bool showDialogBox = false, this.portrait})
+  const ShowPanel(this.panel,
+      {bool showDialogBox = false, this.portrait, this.runMapUpdates = false})
       : showDialogBox = showDialogBox || portrait != null;
 
   @override
@@ -17,7 +19,10 @@ class ShowPanel extends Event {
 
   @override
   String toString() {
-    return 'ShowPanel{panel: $panel, speaker: $portrait}';
+    return 'ShowPanel{panel: $panel, '
+        'portrait: $portrait, '
+        'showDialogBox: $showDialogBox, '
+        'runMapUpdates: $runMapUpdates}';
   }
 
   @override
@@ -26,10 +31,13 @@ class ShowPanel extends Event {
       other is ShowPanel &&
           runtimeType == other.runtimeType &&
           panel == other.panel &&
-          portrait == other.portrait;
+          portrait == other.portrait &&
+          showDialogBox == other.showDialogBox &&
+          runMapUpdates == other.runMapUpdates;
 
   @override
-  int get hashCode => panel.hashCode ^ portrait.hashCode;
+  int get hashCode =>
+      panel.hashCode ^ portrait.hashCode ^ showDialogBox.hashCode;
 }
 
 class HideTopPanels extends Event {
