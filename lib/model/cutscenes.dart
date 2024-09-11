@@ -93,11 +93,11 @@ class HideAllPanels extends Event {
   int get hashCode => 0;
 }
 
-sealed class FadeOutSpeed {
-  const FadeOutSpeed();
+sealed class FadeSpeed {
+  const FadeSpeed();
 }
 
-class VariableSpeed extends FadeOutSpeed {
+class VariableSpeed extends FadeSpeed {
   final int value;
 
   VariableSpeed(this.value) {
@@ -118,7 +118,7 @@ class VariableSpeed extends FadeOutSpeed {
   int get hashCode => value.hashCode;
 }
 
-class Instantly extends FadeOutSpeed {
+class Instantly extends FadeSpeed {
   const Instantly();
   @override
   String toString() => 'Instantly';
@@ -130,7 +130,7 @@ class Instantly extends FadeOutSpeed {
   int get hashCode => toString().hashCode;
 }
 
-class Normal extends FadeOutSpeed {
+class Normal extends FadeSpeed {
   const Normal();
   @override
   String toString() => 'Normal';
@@ -143,7 +143,7 @@ class Normal extends FadeOutSpeed {
 }
 
 class FadeOut extends Event {
-  final FadeOutSpeed speed;
+  final FadeSpeed speed;
 
   const FadeOut() : speed = const Normal();
 
@@ -173,9 +173,14 @@ class FadeOut extends Event {
 }
 
 class FadeInField extends Event {
-  final bool instantly;
+  final FadeSpeed speed;
 
-  const FadeInField({this.instantly = false});
+  const FadeInField({bool instantly = false})
+      : speed = instantly ? const Instantly() : const Normal();
+
+  const FadeInField.instantly() : speed = const Instantly();
+
+  FadeInField.withSpeed(int speed) : speed = VariableSpeed(speed);
 
   @override
   void visit(EventVisitor visitor) {
@@ -184,7 +189,7 @@ class FadeInField extends Event {
 
   @override
   String toString() {
-    return 'FadeInField{}';
+    return 'FadeInField{$speed}';
   }
 
   @override
@@ -192,10 +197,10 @@ class FadeInField extends Event {
       identical(this, other) ||
       other is FadeInField &&
           runtimeType == other.runtimeType &&
-          instantly == other.instantly;
+          speed == other.speed;
 
   @override
-  int get hashCode => instantly.hashCode ^ runtimeType.hashCode;
+  int get hashCode => speed.hashCode ^ runtimeType.hashCode;
 }
 
 sealed class Panel {}

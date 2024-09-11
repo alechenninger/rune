@@ -1805,10 +1805,14 @@ class SceneAsmGenerator implements EventVisitor {
           movea.l('Map_Palettes_Addr'.w, a0),
           jsr('LoadMapPalette'.l)
         ],
-        if (fadeIn.instantly)
-          jsr(Label('VDP_EnableDisplay').l)
-        else
-          jsr(Label('Pal_FadeIn').l)
+        switch (fadeIn.speed) {
+          Instantly() => jsr(Label('VDP_EnableDisplay').l),
+          Normal() => jsr(Label('Pal_FadeIn').l),
+          VariableSpeed s => Asm([
+              move.b(s.value.i, 0xFFFFED52.w),
+              jsr('Pal_VariableFadeIn'.l),
+            ]),
+        }
       ]);
     });
   }
