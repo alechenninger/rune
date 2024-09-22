@@ -2028,13 +2028,18 @@ class SceneAsmGenerator implements EventVisitor {
         }
       }
 
-      return events_asm.changeMap(
+      _eventAsm.add(events_asm.changeMap(
           to: newId.i,
           from: currentId?.i,
           startX: Word(x).i,
           startY: Word(y).i,
           facingDir: facing.constant.i,
-          partyArrangement: alignByte.i);
+          partyArrangement: alignByte.i));
+
+      if (_memory.cameraLock != false) {
+        _eventAsm.add(events_asm.lockCamera(false));
+        _memory.cameraLock = false;
+      }
     });
 
     _terminateDialog();

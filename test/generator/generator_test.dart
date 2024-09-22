@@ -544,6 +544,41 @@ main() {
     expect(program.dialogTrees.withoutComments(), expectedTrees);
   });
 
+  test('unlocks camera after changing map if not unlocked', () {
+    // First lock the camera
+    // Change the map
+    // Expect that after the map change, the camera is unlocked
+    var scene = Scene([
+      LockCamera(),
+      FadeOut(),
+      LoadMap(
+          map: map2,
+          startingPosition: Position(0x200, 0x200),
+          facing: Direction.down),
+      FadeInField(),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().trim(),
+        Asm([
+          lockCamera(true),
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
+          move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
+          move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
+          move.w(0x40.toWord.i, (Map_Start_Y_Pos).w),
+          move.w(Constant('FacingDir_Down').i, (Map_Start_Facing_Dir).w),
+          move.w(0.i, (Map_Start_Char_Align).w),
+          bclr(3.i, (Map_Load_Flags).w),
+          jsr(Label('RefreshMap').l),
+          lockCamera(false),
+          jsr(Label('Pal_FadeIn').l),
+        ]));
+  });
+
   test('custom event flags produce constants', () {
     var program = Program();
     program.addScene(SceneId('test'), Scene([SetFlag(EventFlag('Test000'))]),
