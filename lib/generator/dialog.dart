@@ -11,6 +11,7 @@ import '../characters.dart';
 import '../model/model.dart';
 import 'cutscenes.dart';
 import 'generator.dart';
+import 'movement.dart';
 
 class DialogAsm extends Asm {
   DialogAsm.empty() : super.empty();
@@ -86,12 +87,13 @@ sealed class DialogEvent {
 
   static DialogEvent? fromEvent(Event event, EventState state) {
     switch (event) {
-      case IndividualMoves(justFacing: var facing?):
-        throw "todo";
+      case IndividualMoves(justFacing: var facing?)
+          when FaceInDialog.canFaceInDialog(facing):
+        return FaceInDialog(facing);
       case PlaySound e:
-        throw 'todo';
+        return SoundCode(e.sound.sfxId);
       case PlayMusic e:
-        throw 'todo';
+        return SoundCode(e.music.musicId);
       case ShowPanel e
           when e.showDialogBox &&
               (e.portrait == null || e.portrait == state.dialogPortrait):
@@ -103,6 +105,9 @@ sealed class DialogEvent {
       case Pause p when p.duringDialog != false:
         var additionalFrames = p.duration.toFrames() - 1;
         return PauseCode(additionalFrames.toByte);
+      case DialogCodes c:
+        return DialogCodesEvent(c.codes);
+      // TODO: StopMusic
       default:
         return null;
     }
@@ -138,8 +143,78 @@ class SoundCode extends DialogEvent {
   @override
   Asm toAsm(EventState state) => Asm([
         dc.b(const [ControlCodes.action, Byte.constant(3)]),
-        dc.w([sfxId]),
+        dc.b([sfxId]),
       ]);
+}
+
+class DialogCodesEvent extends DialogEvent {
+  final List<Byte> codes;
+
+  DialogCodesEvent(this.codes);
+
+  @override
+  Asm toAsm(EventState state) {
+    return dc.b(codes);
+  }
+}
+
+class FaceInDialog extends DialogEvent {
+  final Map<FieldObject, DirectionExpression> facing;
+
+  FaceInDialog(this.facing);
+
+  static bool canFaceInDialog(Map<FieldObject, DirectionExpression> facing) {
+    return facing.entries.every((entry) {
+      var MapEntry(key: obj, value: dir) = entry;
+      if (!obj.hasCompactIdRepresentation) return false;
+      switch (dir) {
+        case Direction():
+        case DirectionOfVector(
+              from: PositionOfObject from,
+              to: PositionOfObject to
+            )
+            when (from.obj == obj && to.obj.hasCompactIdRepresentation):
+          return true;
+        case _:
+          return false;
+      }
+    });
+  }
+
+  @override
+  Asm toAsm(EventState state) {
+    var asm = Asm.empty();
+
+    for (var MapEntry(key: obj, value: dir) in facing.entries) {
+      var id = obj.compactId(state);
+      var face = switch (dir) {
+        Direction d => d.constant,
+        DirectionOfVector(from: PositionOfObject from, to: PositionOfObject to)
+            when (from.obj == obj) =>
+          switch (to.obj.compactId(state)) {
+            int id => Word(id | 0x100),
+            _ => null
+          },
+        // TODO: we could support position by using bit 15 to flag,
+        // and storing x and y as bytes (would max out at 7F0, FF0).
+        _ => null,
+      };
+
+      if (face == null || id == null) {
+        throw StateError('cannot face object in dialog. event: $this');
+      }
+
+      asm.add(Asm([
+        dc.b([const Byte.constant(0xf2), const Byte.constant(0xE), Byte(id)]),
+        dc.w([face])
+      ]));
+    }
+
+    return asm;
+  }
+
+  @override
+  String toString() => 'FaceInDialog{$facing}';
 }
 
 extension DialogToAsm on Dialog {

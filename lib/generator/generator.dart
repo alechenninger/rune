@@ -555,9 +555,10 @@ EventType? sceneEventType(List<Event> events,
         // Events need dialog after, otherwise their order
         // creates unwanted dialog windows.
         (event is Dialog && !event.hidePanelsOnClose) ||
+        (event is DialogCodes) ||
         (event is IndividualMoves &&
             switch (event.justFacing) {
-              var f? => _canFaceInDialog(f),
+              var f? => FaceInDialog.canFaceInDialog(f),
               null => false
             } &&
             hasDialogAfter) ||
@@ -1001,13 +1002,13 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void individualMoves(IndividualMoves moves) {
     var facing = moves.justFacing;
-    Asm? dialogAsm;
 
-    if (facing != null &&
-        (dialogAsm = _faceInDialog(facing, memory: _memory)) != null) {
+    if (facing != null && FaceInDialog.canFaceInDialog(facing)) {
       _addToEventOrDialog(moves,
           inDialog: () {
-            _addToDialog(dialogAsm!);
+            Asm dialogAsm = FaceInDialog(facing).toAsm(_memory);
+
+            _addToDialog(dialogAsm);
 
             for (var MapEntry(key: obj, value: dir) in facing.entries) {
               switch (dir.known(_memory)) {
@@ -2084,6 +2085,7 @@ class SceneAsmGenerator implements EventVisitor {
 
       var p = showPanel.portrait;
       _addToDialog(Asm([
+        // TODO: Use PanelCode
         if (_memory.dialogPortrait != p) portrait(toPortraitCode(p)),
         dc.b([Byte(0xf2), Byte.zero]),
         dc.w([Word(index)]),
@@ -2213,8 +2215,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void playSound(PlaySound playSound) {
     _addToEventOrDialog(playSound, inDialog: () {
-      _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
-      _addToDialog(dc.b([playSound.sound.sfxId]));
+      _addToDialog(SoundCode(playSound.sound.sfxId).toAsm(_memory));
     }, inEvent: (_) {
       return Asm([
         // Necessary to ensure previous sound change occurs
@@ -2240,8 +2241,7 @@ class SceneAsmGenerator implements EventVisitor {
     var musicId = playMusic.music.musicId;
 
     _addToEventOrDialog(playMusic, inDialog: () {
-      _addToDialog(dc.b([Byte(0xf2), Byte(3)]));
-      _addToDialog(dc.b([musicId]));
+      _addToDialog(SoundCode(musicId).toAsm(_memory));
       // TODO: note in this case, saved sound index is not set
     }, inEvent: (_) {
       return Asm([
@@ -3272,55 +3272,6 @@ class SceneAsmGenerator implements EventVisitor {
   }
 }
 
-Asm? _faceInDialog(Map<FieldObject, DirectionExpression> facing,
-    {required Memory memory}) {
-  var asm = Asm.empty();
-
-  for (var MapEntry(key: obj, value: dir) in facing.entries) {
-    var id = obj.compactId(memory);
-    var face = switch (dir) {
-      Direction d => d.constant,
-      DirectionOfVector(from: PositionOfObject from, to: PositionOfObject to)
-          when (from.obj == obj) =>
-        switch (to.obj.compactId(memory)) {
-          int id => Word(id | 0x100),
-          _ => null
-        },
-      // TODO: we could support position by using bit 15 to flag,
-      // and storing x and y as bytes (would max out at 7F0, FF0).
-      _ => null,
-    };
-
-    if (face == null || id == null) {
-      return null;
-    }
-
-    asm.add(Asm([
-      dc.b([Byte(0xf2), Byte(0xE), Byte(id)]),
-      dc.w([face])
-    ]));
-  }
-
-  return asm;
-}
-
-bool _canFaceInDialog(Map<FieldObject, DirectionExpression> facing) =>
-    facing.entries.every((entry) {
-      var MapEntry(key: obj, value: dir) = entry;
-      if (!obj.hasCompactIdRepresentation) return false;
-      switch (dir) {
-        case Direction():
-        case DirectionOfVector(
-              from: PositionOfObject from,
-              to: PositionOfObject to
-            )
-            when (from.obj == obj && to.obj.hasCompactIdRepresentation):
-          return true;
-        case _:
-          return false;
-      }
-    });
-
 int? _lastLineIfFadeOut(Asm asm) {
   for (var i = asm.lines.length - 1; i >= 0; --i) {
     var line = asm.lines[i];
@@ -3532,10 +3483,7 @@ extension SecondsPerFrame on int {
 extension SoundId on Sound {
   Expression get soundId {
     return switch (this) {
-      // Analyzer seems to be bugged here.
-      // ignore: pattern_never_matches_value_type
       SoundEffect s => s.sfxId,
-      // ignore: pattern_never_matches_value_type
       Music m => m.musicId,
     };
   }

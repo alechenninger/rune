@@ -599,7 +599,7 @@ Asm _waitForMovement(
 }
 
 extension FieldObjectAsm on FieldObject {
-  int? compactId(Memory mem) {
+  int? compactId(EventState mem) {
     return switch (resolve(mem)) {
       Character c => c.charIdValue.value,
       BySlot s => (s.index - 1) | 0x80,

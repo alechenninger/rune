@@ -113,30 +113,41 @@ class DialogSpan {
   final Span span;
 
   /// Duration to pause for after the [span].
+  @Deprecated('Use events instead')
   final Duration pause;
 
   /// Panel to be displayed after the [span].
+  ///
+  /// Comes after [pause] if pause is also set.
+  @Deprecated('Use events instead')
   final Panel? panel;
 
   /// Events to run after the [span].
-  // TODO: deprecate [pause] and [panel] in favor of [events]
-  final List<Event> events = [];
+  ///
+  /// Comes after [pause] and [panel] if either are set.
+  final List<Event> events;
 
   String get text => span.text;
   bool get italic => span.italic;
 
   DialogSpan(String text,
-      {bool italic = false, this.pause = Duration.zero, this.panel})
-      : span = Span(text, italic: italic);
+      {bool italic = false,
+      this.pause = Duration.zero,
+      this.panel,
+      List<Event> events = const []})
+      : span = Span(text, italic: italic),
+        events = List.unmodifiable(events);
 
   DialogSpan.italic(String text) : this(text, italic: true);
 
-  DialogSpan.fromSpan(this.span, {this.pause = Duration.zero, this.panel});
+  DialogSpan.fromSpan(this.span,
+      {this.pause = Duration.zero, this.panel, List<Event> events = const []})
+      : events = List.unmodifiable(events);
 
-  DialogSpan trimLeft() =>
-      DialogSpan.fromSpan(span.trimLeft(), pause: pause, panel: panel);
-  DialogSpan trimRight() =>
-      DialogSpan.fromSpan(span.trimRight(), pause: pause, panel: panel);
+  DialogSpan trimLeft() => DialogSpan.fromSpan(span.trimLeft(),
+      pause: pause, panel: panel, events: events);
+  DialogSpan trimRight() => DialogSpan.fromSpan(span.trimRight(),
+      pause: pause, panel: panel, events: events);
 
   // TODO: markup parsing belongs in parse layer
   static List<DialogSpan> parse(String markup) {
@@ -149,7 +160,9 @@ class DialogSpan {
         'text: $text, '
         'italic: $italic, '
         'pause: $pause, '
-        'panel: $panel}';
+        'panel: $panel, '
+        'events: $events'
+        '}';
   }
 
   @override
@@ -159,10 +172,15 @@ class DialogSpan {
           runtimeType == other.runtimeType &&
           span == other.span &&
           pause == other.pause &&
-          panel == other.panel;
+          panel == other.panel &&
+          const ListEquality().equals(events, other.events);
 
   @override
-  int get hashCode => span.hashCode ^ pause.hashCode ^ panel.hashCode;
+  int get hashCode =>
+      span.hashCode ^
+      pause.hashCode ^
+      panel.hashCode ^
+      const ListEquality().hash(events);
 }
 
 class Span {
