@@ -266,7 +266,7 @@ class IndividualMoves extends Event {
   StepSpeed speed = StepSpeed.fast;
   bool collideLead = false;
 
-  Map<FieldObject, DirectionExpression>? justFacing() {
+  Map<FieldObject, DirectionExpression>? get justFacing {
     var result = <FieldObject, DirectionExpression>{};
     for (var MapEntry(key: obj, value: move) in moves.entries) {
       var direction = move.facing;

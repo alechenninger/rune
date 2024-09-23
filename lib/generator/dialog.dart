@@ -81,9 +81,70 @@ class DialogAsm extends Asm {
   int get dialogs => split().length;
 }
 
+sealed class DialogEvent {
+  Asm toAsm(EventState state);
+
+  static DialogEvent? fromEvent(Event event, EventState state) {
+    switch (event) {
+      case IndividualMoves(justFacing: var facing?):
+        throw "todo";
+      case PlaySound e:
+        throw 'todo';
+      case PlayMusic e:
+        throw 'todo';
+      case ShowPanel e
+          when e.showDialogBox &&
+              (e.portrait == null || e.portrait == state.dialogPortrait):
+        return PanelCode(e.panel.panelIndex.toWord);
+      case HideTopPanels e:
+        throw 'todo';
+      case HideAllPanels e:
+        throw 'todo';
+      case Pause p when p.duringDialog != false:
+        var additionalFrames = p.duration.toFrames() - 1;
+        return PauseCode(additionalFrames.toByte);
+      default:
+        return null;
+    }
+  }
+}
+
+class PauseCode extends DialogEvent {
+  final Byte additionalFrames;
+
+  PauseCode(this.additionalFrames);
+
+  @override
+  Asm toAsm(EventState state) => delay(additionalFrames);
+}
+
+class PanelCode extends DialogEvent {
+  final Word panelIndex;
+
+  PanelCode(this.panelIndex);
+
+  @override
+  Asm toAsm(EventState state) {
+    state.addPanel();
+    return panel(panelIndex);
+  }
+}
+
+class SoundCode extends DialogEvent {
+  final Expression sfxId;
+
+  SoundCode(this.sfxId);
+
+  @override
+  Asm toAsm(EventState state) => Asm([
+        dc.b(const [ControlCodes.action, Byte.constant(3)]),
+        dc.w([sfxId]),
+      ]);
+}
+
 extension DialogToAsm on Dialog {
-  DialogAsm toAsm([EventState? state]) {
-    state ??= EventState();
+  DialogAsm toAsm([EventState? eventState]) {
+    var state = eventState ?? EventState();
     var asm = DialogAsm.empty();
     var quotes = Quotes();
 
@@ -95,28 +156,27 @@ extension DialogToAsm on Dialog {
     }
 
     var ascii = BytesAndAscii([]);
-    var codePoints = <List<ControlCode>?>[];
+    var codePoints = CodePoints();
 
     for (var i = 0; i < spans.length; i++) {
       var span = spans[i];
       var spanAscii = span.toAscii(quotes);
       ascii += spanAscii;
 
-      if (span.pause > Duration.zero) {
-        codePoints.length = ascii.length + 1;
-        var additionalFrames = span.pause.toFrames() - 1;
-        if (additionalFrames >= 0) {
-          codePoints[ascii.length] = [PauseCode(additionalFrames.toByte)];
-        }
-      }
+      var events = [
+        if (span.pause > Duration.zero) Pause(duringDialog: true, span.pause),
+        if (span.panel case var p?) ShowPanel(p, showDialogBox: true),
+        ...span.events
+      ];
 
-      var panel = span.panel;
-      if (panel != null) {
-        state.addPanel();
-        codePoints.length = ascii.length + 1;
-        var codes = codePoints[ascii.length] ?? [];
-        codes.add(PanelCode(panel.panelIndex.toWord));
-        codePoints[ascii.length] = codes;
+      for (var e in events) {
+        var dialogEvent = DialogEvent.fromEvent(e, state);
+        if (dialogEvent == null) {
+          throw StateError(
+              'event in span cannot be compiled to dialog. event: $e');
+        }
+        var asm = dialogEvent.toAsm(state);
+        codePoints.add(ascii.length, asm);
       }
     }
 

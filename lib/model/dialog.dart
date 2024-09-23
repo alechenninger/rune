@@ -118,6 +118,10 @@ class DialogSpan {
   /// Panel to be displayed after the [span].
   final Panel? panel;
 
+  /// Events to run after the [span].
+  // TODO: deprecate [pause] and [panel] in favor of [events]
+  final List<Event> events = [];
+
   String get text => span.text;
   bool get italic => span.italic;
 

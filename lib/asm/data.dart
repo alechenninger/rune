@@ -739,7 +739,7 @@ abstract class SizedValue extends Value implements Sized {
     }
   }
 
-  const SizedValue._(int value) : super.constant(value);
+  const SizedValue._(super.value) : super.constant();
 
   bool get isNegative => value > size.maxValue ~/ 2;
   bool get isPositive => value <= size.maxValue ~/ 2;
@@ -771,16 +771,16 @@ abstract class SizedValue extends Value implements Sized {
 }
 
 class Byte extends SizedValue {
-  static const zero = Byte._(0);
-  static const one = Byte._(1);
-  static const two = Byte._(2);
-  static const max = Byte._(0xFF);
+  static const zero = Byte.constant(0);
+  static const one = Byte.constant(1);
+  static const two = Byte.constant(2);
+  static const max = Byte.constant(0xFF);
 
   Byte(super.value);
   Byte.signed(int value) : super.signed(value, Size.b);
   factory Byte.truncate(int value) => Size.b.truncate(value) as Byte;
 
-  const Byte._(int value) : super._(value);
+  const Byte.constant(super.value) : super._();
 
   factory Byte.parse(String val) {
     if (val.startsWith(r'$')) {

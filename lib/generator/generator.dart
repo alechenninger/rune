@@ -556,7 +556,7 @@ EventType? sceneEventType(List<Event> events,
         // creates unwanted dialog windows.
         (event is Dialog && !event.hidePanelsOnClose) ||
         (event is IndividualMoves &&
-            switch (event.justFacing()) {
+            switch (event.justFacing) {
               var f? => _canFaceInDialog(f),
               null => false
             } &&
@@ -1000,7 +1000,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void individualMoves(IndividualMoves moves) {
-    var facing = moves.justFacing();
+    var facing = moves.justFacing;
     Asm? dialogAsm;
 
     if (facing != null &&
@@ -1256,14 +1256,14 @@ class SceneAsmGenerator implements EventVisitor {
       case true:
         _generateQueueInCurrentMode();
         _runOrContinueDialog(pause);
-        _addToDialog(PauseCode(frames.toByte).toAsm());
+        _addToDialog(PauseCode(frames.toByte).toAsm(_memory));
         break;
       case false:
         _addToEvent(pause, generateEvent);
         break;
       case null:
         _addToEventOrDialog(pause, inDialog: () {
-          _addToDialog(PauseCode(frames.toByte).toAsm());
+          _addToDialog(PauseCode(frames.toByte).toAsm(_memory));
         }, inEvent: generateEvent);
         break;
     }

@@ -4,8 +4,8 @@ import 'package:charcode/ascii.dart';
 
 import 'asm.dart';
 
-class ControlCodes {
-  static final action = Byte(0xf2);
+final class ControlCodes {
+  static const action = Byte.constant(0xf2);
   static final keepNpcFacingDirection = Bytes.list(const [0xF3]);
   static final portrait = Bytes.list(const [0xF4]);
   static final yesNo = Bytes.list(const [0xF5]);
@@ -167,25 +167,45 @@ abstract class ControlCode {
   Asm toAsm();
 }
 
-class PauseCode extends ControlCode {
-  final Byte additionalFrames;
+class CodePoints extends Iterable<List<Asm>?> {
+  final List<List<Asm>?> _codePoints;
 
-  PauseCode(this.additionalFrames);
-
-  @override
-  Asm toAsm() => delay(additionalFrames);
-}
-
-class PanelCode extends ControlCode {
-  final Word panelIndex;
-
-  PanelCode(this.panelIndex);
+  CodePoints() : _codePoints = [];
+  CodePoints.from(List<List<Asm>?> codePoints) : _codePoints = codePoints;
+  const CodePoints.none() : _codePoints = const [];
 
   @override
-  Asm toAsm() => panel(panelIndex);
+  int get length => _codePoints.length;
+
+  List<Asm>? operator [](int index) {
+    return _codePoints[index];
+  }
+
+  CodePoints sublist(int start, [int? end]) {
+    return CodePoints.from(_codePoints.sublist(start, end));
+  }
+
+  /// Add an element to the list at [index], growing the [length] of the
+  /// `CodePoints` if necessary.
+  ///
+  /// Initializes an empty list if there is no element at [index].
+  void add(int index, Asm codePoint) {
+    if (_codePoints.length <= index) {
+      _codePoints.length = index + 1;
+    }
+
+    if (_codePoints[index] case var list?) {
+      list.add(codePoint);
+    } else {
+      _codePoints[index] = [codePoint];
+    }
+  }
+
+  @override
+  Iterator<List<Asm>?> get iterator => _codePoints.iterator;
 }
 
-Asm dialog(Bytes dialog, {List<List<ControlCode>?> codePoints = const []}) {
+Asm dialog(Bytes dialog, {CodePoints codePoints = const CodePoints.none()}) {
   if (codePoints.isNotEmpty) {
     var maxCodePoint = codePoints.length - 1;
     if (maxCodePoint > dialog.length) {
@@ -224,7 +244,7 @@ Asm dialog(Bytes dialog, {List<List<ControlCode>?> codePoints = const []}) {
           if (beforeCode.isNotEmpty) {
             asm.add(dc.b(beforeCode));
           }
-          codes.map((c) => c.toAsm()).forEach(asm.add);
+          codes.forEach(asm.add);
           lastCodeIndex = indexOfCode;
         }
       }
@@ -262,7 +282,7 @@ Asm dialog(Bytes dialog, {List<List<ControlCode>?> codePoints = const []}) {
   if (codePoints.length > dialog.length) {
     var codes = codePoints[dialog.length];
     if (codes != null) {
-      codes.map((c) => c.toAsm()).forEach(asm.add);
+      codes.forEach(asm.add);
     }
   }
 

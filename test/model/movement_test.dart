@@ -426,7 +426,7 @@ void main() {
         ..moves[BySlot(1)] = Face(up)
         ..moves[BySlot(2)] = Face(down);
 
-      expect(moves.justFacing(), {BySlot(1): up, BySlot(2): down});
+      expect(moves.justFacing, {BySlot(1): up, BySlot(2): down});
     });
 
     test('do not just face when there are delays', () {
@@ -437,7 +437,7 @@ void main() {
             ..delay = 1.step
             ..direction = right));
 
-      expect(moves.justFacing(), isNull);
+      expect(moves.justFacing, isNull);
     });
   });
 }
