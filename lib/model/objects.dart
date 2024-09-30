@@ -6,7 +6,12 @@ import 'model.dart';
 class ResetObjectRoutine extends Event {
   final FieldObject object;
 
-  ResetObjectRoutine(this.object);
+  /// Controls whether or not to reinitialize the routine.
+  ///
+  /// If [true], the routine will not be initialized.
+  final bool resume;
+
+  ResetObjectRoutine(this.object, {this.resume = false});
 
   @override
   void visit(EventVisitor visitor) {
@@ -35,7 +40,13 @@ class ChangeObjectRoutine extends Event {
   /// npc behavior type
   final SpecModel routine;
 
-  ChangeObjectRoutine(this.object, this.routine);
+  /// Whether or not to initialize the routine.
+  ///
+  /// Some routines have specific run-once behavior on initialize.
+  /// This can be used to skip that behavior.
+  final bool initialize;
+
+  ChangeObjectRoutine(this.object, this.routine, {this.initialize = true});
 
   @override
   void visit(EventVisitor visitor) {
@@ -53,10 +64,11 @@ class ChangeObjectRoutine extends Event {
       other is ChangeObjectRoutine &&
           runtimeType == other.runtimeType &&
           object == other.object &&
-          routine == other.routine;
+          routine == other.routine &&
+          initialize == other.initialize;
 
   @override
-  int get hashCode => object.hashCode ^ routine.hashCode;
+  int get hashCode => object.hashCode ^ routine.hashCode ^ initialize.hashCode;
 }
 
 sealed class SpecModel {}

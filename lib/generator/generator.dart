@@ -2318,8 +2318,9 @@ class SceneAsmGenerator implements EventVisitor {
 
     var routine = obj.routine(_fieldRoutines);
 
-    changeObjectRoutine(
-        ChangeObjectRoutine(resetRoutine.object, routine.factory.routineModel));
+    changeObjectRoutine(ChangeObjectRoutine(
+        resetRoutine.object, routine.factory.routineModel,
+        initialize: !resetRoutine.resume));
   }
 
   @override
@@ -2349,9 +2350,14 @@ class SceneAsmGenerator implements EventVisitor {
 
       _memory.setRoutine(obj, change.routine);
 
+      var index = switch (change.initialize) {
+        true => routine.index,
+        false => routine.index | 0x8000.toValue
+      };
+
       return Asm([
         if (_memory.inAddress(a4)?.obj != obj) obj.toA4(_memory),
-        move.w(routine.index.i, a4.indirect),
+        move.w(index.i, a4.indirect),
         jsr(routine.label.l)
       ]);
     });

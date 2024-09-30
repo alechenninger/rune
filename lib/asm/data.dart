@@ -195,6 +195,7 @@ abstract class Expression {
   }
 
   Expression operator |(Expression other) {
+    if (other.isKnownZero) return this;
     return ArithmeticExpression(ArithmeticOperator.or, this, other);
   }
 
