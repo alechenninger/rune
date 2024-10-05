@@ -2358,7 +2358,7 @@ class SceneAsmGenerator implements EventVisitor {
       return Asm([
         if (_memory.inAddress(a4)?.obj != obj) obj.toA4(_memory),
         move.w(index.i, a4.indirect),
-        jsr(routine.label.l)
+        if (change.initialize) jsr(routine.label.l)
       ]);
     });
   }
