@@ -852,7 +852,7 @@ void main() {
               label(Label(
                   '.wait_for_movement_MapObjecttestnpc_1_MapObjecttestnpc_0')),
               lea(0xFFFFC300.w, a4),
-              jsr(Label('FieldObj_NPCType2').l),
+              jsr(Label('RunSingleObject').l),
               jsr(Label('Field_LoadSprites').l),
               jsr(Label('Field_BuildSprites').l),
               jsr(Label('AnimateTiles').l),

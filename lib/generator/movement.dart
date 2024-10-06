@@ -582,7 +582,9 @@ Asm _waitForMovement(
   return Asm([
     label(startOfLoop),
     obj.toA4(memory, force: false),
-    jsr(obj.routine(fieldRoutines)),
+    // We can't be sure of the routine at this point
+    // –run whatever it is.
+    jsr('RunSingleObject'.l),
     jsr(Label('Field_LoadSprites').l),
     jsr(Label('Field_BuildSprites').l),
     //movem.l(d0 - a4, -(sp)),
