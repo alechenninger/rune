@@ -656,6 +656,93 @@ ${dialog2.toAsm()}
             jsr(Label('Event_GetAndRunDialogue3').l),
           ]));
     });
+
+    test('dialog with facing mid dialog', () {
+      var scene = Scene([
+        Dialog(speaker: alys, spans: [
+          DialogSpan('Hello',
+              events: [IndividualMoves()..moves[alys] = Face(Direction.down)]),
+          DialogSpan(' there.')
+        ]),
+      ]);
+
+      var program = Program();
+      program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          program.dialogTrees.forMap(map.id).toAsm().withoutComments().trim(),
+          Asm([
+            dc.b([Byte(0xf4), (toPortraitCode(alys.portrait))]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xf2), Byte(0xe), alys.compactId(state)!.toByte]),
+            dc.w([down.constant]),
+            dc.b(Bytes.ascii(' there.')),
+            dc.b([Byte(0xff)])
+          ]));
+    });
+
+    test('dialog with facing mid dialog with long line', () {
+      var scene = Scene([
+        Dialog(speaker: alys, spans: [
+          DialogSpan('Hello',
+              events: [IndividualMoves()..moves[alys] = Face(Direction.down)]),
+          DialogSpan(' there. This is a long span that should break.')
+        ]),
+      ]);
+
+      var program = Program();
+      program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          program.dialogTrees.forMap(map.id).toAsm().withoutComments().trim(),
+          Asm([
+            dc.b([Byte(0xf4), (toPortraitCode(alys.portrait))]),
+            dc.b(Bytes.ascii('Hello')),
+            dc.b([Byte(0xf2), Byte(0xe), alys.compactId(state)!.toByte]),
+            dc.w([down.constant]),
+            dc.b(Bytes.ascii(' there. This is a long span')),
+            dc.b(ControlCodes.newLine),
+            dc.b(Bytes.ascii('that should break.')),
+            dc.b([Byte(0xff)])
+          ]));
+    });
+
+    test('facing mid dialog updates context', () {
+      // Face a direction,
+      // then face a direction mid dialog
+      // then face back the original direction.
+      // If context is not updated, the third facing will be optimized out and not take place.
+      var scene = Scene([
+        SetContext((ctx) {
+          ctx.positions[alys] = Position(0x50, 0x50);
+          ctx.followLead = false;
+          ctx.slots[1] = alys;
+        }),
+        IndividualMoves()..moves[alys] = Face(Direction.down),
+        Dialog(speaker: alys, spans: [
+          DialogSpan('Hello',
+              events: [IndividualMoves()..moves[alys] = Face(Direction.right)]),
+          DialogSpan(' there.'),
+        ]),
+        IndividualMoves()..moves[alys] = Face(Direction.down),
+      ]);
+
+      var program = Program();
+      program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      // Expect event asm to have both movements
+      expect(
+          program.scenes[SceneId('testscene')]?.event
+              .withoutComments()
+              .withoutEmptyLines(),
+          Asm([
+            lea(Constant('Character_1').w, a4),
+            updateObjFacing(Direction.down.address),
+            getAndRunDialog3LowDialogId(Byte.zero.i),
+            lea(Constant('Character_1').w, a4),
+            updateObjFacing(Direction.down.address),
+          ]));
+    });
   });
 
   group('conditional events', () {

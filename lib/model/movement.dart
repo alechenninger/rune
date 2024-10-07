@@ -260,7 +260,7 @@ class RelativePartyMove extends Event {
 }
 
 /// A group of parallel, relative movements
-class IndividualMoves extends Event {
+class IndividualMoves extends Event implements RunnableInDialog {
   // TODO: what if Slot and Character moveables refer to same Character?
   Map<FieldObject, RelativeMovement> moves = {};
   StepSpeed speed = StepSpeed.fast;
@@ -283,6 +283,9 @@ class IndividualMoves extends Event {
   }
 
   bool get isEmpty => moves.isEmpty;
+
+  @override
+  bool canRunInDialog([EventState? state]) => justFacing != null;
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {

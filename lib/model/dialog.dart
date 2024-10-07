@@ -31,21 +31,23 @@ class Dialog extends Event {
       }
 
       if (span.text.isEmpty) {
-        // empty span is merged or just skipped unless contains pause or panel
-        if (span.pause == Duration.zero && span.panel == null) {
+        // empty span is merged or just skipped unless contains events
+        if (span.events.isEmpty) {
           lastSpanSkipped = true;
           continue;
         } else if (_spans.isNotEmpty) {
-          // merge if previous has no panel
+          // merge with previous
           var previous = _spans.last;
-          if (previous.panel == null) {
-            _spans.last = DialogSpan.fromSpan(previous.span,
-                panel: span.panel, pause: span.pause + previous.pause);
-            lastSpanSkipped = true;
-            continue;
-          }
-
-          // fall through (keep)
+          var events = switch ([...previous.events, ...span.events]) {
+            [Pause p1, Pause p2, ...(var rest)] => [
+                Pause(p1.duration + p2.duration, duringDialog: true),
+                ...rest
+              ],
+            var events => events
+          };
+          _spans.last = DialogSpan.fromSpan(previous.span, events: events);
+          lastSpanSkipped = true;
+          continue;
         }
 
         // fall through (keep)
@@ -60,7 +62,7 @@ class Dialog extends Event {
       // spans would come after
       for (var i = _spans.length - 1; i >= 0; i--) {
         var span = _spans[i].trimRight();
-        if (span.text.isEmpty && span.pause == Duration.zero) {
+        if (span.text.isEmpty && span.events.isEmpty) {
           _spans.removeAt(i);
         } else {
           _spans[i] = span;
@@ -124,34 +126,51 @@ class DialogSpan {
 
   /// Events to run after the [span].
   ///
-  /// Comes after [pause] and [panel] if either are set.
-  final List<Event> events;
+  /// Includes [pause] and [panel] if either are set,
+  /// which will always be first (in that order).
+  final List<RunnableInDialog> events;
 
   String get text => span.text;
   bool get italic => span.italic;
 
   DialogSpan(String text,
       {bool italic = false,
-      this.pause = Duration.zero,
-      this.panel,
-      List<Event> events = const []})
-      : span = Span(text, italic: italic),
-        events = List.unmodifiable(events);
+      @Deprecated('Use events instead') Duration pause = Duration.zero,
+      @Deprecated('Use events instead') Panel? panel,
+      Iterable<RunnableInDialog> events = const []})
+      : this.fromSpan(Span(text, italic: italic),
+            pause: pause, panel: panel, events: events);
 
   DialogSpan.italic(String text) : this(text, italic: true);
 
   DialogSpan.fromSpan(this.span,
-      {this.pause = Duration.zero, this.panel, List<Event> events = const []})
-      : events = List.unmodifiable(events);
+      {this.pause = Duration.zero,
+      this.panel,
+      Iterable<RunnableInDialog> events = const []})
+      : events = List.unmodifiable([
+          if (pause != Duration.zero) Pause(pause, duringDialog: true),
+          if (panel != null) ShowPanel(panel, showDialogBox: true),
+          ...events
+        ]) {
+    // Ensure events are all compatible with dialog
+    for (var event in events) {
+      if (!event.canRunInDialog()) {
+        throw ArgumentError.value(
+            event, 'events', 'event cannot run in dialog');
+      }
+    }
+  }
 
-  DialogSpan trimLeft() => DialogSpan.fromSpan(span.trimLeft(),
-      pause: pause, panel: panel, events: events);
-  DialogSpan trimRight() => DialogSpan.fromSpan(span.trimRight(),
-      pause: pause, panel: panel, events: events);
+  DialogSpan trimLeft() => DialogSpan.fromSpan(span.trimLeft(), events: events);
+  DialogSpan trimRight() =>
+      DialogSpan.fromSpan(span.trimRight(), events: events);
 
   // TODO: markup parsing belongs in parse layer
-  static List<DialogSpan> parse(String markup) {
-    return Span.parse(markup).map((e) => DialogSpan.fromSpan(e)).toList();
+  static List<DialogSpan> parse(String markup,
+      {List<RunnableInDialog> events = const []}) {
+    return Span.parse(markup)
+        .map((e) => DialogSpan.fromSpan(e, events: events))
+        .toList();
   }
 
   @override
@@ -159,8 +178,6 @@ class DialogSpan {
     return 'DialogSpan{'
         'text: $text, '
         'italic: $italic, '
-        'pause: $pause, '
-        'panel: $panel, '
         'events: $events'
         '}';
   }
@@ -171,16 +188,10 @@ class DialogSpan {
       other is DialogSpan &&
           runtimeType == other.runtimeType &&
           span == other.span &&
-          pause == other.pause &&
-          panel == other.panel &&
           const ListEquality().equals(events, other.events);
 
   @override
-  int get hashCode =>
-      span.hashCode ^
-      pause.hashCode ^
-      panel.hashCode ^
-      const ListEquality().hash(events);
+  int get hashCode => span.hashCode ^ const ListEquality().hash(events);
 }
 
 class Span {

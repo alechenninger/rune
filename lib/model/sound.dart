@@ -2,10 +2,13 @@ import 'package:quiver/iterables.dart';
 
 import 'model.dart';
 
-class PlaySound extends Event {
+class PlaySound extends Event implements RunnableInDialog {
   final SoundEffect sound;
 
   PlaySound(this.sound);
+
+  @override
+  bool canRunInDialog([EventState? state]) => true;
 
   @override
   void visit(EventVisitor visitor) {
@@ -28,10 +31,13 @@ class PlaySound extends Event {
   int get hashCode => sound.hashCode;
 }
 
-class PlayMusic extends Event {
+class PlayMusic extends Event implements RunnableInDialog {
   final Music music;
 
   PlayMusic(this.music);
+
+  @override
+  bool canRunInDialog([EventState? state]) => true;
 
   @override
   void visit(EventVisitor visitor) {

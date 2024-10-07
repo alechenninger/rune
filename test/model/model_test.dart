@@ -128,7 +128,7 @@ void main() {
   });
 
   group('dialog', () {
-    test('combines spans', () {});
+    test('combines spans', () {}, skip: 'test not implemented');
 
     test('combines pause then pause and panel', () {
       var dialog = Dialog(spans: [
@@ -147,11 +147,91 @@ void main() {
         DialogSpan('', pause: 1.second),
       ]);
 
-      expect(dialog.spans, hasLength(2));
       expect(dialog.spans, [
-        DialogSpan('', pause: 2.seconds, panel: PrincipalPanel.principal),
-        DialogSpan('', pause: 1.second),
+        DialogSpan('', events: [
+          Pause(2.seconds, duringDialog: true),
+          ShowPanel(PrincipalPanel.principal, showDialogBox: true),
+          Pause(1.second, duringDialog: true)
+        ]),
       ]);
+    });
+
+    test('combines empty span events with previous span', () {
+      var dialog = Dialog(spans: [
+        DialogSpan('Hello'),
+        DialogSpan('', events: [Pause(2.seconds)]),
+        DialogSpan('', events: [ShowPanel(PrincipalPanel.principal)]),
+        // DialogSpan('', pause: 2.seconds, panel: PrincipalPanel.principal)
+      ]);
+
+      expect(dialog.spans.firstOrNull?.events, hasLength(2));
+      expect(dialog.spans, [
+        DialogSpan('Hello',
+            events: [Pause(2.seconds), ShowPanel(PrincipalPanel.principal)]),
+      ]);
+    });
+
+    test('pause is equivalent to pause event', () {
+      var dialog = Dialog(spans: [DialogSpan('Test', pause: 2.seconds)]);
+
+      expect(
+          dialog,
+          Dialog(spans: [
+            DialogSpan('Test', events: [Pause(2.seconds, duringDialog: true)])
+          ]));
+    });
+
+    test('panel is equivalent to panel event', () {
+      var dialog =
+          Dialog(spans: [DialogSpan('Test', panel: PrincipalPanel.principal)]);
+
+      expect(
+          dialog,
+          Dialog(spans: [
+            DialogSpan('Test', events: [
+              ShowPanel(PrincipalPanel.principal, showDialogBox: true)
+            ])
+          ]));
+    });
+
+    test('pause and panel are equivalent to pause and panel events', () {
+      var dialog = Dialog(spans: [
+        DialogSpan('Test', pause: 2.seconds, panel: PrincipalPanel.principal)
+      ]);
+
+      expect(
+          dialog,
+          Dialog(spans: [
+            DialogSpan('Test', events: [
+              Pause(2.seconds, duringDialog: true),
+              ShowPanel(PrincipalPanel.principal, showDialogBox: true)
+            ])
+          ]));
+    });
+
+    test('pause and panel come before other events', () {
+      // Include additional events in span and ensure they are added after
+      // pause and panel arguments
+      var dialog = Dialog(spans: [
+        DialogSpan('Test',
+            pause: 2.seconds,
+            panel: PrincipalPanel.principal,
+            events: [
+              Pause(1.second, duringDialog: true),
+              ShowPanel(PrincipalPanel.principal, showDialogBox: true)
+            ])
+      ]);
+
+      expect(
+          dialog,
+          Dialog(spans: [
+            DialogSpan('Test', events: [
+              Pause(2.seconds, duringDialog: true),
+              ShowPanel(PrincipalPanel.principal, showDialogBox: true),
+              Pause(1.second, duringDialog: true),
+              ShowPanel(PrincipalPanel.principal, showDialogBox: true)
+            ])
+          ]));
     });
   });
 

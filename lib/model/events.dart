@@ -34,11 +34,14 @@ class AsmEvent implements Event {
   }
 }
 
-class DialogCodes extends Event {
+class DialogCodes extends Event implements RunnableInDialog {
   final Bytes codes;
 
   DialogCodes(this.codes);
-  
+
+  @override
+  bool canRunInDialog([EventState? state]) => true;
+
   @override
   void visit(EventVisitor visitor) {
     visitor.dialogCodes(this);
@@ -55,7 +58,7 @@ class DialogCodes extends Event {
       other is DialogCodes &&
           runtimeType == other.runtimeType &&
           codes == other.codes;
-  
+
   @override
   int get hashCode => codes.hashCode;
 }
@@ -98,7 +101,7 @@ class SetContext extends Event {
   int get hashCode => _setCtx.hashCode;
 }
 
-class Pause extends Event {
+class Pause extends Event implements RunnableInDialog {
   final Duration duration;
 
   /// Whether or not to pause with the dialog window up, or not.
@@ -111,6 +114,11 @@ class Pause extends Event {
   Dialog asDialogEvent() {
     return Dialog(spans: [DialogSpan("", pause: duration)]);
   }
+
+  @override
+  bool canRunInDialog([EventState? state]) => duringDialog != false;
+
+  Pause inDialog() => Pause(duration, duringDialog: true);
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {

@@ -2,7 +2,7 @@ import 'package:quiver/check.dart';
 
 import 'model.dart';
 
-class ShowPanel extends Event {
+class ShowPanel extends Event implements RunnableInDialog {
   final Panel panel;
   final Portrait? portrait;
   final bool showDialogBox;
@@ -11,6 +11,16 @@ class ShowPanel extends Event {
   const ShowPanel(this.panel,
       {bool showDialogBox = false, this.portrait, this.runMapUpdates = false})
       : showDialogBox = showDialogBox || portrait != null;
+
+  ShowPanel inDialog() {
+    return ShowPanel(panel,
+        showDialogBox: true, portrait: null, runMapUpdates: runMapUpdates);
+  }
+
+  @override
+  bool canRunInDialog([EventState? state]) =>
+      showDialogBox &&
+      (portrait == null || state == null || portrait == state.dialogPortrait);
 
   @override
   void visit(EventVisitor visitor) {

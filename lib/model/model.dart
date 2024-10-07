@@ -182,6 +182,12 @@ abstract class Event {
   void visit(EventVisitor visitor);
 }
 
+abstract interface class RunnableInDialog extends Event {
+  /// If [state] not provided, assumes state is compatible with running the
+  /// event in dialog.
+  bool canRunInDialog([EventState? state]);
+}
+
 class ModelException implements Exception {
   final dynamic message;
 

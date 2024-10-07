@@ -1009,17 +1009,6 @@ class SceneAsmGenerator implements EventVisitor {
             Asm dialogAsm = FaceInDialog(facing).toAsm(_memory);
 
             _addToDialog(dialogAsm);
-
-            for (var MapEntry(key: obj, value: dir) in facing.entries) {
-              switch (dir.known(_memory)) {
-                case null:
-                  _memory.clearFacing(obj);
-                  break;
-                case var dir:
-                  _memory.setFacing(obj, dir);
-                  break;
-              }
-            }
           },
           inEvent: (i) => moves.toAsm(_memory,
               eventIndex: i, fieldRoutines: _fieldRoutines));

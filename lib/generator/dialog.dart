@@ -85,7 +85,7 @@ class DialogAsm extends Asm {
 sealed class DialogEvent {
   Asm toAsm(EventState state);
 
-  static DialogEvent? fromEvent(Event event, EventState state) {
+  static DialogEvent? fromEvent(RunnableInDialog event, EventState state) {
     switch (event) {
       case IndividualMoves(justFacing: var facing?)
           when FaceInDialog.canFaceInDialog(facing):
@@ -208,6 +208,13 @@ class FaceInDialog extends DialogEvent {
         dc.b([const Byte.constant(0xf2), const Byte.constant(0xE), Byte(id)]),
         dc.w([face])
       ]));
+
+      switch (dir.known(state)) {
+        case null:
+          state.clearFacing(obj);
+        case var dir:
+          state.setFacing(obj, dir);
+      }
     }
 
     return asm;
@@ -238,13 +245,7 @@ extension DialogToAsm on Dialog {
       var spanAscii = span.toAscii(quotes);
       ascii += spanAscii;
 
-      var events = [
-        if (span.pause > Duration.zero) Pause(duringDialog: true, span.pause),
-        if (span.panel case var p?) ShowPanel(p, showDialogBox: true),
-        ...span.events
-      ];
-
-      for (var e in events) {
+      for (var e in span.events) {
         var dialogEvent = DialogEvent.fromEvent(e, state);
         if (dialogEvent == null) {
           throw StateError(
