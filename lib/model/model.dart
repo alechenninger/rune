@@ -667,7 +667,7 @@ class Scene extends IterableBase<Event> {
             break;
 
           case Dialog d:
-            var spans = <DialogSpan>[..._justPanels(d)];
+            var spans = <DialogSpan>[..._justEvents(d)];
             var j = i + 1;
 
             loop:
@@ -678,7 +678,7 @@ class Scene extends IterableBase<Event> {
                   j--;
                   break;
                 case Dialog d:
-                  spans.addAll(_justPanels(d));
+                  spans.addAll(_justEvents(d));
                   break;
                 default:
                   break loop;
@@ -689,7 +689,7 @@ class Scene extends IterableBase<Event> {
               Dialog(
                 spans: [
                   DialogSpan.fromSpan(dialogTo,
-                      panel: spans.firstOrNull?.panel),
+                      events: spans.firstOrNull?.events ?? []),
                   ...spans.skip(1)
                 ],
               )
@@ -925,13 +925,13 @@ extension CollapseDialog on List<Event> {
 
       if (e is! Dialog) continue;
 
-      var spans = <DialogSpan>[..._justPanels(e)];
+      var spans = <DialogSpan>[..._justEvents(e)];
       var j = i + 1;
 
       for (; j < length; j++) {
         e = this[j];
         if (e is! Dialog) break;
-        spans.addAll(_justPanels(e));
+        spans.addAll(_justEvents(e));
       }
 
       replaceRange(i, j, [
@@ -956,11 +956,11 @@ extension WithoutSetContext on List<Event> {
   }
 }
 
-Iterable<DialogSpan> _justPanels(Dialog d) {
-  return d.spans
-      .map((s) => s.panel)
-      .whereNotNull()
-      .map((p) => DialogSpan('', panel: p));
+Iterable<DialogSpan> _justEvents(Dialog d) {
+  var events = d.spans
+      .map((s) => s.events)
+      .reduceOr((e1, e2) => [...e1, ...e2], ifEmpty: []);
+  return events.isEmpty ? [] : [DialogSpan('', events: events)];
 }
 
 final onlyWordCharacters = RegExp(r'^\w+$');

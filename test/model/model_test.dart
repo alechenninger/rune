@@ -159,15 +159,18 @@ void main() {
     test('combines empty span events with previous span', () {
       var dialog = Dialog(spans: [
         DialogSpan('Hello'),
-        DialogSpan('', events: [Pause(2.seconds)]),
-        DialogSpan('', events: [ShowPanel(PrincipalPanel.principal)]),
+        DialogSpan('', events: [Pause(2.seconds).inDialog()]),
+        DialogSpan('',
+            events: [ShowPanel(PrincipalPanel.principal).inDialog()]),
         // DialogSpan('', pause: 2.seconds, panel: PrincipalPanel.principal)
       ]);
 
       expect(dialog.spans.firstOrNull?.events, hasLength(2));
       expect(dialog.spans, [
-        DialogSpan('Hello',
-            events: [Pause(2.seconds), ShowPanel(PrincipalPanel.principal)]),
+        DialogSpan('Hello', events: [
+          Pause(2.seconds).inDialog(),
+          ShowPanel(PrincipalPanel.principal).inDialog()
+        ]),
       ]);
     });
 
@@ -890,12 +893,14 @@ void main() {
             scene,
             Scene([
               Dialog(spans: [
-                DialogSpan('x', panel: PrincipalPanel.principal),
-                DialogSpan('', panel: PrincipalPanel.alysGrabsPrincipal),
-                DialogSpan('', panel: PrincipalPanel.manTurnedToStone),
-                DialogSpan('', panel: PrincipalPanel.principal),
-                DialogSpan('', panel: PrincipalPanel.principalScared),
-                DialogSpan('', panel: PrincipalPanel.alysWhispersToHahn),
+                DialogSpan('x', events: [
+                  ShowPanel(PrincipalPanel.principal).inDialog(),
+                  ShowPanel(PrincipalPanel.alysGrabsPrincipal).inDialog(),
+                  ShowPanel(PrincipalPanel.manTurnedToStone).inDialog(),
+                  ShowPanel(PrincipalPanel.principal).inDialog(),
+                  ShowPanel(PrincipalPanel.principalScared).inDialog(),
+                  ShowPanel(PrincipalPanel.alysWhispersToHahn).inDialog(),
+                ]),
               ]),
             ]));
       });
