@@ -274,6 +274,12 @@ Asm dialog(Bytes dialog, {CodePoints codePoints = const CodePoints.none()}) {
       // If -1, then means empty or all space;
       lineStart = skip == -1 ? i : breakPoint + skip;
       if (lineStart > i) i = lineStart;
+      // Check for code points in the skipped portion
+      for (var code in codePoints.sublist(breakPoint, i)) {
+        if (code != null) {
+          code.forEach(asm.add);
+        }
+      }
     }
   }
 

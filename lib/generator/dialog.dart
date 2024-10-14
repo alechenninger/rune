@@ -205,7 +205,7 @@ class FaceInDialog extends DialogEvent {
       }
 
       asm.add(Asm([
-        dc.b([const Byte.constant(0xf2), const Byte.constant(0xE), Byte(id)]),
+        dc.b([ControlCodes.action, const Byte.constant(0xE), Byte(id)]),
         dc.w([face])
       ]));
 

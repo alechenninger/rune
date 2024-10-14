@@ -294,6 +294,26 @@ void main() {
 	dc.b	"That you've always done this..."
 	dc.b	$F9, $3B''');
     });
+
+    test('dialog with event before skipped whitespace plays event', () {
+      var dialog = Dialog(speaker: alys, spans: [
+        DialogSpan("...and they will very likely",
+            events: [IndividualMoves()..moves[alys] = Face(left)]),
+        DialogSpan(" come up with something.",
+            events: [IndividualMoves()..moves[alys] = Face(up)]),
+      ]);
+
+      var asm = dialog.toAsm();
+
+      expect(asm.toString(), r'''	dc.b	$F4, $02
+	dc.b	"...and they will very likely"
+	dc.b	$F2, $0E, $01
+	dc.w	FacingDir_Left
+	dc.b	$FC
+	dc.b	"come up with something."
+	dc.b	$F2, $0E, $01
+	dc.w	FacingDir_Up''');
+    });
   });
 
   group('dialog count', () {
