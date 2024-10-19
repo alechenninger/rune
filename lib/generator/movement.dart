@@ -273,6 +273,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
   var generator = _MovementGenerator(asm, state);
   var length = moves.destinations.length;
   var secondaryObjects = <(FieldObject, PositionExpression)>[];
+  var doMove = moves.waitForMovements ? moveCharacter : setDestination;
 
   if (!moves.followLeader) {
     if (state.followLead != false &&
@@ -310,9 +311,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
           memory: state,
           load: a3,
           load2: a2,
-          asm: (x, y) => Asm([
-                moveCharacter(x: x, y: y),
-              ])));
+          asm: (x, y) => doMove(x: x, y: y)));
     } else {
       asm.add(pos.withPosition(
           memory: state,
@@ -333,23 +332,27 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
               memory: state,
               load: a3,
               load2: a2,
-              asm: (x, y) => moveCharacter(x: x, y: y)));
+              asm: (x, y) => doMove(x: x, y: y)));
         }
 
         // Now ensure characters are done moving.
-        if (secondaryObjects.length < length) {
+        if (moves.waitForMovements && secondaryObjects.length < length) {
           asm.add(jsr(Label('Event_MoveCharacters').l));
         }
       }
     }
 
+    // TODO: if not wait for movement?
     state.positions[obj] = pos.known(state);
     // If we don't know which direction the object was coming from,
     // we don't know which direction it will be facing.
     state.clearFacing(obj);
   });
 
-  generator.resetSpeedFrom(moves.speed);
+  if (moves.waitForMovements) {
+    // TODO: wait for movement asm must reset speed
+    generator.resetSpeedFrom(moves.speed);
+  }
 
   return asm;
 }

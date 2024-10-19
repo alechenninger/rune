@@ -318,7 +318,7 @@ class IndividualMoves extends Event implements RunnableInDialog {
   int get hashCode => const MapEquality().hash(moves) ^ speed.hashCode;
 }
 
-class AbsoluteMoves extends Event {
+class AbsoluteMoves extends Event implements RunnableInDialog {
   // Facing can be controlled with individual movements
   // TODO(movement): we could support delays
   // even though we don't know the duration of movements,
@@ -328,8 +328,21 @@ class AbsoluteMoves extends Event {
   Axis startingAxis = Axis.x;
   bool followLeader = false;
 
+  /// Whether or not to wait for movements, or allow the characters to move
+  /// asynchronously with other events.
+  ///
+  /// See [WaitForMovements].
+  bool waitForMovements = true;
+
   bool get isNotEmpty => destinations.isNotEmpty;
   bool get isEmpty => destinations.isEmpty;
+
+  @override
+  bool canRunInDialog([EventState? state]) {
+    if (state == null) return !waitForMovements;
+    if (waitForMovements) return false;
+    return state.cameraLock == true;
+  }
 
   @override
   void visit(EventVisitor visitor) {
@@ -352,14 +365,45 @@ class AbsoluteMoves extends Event {
           const MapEquality().equals(destinations, other.destinations) &&
           speed == other.speed &&
           startingAxis == other.startingAxis &&
-          followLeader == other.followLeader;
+          followLeader == other.followLeader &&
+          waitForMovements == other.waitForMovements;
 
   @override
   int get hashCode =>
       const MapEquality().hash(destinations) ^
       speed.hashCode ^
       startingAxis.hashCode ^
-      followLeader.hashCode;
+      followLeader.hashCode ^
+      waitForMovements.hashCode;
+}
+
+/// Waits for a set of [FieldObject]s to finish moving to their destinations.
+///
+/// Useful after using [AbsoluteMoves] during dialog.
+class WaitForMovements extends Event {
+  final Set<FieldObject> objects;
+
+  WaitForMovements(this.objects);
+
+  @override
+  void visit(EventVisitor visitor) {
+    // visitor.waitForMovements(this);
+  }
+
+  @override
+  String toString() {
+    return 'WaitForMovements{objects: $objects}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WaitForMovements &&
+          runtimeType == other.runtimeType &&
+          const SetEquality().equals(objects, other.objects);
+
+  @override
+  int get hashCode => const SetEquality().hash(objects);
 }
 
 class InstantMoves extends Event {

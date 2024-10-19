@@ -258,6 +258,7 @@ Asm dialog(Bytes dialog, {CodePoints codePoints = const CodePoints.none()}) {
     dialogLines++;
   }
 
+  // Find the breakpoints and append line if necessary
   for (var i = 0; i < dialog.length; i++) {
     var char = dialog[i];
 
@@ -273,11 +274,16 @@ Asm dialog(Bytes dialog, {CodePoints codePoints = const CodePoints.none()}) {
           dialog.sublist(breakPoint).indexWhere((b) => b.value != $space);
       // If -1, then means empty or all space;
       lineStart = skip == -1 ? i : breakPoint + skip;
+      // Advance i if we start past it; cannot break on those characters
       if (lineStart > i) i = lineStart;
       // Check for code points in the skipped portion
-      for (var code in codePoints.sublist(breakPoint, i)) {
-        if (code != null) {
-          code.forEach(asm.add);
+      // (breakpoint to new lineStart)
+      if (breakPoint < codePoints.length) {
+        for (var code in codePoints.sublist(
+            breakPoint, min(lineStart, codePoints.length))) {
+          if (code != null) {
+            code.forEach(asm.add);
+          }
         }
       }
     }

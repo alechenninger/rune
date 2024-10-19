@@ -957,9 +957,7 @@ extension WithoutSetContext on List<Event> {
 }
 
 Iterable<DialogSpan> _justEvents(Dialog d) {
-  var events = d.spans
-      .map((s) => s.events)
-      .reduceOr((e1, e2) => [...e1, ...e2], ifEmpty: []);
+  var events = d.spans.expand((s) => s.events).whereNot((e) => e is Pause);
   return events.isEmpty ? [] : [DialogSpan('', events: events)];
 }
 

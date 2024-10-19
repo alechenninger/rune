@@ -947,7 +947,10 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
     _generateQueueInCurrentMode();
     _runOrContinueDialog(dialog);
-    _addToDialog(dialog.toAsm(_memory));
+    var (asm, post) =
+        dialog.toGeneratedAsm(_memory, scene: id, eventIndex: _eventCounter);
+    _addToDialog(asm);
+    _postAsm.addAll(post);
   }
 
   @override
@@ -1006,7 +1009,7 @@ class SceneAsmGenerator implements EventVisitor {
     if (facing != null && FaceInDialog.canFaceInDialog(facing)) {
       _addToEventOrDialog(moves,
           inDialog: () {
-            Asm dialogAsm = FaceInDialog(facing).toAsm(_memory);
+            var (dialogAsm, _) = FaceInDialog(facing).toAsm(_memory);
 
             _addToDialog(dialogAsm);
           },
@@ -1022,8 +1025,14 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void absoluteMoves(AbsoluteMoves moves) {
-    _addToEvent(
-        moves, (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
+    if (moves.canRunInDialog(_memory)) {
+      _addToEventOrDialog(moves, inDialog: () {}, inEvent: (_) {
+        // TODO:
+      });
+    } else {
+      _addToEvent(
+          moves, (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
+    }
   }
 
   @override
@@ -1246,14 +1255,16 @@ class SceneAsmGenerator implements EventVisitor {
       case true:
         _generateQueueInCurrentMode();
         _runOrContinueDialog(pause);
-        _addToDialog(PauseCode(frames.toByte).toAsm(_memory));
+        var (asm, _) = PauseCode(frames.toByte).toAsm(_memory);
+        _addToDialog(asm);
         break;
       case false:
         _addToEvent(pause, generateEvent);
         break;
       case null:
         _addToEventOrDialog(pause, inDialog: () {
-          _addToDialog(PauseCode(frames.toByte).toAsm(_memory));
+          var (asm, _) = PauseCode(frames.toByte).toAsm(_memory);
+          _addToDialog(asm);
         }, inEvent: generateEvent);
         break;
     }
@@ -1496,10 +1507,10 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEventOrDialog(setFlag, inDialog: () {
       var flag = _eventFlags.toConstantValue(setFlag.flag);
       if (flag.value > Byte.max) {
-        _addToDialog(dc.b([Byte(0xf2), Byte(0xd)]));
+        _addToDialog(dc.b([ControlCodes.action, Byte(0xd)]));
         _addToDialog(dc.w([flag.constant]));
       } else {
-        _addToDialog(dc.b([Byte(0xf2), Byte(0xb)]));
+        _addToDialog(dc.b([ControlCodes.action, Byte(0xb)]));
         _addToDialog(dc.b([flag.constant]));
       }
     }, inEvent: (_) {
@@ -2076,7 +2087,7 @@ class SceneAsmGenerator implements EventVisitor {
       _addToDialog(Asm([
         // TODO: Use PanelCode
         if (_memory.dialogPortrait != p) portrait(toPortraitCode(p)),
-        dc.b([Byte(0xf2), Byte.zero]),
+        dc.b([ControlCodes.action, Byte.zero]),
         dc.w([Word(index)]),
       ]));
 
@@ -2134,7 +2145,7 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.panelsShown = 0;
     } else {
       _addToEventOrDialog(hidePanels, inDialog: () {
-        _addToDialog(dc.b([Byte(0xf2), Byte.two]));
+        _addToDialog(dc.b([ControlCodes.action, Byte.two]));
       }, inEvent: (_) {
         return jsr(Label('Panel_DestroyAll').l);
       }, after: () {
@@ -2165,10 +2176,10 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.removePanels(panels);
 
       _addToDialog(Asm([
-        for (var i = 0; i < panels; i++) dc.b([Byte(0xf2), Byte.one]),
+        for (var i = 0; i < panels; i++) dc.b([ControlCodes.action, Byte.one]),
         // todo: this is used often but not always, how to know when?
         // it might be if the field is not faded out, but not always
-        if (_memory.isFieldShown == true) dc.b([Byte(0xf2), Byte(6)]),
+        if (_memory.isFieldShown == true) dc.b([ControlCodes.action, Byte(6)]),
       ]));
     }, inEvent: (eventIndex) {
       var panels = hidePanels.panelsToHide;
@@ -2204,7 +2215,8 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void playSound(PlaySound playSound) {
     _addToEventOrDialog(playSound, inDialog: () {
-      _addToDialog(SoundCode(playSound.sound.sfxId).toAsm(_memory));
+      var (asm, _) = SoundCode(playSound.sound.sfxId).toAsm(_memory);
+      _addToDialog(asm);
     }, inEvent: (_) {
       return Asm([
         // Necessary to ensure previous sound change occurs
@@ -2230,7 +2242,8 @@ class SceneAsmGenerator implements EventVisitor {
     var musicId = playMusic.music.musicId;
 
     _addToEventOrDialog(playMusic, inDialog: () {
-      _addToDialog(SoundCode(musicId).toAsm(_memory));
+      var (asm, _) = SoundCode(musicId).toAsm(_memory);
+      _addToDialog(asm);
       // TODO: note in this case, saved sound index is not set
     }, inEvent: (_) {
       return Asm([
@@ -2607,7 +2620,7 @@ class SceneAsmGenerator implements EventVisitor {
           _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
         }
 
-        if (prior != null) {
+        if (prior != null || _postAsm.isNotEmpty) {
           _eventAsm.add(rts);
         }
 
@@ -2629,6 +2642,18 @@ class SceneAsmGenerator implements EventVisitor {
         break;
     }
 
+    for (var subroutine in _postAsm) {
+      if (subroutine.firstOrNull case var first? when first.label == null) {
+        throw ArgumentError.value(first, 'subroutine',
+            'subroutine in post ASM must have a label, but got: $first');
+      }
+
+      if (_eventAsm.isNotEmpty && _eventAsm.last.isNotEmpty) {
+        _eventAsm.addNewline();
+      }
+      _eventAsm.add(subroutine);
+    }
+
     if (appendNewline) {
       switch (_gameMode) {
         case EventMode():
@@ -2645,14 +2670,6 @@ class SceneAsmGenerator implements EventVisitor {
         default:
           // empty
           break;
-      }
-    }
-
-    for (var subroutine in _postAsm) {
-      _eventAsm.add(subroutine);
-
-      if (appendNewline) {
-        _eventAsm.addNewline();
       }
     }
   }

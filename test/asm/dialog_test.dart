@@ -66,7 +66,8 @@ void main() {
 
   test('only pause', () {
     var pause = PauseCode(Byte(60));
-    var codePoints = CodePoints()..add(0, pause.toAsm(EventState()));
+    var (asm2, _) = pause.toAsm(EventState());
+    var codePoints = CodePoints()..add(0, asm2);
     var asm = dialog(Bytes.empty(), codePoints: codePoints);
     expect(asm.toString(), equals(r'''	dc.b	$F9, $3C'''));
   });

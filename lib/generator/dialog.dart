@@ -11,6 +11,7 @@ import '../characters.dart';
 import '../model/model.dart';
 import 'cutscenes.dart';
 import 'generator.dart';
+import 'memory.dart';
 import 'movement.dart';
 
 class DialogAsm extends Asm {
@@ -82,10 +83,13 @@ class DialogAsm extends Asm {
   int get dialogs => split().length;
 }
 
-sealed class DialogEvent {
-  Asm toAsm(EventState state);
+typedef DialogAndRoutines = (Asm dialog, List<Asm> post);
 
-  static DialogEvent? fromEvent(RunnableInDialog event, EventState state) {
+sealed class DialogEvent {
+  DialogAndRoutines toAsm(Memory state,
+      {required SceneId scene, required int eventIndex});
+
+  static DialogEvent? fromEvent(RunnableInDialog event, Memory state) {
     switch (event) {
       case IndividualMoves(justFacing: var facing?)
           when FaceInDialog.canFaceInDialog(facing):
@@ -107,7 +111,10 @@ sealed class DialogEvent {
         return PauseCode(additionalFrames.toByte);
       case DialogCodes c:
         return DialogCodesEvent(c.codes);
+      case AbsoluteMoves m when m.canRunInDialog(state):
+        return AbsoluteMovesInDialog(m);
       // TODO: StopMusic
+      // TODO: to do absolute moves we need to get the routine parameter
       default:
         return null;
     }
@@ -120,7 +127,9 @@ class PauseCode extends DialogEvent {
   PauseCode(this.additionalFrames);
 
   @override
-  Asm toAsm(EventState state) => delay(additionalFrames);
+  DialogAndRoutines toAsm(EventState state,
+          {SceneId? scene, int? eventIndex}) =>
+      (delay(additionalFrames), const []);
 }
 
 class PanelCode extends DialogEvent {
@@ -129,9 +138,10 @@ class PanelCode extends DialogEvent {
   PanelCode(this.panelIndex);
 
   @override
-  Asm toAsm(EventState state) {
+  DialogAndRoutines toAsm(EventState state,
+      {required SceneId scene, required int eventIndex}) {
     state.addPanel();
-    return panel(panelIndex);
+    return (panel(panelIndex), const []);
   }
 }
 
@@ -141,10 +151,15 @@ class SoundCode extends DialogEvent {
   SoundCode(this.sfxId);
 
   @override
-  Asm toAsm(EventState state) => Asm([
-        dc.b(const [ControlCodes.action, Byte.constant(3)]),
-        dc.b([sfxId]),
-      ]);
+  DialogAndRoutines toAsm(EventState state,
+          {SceneId? scene, int? eventIndex}) =>
+      (
+        Asm([
+          dc.b(const [ControlCodes.action, Byte.constant(3)]),
+          dc.b([sfxId]),
+        ]),
+        const []
+      );
 }
 
 class DialogCodesEvent extends DialogEvent {
@@ -153,9 +168,9 @@ class DialogCodesEvent extends DialogEvent {
   DialogCodesEvent(this.codes);
 
   @override
-  Asm toAsm(EventState state) {
-    return dc.b(codes);
-  }
+  DialogAndRoutines toAsm(EventState state,
+          {SceneId? scene, int? eventIndex}) =>
+      (dc.b(codes), const []);
 }
 
 class FaceInDialog extends DialogEvent {
@@ -182,7 +197,7 @@ class FaceInDialog extends DialogEvent {
   }
 
   @override
-  Asm toAsm(EventState state) {
+  DialogAndRoutines toAsm(EventState state, {SceneId? scene, int? eventIndex}) {
     var asm = Asm.empty();
 
     for (var MapEntry(key: obj, value: dir) in facing.entries) {
@@ -217,24 +232,56 @@ class FaceInDialog extends DialogEvent {
       }
     }
 
-    return asm;
+    return (asm, const []);
   }
 
   @override
   String toString() => 'FaceInDialog{$facing}';
 }
 
+class AbsoluteMovesInDialog extends DialogEvent {
+  final AbsoluteMoves moves;
+
+  AbsoluteMovesInDialog(this.moves);
+
+  @override
+  DialogAndRoutines toAsm(Memory state,
+      {required SceneId scene, required int eventIndex}) {
+    // First generate the positioning routine
+    var routineLbl = Label('${scene}_${eventIndex}_AbsoluteMoves');
+    var routine = Asm([
+      label(routineLbl),
+      absoluteMovesToAsm(moves, state, eventIndex: eventIndex),
+    ]);
+
+    for (var obj in moves.destinations.keys) {
+      // _memory.animatedDuringDialog(obj); TODO
+      // Would also need to know what "normal" state is,
+      // so we don't clear the bit for objects where it should always be set
+      routine.add(Asm([obj.toA4(state), bset(1.i, priority_flag(a4)), rts]));
+    }
+
+    var dialog = Asm([
+      dc.b([ControlCodes.action, Byte(0xf)]),
+      dc.l([routineLbl])
+    ]);
+
+    return (dialog, [routine]);
+  }
+}
+
 extension DialogToAsm on Dialog {
-  DialogAsm toAsm([EventState? eventState]) {
-    var state = eventState ?? EventState();
+  DialogAndRoutines toGeneratedAsm(Memory memory,
+      {required SceneId scene, required int eventIndex}) {
     var asm = DialogAsm.empty();
+    var post = <Asm>[];
     var quotes = Quotes();
 
     // i think byte zero removes portrait if already present.
     // todo: could optimize if we know there is no portrait
-    if (state.dialogPortrait != speaker.portrait) {
+    if (memory.dialogPortrait != speaker.portrait) {
       asm.add(portrait(toPortraitCode(speaker.portrait)));
-      state.dialogPortrait = speaker.portrait;
+      memory.dialogPortrait = speaker.portrait;
     }
 
     var ascii = BytesAndAscii([]);
@@ -246,19 +293,30 @@ extension DialogToAsm on Dialog {
       ascii += spanAscii;
 
       for (var e in span.events) {
-        var dialogEvent = DialogEvent.fromEvent(e, state);
+        var dialogEvent = DialogEvent.fromEvent(e, memory);
         if (dialogEvent == null) {
           throw StateError(
               'event in span cannot be compiled to dialog. event: $e');
         }
-        var asm = dialogEvent.toAsm(state);
-        codePoints.add(ascii.length, asm);
+        var (dialog, routines) =
+            dialogEvent.toAsm(memory, scene: scene, eventIndex: eventIndex);
+        post.addAll(routines);
+        codePoints.add(ascii.length, dialog);
       }
     }
 
     asm.add(dialog(ascii, codePoints: codePoints));
 
-    return asm;
+    return (asm, post);
+  }
+
+  @Deprecated('use toGeneratedAsm')
+  DialogAsm toAsm([EventState? eventState]) {
+    var memory =
+        eventState == null ? Memory() : Memory.from(SystemState(), eventState);
+    var (asm, _) =
+        toGeneratedAsm(memory, scene: SceneId('dialog'), eventIndex: 0);
+    return DialogAsm([asm]);
   }
 }
 
