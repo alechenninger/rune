@@ -319,7 +319,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
           load2: a2,
           asm: (x, y) => setDestination(x: x, y: y)));
 
-      if (obj is! BySlot && obj is! Character) {
+      if (obj.isNotCharacter) {
         secondaryObjects.add((obj, pos));
       }
 
@@ -355,6 +355,22 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
   }
 
   return asm;
+}
+
+Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
+  var {true: chars, false: secondary} =
+      wait.objects.groupListsBy((o) => o.isCharacter);
+
+  return Asm([
+    for (var obj in secondary)
+      Asm([
+        obj.toA4(memory),
+        jsr(Label('Event_MoveCharacter').l),
+      ]),
+    if (chars.isNotEmpty) jsr(Label('Event_MoveCharacters').l),
+    // Reset speed
+    asmlib.move.b(1.i, FieldObj_Step_Offset.w)
+  ]);
 }
 
 Asm instantMovesToAsm(InstantMoves moves, Memory memory,

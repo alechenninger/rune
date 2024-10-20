@@ -1036,6 +1036,11 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void waitForMovements(WaitForMovements wait) {
+    _addToEvent(wait, (i) => waitForMovementsToAsm(wait, memory: _memory));
+  }
+
+  @override
   void instantMoves(InstantMoves moves) {
     _addToEvent(moves, (i) => instantMovesToAsm(moves, _memory, eventIndex: i));
   }

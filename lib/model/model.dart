@@ -210,6 +210,7 @@ abstract class EventVisitor {
   void overlapCharacters(OverlapCharacters overlap);
   void individualMoves(IndividualMoves moves);
   void absoluteMoves(AbsoluteMoves moves);
+  void waitForMovements(WaitForMovements wait);
   void instantMoves(InstantMoves moves);
   void stepObject(StepObject step);
   void stepObjects(StepObjects step);
@@ -996,6 +997,9 @@ class BySlot extends FieldObject {
   static const five = BySlot(5);
 
   @override
+  final isCharacter = true;
+
+  @override
   FieldObject resolve(EventState state) {
     var inSlot = state.slots[index];
     if (inSlot == null) {
@@ -1080,6 +1084,9 @@ sealed class Character extends ResolvedFieldObject with Speaker {
     kyra,
     seth
   ];
+
+  @override
+  final isCharacter = true;
 
   @override
   int? slotAsOf(EventState c) => c.slotFor(this);

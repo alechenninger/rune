@@ -284,6 +284,29 @@ class IndividualMoves extends Event implements RunnableInDialog {
 
   bool get isEmpty => moves.isEmpty;
 
+  AbsoluteMoves? get asAbsoluteMoves {
+    var moves = AbsoluteMoves();
+    Axis? startingAxis;
+
+    for (var MapEntry(key: obj, value: move) in this.moves.entries) {
+      var (OffsetPosition? destination, Axis? axis) = switch (move) {
+        StepPath move => (move.asPositionExpressionFrom(obj.position()), null),
+        StepPaths move => move.asPositionExpressionFrom(obj.position()),
+        _ => (null, null)
+      };
+      if (destination == null) return null;
+      if (startingAxis == null) {
+        startingAxis = axis;
+      } else if (startingAxis != axis) {
+        return null;
+      }
+      moves.destinations[obj] = destination;
+    }
+
+    moves.speed = speed;
+    return moves;
+  }
+
   @override
   bool canRunInDialog([EventState? state]) => justFacing != null;
 
@@ -387,7 +410,7 @@ class WaitForMovements extends Event {
 
   @override
   void visit(EventVisitor visitor) {
-    // visitor.waitForMovements(this);
+    visitor.waitForMovements(this);
   }
 
   @override
@@ -493,7 +516,6 @@ class ResolveException implements Exception {
   }
 }
 
-// character by name? character by slot? party?
 abstract class FieldObject extends Moveable {
   const FieldObject();
 
@@ -512,6 +534,9 @@ abstract class FieldObject extends Moveable {
   }
 
   int? slotAsOf(EventState c);
+
+  bool get isCharacter => false;
+  bool get isNotCharacter => !isCharacter;
 
   // TODO(refactor): this api stinks; should not be on same type as "real" thing
   //   consider removing this or return null if we cannot resovle.
@@ -652,16 +677,7 @@ class InteractionObject extends FieldObject {
   }
 }
 
-// TODO: maybe don't do this
-// TODO: maybe instead generalize this as an event wrapper.
-// ContextDependentEvent which when processed produces an event based on the
-// context and then can generate asm for that instead
-// we could replace .resolve() in Moveable with this for example.
-abstract class ContextualMovement {
-  RelativeMovement movementIn(EventState ctx);
-}
-
-abstract class RelativeMovement extends ContextualMovement {
+abstract class RelativeMovement {
   /// Delay in steps before movement starts parallel with other movements.
   Steps get delay;
 
@@ -701,9 +717,6 @@ abstract class RelativeMovement extends ContextualMovement {
   // todo: should this just be StepDirection to include delays?
   // todo: should probably be method instead of getter
   List<Path> get continuousPaths;
-
-  @override
-  RelativeMovement movementIn(EventState ctx) => this;
 
   IndividualMoves move(FieldObject obj) => IndividualMoves()..moves[obj] = this;
 
@@ -773,6 +786,10 @@ class StepPath extends RelativeMovement {
   Steps get duration => delay + distance;
 
   Path get asPath => Path(distance, direction);
+
+  OffsetPosition asPositionExpressionFrom(PositionExpression from) {
+    return OffsetPosition(from, offset: asPath.asPosition);
+  }
 
   @override
   List<Path> get continuousPaths => delay > 0.steps ? [] : [asPath];
@@ -895,6 +912,40 @@ class StepPaths extends RelativeMovement {
     }
   }
 
+  (OffsetPosition?, Axis?) asPositionExpressionFrom(PositionExpression from) {
+    OffsetPosition? position;
+    Axis? startingAxis;
+
+    for (var step in _paths) {
+      // If step faces, cannot express.
+      // (Technically we can be more relaxed if the facing
+      // is the same as the last path direction.)
+      if (step.willFace) {
+        return (null, null);
+      }
+
+      // Set the position if this is the first path or the offset is zero.
+      if (position == null || position.offset.isZero) {
+        position = step.asPositionExpressionFrom(from);
+      } else {
+        // Now we need to update the position with the next step.
+        // This means we require a starting axis.
+        startingAxis = position.offset.axisAligned;
+
+        if (startingAxis == null) {
+          // Cannot support; must have already moved two axis.
+          return (null, null);
+        }
+
+        // Update the position with the next step.
+        position =
+            position.withOffset(position.offset + step.asPath.asPosition);
+      }
+    }
+
+    return (position, startingAxis);
+  }
+
   /// Face the object in the direction of [direction].
   ///
   /// Only affects the end of [continuousPaths]. If there is a subsequent step
@@ -991,30 +1042,6 @@ class StepPaths extends RelativeMovement {
   int get hashCode => _paths.length == 1
       ? _paths.first.hashCode
       : const ListEquality().hash(_paths);
-}
-
-class ContextualStepToPoint extends ContextualMovement {
-  var direction = Direction.up;
-
-  int delay = 0;
-
-  Position to = Position(0, 0);
-
-  Axis startAlong = Axis.x;
-
-  final Position Function(EventState ctx) from;
-
-  ContextualStepToPoint(this.from);
-
-  @override
-  RelativeMovement movementIn(EventState ctx) {
-    return StepToPoint()
-      ..direction = direction
-      ..delay = delay.steps
-      ..to = to
-      ..firstAxis = startAlong
-      ..from = from(ctx);
-  }
 }
 
 /// Simple axis-by-axis movement to a point.

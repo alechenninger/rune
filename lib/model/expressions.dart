@@ -141,6 +141,9 @@ class OffsetPosition extends PositionExpression {
 
   OffsetPosition._(this.base, this.offset);
 
+  OffsetPosition withOffset(Position offset) =>
+      OffsetPosition(base, offset: offset);
+
   @override
   PositionComponentExpression component(Axis axis) => switch (axis.of(offset)) {
         0 => base.component(axis),
@@ -195,6 +198,15 @@ class Position extends PositionExpression {
 
   @override
   int get hashCode => x.hashCode ^ y.hashCode;
+
+  Axis? get axisAligned => switch (this) {
+        Position(x: 0, y: 0) => null,
+        Position(x: 0, y: _) => Axis.y,
+        Position(x: _, y: 0) => Axis.x,
+        _ => null
+      };
+
+  bool get isZero => x == 0 && y == 0;
 
   int get distance => (x.abs() + y.abs());
 
