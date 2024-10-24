@@ -406,7 +406,7 @@ class AbsoluteMoves extends Event implements RunnableInDialog {
 class WaitForMovements extends Event {
   final Set<FieldObject> objects;
 
-  WaitForMovements(this.objects);
+  WaitForMovements(Iterable<FieldObject> objects) : objects = objects.toSet();
 
   @override
   void visit(EventVisitor visitor) {
