@@ -199,6 +199,15 @@ class Memory implements EventState {
       (map, m) => m._eventState.currentMap = map));
 
   @override
+  StepSpeed? get stepSpeed => _eventState.stepSpeed;
+
+  @override
+  set stepSpeed(StepSpeed? speed) => _apply(SetValue<StepSpeed>(
+      speed,
+      (m) => m._eventState.stepSpeed,
+      (speed, m) => m._eventState.stepSpeed = speed));
+
+  @override
   Iterable<Character> get possibleCharacters => _eventState.possibleCharacters;
 
   @override

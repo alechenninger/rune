@@ -62,6 +62,7 @@ const y_step_duration = Constant('y_step_duration');
 /// bit 1 = update movement order (X first, Y second or viceversa)
 /// bit 2 = lock camera
 const Char_Move_Flags = Constant('Char_Move_Flags');
+const FieldObj_Step_Offset = Constant('FieldObj_Step_Offset');
 const Field_Map_Index = Constant('Field_Map_Index');
 const Field_Map_Index_2 = Constant('Field_Map_Index_2');
 const Map_Start_X_Pos = Constant('Map_Start_X_Pos');
@@ -670,7 +671,7 @@ Asm loadPartySlots(List<Expression> party, Address firstFour, Address last) {
     var shift = (party.length - 1) * 8;
     firstFourSlots = firstFourSlots | (0xFFFFFF >> shift).toValue;
   }
-  
+
   return Asm([move.l(firstFourSlots.i, firstFour), move.b(fifthSlot.i, last)]);
 }
 
@@ -784,4 +785,8 @@ Asm setEventFlag(KnownConstantValue flag) {
       jsr('EventFlags_Set'.toLabel.l)
     ]);
   }
+}
+
+Asm setStepSpeed(Address speed) {
+  return Asm([move.b(speed, FieldObj_Step_Offset.w)]);
 }

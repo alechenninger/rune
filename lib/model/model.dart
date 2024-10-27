@@ -290,6 +290,8 @@ class EventState {
 
   GameMap? currentMap;
 
+  StepSpeed? stepSpeed = StepSpeed.fast;
+
   Iterable<Character> get possibleCharacters {
     // TODO: correct this based on story state
     return Character.allCharacters;

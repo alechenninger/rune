@@ -135,7 +135,7 @@ void main() {
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
-              move.b(1.i, FieldObj_Step_Offset.w),
+              move.b(Byte.one.i, FieldObj_Step_Offset.w),
             ]));
       });
 
@@ -645,7 +645,7 @@ void main() {
               doMapUpdateLoop((2 * 8 - 1).toWord),
               characterByIdToA4(demi.charIdAddress),
               updateObjFacing(right.address),
-              move.b(0x01.i, (FieldObj_Step_Offset).w),
+              move.b(Byte.one.i, (FieldObj_Step_Offset).w),
             ]));
       });
     });
@@ -1203,7 +1203,7 @@ void main() {
       expect(state.positions[npc], Position(0x1a0, 0x1f0));
     });
 
-    test('change speed and reset after', () {
+    test('change speed', () {
       var event = AbsoluteMoves()
         ..destinations[shay] = Position(0x1a0, 0x1f0)
         ..speed = StepSpeed.slowWalk;
@@ -1217,7 +1217,6 @@ void main() {
             move.b(0.toByte.i, FieldObj_Step_Offset.w),
             shay.toA4(testState),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
-            move.b(1.i, FieldObj_Step_Offset.w)
           ]));
     });
 
@@ -1488,7 +1487,7 @@ void main() {
 
         expect(postRoutines, [
           Asm([
-            label(Label('TestScene_0_AbsoluteMoves')),
+            label(Label('TestScene_0_0_0_AbsoluteMoves')),
             followLeader(false),
             shay.toA4(testState),
             setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
@@ -1502,7 +1501,7 @@ void main() {
             Asm([
               dc.b(Bytes.ascii('hello')),
               dc.b([ControlCodes.action, Byte(0xf)]),
-              dc.l([Label('TestScene_0_AbsoluteMoves')])
+              dc.l([Label('TestScene_0_0_0_AbsoluteMoves')])
             ]));
       });
 
@@ -1519,7 +1518,7 @@ void main() {
 
         expect(postRoutines, [
           Asm([
-            label(Label('TestScene_0_AbsoluteMoves')),
+            label(Label('TestScene_0_0_0_AbsoluteMoves')),
             followLeader(false),
             shay.toA4(testState),
             setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
@@ -1539,7 +1538,7 @@ void main() {
             Asm([
               dc.b(Bytes.ascii('hello')),
               dc.b([ControlCodes.action, Byte(0xf)]),
-              dc.l([Label('TestScene_0_AbsoluteMoves')])
+              dc.l([Label('TestScene_0_0_0_AbsoluteMoves')])
             ]));
       });
 

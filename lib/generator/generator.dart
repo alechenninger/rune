@@ -2594,6 +2594,11 @@ class SceneAsmGenerator implements EventVisitor {
           unlockCamera(UnlockCamera());
         }
 
+        if (_memory.stepSpeed != StepSpeed.fast) {
+          _eventAsm.add(setStepSpeed(StepSpeed.fast.offset.i));
+          _memory.stepSpeed = StepSpeed.fast;
+        }
+
         // clears z bit so we don't reload the map from cutscene
         _eventAsm.add(comment('Finish'));
         _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
@@ -2612,6 +2617,11 @@ class SceneAsmGenerator implements EventVisitor {
 
         if (_memory.cameraLock == true) {
           unlockCamera(UnlockCamera());
+        }
+
+        if (_memory.stepSpeed != StepSpeed.fast) {
+          _eventAsm.add(setStepSpeed(StepSpeed.fast.offset.i));
+          _memory.stepSpeed = StepSpeed.fast;
         }
 
         _eventAsm.add(comment('Finish'));
@@ -2633,6 +2643,11 @@ class SceneAsmGenerator implements EventVisitor {
           unlockCamera(UnlockCamera());
         }
 
+        if (_memory.stepSpeed != StepSpeed.fast) {
+          _eventAsm.add(setStepSpeed(StepSpeed.fast.offset.i));
+          _memory.stepSpeed = StepSpeed.fast;
+        }
+
         if (type == EventType.cutscene) {
           // clears z bit so we don't reload the map from cutscene
           _eventAsm.add(comment('Finish'));
@@ -2652,6 +2667,10 @@ class SceneAsmGenerator implements EventVisitor {
           // unfortunately this will produce unwanted interrupt
           hideAllPanels(HideAllPanels());
         }
+
+        // TODO: if we moved characters in dialog we might've changed step speed
+        // we need to be able to reset, but there is no event asm to do that
+        // need control code
 
         _terminateDialog();
 

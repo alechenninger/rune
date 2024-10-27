@@ -15,7 +15,6 @@ const FacingDir_Up = Constant('FacingDir_Up');
 const FacingDir_Down = Constant('FacingDir_Down');
 const FacingDir_Left = Constant('FacingDir_Left');
 const FacingDir_Right = Constant('FacingDir_Right');
-const FieldObj_Step_Offset = Constant('FieldObj_Step_Offset');
 
 final scriptableObjectRoutine = AsmRoutineModel(Word(0x194));
 
@@ -183,8 +182,6 @@ extension IndividualMovesToAsm on IndividualMoves {
         asm.add(doMapUpdateLoop((8 * maxSteps.toInt - 1).toWord));
       }
     }
-
-    generator.resetSpeedFrom(speed);
 
     if (collideLead) {
       asm.add(Asm([
@@ -371,17 +368,14 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
     state.clearFacing(obj);
   });
 
-  if (moves.waitForMovements) {
-    // TODO: wait for movement asm must reset speed
-    generator.resetSpeedFrom(moves.speed);
-  }
-
   return asm;
 }
 
 Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
   var {true: chars, false: secondary} =
       wait.objects.groupListsBy((o) => o.isCharacter);
+
+  memory.stepSpeed = StepSpeed.fast;
 
   return Asm([
     for (var obj in secondary)
@@ -404,7 +398,7 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
         bclr(1.i, priority_flag(a4)),
       ]),
     // Reset speed
-    asmlib.move.b(1.i, FieldObj_Step_Offset.w)
+    setStepSpeed(StepSpeed.fast.offset.i),
   ]);
 }
 
@@ -536,14 +530,16 @@ class _MovementGenerator {
 
   void setSpeed(StepSpeed speed) {
     // TODO(movement): move speed to eventstate
-    if (speed != StepSpeed.fast) {
-      asm.add(asmlib.move.b(speed.offset.i, FieldObj_Step_Offset.w));
+    if (speed != _mem.stepSpeed) {
+      asm.add(setStepSpeed(speed.offset.i));
+      _mem.stepSpeed = speed;
     }
   }
 
   void resetSpeedFrom(StepSpeed speed) {
     if (speed != StepSpeed.fast) {
       asm.add(asmlib.move.b(1.i, FieldObj_Step_Offset.w));
+      _mem.stepSpeed = StepSpeed.fast;
     }
   }
 
