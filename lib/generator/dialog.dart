@@ -11,6 +11,7 @@ import '../characters.dart';
 import '../model/model.dart';
 import 'cutscenes.dart';
 import 'generator.dart';
+import 'labels.dart';
 import 'memory.dart';
 import 'movement.dart';
 
@@ -86,8 +87,7 @@ class DialogAsm extends Asm {
 typedef DialogAndRoutines = (Asm dialog, List<Asm> post);
 
 sealed class DialogEvent {
-  DialogAndRoutines toAsm(Memory state,
-      {required SceneId scene, required int eventIndex});
+  DialogAndRoutines toAsm(Memory state, {required Labeller labeller});
 
   static DialogEvent? fromEvent(RunnableInDialog event, Memory state) {
     switch (event) {
@@ -127,8 +127,7 @@ class PauseCode extends DialogEvent {
   PauseCode(this.additionalFrames);
 
   @override
-  DialogAndRoutines toAsm(EventState state,
-          {SceneId? scene, int? eventIndex}) =>
+  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) =>
       (delay(additionalFrames), const []);
 }
 
@@ -138,8 +137,7 @@ class PanelCode extends DialogEvent {
   PanelCode(this.panelIndex);
 
   @override
-  DialogAndRoutines toAsm(EventState state,
-      {required SceneId scene, required int eventIndex}) {
+  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) {
     state.addPanel();
     return (panel(panelIndex), const []);
   }
@@ -151,9 +149,7 @@ class SoundCode extends DialogEvent {
   SoundCode(this.sfxId);
 
   @override
-  DialogAndRoutines toAsm(EventState state,
-          {SceneId? scene, int? eventIndex}) =>
-      (
+  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) => (
         Asm([
           dc.b(const [ControlCodes.action, Byte.constant(3)]),
           dc.b([sfxId]),
@@ -168,8 +164,7 @@ class DialogCodesEvent extends DialogEvent {
   DialogCodesEvent(this.codes);
 
   @override
-  DialogAndRoutines toAsm(EventState state,
-          {SceneId? scene, int? eventIndex}) =>
+  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) =>
       (dc.b(codes), const []);
 }
 
@@ -197,7 +192,7 @@ class FaceInDialog extends DialogEvent {
   }
 
   @override
-  DialogAndRoutines toAsm(EventState state, {SceneId? scene, int? eventIndex}) {
+  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) {
     var asm = Asm.empty();
 
     for (var MapEntry(key: obj, value: dir) in facing.entries) {
@@ -245,21 +240,24 @@ class AbsoluteMovesInDialog extends DialogEvent {
   AbsoluteMovesInDialog(this.moves);
 
   @override
-  DialogAndRoutines toAsm(Memory state,
-      {required SceneId scene, required int eventIndex}) {
+  DialogAndRoutines toAsm(Memory state, {required Labeller labeller}) {
     // First generate the positioning routine
-    var routineLbl = Label('${scene}_${eventIndex}_AbsoluteMoves');
+    var routineLbl = labeller.withContext('AbsoluteMoves').next();
     var routine = Asm([
       label(routineLbl),
-      absoluteMovesToAsm(moves, state, eventIndex: eventIndex),
+      absoluteMovesToAsm(moves, state, labeller: labeller),
     ]);
 
+    // TODO(optimization): this loops through objects again
+    // ideally we'd do this just once to set destinations and move bit
     for (var obj in moves.destinations.keys) {
       // _memory.animatedDuringDialog(obj); TODO
       // Would also need to know what "normal" state is,
       // so we don't clear the bit for objects where it should always be set
-      routine.add(Asm([obj.toA4(state), bset(1.i, priority_flag(a4)), rts]));
+      routine.add(Asm([obj.toA4(state), bset(1.i, priority_flag(a4))]));
     }
+
+    routine.add(rts);
 
     var dialog = Asm([
       dc.b([ControlCodes.action, Byte(0xf)]),
@@ -272,7 +270,7 @@ class AbsoluteMovesInDialog extends DialogEvent {
 
 extension DialogToAsm on Dialog {
   DialogAndRoutines toGeneratedAsm(Memory memory,
-      {required SceneId scene, required int eventIndex}) {
+      {required Labeller labeller}) {
     var asm = DialogAsm.empty();
     var post = <Asm>[];
     var quotes = Quotes();
@@ -292,14 +290,15 @@ extension DialogToAsm on Dialog {
       var spanAscii = span.toAscii(quotes);
       ascii += spanAscii;
 
-      for (var e in span.events) {
+      for (var j = 0; j < span.events.length; j++) {
+        var e = span.events[j];
         var dialogEvent = DialogEvent.fromEvent(e, memory);
         if (dialogEvent == null) {
           throw StateError(
               'event in span cannot be compiled to dialog. event: $e');
         }
-        var (dialog, routines) =
-            dialogEvent.toAsm(memory, scene: scene, eventIndex: eventIndex);
+        var (dialog, routines) = dialogEvent.toAsm(memory,
+            labeller: labeller.withContext(i).withContext(j));
         post.addAll(routines);
         codePoints.add(ascii.length, dialog);
       }
@@ -314,8 +313,7 @@ extension DialogToAsm on Dialog {
   DialogAsm toAsm([EventState? eventState]) {
     var memory =
         eventState == null ? Memory() : Memory.from(SystemState(), eventState);
-    var (asm, _) =
-        toGeneratedAsm(memory, scene: SceneId('dialog'), eventIndex: 0);
+    var (asm, _) = toGeneratedAsm(memory, labeller: Labeller());
     return DialogAsm([asm]);
   }
 }

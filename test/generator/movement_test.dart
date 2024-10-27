@@ -1,6 +1,9 @@
+import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/generator/labels.dart';
 import 'package:rune/generator/memory.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/model/model.dart';
@@ -849,8 +852,7 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              label(Label(
-                  '.wait_for_movement_MapObjecttestnpc_1_MapObjecttestnpc_0')),
+              label(Label('.wait_for_movement_1_MapObjecttestnpc_0')),
               lea(0xFFFFC300.w, a4),
               jsr(Label('RunSingleObject').l),
               jsr(Label('Field_LoadSprites').l),
@@ -862,8 +864,7 @@ void main() {
               moveq(0.i, d0),
               move.w(x_step_duration(a4), d0),
               or.w(y_step_duration(a4), d0),
-              bne.s(Label(
-                  '.wait_for_movement_MapObjecttestnpc_1_MapObjecttestnpc_0')),
+              bne.s(Label('.wait_for_movement_1_MapObjecttestnpc_0')),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(curr_x_pos(a4), dest_x_pos(a4)),
               move.w(curr_y_pos(a4), dest_y_pos(a4)),
@@ -1471,6 +1472,121 @@ void main() {
 
         expect(() => absoluteMovesToAsm(event, state),
             throwsA(TypeMatcher<StateError>()));
+      });
+    });
+
+    group('in dialog', () {
+      test('single character', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] = Position(0x1a0, 0x1f0)
+          ..waitForMovements = false;
+        var dialog = Dialog(spans: DialogSpan.parse('hello', events: [event]));
+
+        var (asm, postRoutines) = dialog.toGeneratedAsm(
+            state..cameraLock = true,
+            labeller: Labeller.localTo('TestScene').withContext(0));
+
+        expect(postRoutines, [
+          Asm([
+            label(Label('TestScene_0_AbsoluteMoves')),
+            followLeader(false),
+            shay.toA4(testState),
+            setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            bset(1.i, priority_flag(a4)),
+            rts,
+          ])
+        ]);
+
+        expect(
+            asm,
+            Asm([
+              dc.b(Bytes.ascii('hello')),
+              dc.b([ControlCodes.action, Byte(0xf)]),
+              dc.l([Label('TestScene_0_AbsoluteMoves')])
+            ]));
+      });
+
+      test('character and npc in the same span', () {
+        var event = AbsoluteMoves()
+          ..destinations[shay] = Position(0x1a0, 0x1f0)
+          ..destinations[npc] = Position(0x1b0, 0x1f0)
+          ..waitForMovements = false;
+        var dialog = Dialog(spans: DialogSpan.parse('hello', events: [event]));
+
+        var (asm, postRoutines) = dialog.toGeneratedAsm(
+            state..cameraLock = true,
+            labeller: Labeller.localTo('TestScene').withContext(0));
+
+        expect(postRoutines, [
+          Asm([
+            label(Label('TestScene_0_AbsoluteMoves')),
+            followLeader(false),
+            shay.toA4(testState),
+            setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            npc.toA4(testState),
+            move.w(0x8194.toWord.i, a4.indirect),
+            setDestination(x: 0x1b0.toWord.i, y: 0x1f0.toWord.i),
+            shay.toA4(testState),
+            bset(1.i, priority_flag(a4)),
+            npc.toA4(testState),
+            bset(1.i, priority_flag(a4)),
+            rts,
+          ])
+        ]);
+
+        expect(
+            asm,
+            Asm([
+              dc.b(Bytes.ascii('hello')),
+              dc.b([ControlCodes.action, Byte(0xf)]),
+              dc.l([Label('TestScene_0_AbsoluteMoves')])
+            ]));
+      });
+
+      test('multiple objects across multiple spans', () {
+        var event1 = AbsoluteMoves()
+          ..destinations[shay] = Position(0x1a0, 0x1f0)
+          ..waitForMovements = false;
+        var event2 = AbsoluteMoves()
+          ..destinations[alys] = Position(0x1b0, 0x1f0)
+          ..waitForMovements = false;
+        var dialog = Dialog(spans: [
+          DialogSpan('hello', events: [event1]),
+          DialogSpan(' world', events: [event2])
+        ]);
+
+        var (asm, postRoutines) = dialog.toGeneratedAsm(
+            state..cameraLock = true,
+            labeller: Labeller.localTo('TestScene').withContext(0));
+
+        expect(postRoutines, [
+          Asm([
+            label(Label('TestScene_0_0_0_AbsoluteMoves')),
+            followLeader(false),
+            shay.toA4(testState),
+            setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            bset(1.i, priority_flag(a4)),
+            rts,
+          ]),
+          Asm([
+            label(Label('TestScene_0_1_0_AbsoluteMoves')),
+            alys.toA4(testState),
+            setDestination(x: 0x1b0.toWord.i, y: 0x1f0.toWord.i),
+            bset(1.i, priority_flag(a4)),
+            rts,
+          ])
+        ]);
+
+        expect(
+            asm,
+            Asm([
+              dc.b(Bytes.ascii('hello')),
+              dc.b([ControlCodes.action, Byte(0xf)]),
+              dc.l([Label('TestScene_0_0_0_AbsoluteMoves')]),
+              dc.b(Bytes.ascii(' world')),
+              dc.b([ControlCodes.action, Byte(0xf)]),
+              dc.l([Label('TestScene_0_1_0_AbsoluteMoves')]),
+            ]));
       });
     });
   });

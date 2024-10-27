@@ -44,6 +44,7 @@ import 'cutscenes.dart';
 import 'debug.dart' as debug;
 import 'dialog.dart';
 import 'event.dart';
+import 'labels.dart';
 import 'map.dart';
 import 'memory.dart';
 import 'movement.dart';
@@ -655,6 +656,7 @@ class GenerationContext {
 
 class SceneAsmGenerator implements EventVisitor {
   final SceneId id;
+  final Labeller _labeller;
 
   // Non-volatile state (state of the code being generated)
   final GenerationContext _context;
@@ -746,6 +748,7 @@ class SceneAsmGenerator implements EventVisitor {
       FieldObject? withObject = const InteractionObject(),
       FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
+        _labeller = Labeller.localTo(id),
         _gameMode = InteractionMode(withObject: withObject),
         _context = GenerationContext(
             _EventRoutinesWrappingConfiguration(
@@ -775,6 +778,7 @@ class SceneAsmGenerator implements EventVisitor {
       EventType? eventType,
       FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
+        _labeller = Labeller.localTo(id),
         _gameMode = EventMode(type: eventType ?? EventType.event),
         _context = GenerationContext(
             _AsmProgramConfiguration(
@@ -801,7 +805,8 @@ class SceneAsmGenerator implements EventVisitor {
       required EventAsm eventAsm,
       required Asm runEventAsm,
       required ProgramConfiguration config})
-      : _gameMode = RunEventMode(),
+      : _labeller = Labeller.localTo(id),
+        _gameMode = RunEventMode(),
         _context = GenerationContext(config,
             eventAsm: eventAsm, runEventAsm: runEventAsm) {
     _memory.currentMap = inMap;
@@ -947,8 +952,8 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
     _generateQueueInCurrentMode();
     _runOrContinueDialog(dialog);
-    var (asm, post) =
-        dialog.toGeneratedAsm(_memory, scene: id, eventIndex: _eventCounter);
+    var (asm, post) = dialog.toGeneratedAsm(_memory,
+        labeller: _labeller.withContext(_eventCounter));
     _addToDialog(asm);
     _postAsm.addAll(post);
   }
@@ -987,9 +992,8 @@ class SceneAsmGenerator implements EventVisitor {
           face.object == const InteractionObject()) {
         asm.add(jsr(Label('Interaction_UpdateObj').l));
       } else {
-        asm.add(face
-            .toMoves()
-            .toAsm(_memory, eventIndex: i, fieldRoutines: _fieldRoutines));
+        asm.add(face.toMoves().toAsm(_memory,
+            fieldRoutines: _fieldRoutines, labeller: _labeller.withContext(i)));
       }
 
       return asm;
@@ -1014,12 +1018,14 @@ class SceneAsmGenerator implements EventVisitor {
             _addToDialog(dialogAsm);
           },
           inEvent: (i) => moves.toAsm(_memory,
-              eventIndex: i, fieldRoutines: _fieldRoutines));
+              fieldRoutines: _fieldRoutines,
+              labeller: _labeller.withContext(i)));
     } else {
       _addToEvent(
           moves,
           (i) => moves.toAsm(_memory,
-              eventIndex: i, fieldRoutines: _fieldRoutines));
+              fieldRoutines: _fieldRoutines,
+              labeller: _labeller.withContext(i)));
     }
   }
 
@@ -1037,6 +1043,12 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void waitForMovements(WaitForMovements wait) {
+    _checkNotFinished();
+
+    // TODO(wait for movements): use explicit param
+    var keepDialog = _memory.cameraLock == false ||
+        wait.objects.none((o) => o.slotAsOf(_memory) == 1);
+
     _addToEvent(wait, (i) => waitForMovementsToAsm(wait, memory: _memory));
   }
 
@@ -1236,7 +1248,9 @@ class SceneAsmGenerator implements EventVisitor {
         ..moves[BySlot(1)] = move.movement
         ..speed = move.speed;
       return moves.toAsm(_memory,
-          eventIndex: i, fieldRoutines: _fieldRoutines, followLead: true);
+          fieldRoutines: _fieldRoutines,
+          labeller: _labeller.withContext(i),
+          followLead: true);
     });
   }
 
@@ -2658,6 +2672,9 @@ class SceneAsmGenerator implements EventVisitor {
       }
       _eventAsm.add(subroutine);
     }
+
+    // In case other event branches are generated
+    _postAsm.clear();
 
     if (appendNewline) {
       switch (_gameMode) {

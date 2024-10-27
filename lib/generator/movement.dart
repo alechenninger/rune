@@ -8,6 +8,7 @@ import 'package:rune/generator/stack.dart';
 import '../asm/asm.dart' as asmlib;
 import '../model/model.dart';
 import 'event.dart';
+import 'labels.dart';
 import 'memory.dart';
 
 const FacingDir_Up = Constant('FacingDir_Up');
@@ -38,13 +39,14 @@ if independent moves == follow lead moves, just use follow lead flag
 
 extension IndividualMovesToAsm on IndividualMoves {
   EventAsm toAsm(Memory ctx,
-      {int? eventIndex,
+      {Labeller? labeller,
       FieldRoutineRepository? fieldRoutines,
       bool followLead = false}) {
+    labeller ??= Labeller();
     fieldRoutines ??= defaultFieldRoutines;
 
     var asm = EventAsm.empty();
-    var generator = _MovementGenerator(asm, ctx, eventIndex);
+    var generator = _MovementGenerator(asm, ctx, labeller);
 
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
@@ -263,7 +265,7 @@ int Function(RelativeMove<FieldObject>, RelativeMove<FieldObject>)
 }
 
 EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
-    {int? eventIndex}) {
+    {int? eventIndex, Labeller? labeller}) {
   // We assume we don't know the current positions,
   // so we don't know which move is longer.
   // Just start all in parallel.
@@ -313,26 +315,46 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
           load2: a2,
           asm: (x, y) => doMove(x: x, y: y)));
     } else {
-      asm.add(pos.withPosition(
-          memory: state,
-          load: a3,
-          load2: a2,
-          asm: (x, y) => setDestination(x: x, y: y)));
+      var isLastToMove = i == length - 1;
+      if (!isLastToMove) {
+        asm.add(pos.withPosition(
+            memory: state,
+            load: a3,
+            load2: a2,
+            asm: (x, y) => setDestination(x: x, y: y)));
 
-      if (obj.isNotCharacter) {
-        secondaryObjects.add((obj, pos));
-      }
+        if (obj.isNotCharacter) {
+          secondaryObjects.add((obj, pos));
+        }
+      } else {
+        // Last object to move...
 
-      if (i == length - 1) {
-        // Secondary objects not checked in MoveCharacters
-        // Easier to just check them individually
-        for (var (obj, pos) in secondaryObjects) {
-          asm.add(obj.toA4(generator._mem));
+        if (obj.isCharacter) {
+          // Just set destination; we'll move all characters together later.
+          asm.add(pos.withPosition(
+              memory: state,
+              load: a3,
+              load2: a2,
+              asm: (x, y) => setDestination(x: x, y: y)));
+        } else {
+          // Move this object (other objects will move in parallel)
           asm.add(pos.withPosition(
               memory: state,
               load: a3,
               load2: a2,
               asm: (x, y) => doMove(x: x, y: y)));
+
+          // Finish moving any other secondary objects
+          if (moves.waitForMovements) {
+            for (var (obj, pos) in secondaryObjects) {
+              asm.add(obj.toA4(generator._mem));
+              asm.add(pos.withPosition(
+                  memory: state,
+                  load: a3,
+                  load2: a2,
+                  asm: (x, y) => moveCharacter(x: x, y: y)));
+            }
+          }
         }
 
         // Now ensure characters are done moving.
@@ -365,9 +387,22 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
     for (var obj in secondary)
       Asm([
         obj.toA4(memory),
+        // TODO(optimization): this is just to redundantly set them in MoveCharacter
+        // Could factor this away
+        move.w(dest_x_pos(a4), d0),
+        move.w(dest_y_pos(a4), d1),
         jsr(Label('Event_MoveCharacter').l),
+        // Reset move in dialog bit
+        // TODO: this could erroneously change an object that normally animates
+        bclr(1.i, priority_flag(a4)),
       ]),
     if (chars.isNotEmpty) jsr(Label('Event_MoveCharacters').l),
+    // Reset move in dialog bit
+    for (var char in chars)
+      Asm([
+        char.toA4(memory),
+        bclr(1.i, priority_flag(a4)),
+      ]),
     // Reset speed
     asmlib.move.b(1.i, FieldObj_Step_Offset.w)
   ]);
@@ -485,11 +520,12 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
 }
 
 class _MovementGenerator {
-  _MovementGenerator(this.asm, this._mem, [this._eventIndex]);
+  _MovementGenerator(this.asm, this._mem, [Labeller? labeller])
+      : _labeller = labeller ?? Labeller();
 
   final EventAsm asm;
   final Memory _mem;
-  final int? _eventIndex;
+  final Labeller _labeller;
 
   void setStartingAxis(Axis axis) {
     if (_mem.startingAxis != axis) {
@@ -535,11 +571,8 @@ class _MovementGenerator {
 
   void updateFacing(FieldObject obj, DirectionExpression dir, int moveIndex,
       {required FieldRoutineRepository fieldRoutines}) {
-    var labelSuffix = '_${[
-      _eventIndex,
-      _labelSafeString(obj),
-      moveIndex
-    ].nonNulls.join('_')}';
+    var labeller = _labeller.withContext(obj).withContext(moveIndex);
+    var labelSuffix = labeller.suffixLocal();
 
     // This ensures facing doesn't change during subsequent movements.
     if (!scriptable(obj)) {
@@ -550,7 +583,7 @@ class _MovementGenerator {
         if (obj.position().known(_mem) == null)
           _waitForMovement(
               obj: obj,
-              labelSuffix: labelSuffix,
+              labeller: labeller,
               memory: _mem,
               fieldRoutines: fieldRoutines),
         obj.toA4(_mem),
@@ -593,11 +626,12 @@ String _labelSafeString(FieldObject obj) {
 
 Asm _waitForMovement(
     {required FieldObject obj,
-    required String labelSuffix,
+    required Labeller labeller,
     required Memory memory,
     required FieldRoutineRepository fieldRoutines}) {
-  var startOfLoop =
-      Label('.wait_for_movement_${_labelSafeString(obj)}$labelSuffix');
+  var startOfLoop = Labeller.withContext('wait_for_movement')
+      .withContextsFrom(labeller)
+      .nextLocal();
   return Asm([
     label(startOfLoop),
     obj.toA4(memory, force: false),
