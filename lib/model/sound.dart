@@ -60,7 +60,10 @@ class PlayMusic extends Event implements RunnableInDialog {
   int get hashCode => music.hashCode;
 }
 
-class StopMusic extends Event {
+class StopMusic extends Event implements RunnableInDialog {
+  @override
+  bool canRunInDialog([EventState? state]) => true;
+
   @override
   void visit(EventVisitor visitor) {
     visitor.stopMusic(this);

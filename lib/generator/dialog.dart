@@ -113,8 +113,9 @@ sealed class DialogEvent {
         return DialogCodesEvent(c.codes);
       case AbsoluteMoves m when m.canRunInDialog(state):
         return AbsoluteMovesInDialog(m);
-      // TODO: StopMusic
-      // TODO: to do absolute moves we need to get the routine parameter
+      case StopMusic():
+        // TODO: pause or stop?
+        return SoundCode(SoundEffect.stopMusic.sfxId);
       default:
         return null;
     }
