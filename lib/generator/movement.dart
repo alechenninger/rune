@@ -190,6 +190,14 @@ extension IndividualMovesToAsm on IndividualMoves {
       ]));
     }
 
+    if (followLead) {
+      for (var slot in Slots.all) {
+        var obj = BySlot(slot);
+        ctx.positions[obj] = null;
+        ctx.clearFacing(obj);
+      }
+    }
+
     return asm;
   }
 }
