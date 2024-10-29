@@ -405,8 +405,10 @@ class AbsoluteMoves extends Event implements RunnableInDialog {
 /// Useful after using [AbsoluteMoves] during dialog.
 class WaitForMovements extends Event {
   final Set<FieldObject> objects;
+  final bool requireEvent;
 
-  WaitForMovements(Iterable<FieldObject> objects) : objects = objects.toSet();
+  WaitForMovements(Iterable<FieldObject> objects, {this.requireEvent = true})
+      : objects = objects.toSet();
 
   @override
   void visit(EventVisitor visitor) {
@@ -415,7 +417,7 @@ class WaitForMovements extends Event {
 
   @override
   String toString() {
-    return 'WaitForMovements{objects: $objects}';
+    return 'WaitForMovements{objects: $objects, keepDialog: $requireEvent}';
   }
 
   @override
@@ -423,10 +425,11 @@ class WaitForMovements extends Event {
       identical(this, other) ||
       other is WaitForMovements &&
           runtimeType == other.runtimeType &&
-          const SetEquality().equals(objects, other.objects);
+          const SetEquality().equals(objects, other.objects) &&
+          requireEvent == other.requireEvent;
 
   @override
-  int get hashCode => const SetEquality().hash(objects);
+  int get hashCode => const SetEquality().hash(objects) ^ requireEvent.hashCode;
 }
 
 class InstantMoves extends Event {
