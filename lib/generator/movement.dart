@@ -191,7 +191,7 @@ extension IndividualMovesToAsm on IndividualMoves {
     }
 
     if (followLead) {
-      for (var slot in Slots.all) {
+      for (var slot in Slots.all.skip(1)) {
         var obj = BySlot(slot);
         ctx.positions[obj] = null;
         ctx.clearFacing(obj);
