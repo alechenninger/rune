@@ -406,10 +406,20 @@ enum Portrait {
   Tallas,
   DyingBoy,
   Sekreas,
+
+  /// Mustache guy brown and white clothes, green background
   Shopkeeper1,
+
+  /// Woman
   Shopkeeper2,
+
+  /// Younger woman
   Shopkeeper3,
+
+  /// Dezolian
   Shopkeeper4,
+
+  /// Dezolian
   Shopkeeper5,
 
   // Tough looking guy
