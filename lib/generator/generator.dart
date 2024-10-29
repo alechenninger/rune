@@ -2292,9 +2292,12 @@ class SceneAsmGenerator implements EventVisitor {
   move.b	#$80, ($FF5007).l
   jsr	(VInt_Prepare).l
      */
-    _addToEvent(
-        stopMusic,
-        (_) => Asm([
+    _addToEventOrDialog(stopMusic,
+        inDialog: () {
+          // Or use Sound_StopMusic ?
+          _addToDialog(dc.b([ControlCodes.action, Byte(8)]));
+        },
+        inEvent: (_) => Asm([
               move.b(const Constant('Sound_StopMusic').i,
                   Constant('Sound_Index').l),
               clr.b(Constant('Saved_Sound_Index').w)
