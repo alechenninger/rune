@@ -383,7 +383,7 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
   var {true: chars, false: secondary} =
       wait.objects.groupListsBy((o) => o.isCharacter);
 
-  memory.stepSpeed = StepSpeed.fast;
+  memory.stepSpeed = StepSpeed.normal();
 
   return Asm([
     for (var obj in secondary)
@@ -406,7 +406,7 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
         bclr(1.i, priority_flag(a4)),
       ]),
     // Reset speed
-    setStepSpeed(StepSpeed.fast.offset.i),
+    setStepSpeed(StepSpeed.normal().offset.i),
   ]);
 }
 
@@ -545,9 +545,9 @@ class _MovementGenerator {
   }
 
   void resetSpeedFrom(StepSpeed speed) {
-    if (speed != StepSpeed.fast) {
+    if (speed != StepSpeed.normal()) {
       asm.add(asmlib.move.b(1.i, FieldObj_Step_Offset.w));
-      _mem.stepSpeed = StepSpeed.fast;
+      _mem.stepSpeed = StepSpeed.normal();
     }
   }
 

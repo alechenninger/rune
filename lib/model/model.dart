@@ -246,31 +246,34 @@ abstract class EventVisitor {
 }
 
 class EventState {
-  EventState() {
+  EventState() : slots = Slots._() {
     _positions = Positions._(this);
   }
 
+  EventState._branch(EventState from) : slots = from.slots.branch() {
+    _facing.addAll(from._facing);
+    _positions = Positions._(this);
+    positions.addAll(from.positions);
+    startingAxis = from.startingAxis;
+    followLead = from.followLead;
+    cameraLock = from.cameraLock;
+    isFieldShown = from.isFieldShown;
+    dialogPortrait = from.dialogPortrait;
+    keepDialog = from.keepDialog;
+    currentMap = from.currentMap;
+    panelsShown = from.panelsShown;
+    _routines.addAll(from._routines);
+  }
+
   EventState branch() {
-    return EventState()
-      .._facing.addAll(_facing)
-      ..positions.addAll(positions)
-      ..slots.addAll(slots)
-      ..startingAxis = startingAxis
-      ..followLead = followLead
-      ..cameraLock = cameraLock
-      ..isFieldShown = isFieldShown
-      ..dialogPortrait = dialogPortrait
-      ..keepDialog = keepDialog
-      ..currentMap = currentMap
-      ..panelsShown = panelsShown
-      .._routines.addAll(_routines);
+    return EventState._branch(this);
   }
 
   late final Positions _positions;
   Positions get positions => _positions;
 
   /// Character field objects by slot. 1-indexed (zero is invalid).
-  final Slots slots = Slots._();
+  final Slots slots;
 
   Axis? startingAxis = Axis.x;
 
@@ -418,6 +421,14 @@ class Slots {
   static const all = [1, 2, 3, 4, 5];
 
   Slots._();
+
+  Slots branch() {
+    var newSlots = Slots._();
+    newSlots._party.addAll(_party);
+    newSlots._priorParty = _priorParty;
+    newSlots._partyOrderMaintained = _partyOrderMaintained;
+    return newSlots;
+  }
 
   void addAll(Slots slots) {
     _party.addAll(slots._party);
