@@ -1003,7 +1003,13 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void overlapCharacters(OverlapCharacters overlap) {
     _checkNotFinished();
-    _addToEvent(overlap, (_) => jsr(Label('Event_OverlapCharacters').l));
+    _addToEvent(overlap, (_) {
+      if (_memory.stepSpeed != StepSpeed.normal()) {
+        _eventAsm.add(setStepSpeed(StepSpeed.normal().offset.i));
+        _memory.stepSpeed = StepSpeed.normal();
+      }
+      _eventAsm.add(jsr(Label('Event_OverlapCharacters').l));
+    });
   }
 
   @override
@@ -2388,8 +2394,6 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
-  // TODO: we cannot support add here any more.
-  // this is only swap order. add has to accompany a load map
   void changeParty(ChangePartyOrder changeParty) {
     _checkNotFinished();
 
@@ -2597,9 +2601,9 @@ class SceneAsmGenerator implements EventVisitor {
           unlockCamera(UnlockCamera());
         }
 
-        if (_memory.stepSpeed != StepSpeed.fast) {
-          _eventAsm.add(setStepSpeed(StepSpeed.fast.offset.i));
-          _memory.stepSpeed = StepSpeed.fast;
+        if (_memory.stepSpeed != StepSpeed.normal()) {
+          _eventAsm.add(setStepSpeed(StepSpeed.normal().offset.i));
+          _memory.stepSpeed = StepSpeed.normal();
         }
 
         // clears z bit so we don't reload the map from cutscene
@@ -2622,9 +2626,9 @@ class SceneAsmGenerator implements EventVisitor {
           unlockCamera(UnlockCamera());
         }
 
-        if (_memory.stepSpeed != StepSpeed.fast) {
-          _eventAsm.add(setStepSpeed(StepSpeed.fast.offset.i));
-          _memory.stepSpeed = StepSpeed.fast;
+        if (_memory.stepSpeed != StepSpeed.normal()) {
+          _eventAsm.add(setStepSpeed(StepSpeed.normal().offset.i));
+          _memory.stepSpeed = StepSpeed.normal();
         }
 
         _eventAsm.add(comment('Finish'));
@@ -2646,9 +2650,9 @@ class SceneAsmGenerator implements EventVisitor {
           unlockCamera(UnlockCamera());
         }
 
-        if (_memory.stepSpeed != StepSpeed.fast) {
-          _eventAsm.add(setStepSpeed(StepSpeed.fast.offset.i));
-          _memory.stepSpeed = StepSpeed.fast;
+        if (_memory.stepSpeed != StepSpeed.normal()) {
+          _eventAsm.add(setStepSpeed(StepSpeed.normal().offset.i));
+          _memory.stepSpeed = StepSpeed.normal();
         }
 
         if (type == EventType.cutscene) {
