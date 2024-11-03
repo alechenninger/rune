@@ -37,7 +37,9 @@ class ChangePartyOrder extends PartyEvent {
 
   @override
   String toString() {
-    return 'ChangePartyOrder{$party, saveCurrentParty: $saveCurrentParty}';
+    return 'ChangePartyOrder{$party, '
+        'saveCurrentParty: $saveCurrentParty, '
+        'maintainOrder: $maintainOrder}';
   }
 
   @override
@@ -45,10 +47,15 @@ class ChangePartyOrder extends PartyEvent {
       identical(this, other) ||
       other is ChangePartyOrder &&
           runtimeType == other.runtimeType &&
-          const ListEquality().equals(party, other.party);
+          const ListEquality().equals(party, other.party) &&
+          saveCurrentParty == other.saveCurrentParty &&
+          maintainOrder == other.maintainOrder;
 
   @override
-  int get hashCode => const ListEquality().hash(party);
+  int get hashCode =>
+      const ListEquality().hash(party) ^
+      saveCurrentParty.hashCode ^
+      maintainOrder.hashCode;
 }
 
 class RestoreSavedPartyOrder extends PartyEvent {
