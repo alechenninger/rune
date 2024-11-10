@@ -344,6 +344,9 @@ class _Slots implements Slots {
   _Slots(this._memory);
 
   @override
+  Slots branch() => _Slots(_memory.branch());
+
+  @override
   bool get partyOrderMaintained =>
       _memory._eventState.slots.partyOrderMaintained;
 
