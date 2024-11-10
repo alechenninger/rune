@@ -242,17 +242,21 @@ class FieldRoutine<T extends MapObjectSpec> {
   // look into render flag $6 usage?
   final bool vramAnimated;
 
+  final bool animatesInEvents;
+
   final SpecFactory factory;
 
   const FieldRoutine(this.index, this.label, this.factory,
       {this.spriteMappingTiles = _defaultVramTilesPerSprite,
       this.ramArt,
-      this.vramAnimated = false});
+      this.vramAnimated = false,
+      this.animatesInEvents = false});
 
   FieldRoutine.asm(this.index, this.label,
       {this.spriteMappingTiles = _defaultVramTilesPerSprite,
       this.ramArt,
-      this.vramAnimated = false})
+      this.vramAnimated = false,
+      this.animatesInEvents = false})
       : factory = SpecFactory.asm(index);
 
   SpriteVramMapping? spriteVramMapping(MapObjectSpec spec) {
