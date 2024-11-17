@@ -3894,6 +3894,7 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_AirCastle_Part3'): Word(0x371),
   Label('Map_AirCastle_F1_Part10'): Word(0x371),
   Label('Map_AirCastleXeAThoulRoom'): Word(0x371),
+  Label('Map_Zelan_F1'): Word(0x3b9),
   Label('Map_Kuran_F3'): Word(0x3b9),
   Label('Map_GaruberkTower_Part7'): Word(0x252),
 }.map((l, o) => MapEntry(labelToMapId(l), o));

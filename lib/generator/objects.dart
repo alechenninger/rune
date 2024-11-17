@@ -106,6 +106,8 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 7),
   FieldRoutine.asm(Word(0xEC), Label('FieldObj_NPCHahn'),
       spriteMappingTiles: 8),
+  FieldRoutine.asm(Word(0x1f0), Label('FieldObj_NPCWren'),
+      spriteMappingTiles: 8, vramAnimated: true),
 ]);
 
 class FieldRoutineRepository {
