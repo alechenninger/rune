@@ -2298,16 +2298,25 @@ class SceneAsmGenerator implements EventVisitor {
   move.b	#$80, ($FF5007).l
   jsr	(VInt_Prepare).l
      */
-    _addToEventOrDialog(stopMusic,
-        inDialog: () {
-          // Or use Sound_StopMusic ?
-          _addToDialog(dc.b([ControlCodes.action, Byte(8)]));
-        },
-        inEvent: (_) => Asm([
-              move.b(const Constant('Sound_StopMusic').i,
-                  Constant('Sound_Index').l),
-              clr.b(Constant('Saved_Sound_Index').w)
-            ]));
+    var musicId = SoundEffect.stopMusic.sfxId;
+
+    _addToEventOrDialog(stopMusic, inDialog: () {
+      var (asm, _) = SoundCode(musicId).toAsm(_memory);
+      _addToDialog(asm);
+      // TODO: note in this case, saved sound index is not set
+    }, inEvent: (_) {
+      return Asm([
+        // Necessary to ensure previous sound change occurs
+        // TODO: as last event in current dialog is relevant to current dialog
+        // depending on how dialog generation is managed this may miss cases
+        // TODO(frame perfect): may need to run tiles/map updates
+        if (_lastEventInCurrentDialog is PlaySound ||
+            _lastEventInCurrentDialog is PlayMusic)
+          _waitFrames(1),
+        move.b(musicId.i, Constant('Sound_Index').l),
+        move.b(musicId.i, Constant('Saved_Sound_Index').w)
+      ]);
+    });
   }
 
   @override
