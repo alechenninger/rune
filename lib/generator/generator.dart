@@ -31,10 +31,10 @@ import 'package:rune/generator/guild.dart';
 import 'package:rune/src/logging.dart';
 
 import '../asm/asm.dart';
-import '../asm/dialog.dart';
 import '../asm/dialog.dart' as dialog_asm;
-import '../asm/events.dart';
+import '../asm/dialog.dart';
 import '../asm/events.dart' as events_asm;
+import '../asm/events.dart';
 import '../asm/text.dart';
 import '../model/model.dart';
 import '../src/iterables.dart';
@@ -55,8 +55,8 @@ import 'text.dart' as text_model;
 export '../asm/asm.dart' show Asm;
 export 'deprecated.dart';
 export 'map.dart';
-export 'scene.dart';
 export 'objects.dart';
+export 'scene.dart';
 
 typedef DebugOptions = ({
   List<EventFlag> eventFlags,
@@ -146,10 +146,10 @@ class Program {
 
     switch (eventType) {
       case EventType.cutscene:
-        _addCutscenePointer(Label('Cutscene_$id'));
+        _config.cutscenes.add(Label('Cutscene_$id'));
         break;
       case _:
-        _addEventPointer(Label('Event_$id'));
+        _config.events.add(Label('Event_$id'));
         break;
     }
 
@@ -943,7 +943,7 @@ class SceneAsmGenerator implements EventVisitor {
   void dialogCodes(DialogCodes codes) {
     _checkNotFinished();
     _generateQueueInCurrentMode();
-    _runOrContinueDialog(codes);
+    _runOrContinueDialog(codes, interruptDialog: false);
     _addToDialog(dc.b(codes.codes));
   }
 

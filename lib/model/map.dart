@@ -20,6 +20,7 @@ class GameMap {
   // doesn't appear to be a limit other than ROM size
   final _areas = <MapAreaId, MapArea>{};
 
+  // TODO: order is significant between these.
   final _events = <SceneId, Scene>{};
   final _asmEvents = <Byte>{};
 
