@@ -961,8 +961,8 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void displayText(DisplayText display) {
     _addToEvent(display, (i) {
-      _terminateDialog();
-      var asm = text_model.displayTextToAsm(display, _currentDialogTree());
+      var asm = text_model.displayTextToAsm(
+          display, _currentDialogTree(), labeller: _labeller.withContext(i));
       return asm.event;
     });
   }
@@ -2131,7 +2131,10 @@ class SceneAsmGenerator implements EventVisitor {
 
         return Asm([
           move.w(index.toWord.i, d0),
-          jsr('Panel_Create'.toLabel.l),
+          if (showPanel.plane == PanelPlane.foreground)
+            jsr('Panel_Create'.toLabel.l)
+          else
+            jsr('Panel_Create_B'.toLabel.l),
           dmaPlanesVInt(),
         ]);
       });

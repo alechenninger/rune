@@ -7,10 +7,17 @@ class ShowPanel extends Event implements RunnableInDialog {
   final Portrait? portrait;
   final bool showDialogBox;
   final bool runMapUpdates;
+  final PanelPlane plane;
 
-  const ShowPanel(this.panel,
-      {bool showDialogBox = false, this.portrait, this.runMapUpdates = false})
-      : showDialogBox = showDialogBox || portrait != null;
+  ShowPanel(this.panel,
+      {bool showDialogBox = false,
+      this.portrait,
+      this.runMapUpdates = false,
+      this.plane = PanelPlane.foreground})
+      : showDialogBox = showDialogBox || portrait != null {
+    checkArgument(!(showDialogBox && plane == PanelPlane.background),
+        message: 'Cannot show dialog box in background');
+  }
 
   ShowPanel inDialog() {
     return ShowPanel(panel,
@@ -32,7 +39,8 @@ class ShowPanel extends Event implements RunnableInDialog {
     return 'ShowPanel{panel: $panel, '
         'portrait: $portrait, '
         'showDialogBox: $showDialogBox, '
-        'runMapUpdates: $runMapUpdates}';
+        'runMapUpdates: $runMapUpdates, '
+        'plane: $plane}';
   }
 
   @override
@@ -43,11 +51,21 @@ class ShowPanel extends Event implements RunnableInDialog {
           panel == other.panel &&
           portrait == other.portrait &&
           showDialogBox == other.showDialogBox &&
-          runMapUpdates == other.runMapUpdates;
+          runMapUpdates == other.runMapUpdates &&
+          plane == other.plane;
 
   @override
   int get hashCode =>
-      panel.hashCode ^ portrait.hashCode ^ showDialogBox.hashCode;
+      panel.hashCode ^
+      portrait.hashCode ^
+      showDialogBox.hashCode ^
+      runMapUpdates.hashCode ^
+      plane.hashCode;
+}
+
+enum PanelPlane {
+  background,
+  foreground,
 }
 
 class HideTopPanels extends Event {

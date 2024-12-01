@@ -39,11 +39,16 @@ class Labeller {
     return Labeller.combineContexts(this, other);
   }
 
+  /// Get the next top-level label.
   Label next() {
     var label = _nextLabelParts().join('_');
     return Label(label);
   }
 
+  /// Get the next local label for the current top-level context.
+  ///
+  /// Local labels are prefixed with '.'
+  /// and do not include the top-level context.
   Label nextLocal() {
     var parts = _nextLabelParts(includeLocalTo: false);
     var label = [

@@ -557,6 +557,10 @@ class Label extends Sized implements Address {
 
   const Label.known(this.name) : super.constant();
 
+  Label withSuffix(String s) {
+    return Label('$name$s');
+  }
+
   @override
   String toString() => name;
 

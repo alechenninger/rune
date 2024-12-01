@@ -1,7 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:quiver/check.dart';
 
-import '../asm/asm.dart';
 import '../generator/generator.dart';
 import "../src/iterables.dart";
 import 'model.dart';
@@ -113,7 +112,7 @@ class TextColumn {
 /// Spans appear as a continuous block of text which display in unison as one
 /// clearly readable unit, bound by the containing [TextColumn].
 class Text {
-  final TextGroupSet groupSet;
+  final TextBlock groupSet;
   final List<Span> spans;
 
   /// If a line break should occur after these spans.
@@ -166,9 +165,13 @@ PaletteEvent fadeIn(Duration d) => PaletteEvent(FadeState.fadeIn, d);
 PaletteEvent wait(Duration d) => PaletteEvent(FadeState.wait, d);
 PaletteEvent fadeOut(Duration d) => PaletteEvent(FadeState.fadeOut, d);
 
+/// A sequence of [TextBlock]s.
+///
+/// Each `TextBlock` is a set of text which is displayed together,
+/// with shared [PaletteEvent]s.
 class TextGroup {
-  final _sets = <TextGroupSet>[];
-  List<TextGroupSet> get sets => List.unmodifiable(_sets);
+  final _blocks = <TextBlock>[];
+  List<TextBlock> get blocks => List.unmodifiable(_blocks);
   // todo: decouple model from asm
   final Word defaultBlack;
   final Word defaultWhite;
@@ -177,33 +180,33 @@ class TextGroup {
       : defaultWhite = defaultWhite ?? Word(0xEEE),
         defaultBlack = defaultBlack ?? Word(0);
 
-  TextGroupSet addSet({Word? white, Word? black}) {
-    var set = TextGroupSet(
+  TextBlock addBlock({Word? white, Word? black}) {
+    var set = TextBlock(
         group: this,
         white: white ?? defaultWhite,
         black: black ?? defaultBlack);
-    _sets.add(set);
+    _blocks.add(set);
     return set;
   }
 
-  TextGroupSet setAt(int index, {Word? white, Word? black}) {
-    if (index >= _sets.length) {
-      if (index != _sets.length) {
+  TextBlock setAt(int index, {Word? white, Word? black}) {
+    if (index >= _blocks.length) {
+      if (index != _blocks.length) {
         throw ArgumentError(
             'must be existing or next set but was $index', 'index');
       }
-      return addSet(white: white, black: black);
+      return addBlock(white: white, black: black);
     }
-    return _sets[index];
+    return _blocks[index];
   }
 
   @override
   String toString() {
-    return 'TextGroup{$hashCode, sets: $_sets}';
+    return 'TextGroup{$hashCode, sets: $_blocks}';
   }
 }
 
-class TextGroupSet {
+class TextBlock {
   final _paletteEvents = <PaletteEvent>[];
   List<PaletteEvent> get paletteEvents => UnmodifiableListView(_paletteEvents);
 
@@ -213,10 +216,10 @@ class TextGroupSet {
   final Word black;
   final Word white;
 
-  TextGroupSet({required this.group, Word? black, Word? white})
+  TextBlock({required this.group, Word? black, Word? white})
       : black = black ?? Word(0),
         white = white ?? Word(0xeee);
-  TextGroupSet.withDefaultFades(
+  TextBlock.withDefaultFades(
       {required this.group,
       required Duration showFor,
       Word? black,
@@ -235,15 +238,15 @@ class TextGroupSet {
     return Text(spans: spans, groupSet: this, lineBreak: lineBreak);
   }
 
-  void add(PaletteEvent f) => _paletteEvents.add(f);
+  void addEvent(PaletteEvent f) => _paletteEvents.add(f);
   void addDefaultEvents({required Duration showFor}) {
-    add(fadeIn(Duration(milliseconds: 500)));
-    add(wait(showFor));
-    add(fadeOut(Duration(milliseconds: 500)));
+    addEvent(fadeIn(Duration(milliseconds: 500)));
+    addEvent(wait(showFor));
+    addEvent(fadeOut(Duration(milliseconds: 500)));
   }
 
   @override
   String toString() {
-    return 'TextGroupSet{$hashCode, paletteEvents: $_paletteEvents}';
+    return 'TextBlock{$hashCode, paletteEvents: $_paletteEvents}';
   }
 }

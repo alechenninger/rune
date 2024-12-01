@@ -1,8 +1,8 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:quiver/check.dart';
 
-import '../asm/asm.dart';
 import '../asm/dialog.dart';
 import '../asm/text.dart';
 import '../model/text.dart';
@@ -10,26 +10,30 @@ import '../src/iterables.dart';
 import 'dialog.dart';
 import 'event.dart';
 import 'generator.dart';
-import 'scene.dart';
+import 'labels.dart';
 
-const _topLeft = 0xffff8000;
+const _planeABuffer = 0xffff8000;
 const _perLine = 0x180;
 const _perLineOffset = 0x80; // _perLine ~/ 3
 const _perCharacter = 0x2;
 const _perPaletteLine = 0x2000;
-const _maxPosition = _topLeft + _perLineOffset * 27; // last you can fit is * 26
+const _maxPosition =
+    _planeABuffer + _perLineOffset * 27; // last you can fit is * 26
 
-SceneAsm displayTextToAsm(DisplayText display, DialogTree dialogTree) {
+SceneAsm displayTextToAsm(DisplayText display, DialogTree dialogTree,
+    {Labeller? labeller}) {
   var newDialogs = <DialogAsm>[];
   // todo: handle hitting max trees!
-  var currentDialogId = dialogTree.nextDialogId!,
-      dialogIdOffset = currentDialogId;
+  var currentDialogId = dialogTree.nextDialogId!;
   var eventAsm = EventAsm.empty();
-  var fadeRoutines = EventAsm.empty();
+  var eventRoutines = EventAsm.empty();
+  labeller ??= Labeller();
 
   var column = display.column;
 
   // first associate all the asm with each Text, regardless of text group
+  // TODO: position at start of line
+  // TODO: use position as offset within plane A buffer instead of absolute RAM addr
   var textAsmRefs = _generateDialogs(currentDialogId, display, newDialogs);
   newDialogs.forEach(dialogTree.add);
 
@@ -37,49 +41,48 @@ SceneAsm displayTextToAsm(DisplayText display, DialogTree dialogTree) {
   //   remember related information anyway
   var planeA = Plane();
   var vramTileRanges = _VramTileRanges();
-  var eventCursor = _ColumnEventCursor(column);
+  var eventCursor = _ColumnEventCursor(column, labeller);
 
   while (!eventCursor.isDone) {
     for (var group in eventCursor.finishedGroups) {
-      if (group.loadedSet != null) {
-        _clearSet(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
+      if (group.loadedBlock != null) {
+        _clearBlock(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
       }
     }
 
-    var currentGroups = eventCursor.currentGroups;
+    var currentGroups = eventCursor.unfinishedGroups;
 
     // setup text or fade routines if necessary
     var lastVint = -1;
     for (var i = 0; i < currentGroups.length; i++) {
       var group = currentGroups[i];
 
-      if (!group.loadedEvent) {
-        group.loadedEvent = true;
+      if (!group.generatedEvent) {
+        group.generatedEvent = true;
         // todo: often due to symmetry desired in design, these fade routines
         //   end up being the same, creating a lot of redundant code.
         //   especially if we parameterize the palette address
-        var fadeRoutine =
-            group.event!.fadeRoutine(groupIndex: group.index, set: group.set!);
-        if (fadeRoutine != null) {
-          fadeRoutines.add(fadeRoutine);
-          fadeRoutines.addNewline();
+        var eventRoutine = group.eventRoutine();
+        if (eventRoutine != null) {
+          eventRoutines.add(eventRoutine);
+          eventRoutines.addNewline();
         }
       }
 
       if (!group.hidden) {
-        if (!group.isCurrentSetLoaded) {
-          if (group.isPreviousSetLoaded) {
-            _clearSet(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
+        if (!group.isCurrentBlockLoaded) {
+          if (group.isPreviousBlockLoaded) {
+            _clearBlock(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
           }
 
-          group.loadedSet = group.set;
+          group.loadedBlock = group.block;
 
-          lastVint = _loadSetText(
+          lastVint = _loadTextBlock(
                   textAsmRefs, vramTileRanges, group, eventAsm, planeA) ??
               lastVint;
         }
-      } else if (group.loadedSet != null) {
-        _clearSet(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
+      } else if (group.loadedBlock != null) {
+        _clearBlock(group, vramTileRanges, eventAsm, textAsmRefs, planeA);
       }
     }
 
@@ -100,19 +103,20 @@ SceneAsm displayTextToAsm(DisplayText display, DialogTree dialogTree) {
       var frames = eventCursor.timeUntilNextEvent!.toFrames() + 1;
       var loopRoutine = eventCursor.currentLoopRoutine;
 
-      var routine1 = currentGroups[0].event?.fadeRoutineLbl;
-      var routine2 = currentGroups.length > 1
-          ? currentGroups[1].event?.fadeRoutineLbl
-          : null;
+      // We are limited to only two groups event routines simultaneously
+      // currently. Due to only wanting to use two palette lines?
+      var routine1 = currentGroups[0].fadeRoutineLbl;
+      var routine2 =
+          currentGroups.length > 1 ? currentGroups[1].fadeRoutineLbl : null;
       eventAsm.add(Asm([
         if (frames < 128)
           moveq(frames.toByte.i, d0)
         else
           move.l(frames.toLongword.i, d0),
         setLabel(loopRoutine.name),
-        // can potentially use bsr
-        if (routine1 != null) bsr.w(routine1),
-        if (routine2 != null) bsr.w(routine2),
+        // TODO: could write a macro that determines whether to use bsr or jsr
+        if (routine1 != null) bsr(routine1),
+        if (routine2 != null) bsr(routine2),
         vIntPrepare(),
         dbf(d0, loopRoutine)
       ]));
@@ -123,22 +127,22 @@ SceneAsm displayTextToAsm(DisplayText display, DialogTree dialogTree) {
     }
   }
 
-  var done = 'done_${display.hashCode}';
+  var done = labeller.withContext('done').nextLocal();
   // todo: would be nice to use bra i guess? but we don't know how much fade
   //   routine ASM we have.
-  eventAsm.add(bra.w(done.toLabel));
+  eventAsm.add(bra(done));
   eventAsm.addNewline();
 
-  eventAsm.add(fadeRoutines);
-  eventAsm.add(setLabel(done));
+  eventAsm.add(eventRoutines);
+  eventAsm.add(setLabel(done.name));
   return SceneAsm(event: eventAsm);
 }
 
-void _clearSet(_GroupCursor group, _VramTileRanges vramTileRanges,
+void _clearBlock(_GroupCursor group, _VramTileRanges vramTileRanges,
     EventAsm eventAsm, Map<Text, List<TextAsmRef>> textAsmRefs, Plane planeA) {
-  var loaded = group.loadedSet;
+  var loaded = group.loadedBlock;
   if (loaded != null) {
-    group.loadedSet = null;
+    group.loadedBlock = null;
 
     for (var tile in group.loadedTiles) {
       vramTileRanges.releaseRange(startingAt: tile, forGroup: group.index);
@@ -157,27 +161,27 @@ void _clearSet(_GroupCursor group, _VramTileRanges vramTileRanges,
   }
 }
 
-int? _loadSetText(
+int? _loadTextBlock(
     Map<Text, List<TextAsmRef>> textAsmRefs,
     _VramTileRanges vramTileRanges,
     _GroupCursor group,
     EventAsm eventAsm,
     Plane planeA) {
-  TextGroupSet set = group.set!;
+  TextBlock block = group.block!;
   int? lastVint;
 
   // todo: assumes previous set faded out
-  if (group.previousSet?.black != set.black) {
+  if (group.previousBlock?.black != block.black) {
     var palette = Palette_Table_Buffer + (0x5e + 0x20 * group.index).toByte;
-    var setBlack = set.black == Word(0)
+    var setBlack = block.black == Word(0)
         ? clr.w(palette.w)
-        : move.w(set.black.i, palette.w);
+        : move.w(block.black.i, palette.w);
     eventAsm.add(setBlack);
     eventAsm.addNewline();
   }
 
-  for (var j = 0; j < set.texts.length; j++) {
-    var text = set.texts[j];
+  for (var j = 0; j < block.texts.length; j++) {
+    var text = block.texts[j];
 
     var asmRefs = textAsmRefs[text];
     if (asmRefs == null) {
@@ -193,12 +197,12 @@ int? _loadSetText(
       planeA.write(asmRef);
 
       // todo: parameterize palette row offset?
-      var tileNumber = Word(
+      var tileMapping = Word(
           _perPaletteLine * (group.index + 2) + _perCharacter * tile + 0x200);
 
       // each block takes about 0x22 bytes
       eventAsm.add(getDialogueByID(asmRef.dialogId));
-      eventAsm.add(runText2(asmRef.position.l, tileNumber.i));
+      eventAsm.add(runText2(asmRef.position.l, tileMapping.i));
       lastVint = eventAsm.add(vIntPrepare());
       eventAsm.addNewline();
     }
@@ -256,9 +260,9 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
   var alignedLineOffset = display.lineOffset;
   if (column.vAlign != VerticalAlignment.top) {
     var totalLines = layout.line + (layout.col == 0 ? 0 : 1);
-    var maxOffsets =
-        (_maxPosition - (_topLeft + display.lineOffset * _perLineOffset)) ~/
-            _perLineOffset;
+    var maxOffsets = (_maxPosition -
+            (_planeABuffer + display.lineOffset * _perLineOffset)) ~/
+        _perLineOffset;
     var heightInOffsets = totalLines * (_perLine ~/ _perLineOffset);
     if (column.vAlign == VerticalAlignment.center) {
       alignedLineOffset += (maxOffsets - heightInOffsets) ~/ 2;
@@ -268,7 +272,7 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
   }
 
   for (var placement in layout.placements) {
-    var position = Longword(_topLeft +
+    var position = Longword(_planeABuffer +
         alignedLineOffset * _perLineOffset +
         placement.line * _perLine +
         placement.col * _perCharacter);
@@ -290,30 +294,32 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
 class _GroupCursor {
   final int index;
   final TextGroup group;
+  final Labeller labeller;
 
   Duration lastEventTime = Duration.zero;
-  int _setIndex = 0;
+  int _blockIndex = 0;
   int _eventIndex = 0;
 
-  TextGroupSet? previousSet;
-  TextGroupSet? set;
+  TextBlock? previousBlock;
+  TextBlock? block;
   PaletteEvent? _event;
   PaletteEvent? get event => _event;
   Duration? timeLeftInEvent;
 
-  TextGroupSet? loadedSet;
-  bool get isPreviousSetLoaded =>
-      previousSet != null && loadedSet == previousSet;
-  bool get isCurrentSetLoaded => loadedSet == set;
-  bool loadedEvent = false;
+  TextBlock? loadedBlock;
+  bool get isPreviousBlockLoaded =>
+      previousBlock != null && loadedBlock == previousBlock;
+  bool get isCurrentBlockLoaded => loadedBlock == block;
+  bool generatedEvent = false;
   final Set<int> _loadedTiles = {};
   Set<int> get loadedTiles => Set.unmodifiable(_loadedTiles);
 
   bool hidden = true;
 
-  _GroupCursor(this.index, this.group) {
-    set = group.sets.firstOrNull;
-    _setEvent(set?.paletteEvents.firstOrNull, Duration.zero);
+  _GroupCursor(this.index, this.group, Labeller labeller)
+      : labeller = labeller.withContext('group$index') {
+    block = group.blocks.firstOrNull;
+    _setEvent(block?.paletteEvents.firstOrNull, Duration.zero);
     timeLeftInEvent = event?.duration;
   }
 
@@ -325,7 +331,7 @@ class _GroupCursor {
       hidden = true;
     }
     _event = event;
-    loadedEvent = false;
+    generatedEvent = false;
     if (event != null) {
       lastEventTime = at;
       timeLeftInEvent = event.duration;
@@ -338,6 +344,18 @@ class _GroupCursor {
 
   void unloadTile(int tile) {
     _loadedTiles.remove(tile);
+  }
+
+  Label? get fadeRoutineLbl {
+    switch (_event?.state) {
+      case null || FadeState.wait:
+        return null;
+      default:
+        return labeller
+            .withContext('block$_blockIndex')
+            .withContext('event$_eventIndex')
+            .nextLocal();
+    }
   }
 
   /// returns true if there is still a current event
@@ -355,19 +373,19 @@ class _GroupCursor {
 
     _eventIndex++;
 
-    var events = set!.paletteEvents;
+    var events = block!.paletteEvents;
     if (_eventIndex >= events.length) {
-      _setIndex++;
-      var sets = group.sets;
-      if (_setIndex >= sets.length) {
-        previousSet = set;
-        set = null;
+      _blockIndex++;
+      var blocks = group.blocks;
+      if (_blockIndex >= blocks.length) {
+        previousBlock = block;
+        block = null;
         _setEvent(null, time);
         return false;
       }
-      previousSet = set;
-      set = sets[_setIndex];
-      events = set!.paletteEvents;
+      previousBlock = block;
+      block = blocks[_blockIndex];
+      events = block!.paletteEvents;
       _eventIndex = 0;
     }
 
@@ -375,32 +393,50 @@ class _GroupCursor {
 
     return true;
   }
+
+  Asm? eventRoutine() {
+    // check there is an event and a block
+    checkState(index <= 1,
+        message: 'text must not have more that 2 text groups');
+    checkState(block != null, message: 'block must not be null');
+    checkState(event != null, message: 'event must not be null');
+
+    var lbl = fadeRoutineLbl;
+
+    // No fade routine for this event
+    if (lbl == null) return null;
+
+    return event!.fadeRoutine(lbl: lbl, groupIndex: index, block: block!);
+  }
 }
 
 class _ColumnEventCursor {
   final TextColumn column;
+  final Labeller _labeller;
 
   var _time = Duration.zero;
   final _groupCursors = <int, _GroupCursor>{};
 
-  _ColumnEventCursor(this.column) {
+  _ColumnEventCursor(this.column, this._labeller) {
     var groups = column.groups;
     for (int i = 0; i < groups.length; i++) {
       var group = groups[i];
-      _groupCursors[i] = _GroupCursor(i, group);
+      _groupCursors[i] = _GroupCursor(i, group, _labeller);
     }
   }
 
-  _GroupCursor get shortest => currentGroups
+  _GroupCursor get shortest => unfinishedGroups
       .sorted((a, b) => a.timeLeftInEvent!.compareTo(b.timeLeftInEvent!))
       .first;
 
   Duration? get timeUntilNextEvent => shortest.timeLeftInEvent;
 
   Label get currentLoopRoutine =>
-      // todo: for deterministic ASM compiles, we could keep track of unique
-      // columns in context and refer by number
-      'loop_${column.hashCode}_t${_time.inMilliseconds}'.toLabel;
+      // 'loop_${column.hashCode}_t${_time.inMilliseconds}'.toLabel;
+      _labeller
+          .withContext('fadeloop')
+          .withContext('t${_time.inMilliseconds}')
+          .nextLocal();
 
   bool advanceToNextEvent() {
     _time += timeUntilNextEvent!;
@@ -413,30 +449,23 @@ class _ColumnEventCursor {
   }
 
   bool get isDone =>
-      finishedGroups.where((g) => g.loadedSet == null).length == groups.length;
+      finishedGroups.where((g) => g.loadedBlock == null).length ==
+      groups.length;
 
   Iterable<_GroupCursor> get groups => _groupCursors.values;
 
   List<_GroupCursor> get finishedGroups =>
       groups.where((group) => group.event == null).toList(growable: false);
 
-  List<_GroupCursor> get currentGroups =>
+  List<_GroupCursor> get unfinishedGroups =>
       groups.where((group) => group.event != null).toList(growable: false);
 }
 
 extension _PaletteEventAsm on PaletteEvent {
-  Label? get fadeRoutineLbl {
-    if (state == FadeState.wait) return null;
-    return '${state.name}_$hashCode'.toLabel;
-  }
-
-  Asm? fadeRoutine({required int groupIndex, required TextGroupSet set}) {
-    if (groupIndex > 1) {
-      throw ArgumentError('text must not have more that 2 text groups');
-    }
-
-    var lbl = fadeRoutineLbl;
-    if (lbl == null) return null;
+  Asm? fadeRoutine(
+      {required Label lbl, required int groupIndex, required TextBlock block}) {
+    checkArgument(groupIndex <= 1,
+        message: 'text must not have more that 2 text groups');
 
     // todo: fade routines with the same parameters produce the same code
     //   we should reuse them.
@@ -450,8 +479,8 @@ extension _PaletteEventAsm on PaletteEvent {
     // we want to spend 2 frames at each color value
 
     // todo: values must be perfectly divisible by 0x222
-    var white = set.white;
-    var black = set.black;
+    var white = block.white;
+    var black = block.black;
     var steps = (white.value - black.value) ~/ 0x222;
 
     Asm stepTest;
@@ -474,11 +503,13 @@ extension _PaletteEventAsm on PaletteEvent {
       ]);
     }
 
+    var returnLbl = lbl.withSuffix('_ret');
+
     // takes about 0x1e bytes
     return Asm([
       setLabel(lbl.name),
       stepTest,
-      bne.s('.ret'.toLabel),
+      bne.s(returnLbl),
       // todo: do we have to load this every loop?
       lea((Palette_Table_Buffer + paletteOffset.toByte).w, a0),
       move.w(a0.indirect, d1),
@@ -487,11 +518,11 @@ extension _PaletteEventAsm on PaletteEvent {
           addi.w(0x222.toWord.i, d1),
           if (white == Word(0xEEE)) ...[
             btst(0xC.i, d1),
-            bne.s('.ret'.toLabel)
+            bne.s(returnLbl)
           ] else ...[
             cmpi.w((white).i, d1),
             // if d1 > white, don't add to
-            bpl.s('.ret'.toLabel)
+            bpl.s(returnLbl)
           ],
         ])
       else
@@ -499,11 +530,11 @@ extension _PaletteEventAsm on PaletteEvent {
           // if we want a non-zero lower bound, can use
           // e.g. cmpi.w(0x666.toWord.i, d1),
           if (black == Word(0)) tst.w(d1) else cmpi.w(black.i, d1),
-          beq.s('.ret'.toLabel),
+          beq.s(returnLbl),
           subi.w(0x222.toWord.i, d1)
         ]),
       move.w(d1, a0.indirect),
-      setLabel('.ret'),
+      setLabel(returnLbl.name),
       rts,
     ]);
   }
@@ -636,7 +667,7 @@ class Plane {
   void write(TextAsmRef text) {
     // we know what text we actually care about
     // vs extra that is mapped
-    var cell = text.position.value - _topLeft;
+    var cell = text.position.value - _planeABuffer;
 
     for (var i = 0; i < 32 * _perCharacter; i++) {
       _cells[cell + i] = text;
