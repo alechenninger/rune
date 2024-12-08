@@ -17,8 +17,11 @@ const _perLine = 0x180;
 const _perLineOffset = 0x80; // _perLine ~/ 3
 const _perCharacter = 0x2;
 const _perPaletteLine = 0x2000;
-const _maxPosition =
-    _planeABuffer + _perLineOffset * 27; // last you can fit is * 26
+// last you can fit is * 26.
+// TODO: why is this? there's more room in the buffer but maybe it's off screen.
+const _maxPosition = _planeABuffer + _perLineOffset * 27;
+const _planeABufferEnd = _planeABuffer + 0x1000;
+const _maxOffsets = (_maxPosition - _planeABuffer) ~/ _perLineOffset;
 
 SceneAsm displayTextToAsm(DisplayText display, DialogTree dialogTree,
     {Labeller? labeller}) {
@@ -260,14 +263,11 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
   var alignedLineOffset = display.lineOffset;
   if (column.vAlign != VerticalAlignment.top) {
     var totalLines = layout.line + (layout.col == 0 ? 0 : 1);
-    var maxOffsets = (_maxPosition -
-            (_planeABuffer + display.lineOffset * _perLineOffset)) ~/
-        _perLineOffset;
     var heightInOffsets = totalLines * (_perLine ~/ _perLineOffset);
     if (column.vAlign == VerticalAlignment.center) {
-      alignedLineOffset += (maxOffsets - heightInOffsets) ~/ 2;
+      alignedLineOffset += (_maxOffsets - heightInOffsets) ~/ 2;
     } else {
-      alignedLineOffset += maxOffsets - heightInOffsets;
+      alignedLineOffset += _maxOffsets - heightInOffsets;
     }
   }
 
