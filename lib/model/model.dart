@@ -368,6 +368,26 @@ class EventState {
       _routines.remove(obj);
     }
   }
+
+  @override
+  String toString() {
+    return 'EventState{'
+        'slots: $slots, '
+        'startingAxis: $startingAxis, '
+        'followLead: $followLead, '
+        'cameraLock: $cameraLock, '
+        'isFieldShown: $isFieldShown, '
+        'onExitRunBattle: $onExitRunBattle, '
+        'dialogPortrait: $dialogPortrait, '
+        'keepDialog: $keepDialog, '
+        'currentMap: ${currentMap?.id}, '
+        'stepSpeed: $stepSpeed, '
+        'panelsShown: $panelsShown, '
+        'facing: $_facing, '
+        'positions: ${positions._positions}, '
+        'routines: $_routines'
+        '}';
+  }
 }
 
 class Positions {
@@ -511,6 +531,11 @@ class Slots {
     if (_priorParty!.length != _party.length) return false;
     return const MapEquality<int, Character>()
         .equals(_priorParty!.unlockView, _party);
+  }
+
+  @override
+  String toString() {
+    return 'Slots{party: $_party, priorParty: $_priorParty, partyOrderMaintained: $_partyOrderMaintained}';
   }
 }
 
