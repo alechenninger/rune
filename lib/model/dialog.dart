@@ -74,8 +74,8 @@ class Dialog extends Event {
     if (_spans.isEmpty) {
       // todo: consider relaxing this rule to allow reusing dialog to
       //   simply control potraits
-      throw ArgumentError.value(
-          spans, 'spans', 'must contain at least one span with text');
+        throw ArgumentError.value(spans.toString(), 'spans',
+          'must contain at least one span with text');
     }
   }
 
