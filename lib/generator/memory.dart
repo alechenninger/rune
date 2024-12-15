@@ -307,6 +307,11 @@ class Memory implements EventState {
     _changes.add(change);
     return change.apply(this);
   }
+
+  @override
+  String toString() {
+    return 'Memory{sys: $_sysState, event: $_eventState}';
+  }
 }
 
 class _Positions implements Positions {
