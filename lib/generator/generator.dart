@@ -961,8 +961,8 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void displayText(DisplayText display) {
     _addToEvent(display, (i) {
-      var asm = text_model.displayTextToAsm(
-          display, _currentDialogTree(), labeller: _labeller.withContext(i));
+      var asm = text_model.displayTextToAsm(display, _currentDialogTree(),
+          labeller: _labeller.withContext(i));
       return asm.event;
     });
   }
@@ -1037,10 +1037,18 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void absoluteMoves(AbsoluteMoves moves) {
+    _checkNotFinished();
+
     if (moves.canRunInDialog(_memory)) {
-      _addToEventOrDialog(moves, inDialog: () {}, inEvent: (_) {
-        // TODO:
-      });
+      _addToEventOrDialog(moves,
+          inDialog: () {
+            var (asm, routines) = AbsoluteMovesInDialog(moves)
+                .toAsm(_memory, labeller: _labeller);
+
+            _postAsm.addAll(routines);
+            _addToDialog(asm);
+          },
+          inEvent: (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
     } else {
       _addToEvent(
           moves, (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
@@ -1050,12 +1058,9 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void waitForMovements(WaitForMovements wait) {
     _checkNotFinished();
-
-    // TODO(wait for movements): use explicit param
-    var keepDialog = _memory.cameraLock == false ||
-        wait.objects.none((o) => o.slotAsOf(_memory) == 1);
-
-    _addToEvent(wait, (i) => waitForMovementsToAsm(wait, memory: _memory));
+    var keepDialog = !wait.requireEvent;
+    _addToEvent(wait, (i) => waitForMovementsToAsm(wait, memory: _memory),
+        keepDialog: keepDialog);
   }
 
   @override
