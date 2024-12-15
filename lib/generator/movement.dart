@@ -380,8 +380,8 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
 }
 
 Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
-  var {true: chars, false: secondary} =
-      wait.objects.groupListsBy((o) => o.isCharacter);
+  var chars = wait.objects.where((o) => o.isCharacter).toList();
+  var secondary = wait.objects.where((o) => o.isNotCharacter).toList();
 
   memory.stepSpeed = StepSpeed.normal();
 
