@@ -290,7 +290,10 @@ class IndividualMoves extends Event implements RunnableInDialog {
 
     for (var MapEntry(key: obj, value: move) in this.moves.entries) {
       var (OffsetPosition? destination, Axis? axis) = switch (move) {
-        StepPath move => (move.asPositionExpressionFrom(obj.position()), null),
+        StepPath move when move.willNotFace => (
+            move.asPositionExpressionFrom(obj.position()),
+            null
+          ),
         StepPaths move => move.asPositionExpressionFrom(obj.position()),
         _ => (null, null)
       };
@@ -374,10 +377,11 @@ class AbsoluteMoves extends Event implements RunnableInDialog {
 
   @override
   String toString() {
-    return 'AbsoluteMoves{destinations: '
-        '$destinations, speed: '
-        '$speed, startingAxis: '
-        '$startingAxis}';
+    return 'AbsoluteMoves{destinations: $destinations, '
+        'speed: $speed, '
+        'startingAxis: $startingAxis, '
+        'followLeader: $followLeader, '
+        'waitForMovements: $waitForMovements}';
   }
 
   @override
@@ -403,11 +407,11 @@ class AbsoluteMoves extends Event implements RunnableInDialog {
 /// Waits for a set of [FieldObject]s to finish moving to their destinations.
 ///
 /// Useful after using [AbsoluteMoves] during dialog.
-class WaitForMovements extends Event {
+class WaitForMovements extends Event implements RunnableInDialog {
   final Set<FieldObject> objects;
   final bool requireEvent;
 
-  WaitForMovements(Iterable<FieldObject> objects, {this.requireEvent = true})
+  WaitForMovements(Iterable<FieldObject> objects, {this.requireEvent = false})
       : objects = objects.toSet();
 
   @override
@@ -416,8 +420,18 @@ class WaitForMovements extends Event {
   }
 
   @override
+  bool canRunInDialog([EventState? state]) {
+    if (requireEvent) return false;
+    if (state == null) return true;
+    if (state.cameraLock == true) return true;
+    // If any are slot 1 and camera is not locked, the camera will move.
+    // We cannot show dialog while the camera moves.
+    return objects.none((o) => o.slotAsOf(state) == 1);
+  }
+
+  @override
   String toString() {
-    return 'WaitForMovements{objects: $objects, keepDialog: $requireEvent}';
+    return 'WaitForMovements{objects: $objects, requireEvent: $requireEvent}';
   }
 
   @override

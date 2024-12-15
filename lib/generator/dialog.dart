@@ -116,6 +116,8 @@ sealed class DialogEvent {
       case StopMusic():
         // TODO: pause or stop?
         return SoundCode(SoundEffect.stopMusic.sfxId);
+      case WaitForMovements wait:
+        return WaitForMovementsInDialog(wait);
       default:
         return null;
     }
@@ -269,6 +271,29 @@ class AbsoluteMovesInDialog extends DialogEvent {
   }
 }
 
+class WaitForMovementsInDialog extends DialogEvent {
+  final WaitForMovements wait;
+
+  WaitForMovementsInDialog(this.wait);
+
+  @override
+  DialogAndRoutines toAsm(Memory state, {required Labeller labeller}) {
+    var routineLbl = labeller.withContext('WaitForMovements').next();
+    var routine = Asm([
+      label(routineLbl),
+      waitForMovementsToAsm(wait, memory: state),
+      rts,
+    ]);
+
+    var dialog = Asm([
+      dc.b([ControlCodes.action, Byte(0xf)]),
+      dc.l([routineLbl])
+    ]);
+
+    return (dialog, [routine]);
+  }
+}
+
 extension DialogToAsm on Dialog {
   DialogAndRoutines toGeneratedAsm(Memory memory,
       {required Labeller labeller}) {
@@ -296,7 +321,7 @@ extension DialogToAsm on Dialog {
         var dialogEvent = DialogEvent.fromEvent(e, memory);
         if (dialogEvent == null) {
           throw StateError(
-              'event in span cannot be compiled to dialog. event: $e');
+              'event in span cannot be compiled to dialog. event= $e memory=$memory');
         }
         var (dialog, routines) = dialogEvent.toAsm(memory,
             labeller: labeller.withContext(i).withContext(j));
