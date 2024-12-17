@@ -955,6 +955,7 @@ class SceneAsmGenerator implements EventVisitor {
     var (asm, post) = dialog.toGeneratedAsm(_memory,
         labeller: _labeller.withContext(_eventCounter));
     _addToDialog(asm);
+    _memory.unknownAddressRegisters();
     _postAsm.addAll(post);
   }
 

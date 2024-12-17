@@ -369,6 +369,15 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
       }
     }
 
+    if (moves.waitForMovements) {
+      state.putInAddress(a0, null);
+      state.putInAddress(a1, null);
+      state.putInAddress(a2, null);
+      state.putInAddress(a3, null);
+      state.putInAddress(a5, null);
+      state.putInAddress(a6, null);
+    }
+
     // TODO: if not wait for movement?
     state.positions[obj] = pos.known(state);
     // If we don't know which direction the object was coming from,
@@ -385,7 +394,7 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
 
   memory.stepSpeed = StepSpeed.normal();
 
-  return Asm([
+  var asm = Asm([
     for (var obj in secondary)
       Asm([
         obj.toA4(memory),
@@ -408,6 +417,15 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
     // Reset speed
     setStepSpeed(StepSpeed.normal().offset.i),
   ]);
+
+  memory.putInAddress(a0, null);
+  memory.putInAddress(a1, null);
+  memory.putInAddress(a2, null);
+  memory.putInAddress(a3, null);
+  memory.putInAddress(a5, null);
+  memory.putInAddress(a6, null);
+
+  return asm;
 }
 
 Asm instantMovesToAsm(InstantMoves moves, Memory memory,

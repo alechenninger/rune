@@ -195,7 +195,7 @@ class FaceInDialog extends DialogEvent {
   }
 
   @override
-  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) {
+  DialogAndRoutines toAsm(Memory state, {Labeller? labeller}) {
     var asm = Asm.empty();
 
     for (var MapEntry(key: obj, value: dir) in facing.entries) {
@@ -229,6 +229,8 @@ class FaceInDialog extends DialogEvent {
           state.setFacing(obj, dir);
       }
     }
+
+    state.unknownAddressRegisters();
 
     return (asm, const []);
   }
@@ -315,6 +317,8 @@ extension DialogToAsm on Dialog {
       var span = spans[i];
       var spanAscii = span.toAscii(quotes);
       ascii += spanAscii;
+
+      memory.unknownAddressRegisters();
 
       for (var j = 0; j < span.events.length; j++) {
         var e = span.events[j];
