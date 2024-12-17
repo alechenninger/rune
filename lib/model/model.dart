@@ -1129,6 +1129,18 @@ sealed class Character extends ResolvedFieldObject with Speaker {
   @override
   int? slotAsOf(EventState c) => c.slotFor(this);
 
+  @override
+  Iterable<FieldObject> unknownObjects(EventState state) sync* {
+    if (state.slotFor(this) == null) {
+      // Include all slots which do not have a character
+      for (var slot in Slots.all) {
+        if (state.slots[slot] == null) {
+          yield BySlot(slot);
+        }
+      }
+    }
+  }
+
   SlotOfCharacter slot() => SlotOfCharacter(this);
 }
 
