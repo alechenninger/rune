@@ -1445,6 +1445,9 @@ class BytesBuilder {
 
   Bytes bytes() {
     _finishSpan();
+    if (_spans.isEmpty) {
+      return Bytes.empty();
+    }
     return _spans.length > 1 ? BytesAndAscii(_spans) : _spans[0];
   }
 

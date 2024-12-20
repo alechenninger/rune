@@ -71,6 +71,13 @@ void main() {
     });
   });
 
+  group('bytesbuilder', () {
+    test('empty bytes builder is empty', () {
+      var b = BytesBuilder();
+      expect(b.bytes(), Bytes.empty());
+    });
+  });
+
   group('ascii', () {
     test('ascii byte data to string is a quoted ascii string', () {
       var b = Bytes.ascii('Look at that great big whale!');
