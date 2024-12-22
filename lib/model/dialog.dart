@@ -22,7 +22,7 @@ class Dialog extends Event {
 
     for (var i = 0; i < spans.length; i++) {
       var span = spans[i];
-      if (_spans.isEmpty) {
+      if (_spans.where((s) => s.hasText).isEmpty) {
         span = span.trimLeft();
       }
 
@@ -74,7 +74,7 @@ class Dialog extends Event {
     if (_spans.isEmpty) {
       // todo: consider relaxing this rule to allow reusing dialog to
       //   simply control potraits
-        throw ArgumentError.value(spans.toString(), 'spans',
+      throw ArgumentError.value(spans.toString(), 'spans',
           'must contain at least one span with text');
     }
   }
@@ -130,6 +130,7 @@ class DialogSpan {
   /// which will always be first (in that order).
   final List<RunnableInDialog> events;
 
+  bool get hasText => span.text.isNotEmpty;
   String get text => span.text;
   bool get italic => span.italic;
 
