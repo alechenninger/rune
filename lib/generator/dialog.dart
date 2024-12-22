@@ -807,20 +807,20 @@ final _replacements = {
 // TODO: this is a bit of a mess, clean it up
 
 final _uppercase = RegExp('[A-Z]');
-final _uppercaseStart = 65;
+const _uppercaseStart = 65;
 final _lowercase = RegExp('[a-z]');
-final _lowercaseStart = 97;
+const _lowercaseStart = 97;
 
-final _uppercaseTileStart = 78;
-final _lowercaseTileStart = _uppercaseTileStart + 26;
+const _uppercaseTileStart = 78;
+const _lowercaseTileStart = _uppercaseTileStart + 26;
 
-final _italicizedOther = {
+const _italicizedOther = {
   '!': 130,
   '?': 131,
 };
 
-final _nonItalicizedLetters = <String>{}; //...Quotes.characters}; //{'x', 'z'};
-final _quotes = ['"', '“', '”'];
+const _nonItalicizedLetters = <String>{}; //...Quotes.characters}; //{'x', 'z'};
+const _quotes = ['"', '“', '”'];
 
 extension DialogSpanToAscii on DialogSpan {
   Bytes toAscii([Quotes? q]) {
@@ -830,6 +830,10 @@ extension DialogSpanToAscii on DialogSpan {
 
 extension SpanToAscii on Span {
   Bytes toAscii([Quotes? q]) {
+    if (text.isEmpty) {
+      return Bytes.empty();
+    }
+
     var quotes = q ?? Quotes();
 
     var transformed = text.characters.map((e) {
