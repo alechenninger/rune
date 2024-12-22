@@ -1817,6 +1817,10 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.panelsShown = 0;
       _memory.unknownAddressRegisters();
 
+      if (needsRefresh) {
+        _memory.stepSpeed = StepSpeed.normal();
+      }
+
       return Asm([
         if (wasFieldShown == false && (panelsShown ?? 0) > 0) ...[
           // todo: as an optimization, we could potentially replace dialog routine
@@ -1999,6 +2003,7 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.isMapInCram = true;
     _memory.isMapInVram = true;
     _memory.isDialogInCram = true;
+    _memory.stepSpeed = StepSpeed.normal();
   }
 
   @override
@@ -2086,6 +2091,7 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.isMapInCram = true;
     _memory.isDialogInCram = true;
     _memory.isMapInVram = true;
+    _memory.stepSpeed = StepSpeed.normal();
 
     // Due to new map, clear known positions.
     //TODO: _memory.clearAllFacing();
