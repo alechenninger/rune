@@ -294,23 +294,8 @@ class AbsoluteMovesInDialog extends DialogEvent {
     var routine = Asm([
       label(routineLbl),
       absoluteMovesToAsm(moves, state, labeller: labeller),
+      rts
     ]);
-
-    // TODO(optimization): this loops through objects again
-    // ideally we'd do this just once to set destinations and move bit
-    for (var obj in moves.followLeader
-        ? [
-            for (var slot in Slots.all) BySlot(slot),
-            ...moves.destinations.keys.where((o) => o.isNotCharacter)
-          ]
-        : moves.destinations.keys) {
-      // _memory.animatedDuringDialog(obj); TODO
-      // Would also need to know what "normal" state is,
-      // so we don't clear the bit for objects where it should always be set
-      routine.add(Asm([obj.toA4(state), bset(1.i, priority_flag(a4))]));
-    }
-
-    routine.add(rts);
 
     var dialog = Asm([
       dc.b([ControlCodes.action, Byte(0xf)]),

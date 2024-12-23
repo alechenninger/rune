@@ -298,6 +298,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
   moves.destinations.entries.forEachIndexed((i, dest) {
     var obj = dest.key.resolve(state);
     var pos = dest.value;
+    var isLast = i == length - 1;
 
     if (moves.followLeader &&
         (obj is Character && obj.slotAsOf(state) != 1 ||
@@ -313,15 +314,22 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
     // so we probably know they're not otherwise moving randomly.
     generator.ensureScriptable(obj);
 
-    if (length == 1) {
-      asm.add(pos.withPosition(
-          memory: state,
-          load: a3,
-          load2: a2,
-          asm: (x, y) => doMove(x: x, y: y)));
-    } else {
-      var isLastToMove = i == length - 1;
-      if (!isLastToMove) {
+    // TODO: need to set animate flag when not waiting for movements and remove from dialog generation
+    if (!moves.waitForMovements &&
+        // If follow leader is set, we'll set the flags for all slots later
+        (obj.isNotCharacter || !moves.followLeader)) {
+      asm.add(bset(1.i, priority_flag(a4)));
+    }
+
+    switch ((isLast, i)) {
+      case (true, 0):
+        asm.add(pos.withPosition(
+            memory: state,
+            load: a3,
+            load2: a2,
+            asm: (x, y) => doMove(x: x, y: y)));
+        break;
+      case (false, _):
         asm.add(pos.withPosition(
             memory: state,
             load: a3,
@@ -331,9 +339,8 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
         if (obj.isNotCharacter) {
           secondaryObjects.add((obj, pos));
         }
-      } else {
-        // Last object to move...
-
+        break;
+      case (true, _):
         if (obj.isCharacter) {
           // Just set destination; we'll move all characters together later.
           asm.add(pos.withPosition(
@@ -352,7 +359,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
           // Finish moving any other secondary objects
           if (moves.waitForMovements) {
             for (var (obj, pos) in secondaryObjects) {
-              asm.add(obj.toA4(generator._mem));
+              asm.add(obj.toA4(state));
               asm.add(pos.withPosition(
                   memory: state,
                   load: a3,
@@ -366,7 +373,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
         if (moves.waitForMovements && secondaryObjects.length < length) {
           asm.add(jsr(Label('Event_MoveCharacters').l));
         }
-      }
+        break;
     }
 
     if (moves.waitForMovements) {
@@ -376,9 +383,26 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
       state.putInAddress(a3, null);
       state.putInAddress(a5, null);
       state.putInAddress(a6, null);
+    } else if (moves.followLeader) {
+      // Because we're following the leader, other characters will move that
+      // weren't referenced in destinations.
+      // Because we are not waiting for movements, we need to set their animate
+      // during dialog bit also.
+
+      // TODO(optimization): this loops through objects again
+      // ideally we'd do this just once to set destinations and move bit
+      for (var slot in Slots.all) {
+        // _memory.animatedDuringDialog(obj); TODO(correctness)
+        // Would also need to know what "normal" state is,
+        // so we don't clear the bit for objects where it should always be set
+        asm.add(Asm([BySlot(slot).toA4(state), bset(1.i, priority_flag(a4))]));
+      }
     }
 
-    // TODO: if not wait for movement?
+    // TODO(correctness): if not wait for movement?
+    // i think we'd have to set destinations in memory, which could also serve
+    // as an indicator that we need to wait for movement to finish /
+    // animate during dialog.
     state.positions[obj] = pos.known(state);
     // If we don't know which direction the object was coming from,
     // we don't know which direction it will be facing.
