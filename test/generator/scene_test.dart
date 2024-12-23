@@ -982,9 +982,9 @@ ${dialog2.toAsm()}
               moveq(alys.charIdAddress, d0),
               jsr(('FindCharacterSlot').l),
               cmpi.b(0xFF.i, d1),
-              beq(Label('.3_continue')),
+              beq(Label('.4_continue')),
               getAndRunDialog3LowDialogId(Byte.one.i),
-              setLabel('.3_continue'),
+              setLabel('.4_continue'),
               getAndRunDialog3LowDialogId(Byte.two.i),
             ]).withoutComments());
 
@@ -1028,12 +1028,12 @@ ${dialog2.toAsm()}
             getAndRunDialog3LowDialogId(0.toByte.i),
             moveq(Constant('EventFlag_Test').i, d0),
             jsr(Label('EventFlags_Test').l),
-            beq.w(Label('.Test_unset2')),
+            beq.w(Label('.Test_unset3')),
             getAndRunDialog3LowDialogId(1.toByte.i),
-            bra.w(Label('.Test_cont2')),
-            setLabel('.Test_unset2'),
+            bra.w(Label('.Test_cont3')),
+            setLabel('.Test_unset3'),
             getAndRunDialog3LowDialogId(2.toByte.i),
-            setLabel('.Test_cont2'),
+            setLabel('.Test_cont3'),
             getAndRunDialog3LowDialogId(3.toByte.i),
           ]).withoutComments());
 

@@ -2004,7 +2004,7 @@ void main() {
         expect(
             asm.events.withoutComments().trim(),
             Asm([
-              label(Label('Event_GrandCross_testrun2')),
+              label(Label('Event_GrandCross_testrun3')),
               getAndRunDialog3LowDialogId(0.toByte.i),
               rts,
             ]));
@@ -2084,11 +2084,11 @@ void main() {
         expect(
             asm.events.withoutComments(),
             Asm([
-              label(Label('Event_GrandCross_testrun2')),
+              label(Label('Event_GrandCross_testrun3')),
               getAndRunDialog3LowDialogId(0.toByte.i),
               rts,
               newLine(),
-              label(Label('Event_GrandCross_testrun3')),
+              label(Label('Event_GrandCross_testrun5')),
               getAndRunDialog3LowDialogId(1.toByte.i),
               rts,
               newLine()
@@ -2140,11 +2140,11 @@ void main() {
               label(Label('.testflag1_unset1')),
               moveq(Constant('EventFlag_testflag3').i, d0),
               jsr(Label('EventFlags_Test').l),
-              beq.w(Label('.testflag3_unset5')),
+              beq.w(Label('.testflag3_unset7')),
               move.w(Word(2).i, Constant('Event_Index').w),
               moveq(1.i, d7),
               rts,
-              label(Label('.testflag3_unset5')),
+              label(Label('.testflag3_unset7')),
               move.w(Word(3).i, Constant('Event_Index').w),
               moveq(1.i, d7),
               rts,
@@ -2172,13 +2172,13 @@ void main() {
         expect(
             asm.events.withoutComments().trim(),
             Asm([
-              label(Label('Event_GrandCross_testrun2')),
+              label(Label('Event_GrandCross_testrun3')),
               getAndRunDialog3LowDialogId(0.toByte.i),
               moveq(Constant('EventFlag_testflag2').i, d0),
               jsr(Label('EventFlags_Test').l),
-              beq.w(Label('.testflag2_unset3')),
+              beq.w(Label('.testflag2_unset4')),
               getAndRunDialog3LowDialogId(1.toByte.i),
-              label(Label('.testflag2_unset3')),
+              label(Label('.testflag2_unset4')),
               jsr('Event_CloseDialog'.l),
               rts,
             ]));
@@ -2286,11 +2286,11 @@ void main() {
         expect(
             asm.events.withoutComments(),
             Asm([
-              label(Label('Event_GrandCross_testrun2')),
+              label(Label('Event_GrandCross_testrun3')),
               getAndRunDialog3LowDialogId(0.toByte.i),
               rts,
               newLine(),
-              label(Label('Event_GrandCross_testrun3')),
+              label(Label('Event_GrandCross_testrun5')),
               getAndRunDialog3LowDialogId(1.toByte.i),
               rts,
               newLine()

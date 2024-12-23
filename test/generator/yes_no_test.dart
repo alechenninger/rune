@@ -74,12 +74,12 @@ main() {
             Asm([
               getAndRunDialog3LowDialogId(Byte(1).i),
               tst.b(Constant('Yes_No_Option').w),
-              beq.w(Label('.2_yes_choice')),
+              beq.w(Label('.4_yes_choice')),
               generateEventAsm([Pause(2.seconds)]),
-              bra.w(Label('.2_choice_continue')),
-              setLabel('.2_yes_choice'),
+              bra.w(Label('.4_choice_continue')),
+              setLabel('.4_yes_choice'),
               generateEventAsm([Pause(1.seconds)]),
-              setLabel('.2_choice_continue'),
+              setLabel('.4_choice_continue'),
               returnFromInteractionEvent(),
             ]));
       });
@@ -150,14 +150,14 @@ main() {
             Asm([
               getAndRunDialog3LowDialogId(Byte(1).i),
               tst.b(Constant('Yes_No_Option').w),
-              beq.w(Label('.2_yes_choice')),
+              beq.w(Label('.3_yes_choice')),
               generateEventAsm([Pause(2.seconds)]),
               popAndRunDialog3,
-              bra.w(Label('.2_choice_continue')),
-              setLabel('.2_yes_choice'),
+              bra.w(Label('.3_choice_continue')),
+              setLabel('.3_yes_choice'),
               generateEventAsm([Pause(1.seconds)]),
               popAndRunDialog3,
-              setLabel('.2_choice_continue'),
+              setLabel('.3_choice_continue'),
               returnFromInteractionEvent(),
             ]));
       });
