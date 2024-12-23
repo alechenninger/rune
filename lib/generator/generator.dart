@@ -559,7 +559,7 @@ EventType? sceneEventType(List<Event> events,
         (event is DialogCodes) ||
         (event is IndividualMoves &&
             switch (event.justFacing) {
-              var f? => FaceInDialog.canFaceInDialog(f),
+              var f? => FaceInDialogByteCode.ok(f),
               null => false
             } &&
             hasDialogAfter) ||
@@ -635,9 +635,7 @@ class GenerationContext {
   var _eventCounter = 1;
   int get eventCounter => _eventCounter;
 
-  int getAndIncrementEventCount() {
-    return _eventCounter++;
-  }
+  int getAndIncrementEventCount() => _eventCounter++;
 
   /// For currently generating branch, what is the known state of event flags
   // note: empty is currently used to understand "root" condition
@@ -953,7 +951,8 @@ class SceneAsmGenerator implements EventVisitor {
     _generateQueueInCurrentMode();
     _runOrContinueDialog(dialog);
     var (asm, post) = dialog.toGeneratedAsm(_memory,
-        labeller: _labeller.withContext(_eventCounter));
+        labeller: _labeller.withContext(_eventCounter),
+        fieldRoutines: _fieldRoutines);
     _addToDialog(asm);
     _memory.unknownAddressRegisters();
     _postAsm.addAll(post);
@@ -1017,10 +1016,10 @@ class SceneAsmGenerator implements EventVisitor {
   void individualMoves(IndividualMoves moves) {
     var facing = moves.justFacing;
 
-    if (facing != null && FaceInDialog.canFaceInDialog(facing)) {
+    if (facing != null && FaceInDialogByteCode.ok(facing)) {
       _addToEventOrDialog(moves,
           inDialog: () {
-            var (dialogAsm, _) = FaceInDialog(facing).toAsm(_memory);
+            var (dialogAsm, _) = FaceInDialogByteCode(facing).toAsm(_memory);
 
             _addToDialog(dialogAsm);
           },
@@ -2948,6 +2947,7 @@ class SceneAsmGenerator implements EventVisitor {
   void _runOrContinueDialog(Event event, {bool interruptDialog = true}) {
     // TODO: call generatequeueincurrentmode here instead of before calling this method
 
+    _context.getAndIncrementEventCount();
     _expectFacePlayerFirstIfInteraction();
 
     switch (_gameMode) {

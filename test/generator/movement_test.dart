@@ -1483,7 +1483,8 @@ void main() {
 
         var (asm, postRoutines) = dialog.toGeneratedAsm(
             state..cameraLock = true,
-            labeller: Labeller.localTo('TestScene').withContext(0));
+            labeller: Labeller.localTo('TestScene').withContext(0),
+            fieldRoutines: defaultFieldRoutines);
 
         expect(postRoutines, [
           Asm([
@@ -1514,7 +1515,8 @@ void main() {
 
         var (asm, postRoutines) = dialog.toGeneratedAsm(
             state..cameraLock = true,
-            labeller: Labeller.localTo('TestScene').withContext(0));
+            labeller: Labeller.localTo('TestScene').withContext(0),
+            fieldRoutines: defaultFieldRoutines);
 
         expect(postRoutines, [
           Asm([
@@ -1556,7 +1558,8 @@ void main() {
 
         var (asm, postRoutines) = dialog.toGeneratedAsm(
             state..cameraLock = true,
-            labeller: Labeller.localTo('TestScene').withContext(0));
+            labeller: Labeller.localTo('TestScene').withContext(0),
+            fieldRoutines: defaultFieldRoutines);
 
         expect(postRoutines, [
           Asm([

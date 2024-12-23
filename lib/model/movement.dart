@@ -155,12 +155,22 @@ class FacePlayer extends Event {
 }
 
 /// The party follows the leader
-class RelativePartyMove extends Event {
+class RelativePartyMove extends Event implements RunnableInDialog {
   RelativeMovement movement;
   StepSpeed speed = StepSpeed.fast;
   Axis startingAxis = Axis.x;
 
   RelativePartyMove(this.movement);
+
+  AbsoluteMoves? get asAbsoluteMoves {
+    var individual = IndividualMoves()
+      ..moves[BySlot(1)] = movement
+      ..speed = speed;
+    var absolute = individual.asAbsoluteMoves;
+    if (absolute == null) return null;
+    absolute.followLeader = true;
+    return absolute;
+  }
 
   IndividualMoves toIndividualMoves(EventState ctx) {
     var individual = IndividualMoves();
@@ -231,6 +241,13 @@ class RelativePartyMove extends Event {
   }
 
   @override
+  bool canRunInDialog([EventState? state]) {
+    if (asAbsoluteMoves == null) return false;
+    if (state == null) return true;
+    return state.cameraLock == true;
+  }
+
+  @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
     return generator.partyMoveToAsm(this, ctx);
   }
@@ -242,7 +259,7 @@ class RelativePartyMove extends Event {
 
   @override
   String toString() {
-    return 'PartyMove{movement: $movement, startingAxis: $startingAxis}';
+    return 'RelativePartyMove{movement: $movement, startingAxis: $startingAxis}';
   }
 
   @override

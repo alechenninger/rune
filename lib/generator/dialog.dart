@@ -87,13 +87,18 @@ class DialogAsm extends Asm {
 typedef DialogAndRoutines = (Asm dialog, List<Asm> post);
 
 sealed class DialogEvent {
-  DialogAndRoutines toAsm(Memory state, {required Labeller labeller});
+  DialogAndRoutines toAsm(Memory state,
+      {required Labeller labeller,
+      required FieldRoutineRepository fieldRoutines});
 
   static DialogEvent? fromEvent(RunnableInDialog event, Memory state) {
     switch (event) {
-      case IndividualMoves(justFacing: var facing?)
-          when FaceInDialog.canFaceInDialog(facing):
-        return FaceInDialog(facing);
+      case IndividualMoves m:
+        return switch (m.justFacing) {
+          null => null,
+          var f when FaceInDialogByteCode.ok(f) => FaceInDialogByteCode(f),
+          _ => FaceInDialogRoutine(m),
+        };
       case PlaySound e:
         return SoundCode(e.sound.sfxId);
       case PlayMusic e:
@@ -130,7 +135,8 @@ class PauseCode extends DialogEvent {
   PauseCode(this.additionalFrames);
 
   @override
-  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) =>
+  DialogAndRoutines toAsm(EventState state,
+          {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) =>
       (delay(additionalFrames), const []);
 }
 
@@ -140,7 +146,8 @@ class PanelCode extends DialogEvent {
   PanelCode(this.panelIndex);
 
   @override
-  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) {
+  DialogAndRoutines toAsm(EventState state,
+      {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
     state.addPanel();
     return (panel(panelIndex), const []);
   }
@@ -152,7 +159,9 @@ class SoundCode extends DialogEvent {
   SoundCode(this.sfxId);
 
   @override
-  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) => (
+  DialogAndRoutines toAsm(EventState state,
+          {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) =>
+      (
         Asm([
           dc.b(const [ControlCodes.action, Byte.constant(3)]),
           dc.b([sfxId]),
@@ -167,16 +176,48 @@ class DialogCodesEvent extends DialogEvent {
   DialogCodesEvent(this.codes);
 
   @override
-  DialogAndRoutines toAsm(EventState state, {Labeller? labeller}) =>
+  DialogAndRoutines toAsm(EventState state,
+          {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) =>
       (dc.b(codes), const []);
 }
 
-class FaceInDialog extends DialogEvent {
+class FaceInDialogRoutine extends DialogEvent {
+  final IndividualMoves moves;
+
+  FaceInDialogRoutine(this.moves);
+
+  @override
+  DialogAndRoutines toAsm(Memory state,
+      {required Labeller labeller,
+      required FieldRoutineRepository fieldRoutines}) {
+    var routineLbl = labeller.withContext('FaceInDialog').next();
+    var routine = Asm([
+      label(routineLbl),
+      moves.toAsm(state, labeller: labeller, fieldRoutines: fieldRoutines),
+      rts
+    ]);
+
+    var dialog = Asm([
+      dc.b([ControlCodes.action, Byte(0xf)]),
+      dc.l([routineLbl])
+    ]);
+
+    return (dialog, [routine]);
+  }
+
+  @override
+  String toString() {
+    return 'FaceInDialogRoutine{$moves}';
+  }
+}
+
+class FaceInDialogByteCode extends DialogEvent {
   final Map<FieldObject, DirectionExpression> facing;
 
-  FaceInDialog(this.facing);
+  FaceInDialogByteCode(this.facing);
 
-  static bool canFaceInDialog(Map<FieldObject, DirectionExpression> facing) {
+  /// Returns `true` if all objects can be faced in dialog byte code.
+  static bool ok(Map<FieldObject, DirectionExpression> facing) {
     return facing.entries.every((entry) {
       var MapEntry(key: obj, value: dir) = entry;
       if (!obj.hasCompactIdRepresentation) return false;
@@ -195,7 +236,8 @@ class FaceInDialog extends DialogEvent {
   }
 
   @override
-  DialogAndRoutines toAsm(Memory state, {Labeller? labeller}) {
+  DialogAndRoutines toAsm(Memory state,
+      {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
     var asm = Asm.empty();
 
     for (var MapEntry(key: obj, value: dir) in facing.entries) {
@@ -236,7 +278,7 @@ class FaceInDialog extends DialogEvent {
   }
 
   @override
-  String toString() => 'FaceInDialog{$facing}';
+  String toString() => 'FaceInDialogByteCode{$facing}';
 }
 
 class AbsoluteMovesInDialog extends DialogEvent {
@@ -245,7 +287,8 @@ class AbsoluteMovesInDialog extends DialogEvent {
   AbsoluteMovesInDialog(this.moves);
 
   @override
-  DialogAndRoutines toAsm(Memory state, {required Labeller labeller}) {
+  DialogAndRoutines toAsm(Memory state,
+      {required Labeller labeller, FieldRoutineRepository? fieldRoutines}) {
     // First generate the positioning routine
     var routineLbl = labeller.withContext('AbsoluteMoves').next();
     var routine = Asm([
@@ -255,7 +298,12 @@ class AbsoluteMovesInDialog extends DialogEvent {
 
     // TODO(optimization): this loops through objects again
     // ideally we'd do this just once to set destinations and move bit
-    for (var obj in moves.destinations.keys) {
+    for (var obj in moves.followLeader
+        ? [
+            for (var slot in Slots.all) BySlot(slot),
+            ...moves.destinations.keys.where((o) => o.isNotCharacter)
+          ]
+        : moves.destinations.keys) {
       // _memory.animatedDuringDialog(obj); TODO
       // Would also need to know what "normal" state is,
       // so we don't clear the bit for objects where it should always be set
@@ -279,7 +327,8 @@ class WaitForMovementsInDialog extends DialogEvent {
   WaitForMovementsInDialog(this.wait);
 
   @override
-  DialogAndRoutines toAsm(Memory state, {required Labeller labeller}) {
+  DialogAndRoutines toAsm(Memory state,
+      {required Labeller labeller, FieldRoutineRepository? fieldRoutines}) {
     var routineLbl = labeller.withContext('WaitForMovements').next();
     var routine = Asm([
       label(routineLbl),
@@ -298,7 +347,8 @@ class WaitForMovementsInDialog extends DialogEvent {
 
 extension DialogToAsm on Dialog {
   DialogAndRoutines toGeneratedAsm(Memory memory,
-      {required Labeller labeller}) {
+      {required Labeller labeller,
+      required FieldRoutineRepository fieldRoutines}) {
     var asm = DialogAsm.empty();
     var post = <Asm>[];
     var quotes = Quotes();
@@ -325,10 +375,11 @@ extension DialogToAsm on Dialog {
         var dialogEvent = DialogEvent.fromEvent(e, memory);
         if (dialogEvent == null) {
           throw StateError(
-              'event in span cannot be compiled to dialog. event= $e memory=$memory');
+              'event in span cannot be compiled to dialog. event=$e memory=$memory');
         }
         var (dialog, routines) = dialogEvent.toAsm(memory,
-            labeller: labeller.withContext(i).withContext(j));
+            labeller: labeller.withContext(i).withContext(j),
+            fieldRoutines: fieldRoutines);
         post.addAll(routines);
         codePoints.add(ascii.length, dialog);
       }
@@ -343,7 +394,8 @@ extension DialogToAsm on Dialog {
   DialogAsm toAsm([EventState? eventState]) {
     var memory =
         eventState == null ? Memory() : Memory.from(SystemState(), eventState);
-    var (asm, _) = toGeneratedAsm(memory, labeller: Labeller());
+    var (asm, _) = toGeneratedAsm(memory,
+        labeller: Labeller(), fieldRoutines: defaultFieldRoutines);
     return DialogAsm([asm]);
   }
 }
