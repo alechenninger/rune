@@ -1100,4 +1100,28 @@ void main() {
       ]);
     });
   });
+
+  group('direction expresions', () {
+    group('offset directions', () {
+      test('1 turn is equivalent to -3 turns', () {
+        expect(OffsetDirection(up, turns: 1), OffsetDirection(up, turns: -3));
+      });
+
+      test('2 turns is equivalent to -2 turns', () {
+        expect(OffsetDirection(up, turns: 2), OffsetDirection(up, turns: -2));
+      });
+
+      test('3 turns is equivalent to -1 turns', () {
+        expect(OffsetDirection(up, turns: 3), OffsetDirection(up, turns: -1));
+      });
+
+      test('4 turns is equivalent to 0 turns', () {
+        expect(OffsetDirection(up, turns: 4), OffsetDirection(up, turns: 0));
+      });
+
+      test('if direction is known, offset is known', () {
+        expect(OffsetDirection(up, turns: 1).known(EventState()), right);
+      });
+    });
+  });
 }
