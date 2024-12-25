@@ -1021,34 +1021,56 @@ extension DirectionOfVectorAsm on DirectionOfVector {
     labelSuffix ??= '';
 
     return Asm([
-      to.withY(memory: memory, asm: (y) => move.w(y, d2), load: load2),
+      // Diff x
+      to.withX(memory: memory, asm: (x) => move.w(x, d2), load: load2),
+      from.withX(
+          memory: memory,
+          asm: (x) => x is Immediate ? subi.w(x, d2) : sub.w(x, d2),
+          load: load1),
+      // Diff y
+      to.withY(memory: memory, asm: (y) => move.w(y, d3), load: load2),
+      // not sure if below comment is still relevant
       // TODO(optimization): could consider allowing a force load of load1
       // even if not needed. this would be an optimization when using
       // updateobjfacing, because we wouldn't need to load later and
       // then have to deal with saving d0 to the stack
       from.withY(
           memory: memory,
-          asm: (y) => Asm([
-                moveq(FacingDir_Down.i, destination),
-                y is Immediate ? cmpi.w(y, d2) : cmp.w(y, d2)
-              ]),
+          asm: (y) => y is Immediate ? subi.w(y, d3) : sub.w(y, d3),
           load: load1),
-      beq.s(Label(r'.checkx' + labelSuffix)),
-      bcc.s(Label(r'.keep' + labelSuffix)), // keep up
-      move.w(FacingDir_Up.i, destination),
-      bra.s(Label(r'.keep' + labelSuffix)), // keep
-      label(Label(r'.checkx' + labelSuffix)),
-      to.withX(memory: memory, asm: (x) => move.w(x, d2), load: load2),
-      from.withX(
-          memory: memory,
-          asm: (x) => Asm([
-                move.w(FacingDir_Right.i, destination),
-                x is Immediate ? cmpi.w(x, d2) : cmp.w(x, d2)
-              ]),
-          load: load1),
-      bcc.s(Label(r'.keep' + labelSuffix)), // keep up
+      // Compute the magnitudes of the deltas
+      move.w(d2, d4),
+      bpl.s(Label('.positive_dx$labelSuffix')),
+      neg.w(d4),
+      label(Label('.positive_dx$labelSuffix')),
+      move.w(d3, d5),
+      bpl.s(Label('.positive_dy$labelSuffix')),
+      neg.w(d5),
+      label(Label('.positive_dy$labelSuffix')),
+      // Compare magnitudes
+      cmp.w(d4, d5),
+      bgt.s(Label('.checky$labelSuffix')),
+
+      // Check horizontal
+      tst.w(d2),
+      bpl.s(Label('.right$labelSuffix')),
       move.w(FacingDir_Left.i, destination),
-      label(Label(r'.keep' + labelSuffix)),
+      bra.s(Label('.keep$labelSuffix')), // keep
+      label(Label('.right$labelSuffix')),
+      move.w(FacingDir_Right.i, destination),
+      bra.s(Label('.keep$labelSuffix')), // keep
+
+      // Check vertical
+      label(Label('.checky$labelSuffix')),
+      tst.w(d3),
+      bpl.s(Label('.down$labelSuffix')),
+      move.w(FacingDir_Up.i, destination),
+      bra.s(Label('.keep$labelSuffix')), // keep
+
+      label(Label('.down$labelSuffix')),
+      move.w(FacingDir_Down.i, destination),
+
+      label(Label('.keep$labelSuffix')),
       asm(destination)
     ]);
   }

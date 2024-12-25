@@ -55,7 +55,11 @@ const BranchMnemonic bhi = BranchMnemonic('bhi');
 /// Branch if C or Z are set. (unsigned ≤)
 const BranchMnemonic bls = BranchMnemonic('bls');
 
+/// Branch if N and V are the same, and Z is clear (signed >).
+const BranchMnemonic bgt = BranchMnemonic('bgt');
+
 const AddiMnemonic addi = AddiMnemonic();
+const SubMnemonic sub = SubMnemonic();
 const SubiMnemonic subi = SubiMnemonic();
 const SubqMnemonic subq = SubqMnemonic();
 const CmpMnemonic cmp = CmpMnemonic();
@@ -63,6 +67,7 @@ const CmpiMnemonic cmpi = CmpiMnemonic();
 const TstMnemonic tst = TstMnemonic();
 const LsMnemonic lsl = LsMnemonic('l');
 const LsMnemonic lsr = LsMnemonic('r');
+const NegMnemonic neg = NegMnemonic();
 
 final rts = cmd('rts', []);
 
@@ -193,6 +198,14 @@ class AddiMnemonic {
   Asm l(Address from, Address to) => cmd('addi.l', [from, to]);
 }
 
+class SubMnemonic {
+  const SubMnemonic();
+
+  Asm b(Address from, Address to) => cmd('sub.b', [from, to]);
+  Asm w(Address from, Address to) => cmd('sub.w', [from, to]);
+  Asm l(Address from, Address to) => cmd('sub.l', [from, to]);
+}
+
 class SubiMnemonic {
   const SubiMnemonic();
 
@@ -247,6 +260,14 @@ class LsMnemonic {
   Asm b(Address from, Address to) => cmd('ls$direction.w', [from, to]);
   Asm w(Address from, Address to) => cmd('ls$direction.w', [from, to]);
   Asm l(Address from, Address to) => cmd('ls$direction.l', [from, to]);
+}
+
+class NegMnemonic {
+  const NegMnemonic();
+
+  Asm b(Address destination) => cmd('neg.b', [destination]);
+  Asm w(Address destination) => cmd('neg.w', [destination]);
+  Asm l(Address destination) => cmd('neg.l', [destination]);
 }
 
 class AsmError extends ArgumentError {
