@@ -382,8 +382,15 @@ class AbsoluteMoves extends Event implements RunnableInDialog {
 
   @override
   bool canRunInDialog([EventState? state]) {
-    if (state == null) return !waitForMovements;
     if (waitForMovements) return false;
+    // Assume okay if no state provided
+    if (state == null) return true;
+    // If none are slot 1, okay (because no camera movement possible).
+    if (destinations.keys
+        .every((o) => o.slotAsOf(state) != null && o.slotAsOf(state) != 1)) {
+      return true;
+    }
+    // Otherwise, only allowed if camera is locked.
     return state.cameraLock == true;
   }
 
