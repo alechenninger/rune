@@ -66,10 +66,8 @@ class TextColumn {
       this.hAlign = HorizontalAlignment.left,
       required List<Text> texts})
       : texts = List.unmodifiable(texts),
-        groups = List.unmodifiable(texts
-            .map((e) => e.groupSet.group)
-            .toSet()
-            .toList(growable: false)) {
+        groups = List.unmodifiable(
+            texts.map((e) => e.block.group).toSet().toList(growable: false)) {
     checkArgument(left + width <= 40,
         message:
             'left + width must be <= 40 but $left + $width = ${left + width}');
@@ -112,15 +110,15 @@ class TextColumn {
 /// Spans appear as a continuous block of text which display in unison as one
 /// clearly readable unit, bound by the containing [TextColumn].
 class Text {
-  final TextBlock groupSet;
+  final TextBlock block;
   final List<Span> spans;
 
   /// If a line break should occur after these spans.
   final bool lineBreak;
 
-  @Deprecated('use TextGroupSet#addText instead')
-  Text({required this.spans, required this.groupSet, this.lineBreak = false}) {
-    groupSet._addToSet(this);
+  @Deprecated('use TextBlock#addText instead')
+  Text({required this.spans, required this.block, this.lineBreak = false}) {
+    block._addToSet(this);
   }
 
   int get length => spans
@@ -137,13 +135,13 @@ class Text {
       identical(this, other) ||
       other is Text &&
           runtimeType == other.runtimeType &&
-          groupSet == other.groupSet &&
+          block == other.block &&
           const ListEquality<Span>().equals(spans, other.spans) &&
           lineBreak == other.lineBreak;
 
   @override
   int get hashCode =>
-      groupSet.hashCode ^
+      block.hashCode ^
       const ListEquality<Span>().hash(spans) ^
       lineBreak.hashCode;
 }
@@ -152,7 +150,13 @@ enum HorizontalAlignment { left, center, right }
 
 enum VerticalAlignment { top, center, bottom }
 
-enum FadeState { fadeIn, wait, fadeOut }
+enum FadeState {
+  fadeIn,
+  wait,
+  fadeOut;
+
+  PaletteEvent lasting(Duration d) => PaletteEvent(this, d);
+}
 
 class PaletteEvent {
   final Duration duration;
@@ -189,7 +193,7 @@ class TextGroup {
     return set;
   }
 
-  TextBlock setAt(int index, {Word? white, Word? black}) {
+  TextBlock setBlockAt(int index, {Word? white, Word? black}) {
     if (index >= _blocks.length) {
       if (index != _blocks.length) {
         throw ArgumentError(
@@ -202,7 +206,7 @@ class TextGroup {
 
   @override
   String toString() {
-    return 'TextGroup{$hashCode, sets: $_blocks}';
+    return 'TextGroup{$hashCode, blocks: $_blocks}';
   }
 }
 
@@ -235,7 +239,7 @@ class TextBlock {
 
   Text addText(List<Span> spans, {bool lineBreak = false}) {
     // ignore: deprecated_member_use_from_same_package
-    return Text(spans: spans, groupSet: this, lineBreak: lineBreak);
+    return Text(spans: spans, block: this, lineBreak: lineBreak);
   }
 
   void addEvent(PaletteEvent f) => _paletteEvents.add(f);

@@ -46,14 +46,14 @@ void main() {
     var asm = displayTextToAsm(
         DisplayText(
             column: TextColumn(vAlign: VerticalAlignment.center, texts: [
-          Text(spans: Span.parse('Hello world! '), groupSet: fadeIn1),
-          Text(spans: Span.parse('Bye! '), groupSet: fadeIn2),
-          Text(spans: Span.parse('Hi again! '), groupSet: fadeIn3),
+          Text(spans: Span.parse('Hello world! '), block: fadeIn1),
+          Text(spans: Span.parse('Bye! '), block: fadeIn2),
+          Text(spans: Span.parse('Hi again! '), block: fadeIn3),
           Text(
               spans: Span.parse('This fading _business_ is really something. '),
-              groupSet: fade4),
-          Text(spans: Span.parse("I'll say!"), groupSet: fadeIn5),
-          Text(spans: Span.parse('This is even wackier'), groupSet: fadeIn1),
+              block: fade4),
+          Text(spans: Span.parse("I'll say!"), block: fadeIn5),
+          Text(spans: Span.parse('This is even wackier'), block: fadeIn1),
         ])),
         dialog,
         labeller: Labeller.localTo('test').withContext('0'));
@@ -439,14 +439,14 @@ void main() {
 
     var display = DisplayText(
         column: TextColumn(texts: [
-      Text(spans: [Span('hello ')], groupSet: g1s1),
+      Text(spans: [Span('hello ')], block: g1s1),
       Text(
           spans: [Span('1234567890abcdefghijklmnopqrstuvwxyz!-– ')],
-          groupSet: g2s1),
-      Text(spans: Span.parse('world '), groupSet: g1s1),
+          block: g2s1),
+      Text(spans: Span.parse('world '), block: g1s1),
       Text(
           spans: [Span('1234567890abcdefghijklmnopqrstuvwxyz!-– ')],
-          groupSet: g1s2),
+          block: g1s2),
     ]));
 
     var dialog = DialogTree();
@@ -491,17 +491,17 @@ void main() {
             texts: [
               Text(
                   spans: [Span('The rise and fall.')],
-                  groupSet: riseAndFall,
+                  block: riseAndFall,
                   lineBreak: true),
               Text(
                   spans: [Span('The dusk and dawn.')],
-                  groupSet: duskAndDawn,
+                  block: duskAndDawn,
                   lineBreak: true),
               Text(
                   spans: [Span('The beginning and the end...')],
-                  groupSet: begAndEnd,
+                  block: begAndEnd,
                   lineBreak: true),
-              Text(spans: [Span('of the millennium.')], groupSet: ofMillen),
+              Text(spans: [Span('of the millennium.')], block: ofMillen),
             ]));
 
     var tree = DialogTree();
