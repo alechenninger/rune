@@ -249,6 +249,7 @@ enum Zone {
   Zelan(World.Zelan),
   RajaTemple(World.Dezolis, 'Raja Temple'),
   Dezolis(World.Dezolis),
+  DezolisField(World.Dezolis, 'Dezolis Field'),
   Ryuon(World.Dezolis),
   Tyler(World.Dezolis),
   Kuran(World.Kuran),
@@ -503,6 +504,8 @@ enum MapId {
   Zelan_F1(Zone.Zelan),
 
   RajaTemple(Zone.RajaTemple),
+
+  DezolisField(Zone.DezolisField),
 
   Ryuon(Zone.Ryuon),
   RyuonItemShop(Zone.Ryuon),
