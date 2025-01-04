@@ -7,7 +7,6 @@ import 'model.dart';
 class Dialog extends Event {
   Speaker speaker;
   Portrait get portrait => speaker.portrait;
-  // fixme: toString/==/etc
   bool hidePanelsOnClose = false;
   final List<DialogSpan> _spans = [];
   List<DialogSpan> get spans => UnmodifiableListView(_spans);
@@ -84,7 +83,7 @@ class Dialog extends Event {
     return 'Dialog{'
         'speaker: $speaker, '
         'hidePanelsOnClose: $hidePanelsOnClose, '
-        '_spans: $_spans'
+        'spans: $_spans'
         '}';
   }
 
