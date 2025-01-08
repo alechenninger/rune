@@ -68,6 +68,8 @@ final defaultFieldRoutines = FieldRoutineRepository([
       SpecFactory.npc((s, d) => Npc(s, SlowlyWanderAround(d)))),
   FieldRoutine(Word(0x58), Label('FieldObj_NPCType9'),
       SpecFactory.npc((s, d) => Npc(s, FaceUp()))),
+  FieldRoutine(Word(0x5C), Label('FieldObj_NPCType10'),
+      SpecFactory.npc((s, d) => Npc(s, FaceLeft()))),
   FieldRoutine(
       Word(0x140),
       Label('loc_49502'),
