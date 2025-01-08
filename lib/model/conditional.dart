@@ -133,7 +133,7 @@ const storyEvents = [
   EventFlag('RajaTemple'),
   EventFlag('RajaJoined'),
   EventFlag('Snowstorm'),
-  //EventFlag('LandaleWhereabouts'), // optional Gyuna ... or not?
+  EventFlag('LandaleWhereabouts'), // optional in original
   EventFlag('TylerGrave'),
   EventFlag('DezoSpaceport'),
   EventFlag('Kuran'),
