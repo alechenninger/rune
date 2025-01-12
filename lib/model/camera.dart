@@ -17,7 +17,7 @@ class MoveCamera extends Event {
   int get hashCode => to.hashCode ^ speed.hashCode;
 
   @override
-  String toString() => 'MoveCamera{to: $to}';
+  String toString() => 'MoveCamera{to: $to, speed: $speed}';
 
   @override
   void visit(EventVisitor visitor) {
