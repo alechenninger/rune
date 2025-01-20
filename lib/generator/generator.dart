@@ -3932,6 +3932,24 @@ final _defaultBuiltInSprites = {
         tiles: 0x11,
         art: RomArt(label: Label('loc_151984')),
         requiredVramTile: Word(0x413))
+  ],
+  MapId.Tyler: [
+    SpriteVramMapping(
+        tiles: 0x2e,
+        art: RomArt(label: Label('loc_1918D4')),
+        requiredVramTile: Word(0x204)),
+    SpriteVramMapping(
+        tiles: 0x34,
+        art: RomArt(label: Label('loc_191BEE')),
+        requiredVramTile: Word(0x232)),
+    SpriteVramMapping(
+        tiles: 0x35,
+        art: RomArt(label: Label('loc_191F8C')),
+        requiredVramTile: Word(0x266)),
+    SpriteVramMapping(
+        tiles: 0x3a,
+        art: RomArt(label: Label('loc_19237C')),
+        requiredVramTile: Word(0x29b)),
   ]
 };
 
