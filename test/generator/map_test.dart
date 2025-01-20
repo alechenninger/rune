@@ -519,6 +519,43 @@ void main() {
       expect(objectsAsm[7], dc.w([0x418.toWord]));
       expect(objectsAsm[12], dc.w([0x460.toWord]));
     });
+
+    test('reusing fixed sprites for objects if possible', () {
+      // ...instead of reusing where the object's sprite would be positioned
+      // otherwise.
+      program = Program(vramTileOffsets: {
+        MapId.Test: Word(0x100)
+      }, builtInSprites: {
+        MapId.Test: [
+          SpriteVramMapping(
+              tiles: 0x100,
+              art: RomArt(label: Label('Art_SomethingSpecial')),
+              requiredVramTile: Word(0x2d0)) // 2d0-3d0
+        ]
+      });
+
+      // While there is room for the sprite, it should reuse the fixed mapping.
+      testMap.addObject(
+        MapObject(
+            startPosition: Position(0x1e0, 0x2e0),
+            spec: AsmSpec(
+                routine: Word(0x224),
+                startFacing: down,
+                artLabel: Label('Art_SomethingSpecial'))),
+      );
+
+      var mapAsm = program.addMap(testMap);
+
+      expect(
+          mapAsm.sprites,
+          Asm([
+            dc.w([0x2d0.toWord]),
+            dc.l([Constant('Art_SomethingSpecial')]),
+          ]));
+
+      var objectsAsm = mapAsm.objects.withoutComments();
+      expect(objectsAsm[2], dc.w([0x2d0.toWord]));
+    });
   });
 
   group('routines which use ram art', () {

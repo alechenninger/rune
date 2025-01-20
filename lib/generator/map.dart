@@ -823,13 +823,17 @@ class SpriteVramMapping {
     if (animated || other.animated) return null;
     if (art != other.art) return null;
     if (art == null || other.art == null) return null;
-    if (requiredVramTile != null &&
-        other.requiredVramTile != null &&
-        requiredVramTile != other.requiredVramTile) return null;
+    final requiredTiles = <Word>{
+      if (requiredVramTile case var t?) t,
+      if (other.requiredVramTile case var t?) t,
+    };
+    // Two different required tiles; cannot merge
+    if (requiredTiles.length == 2) return null;
     return SpriteVramMapping(
         tiles: max(tiles, other.tiles),
         art: art,
-        duplicateOffsets: duplicateOffsets);
+        duplicateOffsets: duplicateOffsets,
+        requiredVramTile: requiredTiles.firstOrNull);
   }
 
   @override
