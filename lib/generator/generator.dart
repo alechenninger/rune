@@ -2469,6 +2469,20 @@ class SceneAsmGenerator implements EventVisitor {
           saveCurrent: changeParty.saveCurrentParty,
           maintainOrder: changeParty.maintainOrder);
 
+      // Reset slot positions now that slots have changed.
+      for (var slot in Slots.all) {
+        var char = newParty.length >= slot ? newParty[slot - 1] : null;
+        if (char != null) {
+          // If we know the character, and we know the char's position,
+          // this will reset their new slot to the correct position.
+          // Their old slot is not yet adjusted.
+          // This loop will reset it.
+          _memory.positions[char] = _memory.positions[char];
+        } else {
+          _memory.positions[BySlot(slot)] = null;
+        }
+      }
+
       return null;
     });
   }

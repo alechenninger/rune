@@ -2368,6 +2368,62 @@ loc_742A4:
               jsr(Label('Event_SwapCharacter').l),
             ]));
       });
+
+      test('resets slot positions if new character position is not known', () {
+        // if we knew all slot positions, but now swap some
+        // we should no longer know positions for swapped slots
+        var newPositions = <Position?>[null, null, null, null, null];
+
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.slots[2] = alys;
+            // Assume we know all slot positions
+            ctx.positions[BySlot(1)] = Position(0x100, 0x100);
+            ctx.positions[BySlot(2)] = Position(0x100, 0x110);
+            ctx.positions[BySlot(3)] = Position(0x100, 0x120);
+            ctx.positions[BySlot(4)] = Position(0x100, 0x130);
+            ctx.positions[BySlot(5)] = Position(0x100, 0x140);
+          }),
+          // Note alys stays in slot 2
+          ChangePartyOrder([rune, alys, hahn, wren, raja],
+              saveCurrentParty: false),
+          SetContext((ctx) {
+            for (var slot in Slots.all) {
+              newPositions[slot - 1] = ctx.positions[BySlot(slot)];
+            }
+          })
+        ]);
+
+        Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+        expect(newPositions, [null, Position(0x100, 0x110), null, null, null]);
+      });
+
+      test('sets slot position if new character position is known', () {
+        // if we swap a character into a slot
+        // and we know the character's position
+        // then we should know the slot's position
+        Position? newSlot1Position;
+        Position? newSlot2Position;
+
+        var scene = Scene([
+          SetContext((ctx) {
+            ctx.slots[2] = rune;
+            ctx.positions[rune] = Position(0x100, 0x100);
+          }),
+          ChangePartyOrder([rune, alys, hahn, wren, raja],
+              saveCurrentParty: false),
+          SetContext((ctx) {
+            newSlot1Position = ctx.positions[BySlot(1)];
+            newSlot2Position = ctx.positions[BySlot(2)];
+          })
+        ]);
+
+        Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+        expect(newSlot1Position, Position(0x100, 0x100));
+        expect(newSlot2Position, isNull);
+      });
     });
   });
 
