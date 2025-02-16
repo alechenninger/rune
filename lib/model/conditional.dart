@@ -133,7 +133,9 @@ const storyEvents = [
   EventFlag('RajaTemple'),
   EventFlag('RajaJoined'),
   EventFlag('Snowstorm'),
-  EventFlag('LandaleWhereabouts'), // optional in original
+  // New to Grand Cross. – but maybe leave out for SRAM compatibility?
+  // EventFlag('RyuonFirstTime'),
+  EventFlag('LandaleWhereabouts'),
   EventFlag('TylerGrave'),
   EventFlag('DezoSpaceport'),
   EventFlag('Kuran'),
