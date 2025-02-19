@@ -135,7 +135,7 @@ class AsmRoutineModel extends SpecModel {
 }
 
 /// Updates the next interaction for some map elements, which are reset back
-/// to their original interaction when the map is reloaded.`
+/// to their original interaction when the map is reloaded.
 class OnNextInteraction extends Event {
   final List<MapObjectId> withObjects;
   final Scene onInteract;
