@@ -941,8 +941,11 @@ class SceneAsmGenerator implements EventVisitor {
   void dialogCodes(DialogCodes codes) {
     _checkNotFinished();
     _generateQueueInCurrentMode();
-    _runOrContinueDialog(codes, interruptDialog: false);
-    _addToDialog(dc.b(codes.codes));
+    // To not interrupt dialog, use inline to dialog.
+    _runOrContinueDialog(codes, interruptDialog: true);
+    var (asm, routines) = DialogCodesEvent(codes.codes).toAsm(_memory);
+    _addToDialog(asm);
+    _postAsm.addAll(routines);
   }
 
   @override
@@ -1019,9 +1022,11 @@ class SceneAsmGenerator implements EventVisitor {
     if (facing != null && FaceInDialogByteCode.ok(facing)) {
       _addToEventOrDialog(moves,
           inDialog: () {
-            var (dialogAsm, _) = FaceInDialogByteCode(facing).toAsm(_memory);
+            var (dialogAsm, routines) =
+                FaceInDialogByteCode(facing).toAsm(_memory);
 
             _addToDialog(dialogAsm);
+            _postAsm.addAll(routines);
           },
           inEvent: (i) => moves.toAsm(_memory,
               fieldRoutines: _fieldRoutines,
@@ -1285,16 +1290,18 @@ class SceneAsmGenerator implements EventVisitor {
       case true:
         _generateQueueInCurrentMode();
         _runOrContinueDialog(pause);
-        var (asm, _) = PauseCode(frames.toByte).toAsm(_memory);
+        var (asm, routines) = PauseCode(frames.toByte).toAsm(_memory);
         _addToDialog(asm);
+        _postAsm.addAll(routines);
         break;
       case false:
         _addToEvent(pause, generateEvent);
         break;
       case null:
         _addToEventOrDialog(pause, inDialog: () {
-          var (asm, _) = PauseCode(frames.toByte).toAsm(_memory);
+          var (asm, routines) = PauseCode(frames.toByte).toAsm(_memory);
           _addToDialog(asm);
+          _postAsm.addAll(routines);
         }, inEvent: generateEvent);
         break;
     }
@@ -2254,8 +2261,9 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void playSound(PlaySound playSound) {
     _addToEventOrDialog(playSound, inDialog: () {
-      var (asm, _) = SoundCode(playSound.sound.sfxId).toAsm(_memory);
+      var (asm, routines) = SoundCode(playSound.sound.sfxId).toAsm(_memory);
       _addToDialog(asm);
+      _postAsm.addAll(routines);
     }, inEvent: (_) {
       return Asm([
         // Necessary to ensure previous sound change occurs
@@ -2281,8 +2289,9 @@ class SceneAsmGenerator implements EventVisitor {
     var musicId = playMusic.music.musicId;
 
     _addToEventOrDialog(playMusic, inDialog: () {
-      var (asm, _) = SoundCode(musicId).toAsm(_memory);
+      var (asm, routines) = SoundCode(musicId).toAsm(_memory);
       _addToDialog(asm);
+      _postAsm.addAll(routines);
       // TODO: note in this case, saved sound index is not set
     }, inEvent: (_) {
       return Asm([
@@ -2315,8 +2324,9 @@ class SceneAsmGenerator implements EventVisitor {
     var musicId = SoundEffect.stopMusic.sfxId;
 
     _addToEventOrDialog(stopMusic, inDialog: () {
-      var (asm, _) = SoundCode(musicId).toAsm(_memory);
+      var (asm, routines) = SoundCode(musicId).toAsm(_memory);
       _addToDialog(asm);
+      _postAsm.addAll(routines);
       // TODO: note in this case, saved sound index is not set
     }, inEvent: (_) {
       return Asm([

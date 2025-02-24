@@ -87,6 +87,9 @@ class DialogAsm extends Asm {
 typedef DialogAndRoutines = (Asm dialog, List<Asm> post);
 
 sealed class DialogEvent {
+  /// Returns the ASM for the dialog event and 
+  /// any routines that need to be added to post-event ASM 
+  /// in separate subroutines.
   DialogAndRoutines toAsm(Memory state,
       {required Labeller labeller,
       required FieldRoutineRepository fieldRoutines});
