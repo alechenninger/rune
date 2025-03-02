@@ -327,6 +327,41 @@ class IndividualMoves extends Event implements RunnableInDialog {
     return moves;
   }
 
+  IndividualMoves delayed(Steps delay) {
+    var result = IndividualMoves();
+    for (var MapEntry(key: obj, value: move) in moves.entries) {
+      result.moves[obj] = move.delayed(delay);
+    }
+    return result;
+  }
+
+  /// Return a new moves with [other] moves following `this`, in sequence.
+  ///
+  /// If the two cannot be sequenced, returns `null`.
+  IndividualMoves? andThen(IndividualMoves other) {
+    if (other.moves.isEmpty) return this;
+    if (moves.isEmpty) return other;
+    if (collideLead != other.collideLead) return null;
+    if (speed != other.speed) return null;
+
+    var result = IndividualMoves();
+    result.moves.addAll(moves);
+
+    for (var MapEntry(key: moveable, value: move)
+        in other.delayed(duration).moves.entries) {
+      if (result.moves[moveable] case var existing?) {
+        if (existing.append(move) case var appended?) {
+          result.moves[moveable] = appended;
+        } else {
+          return null;
+        }
+      } else {
+        result.moves[moveable] = move;
+      }
+    }
+    return result;
+  }
+
   @override
   bool canRunInDialog([EventState? state]) => justFacing != null;
 
@@ -744,6 +779,10 @@ abstract class RelativeMovement {
   /// If this movement represents an object standing still (doing nothing).
   bool get still => duration == 0.steps && facing == null;
 
+  /// Attempt to append the movement [m] to this one.
+  ///
+  /// If move cannot be appended, returns `null`.
+  /// If move can be appended, returns a new movement with the two combined.
   RelativeMovement? append(RelativeMovement m) => null;
 
   /// If [steps] is 0, and the only continuous path is a [facing],
@@ -752,6 +791,8 @@ abstract class RelativeMovement {
   ///
   /// Facing can only be traveled this way; otherwise it will be skipped.
   RelativeMovement less(Steps steps);
+
+  RelativeMovement delayed(Steps delay);
 
   /// Movements which are continuous (there is no pause or facing in between)
   /// and should start immediately (delay should == 0).
@@ -830,6 +871,15 @@ class StepPath extends RelativeMovement {
 
   OffsetPosition asPositionExpressionFrom(PositionExpression from) {
     return OffsetPosition(from, offset: asPath.asPosition);
+  }
+
+  @override
+  StepPath delayed(Steps delay) {
+    return StepPath()
+      ..direction = direction
+      ..distance = distance
+      ..delay = this.delay + delay
+      ..facing = facing;
   }
 
   @override
@@ -923,6 +973,19 @@ class StepPaths extends RelativeMovement {
     return null;
   }
 
+  @override
+  StepPaths delayed(Steps delay) {
+    // Delay the first step if one is present,
+    // otherwise create an initial step with only the delay.
+    if (_paths case [var first, ...var rest]) {
+      return StepPaths()
+        ..step(first.delayed(delay))
+        ..stepAll(rest);
+    } else {
+      return StepPaths()..wait(delay);
+    }
+  }
+
   void wait(Steps duration) {
     step(StepPath()..delay = duration);
   }
@@ -950,6 +1013,12 @@ class StepPaths extends RelativeMovement {
       } else {
         _paths.add(step);
       }
+    }
+  }
+
+  void stepAll(Iterable<StepPath> steps) {
+    for (var it in steps) {
+      step(it);
     }
   }
 
@@ -1140,6 +1209,16 @@ class StepToPoint extends RelativeMovement {
   }
 
   @override
+  StepToPoint delayed(Steps delay) {
+    return StepToPoint()
+      ..delay = this.delay + delay
+      ..facing = facing
+      ..from = from
+      ..to = to
+      ..firstAxis = firstAxis;
+  }
+
+  @override
   List<Path> get continuousPaths {
     if (delay > 0.steps) return [];
     return _paths();
@@ -1320,6 +1399,9 @@ class Face extends RelativeMovement {
 
     return Face(facing)..delay = delay - steps;
   }
+
+  @override
+  StepPath delayed(Steps delay) => asStep().delayed(delay);
 
   @override
   String toString() {
