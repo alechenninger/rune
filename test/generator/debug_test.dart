@@ -67,6 +67,7 @@ void main() {
 	moveq	#EventFlag_PrincipalConfession, d0
 	jsr	(EventFlags_Set).l
 
+	move.b	#0, (World_Index).w	; Motavia
 	move.w	#MapID_ChazHouse, (Field_Map_Index).w
 	move.w	#$FFFF, (Field_Map_Index_2).w
 	move.w	#$003E, (Map_Start_X_Pos).w

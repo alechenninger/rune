@@ -35,7 +35,7 @@ EventAsm debugStart({
     ],
     if (flagsSet.isNotEmpty) newLine(),
     move.b(World.values.indexOf(startingMap.world).i, Constant('World_Index').w,
-        comment: '${startingMap.world}'),
+        comment: startingMap.world.name),
     move.w(startingMap.toAsm.i, Field_Map_Index.w),
     move.w(0xFFFF.toWord.i, Field_Map_Index_2.w),
     move.w(x.toWord.i, Map_Start_X_Pos.w),
