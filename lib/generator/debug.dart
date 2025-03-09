@@ -1,6 +1,7 @@
 import 'package:quiver/check.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/model/map.dart';
 
 import '../model/model.dart' as model;
 import 'event.dart';
@@ -33,6 +34,8 @@ EventAsm debugStart({
       setEventFlag(eventFlags.toConstantValue(f)),
     ],
     if (flagsSet.isNotEmpty) newLine(),
+    move.b(World.values.indexOf(startingMap.world).i, Constant('World_Index').w,
+        comment: '${startingMap.world}'),
     move.w(startingMap.toAsm.i, Field_Map_Index.w),
     move.w(0xFFFF.toWord.i, Field_Map_Index_2.w),
     move.w(x.toWord.i, Map_Start_X_Pos.w),
