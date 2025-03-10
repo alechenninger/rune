@@ -1033,6 +1033,7 @@ class BySlot extends FieldObject {
   static const three = BySlot(3);
   static const four = BySlot(4);
   static const five = BySlot(5);
+  static const all = [one, two, three, four, five];
 
   @override
   final isCharacter = true;
