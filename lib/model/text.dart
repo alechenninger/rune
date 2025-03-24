@@ -253,4 +253,10 @@ class TextBlock {
   String toString() {
     return 'TextBlock{$hashCode, paletteEvents: $_paletteEvents}';
   }
+
+  @override
+  bool operator ==(Object other) {
+    // TODO: implement ==
+    return super == other;
+  }
 }
