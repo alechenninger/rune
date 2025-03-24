@@ -70,6 +70,8 @@ final defaultFieldRoutines = FieldRoutineRepository([
       SpecFactory.npc((s, d) => Npc(s, FaceUp()))),
   FieldRoutine(Word(0x5C), Label('FieldObj_NPCType10'),
       SpecFactory.npc((s, d) => Npc(s, FaceLeft()))),
+  FieldRoutine.asm(Word(0xa4), Label('FieldObj_Fire'),
+      spriteMappingTiles: 0x24),
   FieldRoutine(
       Word(0x140),
       Label('loc_49502'),
@@ -110,6 +112,10 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 8),
   FieldRoutine.asm(Word(0x1f0), Label('FieldObj_NPCWren'),
       spriteMappingTiles: 8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x224), Label('FieldObj_GravestoneHalf'),
+      spriteMappingTiles: 0x2e),
+  FieldRoutine.asm(Word(0x9c), Label('FieldObj_Penguin'),
+      spriteMappingTiles: 0x90),
 ]);
 
 class FieldRoutineRepository {
@@ -123,7 +129,7 @@ class FieldRoutineRepository {
         _byModel = {for (var r in routines) r.factory.routineModel: r};
 
   Iterable<FieldRoutine> all() =>
-      fieldObjectsJmpTbl.values.map((i) => byIndex(i)).whereNotNull();
+      fieldObjectsJmpTbl.values.map((i) => byIndex(i)).nonNulls;
 
   FieldRoutine? byIndex(Word index) {
     var byIndex = _byIndex[index];
