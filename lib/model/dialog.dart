@@ -295,6 +295,7 @@ abstract mixin class Speaker {
     MissingStudent,
     AlysWounded,
     Gyuna,
+    DezoPenguin,
   ];
 
   static final Map<String, Speaker> _byName = allSpeakers.groupFoldBy(
@@ -330,6 +331,7 @@ abstract mixin class Speaker {
       NpcSpeaker(Portrait.MissingStudent, 'Missing Student');
   static final AlysWounded = NpcSpeaker(Portrait.AlysWounded, 'Alys (sick)');
   static final Gyuna = NpcSpeaker(Portrait.Gyuna, 'Gyuna');
+  static final DezoPenguin = NpcSpeaker(Portrait.none, 'Dezo Penguin');
 
   @override
   String toString() => name;
@@ -432,9 +434,12 @@ enum Portrait {
   /// Blue motavian, brown hood, green background
   Shopkeeper7;
 
+  bool isNamed(String name) {
+    return name.toLowerCase() == this.name.toLowerCase();
+  }
+
   /// Returns the portrait for the given [name].
   static Portrait? byName(String name) {
-    return Portrait.values
-        .firstWhereOrNull((e) => e.name.toLowerCase() == name.toLowerCase());
+    return Portrait.values.firstWhereOrNull((p) => p.isNamed(name));
   }
 }
