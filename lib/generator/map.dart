@@ -698,7 +698,9 @@ class _VramRegion {
     var goalSize = width - toFree;
 
     // Would the goal size violate region constraints?
-    if (start + goalSize < minEnd || goalSize < 0) return null;
+    if (start + goalSize < minEnd || goalSize < 0) {
+      return null;
+    }
 
     var bestSize = 0;
     var bestSubset = <SpriteVramMapping>[];
@@ -762,8 +764,15 @@ class _VramRegion {
     } else {
       var toFree = address - _offsetStart;
       var dropped = freeUp(toFree);
+      if (dropped == null) {
+        throw StateError('cannot move start to ${Longword(address)}; '
+            'not enough space to free ${Longword(toFree)}. '
+            'fixed regions may be too small. '
+            'this can happen if an object corresponding to sprite in a '
+            'fixed region does not have the correct spriteMappingTiles.');
+      }
       _offsetStart = address;
-      return dropped!;
+      return dropped;
     }
   }
 
