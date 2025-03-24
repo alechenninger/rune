@@ -100,6 +100,19 @@ extension MapIdAsm on MapId {
   Constant get toAsm => mapIdToAsm(this);
 }
 
+extension WorldAsm on World {
+  Value get toAsm {
+    return switch (this) {
+      World.Motavia => 0.toValue,
+      World.Dezolis => 1.toValue,
+      World.Rykros => 2.toValue,
+      World.Zelan => 3.toValue,
+      World.Kuran => 4.toValue,
+      World.AirCastle => 5.toValue,
+    };
+  }
+}
+
 MapAsm compileMap(GameMap map, ProgramConfiguration config) {
   var spriteVramOffset = config.spriteVramOffsetForMap(map.id);
   var builtInSprites = config.builtInSpritesForMap(map.id);

@@ -63,6 +63,7 @@ const y_step_duration = Constant('y_step_duration');
 /// bit 2 = lock camera
 const Char_Move_Flags = Constant('Char_Move_Flags');
 const FieldObj_Step_Offset = Constant('FieldObj_Step_Offset');
+const World_Index = Constant('World_Index');
 const Field_Map_Index = Constant('Field_Map_Index');
 const Field_Map_Index_2 = Constant('Field_Map_Index_2');
 const Map_Start_X_Pos = Constant('Map_Start_X_Pos');

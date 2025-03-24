@@ -257,9 +257,10 @@ main() {
     var asm = program.addScene(SceneId('id'), scene, startingMap: map);
 
     expect(
-        asm.event.withoutComments().withoutEmptyLines().head(9),
+        asm.event.withoutComments().withoutEmptyLines().head(10),
         Asm([
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.b(MapId.Test_Part2.world.toAsm.i, (World_Index).w),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
           move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
           move.w(0x44.toWord.i, (Map_Start_X_Pos).w),
@@ -309,7 +310,7 @@ main() {
     var asm = program.addScene(SceneId('id'), scene, startingMap: map);
 
     expect(
-        asm.event.withoutComments().withoutEmptyLines().head(11),
+        asm.event.withoutComments().withoutEmptyLines().head(12),
         Asm([
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
           // not sure if this is needed here?
@@ -319,6 +320,7 @@ main() {
           // i wonder why this didnt do vintprepareloop
           jsr(Label('Pal_FadeIn').l),
           jsr(Label('VInt_Prepare').l),
+          move.b(MapId.Test_Part2.world.toAsm.i, (World_Index).w),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
           move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
           move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
@@ -346,6 +348,7 @@ main() {
         asm.event.withoutComments().withoutEmptyLines().trim(),
         Asm([
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.b(MapId.Test_Part2.world.toAsm.i, (World_Index).w),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
           move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
           move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
@@ -376,6 +379,7 @@ main() {
         Asm([
           // this clears palette
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.b(MapId.Test_Part2.world.toAsm.i, (World_Index).w),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
           move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
           move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
@@ -409,6 +413,7 @@ main() {
         Asm([
           // this clears palette
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.b(MapId.Test_Part2.world.toAsm.i, (World_Index).w),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
           move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
           move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
@@ -441,6 +446,7 @@ main() {
         Asm([
           // this clears palette
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.b(MapId.Test_Part2.world.toAsm.i, (World_Index).w),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
           move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
           move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
@@ -516,6 +522,7 @@ main() {
           getAndRunDialog3LowDialogId(Byte.zero.i),
           // this clears palette
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.b(MapId.Test_Part2.world.toAsm.i, (World_Index).w),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
           move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
           move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
@@ -566,6 +573,7 @@ main() {
         Asm([
           lockCamera(true),
           jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          move.b(MapId.Test_Part2.world.toAsm.i, (World_Index).w),
           move.w(Constant('MapID_Test_Part2').i, (Field_Map_Index).w),
           move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
           move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
@@ -2003,7 +2011,7 @@ loc_742A4:
               Instruction.parse(
                   r'	move.l #CharID_Rune<<24|$FFFFFF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
-              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+              move.b(MapId.Test.world.toAsm.i, (World_Index).w)
             ]));
       });
 
@@ -2028,7 +2036,7 @@ loc_742A4:
               Instruction.parse(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|$FFFF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
-              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+              move.b(MapId.Test.world.toAsm.i, (World_Index).w)
             ]));
       });
 
@@ -2053,7 +2061,7 @@ loc_742A4:
               Instruction.parse(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|$FF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
-              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+              move.b(MapId.Test.world.toAsm.i, (World_Index).w)
             ]));
       });
 
@@ -2078,7 +2086,7 @@ loc_742A4:
               Instruction.parse(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
-              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+              move.b(MapId.Test.world.toAsm.i, (World_Index).w)
             ]));
       });
 
@@ -2103,7 +2111,7 @@ loc_742A4:
               Instruction.parse(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
-              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+              move.b(MapId.Test.world.toAsm.i, (World_Index).w)
             ]));
       });
 
@@ -2197,7 +2205,7 @@ loc_742A4:
               Instruction.parse(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
-              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+              move.b(MapId.Test.world.toAsm.i, (World_Index).w),
             ]));
       });
 
@@ -2220,7 +2228,7 @@ loc_742A4:
             Asm([
               move.l(Constant('Saved_Char_ID_Mem_1').w, Current_Party_Slots.w),
               move.b(Constant('Saved_Char_ID_Mem_5').w, Current_Party_Slot_5.w),
-              move.w(MapId.Test.toAsm.i, (Field_Map_Index).w)
+              move.b(MapId.Test.world.toAsm.i, (World_Index).w),
             ]));
       });
     });

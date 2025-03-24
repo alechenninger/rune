@@ -2071,6 +2071,7 @@ class SceneAsmGenerator implements EventVisitor {
         }
       }
 
+      _eventAsm.add(move.b(newMap.id.world.toAsm.i, World_Index.w));
       _eventAsm.add(events_asm.changeMap(
           to: newId.i,
           from: currentId?.i,
@@ -2686,9 +2687,7 @@ class SceneAsmGenerator implements EventVisitor {
       case EventMode(priorMode: RunEventMode? prior, type: var type):
         _terminateDialog();
 
-        if (needToShowField) {
-          fadeInField(FadeInField());
-        } else if (needToHidePanels) {
+        if (needToHidePanels) {
           // unfortunately this will produce unwanted interrupt
           hideAllPanels(HideAllPanels());
         }
@@ -2706,6 +2705,8 @@ class SceneAsmGenerator implements EventVisitor {
           // clears z bit so we don't reload the map from cutscene
           _eventAsm.add(comment('Finish'));
           _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
+        } else if (needToShowField) {
+          fadeInField(FadeInField());
         }
 
         if (prior != null || _postAsm.isNotEmpty) {
@@ -3370,6 +3371,14 @@ class SceneAsmGenerator implements EventVisitor {
       if (last != null) {
         _eventAsm.replace(last, events_asm.fadeOut(initVramAndCram: true));
       } else {
+        // In some cases, we need to clear the sprite table buffer
+        // before initializing the VRAM and CRAM.
+        // For example, after loading the map, the party sprites are loaded,
+        // even if the map did not fade in.
+        // TODO(testing): needs test case
+        if (_memory.isMapInVram == true) {
+          _eventAsm.add(jsr('ClearSpriteTableBuf'.l));
+        }
         _eventAsm.add(jsr(Label('InitVRAMAndCRAMAfterFadeOut').l));
       }
     }
@@ -3974,7 +3983,7 @@ final _defaultBuiltInSprites = {
         tiles: 0x3a,
         art: RomArt(label: Label('loc_19237C')),
         requiredVramTile: Word(0x29b)),
-  ]
+  ],
 };
 
 Queue<Word> freeEventFlags() {
