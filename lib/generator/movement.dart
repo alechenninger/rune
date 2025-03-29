@@ -747,34 +747,7 @@ extension FieldObjectAsm on FieldObject {
   /// and need to reload it.
   Asm toA4(Memory ctx,
       {bool force = false, PushToStack maintain = const NoneToPush()}) {
-    var current = ctx.inAddress(a4)?.obj;
-    // TODO(movement generator): should we resolve when putting into address
-    //  memory?
-    if (!force && (current == this || current == resolve(ctx))) {
-      return Asm.empty();
-    }
-
-    var obj = this;
-    var slot = obj.slotAsOf(ctx);
-    var asm = switch ((slot, obj)) {
-      (var s?, _) => characterBySlotToA4(s),
-      (_, Character c) => maintain.wrap(characterByIdToA4(c.charIdAddress)),
-      (_, MapObject o) => leaConstant(o.address(ctx), a4),
-      (_, MapObjectById o) => leaConstant(o.address(ctx), a4),
-      // TODO(movement): this could generalize to checking every a register
-      _ when ctx.inAddress(a3)?.obj == obj => lea(a3.indirect, a4),
-      _ => throw UnsupportedError('$this.toA4')
-    };
-
-    ctx.putInAddress(a4, obj);
-    return asm;
-    /*
-    notes:
-	jsr	(Event_GetCharacter).l
-	bmi.s	loc_6E212
-
-    i.e. bmi branch if char id not found in party
-     */
+    return toA(a4, ctx, force: force, maintain: maintain);
   }
 
   /// NOTE! May overwrite data registers.
@@ -785,10 +758,10 @@ extension FieldObjectAsm on FieldObject {
   /// If [keepA4] is `true` and A4 must be overwritten,
   /// then it will be pushed/popped onto the stack so afterwards
   /// the value in A4 remains the same.
-  Asm toA(DirectAddressRegister a, Memory memory, {bool keepA4 = true}) {
-    if (a == a4) return toA4(memory);
-
-    if (memory.inAddress(a)?.obj == resolve(memory)) {
+  Asm toA(DirectAddressRegister a, Memory memory,
+      {bool force = false, PushToStack maintain = const NoneToPush()}) {
+    var current = memory.inAddress(a)?.obj;
+    if (!force && (current == this || current == resolve(memory))) {
       return Asm.empty();
     }
 
@@ -798,39 +771,40 @@ extension FieldObjectAsm on FieldObject {
     switch (obj) {
       case MapObject():
         var address = obj.address(memory);
-        asm = lea(Absolute.long(address), a);
+        asm = lea(Absolute.word(address), a);
       case MapObjectById():
         var address = obj.address(memory);
-        asm = lea(Absolute.long(address), a);
+        asm = lea(Absolute.word(address), a);
       case BySlot():
         asm = lea(Constant('Character_${obj.index}').w, a);
-      case InteractionObject() when memory.inAddress(a3)?.obj == obj:
-        asm = (a == a3) ? Asm.empty() : lea(a3.indirect, a);
+      case InteractionObject():
+        if (memory.inAddress(a3)?.obj == obj) {
+          // Already in address register; reuse.
+          asm = (a == a3) ? Asm.empty() : lea(a3.indirect, a);
+        } else {
+          // Load index from Interaction_Object_Index
+          asm = maintain.wrap(Asm([
+            comment('Load interaction object'),
+            moveq(0.i, d0),
+            move.b('Interaction_Object_Index'.w, d0),
+            lsl.w(6.i, d0),
+            addi.l('Field_Obj_Secondary'.l, d0),
+            movea.l(d0, a),
+          ]));
+        }
       case Character c:
         asm = switch (c.slotAsOf(memory)) {
           var slot? => lea(Constant('Character_$slot').w, a),
-          null => Asm([
-              moveq(c.charIdAddress, d0),
-              Asm.fromRaw('	getcharacter	$a'),
-            ])
+          null => maintain.wrap(a == a4
+              ? characterByIdToA4(c.charIdAddress)
+              : Asm([
+                  moveq(c.charIdAddress, d0),
+                  Asm.fromRaw('	getcharacter	$a'),
+                ]))
         };
       default:
-        // Does this branch ever get reached?
-        var inA4 = memory.inAddress(a4)?.obj;
-        var doLoad = Asm([
-          obj.toA4(memory),
-          lea(a4.indirect, a),
-        ]);
-
-        if (keepA4) {
-          asm = PushToStack.one(a4, Size.l).wrap(doLoad);
-          if (inA4 case Object()) memory.putInAddress(a4, inA4);
-        } else {
-          memory.putInAddress(a4, obj);
-          asm = doLoad;
-        }
+        throw UnsupportedError('toA($a, $this) not implemented');
     }
-
     memory.putInAddress(a, obj);
     return asm;
   }

@@ -14,7 +14,7 @@ import 'animate.dart';
 import 'camera.dart';
 import 'palette.dart';
 import 'guild.dart';
-import 'objects.dart';
+import 'behavior.dart';
 import 'conditional.dart';
 import 'cutscenes.dart';
 import 'dialog.dart';
@@ -22,6 +22,7 @@ import 'events.dart';
 import 'expressions.dart';
 import 'map.dart';
 import 'movement.dart';
+import 'objects.dart';
 import 'party.dart';
 import 'sound.dart';
 import 'text.dart';
@@ -29,7 +30,7 @@ import 'text.dart';
 export 'animate.dart';
 export 'battle.dart';
 export 'camera.dart';
-export 'objects.dart';
+export 'behavior.dart';
 export 'conditional.dart';
 export 'cutscenes.dart';
 export 'dialog.dart';
@@ -38,6 +39,7 @@ export 'expressions.dart';
 export 'palette.dart';
 export 'map.dart';
 export 'movement.dart';
+export 'objects.dart';
 export 'party.dart';
 export 'sound.dart';
 export 'text.dart';
@@ -1023,298 +1025,3 @@ class SceneId {
 }
 
 // TODO(refactor): should just be an enum?
-class BySlot extends FieldObject {
-  final int index;
-
-  const BySlot(this.index);
-
-  static const one = BySlot(1);
-  static const two = BySlot(2);
-  static const three = BySlot(3);
-  static const four = BySlot(4);
-  static const five = BySlot(5);
-  static const all = [one, two, three, four, five];
-
-  @override
-  final isCharacter = true;
-
-  @override
-  FieldObject resolve(EventState state) {
-    var inSlot = state.slots[index];
-    if (inSlot == null) {
-      return this;
-    }
-    return inSlot;
-  }
-
-  @override
-  Iterable<FieldObject> unknownObjects(EventState state) sync* {
-    // If this slot is not known
-    if (state.slots[index] == null) {
-      // Include all characters whose slot is not known
-      for (var c in state.possibleCharacters) {
-        if (state.slotFor(c) == null) {
-          yield c;
-        }
-      }
-    }
-  }
-
-  @override
-  String toString() {
-    return 'Slot{$index}';
-  }
-
-  @override
-  int slotAsOf(EventState c) => index;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is BySlot &&
-          runtimeType == other.runtimeType &&
-          index == other.index;
-
-  @override
-  int get hashCode => index.hashCode;
-}
-
-sealed class Character extends ResolvedFieldObject with Speaker {
-  const Character();
-
-  static Character? byName(String name) {
-    switch (name.toLowerCase()) {
-      case 'alys':
-        return alys;
-      case 'shay':
-        return shay;
-      case 'hahn':
-        return hahn;
-      case 'rune':
-        return rune;
-      case 'gryz':
-        return gryz;
-      case 'rika':
-        return rika;
-      case 'demi':
-        return demi;
-      case 'wren':
-        return wren;
-      case 'raja':
-        return raja;
-      case 'kyra':
-        return kyra;
-      case 'seth':
-        return seth;
-    }
-    return null;
-  }
-
-  static final allCharacters = [
-    alys,
-    shay,
-    hahn,
-    rune,
-    gryz,
-    rika,
-    demi,
-    wren,
-    raja,
-    kyra,
-    seth
-  ];
-
-  @override
-  final isCharacter = true;
-
-  @override
-  int? slotAsOf(EventState c) => c.slotFor(this);
-
-  @override
-  Iterable<FieldObject> knownObjects(EventState state) sync* {
-    yield this;
-    if (state.slotFor(this) case var slot?) {
-      yield BySlot(slot);
-    }
-  }
-
-  @override
-  Iterable<FieldObject> unknownObjects(EventState state) sync* {
-    if (state.slotFor(this) == null) {
-      // Include all slots which do not have a character
-      for (var slot in Slots.all) {
-        if (state.slots[slot] == null) {
-          yield BySlot(slot);
-        }
-      }
-    }
-  }
-
-  SlotOfCharacter slot() => SlotOfCharacter(this);
-}
-
-const alys = Alys();
-const shay = Shay();
-const hahn = Hahn();
-const rune = Rune();
-const gryz = Gryz();
-const rika = Rika();
-const demi = Demi();
-const wren = Wren();
-const raja = Raja();
-const kyra = Kyra();
-const seth = Seth();
-
-class Alys extends Character {
-  const Alys();
-  @override
-  final name = 'Alys';
-  @override
-  final portrait = Portrait.Alys;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Alys && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Shay extends Character {
-  const Shay();
-  @override
-  final name = 'Shay';
-  @override
-  final portrait = Portrait.Shay;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Shay && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Hahn extends Character {
-  const Hahn();
-  @override
-  final name = 'Hahn';
-  @override
-  final portrait = Portrait.Hahn;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Hahn && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Rune extends Character {
-  const Rune();
-  @override
-  final name = 'Rune';
-  @override
-  final portrait = Portrait.Rune;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Rune && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Gryz extends Character {
-  const Gryz();
-  @override
-  final name = 'Gryz';
-  @override
-  final portrait = Portrait.Gryz;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Gryz && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Rika extends Character {
-  const Rika();
-  @override
-  final name = 'Rika';
-  @override
-  final portrait = Portrait.Rika;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Rika && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Demi extends Character {
-  const Demi();
-  @override
-  final name = 'Demi';
-  @override
-  final portrait = Portrait.Demi;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Demi && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Wren extends Character {
-  const Wren();
-  @override
-  final name = 'Wren';
-  @override
-  final portrait = Portrait.Wren;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Wren && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Raja extends Character {
-  const Raja();
-  @override
-  final name = 'Raja';
-  @override
-  final portrait = Portrait.Raja;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Raja && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Kyra extends Character {
-  const Kyra();
-  @override
-  final name = 'Kyra';
-  @override
-  final portrait = Portrait.Kyra;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Kyra && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}
-
-class Seth extends Character {
-  const Seth();
-  @override
-  final name = 'Seth';
-  @override
-  final portrait = Portrait.Seth;
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Seth && runtimeType == other.runtimeType;
-  @override
-  int get hashCode => name.hashCode;
-}

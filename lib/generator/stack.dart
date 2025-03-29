@@ -18,7 +18,7 @@ sealed class PushToStack {
     }
   }
 
-  PushToStack();
+  const PushToStack();
 
   PopFromStack pop();
   Asm asm();
@@ -112,16 +112,18 @@ class PushOneToStack extends PushToStack {
   final Register register;
   final Size size;
 
-  PushOneToStack(this.register, this.size);
+  const PushOneToStack(this.register, this.size);
 
   /// Merges two [PushOneToStack] instances into a [PushManyToStack]
   /// if they are of the same size. Otherwise, returns `null`.
+  @override
   PushManyToStack? mergeOne(PushOneToStack other) {
     if (size != other.size) return null;
     return PushManyToStack(RegisterList.of([register, other.register]), size);
   }
 
   /// Merges this [PushOneToStack] with [other] [PushManyToStack].
+  @override
   PushManyToStack? mergeMany(PushManyToStack other) {
     if (size != other.size) return null;
     return PushManyToStack(
