@@ -571,9 +571,9 @@ Asm stepObject(
     required Address y,
     required Address additionalFrames}) {
   return Asm([
-    move.l(x, d0),
-    move.l(y, d1),
-    move.l(additionalFrames, d2),
+    if (x != d0) move.l(x, d0),
+    if (y != d1) move.l(y, d1),
+    if (additionalFrames != d2) move.l(additionalFrames, d2),
     jsr(Label('Event_StepObject').l),
     setDestination(
         x: a4.indirect.plus(curr_x_pos), y: a4.indirect.plus(curr_y_pos))

@@ -702,16 +702,25 @@ Asm _waitForMovement(
 extension FieldObjectAsm on FieldObject {
   int? compactId(EventState mem) {
     return switch (resolve(mem)) {
+      // neither bit 6 nor bit 7
       Character c => c.charIdValue.value,
+      // bit 7 – these two are both indexes in ram along the same table
       BySlot s => (s.index - 1) | 0x80,
       MapObject m => (mem.currentMap!.indexOf(m.id)! + 12) | 0x80,
+      // bit 6, not bit 7
+      InteractionObject() => 0x40,
       _ => null,
     };
   }
 
   bool get hasCompactIdRepresentation {
     return switch (this) {
-      Character() || BySlot() || MapObject() || MapObjectById() => true,
+      Character() ||
+      BySlot() ||
+      MapObject() ||
+      MapObjectById() ||
+      InteractionObject() =>
+        true,
       _ => false,
     };
   }
@@ -778,17 +787,19 @@ extension FieldObjectAsm on FieldObject {
       case BySlot():
         asm = lea(Constant('Character_${obj.index}').w, a);
       case InteractionObject():
+        // TODO: we could generalize this optimization for any object
         if (memory.inAddress(a3)?.obj == obj) {
           // Already in address register; reuse.
           asm = (a == a3) ? Asm.empty() : lea(a3.indirect, a);
         } else {
           // Load index from Interaction_Object_Index
+          // See also GetObjectByIndexOrId in asm
           asm = maintain.wrap(Asm([
             comment('Load interaction object'),
             moveq(0.i, d0),
             move.b('Interaction_Object_Index'.w, d0),
             lsl.w(6.i, d0),
-            addi.l('Field_Obj_Secondary'.l, d0),
+            addi.l('Field_Obj_Secondary'.i, d0),
             movea.l(d0, a),
           ]));
         }
