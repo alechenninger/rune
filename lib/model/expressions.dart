@@ -358,6 +358,9 @@ sealed class DirectionExpression extends UnaryExpression {
   Direction? known(EventState memory);
   DirectionExpression get opposite;
   DirectionExpression turn(int times) => OffsetDirection(this, turns: times);
+
+  PolarVectorExpression multiplyVector(Vector2dExpression vector) =>
+      PolarVectorExpression(vector, this);
 }
 
 class DirectionOfVector extends DirectionExpression {
@@ -542,6 +545,10 @@ enum Direction implements DirectionExpression {
         right => left,
       };
 
+  @override
+  PolarVectorExpression multiplyVector(Vector2dExpression vector) =>
+      PolarVectorExpression(vector, this);
+
   Path operator *(Steps magnitude) => Path(magnitude, this);
 
   Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
@@ -566,6 +573,7 @@ class Vector2dOfXY extends Vector2dExpression {
   final DoubleExpression y;
 
   const Vector2dOfXY(this.x, this.y);
+  Vector2dOfXY.constant(double x, double y) : this(Double(x), Double(y));
 
   @override
   Point<double>? known(EventState state) =>

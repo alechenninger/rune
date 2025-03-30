@@ -964,6 +964,12 @@ class Longword extends SizedValue {
     var result = (value * multiplier).truncate();
     return Longword.signed(result);
   }
+
+  Longword operator -() => negative();
+
+  Longword negative() {
+    return Longword.signed(-value);
+  }
 }
 
 enum Size {

@@ -33,6 +33,8 @@ Asm stepObjectToAsm(StepObject step,
   return step.stepPerFrame.withVector(
       memory: memory,
       labeller: labeller,
+      destinationX: d0,
+      destinationY: d1,
       asm: (x, y) => Asm([
             step.object.toA4(memory),
             if (step.onTop) move.b(1.i, 5(a4)),

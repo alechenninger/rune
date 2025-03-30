@@ -946,6 +946,17 @@ PartyArrangement? asmToArrangement(Byte b) {
 }
 
 extension DirectionExpressionAsm on DirectionExpression {
+  /// Generates the ASM to retrieve the direction within some address.
+  ///
+  /// This address is passed to the [asm] callback.
+  ///
+  /// If a direct data register is needed to load the address,
+  /// it is loaded into [destination],
+  /// but this does not mean the callback address is
+  /// _always_ the `destination` (it may be something else).
+  ///
+  /// Adjust [load1] and [load2] to change address registers used
+  /// to avoid conflicts. These may be used in the resulting address.
   Asm withDirection(
       {required Memory memory,
       required Asm Function(Address) asm,
@@ -1445,6 +1456,8 @@ extension Vector2dExpressionAsm on Vector2dExpression {
     required Memory memory,
     required Asm Function(Address x, Address y) asm,
     Labeller? labeller,
+    DirectDataRegister destinationX = d0,
+    DirectDataRegister destinationY = d1,
   }) {
     labeller ??= Labeller();
     // TODO: need variable load addresses in case any of these
@@ -1453,8 +1466,12 @@ extension Vector2dExpressionAsm on Vector2dExpression {
     return switch (this) {
       Vector2dOfXY v =>
         v.withVector(memory: memory, labeller: labeller, asm: asm),
-      PolarVectorExpression p =>
-        p.withVector(memory: memory, labeller: labeller, asm: asm),
+      PolarVectorExpression p => p.withVector(
+          memory: memory,
+          labeller: labeller,
+          destinationX: destinationX,
+          destinationY: destinationY,
+          asm: asm),
     };
   }
 }
@@ -1479,6 +1496,8 @@ extension PolarVectorExpressionAsm on PolarVectorExpression {
     required Memory memory,
     required Asm Function(Address x, Address y) asm,
     Labeller? labeller,
+    DirectDataRegister destinationX = d0,
+    DirectDataRegister destinationY = d1,
   }) {
     if (known(memory) case var p?) {
       return asm(Longword(0x10000).signedMultiply(p.x).i,
@@ -1488,26 +1507,39 @@ extension PolarVectorExpressionAsm on PolarVectorExpression {
     labeller ??= Labeller();
     return position.withVector(
         memory: memory,
+        labeller: labeller,
+        destinationX: destinationX,
+        destinationY: destinationY,
         asm: (x, y) {
           var keep = labeller!.withContext('keep').nextLocal();
           var xMove = labeller.withContext('xmove').nextLocal();
           return Asm([
-            if (x != d0) move.l(x, d0),
-            if (y != d1) move.l(y, d1),
-            move.b(facing_dir(a4), d2),
-            btst(3.i, d2),
-            bne.s(xMove),
-            moveq(0.i, d0),
-            cmpi.b(FacingDir_Down.i, d2),
-            beq.s(keep),
-            neg.l(d1),
-            bra.s(keep),
-            label(xMove),
-            moveq(0.i, d1),
-            cmpi.b(FacingDir_Right.i, d2),
-            beq.s(keep),
-            neg.l(d0),
-            label(keep),
+            if (x is! Immediate && x != destinationX) move.l(x, destinationX),
+            if (y is! Immediate && y != destinationY) move.l(y, destinationY),
+            direction.withDirection(
+                memory: memory,
+                destination: d2,
+                labelSuffix: labeller.suffixLocal(),
+                // We don't care about conflicting loads here,
+                // because the facing value is only used for this computation.
+                asm: (d) => Asm([
+                      btst(3.i, d),
+                      bne.s(xMove),
+                      moveq(0.i, destinationX),
+                      if (y is Immediate) move.l(y, destinationY),
+                      cmpi.b(FacingDir_Down.i, d),
+                      beq.s(keep),
+                      neg.l(destinationY),
+                      bra.s(keep),
+                      label(xMove),
+                      if (x is Immediate) move.l(x, destinationX),
+                      moveq(0.i, destinationY),
+                      cmpi.b(FacingDir_Right.i, d),
+                      beq.s(keep),
+                      neg.l(destinationX),
+                      label(keep),
+                      asm(destinationX, destinationY),
+                    ]))
           ]);
         });
   }
