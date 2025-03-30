@@ -24,7 +24,7 @@ class StepObject extends Event {
   final bool animate;
 
   /// Relative movement per frame in pixels.
-  final Point<double> stepPerFrame;
+  final Vector2dExpression stepPerFrame;
 
   /// How many frames should the movement last. > 0.
   final int frames;
@@ -34,6 +34,16 @@ class StepObject extends Event {
       this.animate = true,
       required this.stepPerFrame,
       required this.frames}) {
+    checkArgument(frames > 0, message: 'Frames must be greater than 0.');
+  }
+
+  StepObject.constantStep(this.object,
+      {this.onTop = false,
+      this.animate = true,
+      required Point<double> stepPerFrame,
+      required this.frames})
+      : stepPerFrame =
+            Vector2dOfXY(Double(stepPerFrame.x), Double(stepPerFrame.y)) {
     checkArgument(frames > 0, message: 'Frames must be greater than 0.');
   }
 
@@ -95,6 +105,19 @@ class StepObjects extends Event {
       this.animate = true,
       required this.stepPerFrame,
       required this.frames}) {
+    checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
+    checkArgument(frames > 0, message: 'Frames must be greater than 0.');
+  }
+
+  StepObjects.constantStep(this.objects,
+      {this.onTop = false,
+      this.animate = true,
+      // required Point<double> stepPerFrame,
+      required this.stepPerFrame,
+      required this.frames})
+  /* : stepPerFrame =
+            Vector2dOfXY(Double(stepPerFrame.x), Double(stepPerFrame.y)) */
+  {
     checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
     checkArgument(frames > 0, message: 'Frames must be greater than 0.');
   }
@@ -182,15 +205,19 @@ class ShutterObjects extends Event {
   }
 
   _addEventsWithPause(List events, Duration pause) {
-    events.add(StepObjects(objects, stepPerFrame: start.step, frames: 1));
+    events.add(
+        StepObjects.constantStep(objects, stepPerFrame: start.step, frames: 1));
     events.add(Pause(pause));
-    events.add(StepObjects(objects, stepPerFrame: start.step * -1, frames: 1));
+    events.add(StepObjects.constantStep(objects,
+        stepPerFrame: start.step * -1, frames: 1));
     events.add(Pause(pause));
   }
 
   _addEventsWithoutPause(List events) {
-    events.add(StepObjects(objects, stepPerFrame: start.step, frames: 1));
-    events.add(StepObjects(objects, stepPerFrame: start.step * -1, frames: 1));
+    events.add(
+        StepObjects.constantStep(objects, stepPerFrame: start.step, frames: 1));
+    events.add(StepObjects.constantStep(objects,
+        stepPerFrame: start.step * -1, frames: 1));
   }
 
   @override
@@ -269,9 +296,9 @@ class JumpObject extends Event {
     var down = Point<double>(xPerFrame, (height + yMovement) / framesDown);
     var up = Point<double>(xPerFrame, -height / framesUp);
     return [
-      StepObjects(objects,
+      StepObjects.constantStep(objects,
           stepPerFrame: up, frames: framesUp, onTop: true, animate: animate),
-      StepObjects(objects,
+      StepObjects.constantStep(objects,
           stepPerFrame: down, frames: framesDown, onTop: true, animate: animate)
     ];
   }

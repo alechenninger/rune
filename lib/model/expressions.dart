@@ -17,6 +17,35 @@ sealed class UnaryExpression extends ModelExpression {
   final arity = 1;
 }
 
+sealed class DoubleExpression extends UnaryExpression {
+  const DoubleExpression();
+  double? known(EventState state);
+}
+
+class Double extends DoubleExpression {
+  final double value;
+
+  const Double(this.value);
+
+  @override
+  double? known(EventState state) => value;
+
+  @override
+  String toString() {
+    return 'Double{$value}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Double &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+
+  @override
+  int get hashCode => value.hashCode;
+}
+
 sealed class BinaryExpression extends ModelExpression {
   @override
   final arity = 2;
@@ -516,6 +545,81 @@ enum Direction implements DirectionExpression {
   Path operator *(Steps magnitude) => Path(magnitude, this);
 
   Axis get axis => normal.x == 0 ? Axis.y : Axis.x;
+}
+
+/// An expression which evaluates to signed longword x, y coordinates
+/// in fractional pixels.
+///
+/// A value of 0x10000 is equal to single pixel.
+/// (1 in the higher order word).
+/// Compare to a value of 0x1 in a [PositionExpression],
+/// which is equal to 0x100000 (16 pixels) in a `Vector2dExpression`.
+/// (0x10 in the higher order word).
+sealed class Vector2dExpression extends BinaryExpression {
+  const Vector2dExpression();
+  Point<double>? known(EventState state);
+}
+
+/// A constant 2D vector (in doubles).
+class Vector2dOfXY extends Vector2dExpression {
+  final DoubleExpression x;
+  final DoubleExpression y;
+
+  const Vector2dOfXY(this.x, this.y);
+
+  @override
+  Point<double>? known(EventState state) =>
+      switch ((x.known(state), y.known(state))) {
+        (var x?, var y?) => Point(x, y),
+        _ => null,
+      };
+
+  @override
+  String toString() {
+    return 'Vector2d{x: $x, y: $y}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Vector2dOfXY &&
+          runtimeType == other.runtimeType &&
+          x == other.x &&
+          y == other.y;
+
+  @override
+  int get hashCode => x.hashCode ^ y.hashCode;
+}
+
+class PolarVectorExpression extends Vector2dExpression {
+  final Vector2dExpression position;
+  final DirectionExpression direction;
+
+  PolarVectorExpression(this.position, this.direction);
+
+  @override
+  Point<double>? known(EventState state) {
+    var p = position.known(state);
+    var d = direction.known(state);
+    if (p == null || d == null) return null;
+    return Point((p.x * d.normal.x).toDouble(), (p.y * d.normal.y).toDouble());
+  }
+
+  @override
+  String toString() {
+    return 'PolarVectorExpression{position: $position, direction: $direction}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PolarVectorExpression &&
+          runtimeType == other.runtimeType &&
+          position == other.position &&
+          direction == other.direction;
+
+  @override
+  int get hashCode => position.hashCode ^ direction.hashCode;
 }
 
 /// An expression which evaluates to a character slot index (or null).

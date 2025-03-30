@@ -95,12 +95,12 @@ void main() {
       var jump = JumpObject(alys, duration: 1.second, height: 10);
 
       expect(jump.toSteps(), [
-        StepObjects([alys],
+        StepObjects.constantStep([alys],
             onTop: true,
             animate: false,
             frames: 0.5.seconds.toFrames(),
             stepPerFrame: Point(0, -10 / 0.5.seconds.toFrames())),
-        StepObjects([alys],
+        StepObjects.constantStep([alys],
             onTop: true,
             animate: false,
             frames: 0.5.second.toFrames(),
@@ -113,12 +113,12 @@ void main() {
           JumpObject(alys, duration: 1.second, height: 10, xMovement: -16);
 
       expect(jump.toSteps(), [
-        StepObjects([alys],
+        StepObjects.constantStep([alys],
             onTop: true,
             animate: false,
             frames: 0.5.seconds.toFrames(),
             stepPerFrame: Point(-8 / 30, -10 / 30)),
-        StepObjects([alys],
+        StepObjects.constantStep([alys],
             onTop: true,
             animate: false,
             frames: 0.5.second.toFrames(),
@@ -1065,16 +1065,16 @@ void main() {
           duration: 1.second, times: 2);
       var pause = Pause(((60 - 2) / 2).truncate().framesToDuration());
       expect(shutter.toEvents(), [
-        StepObjects([MapObjectById.of('test')],
+        StepObjects.constantStep([MapObjectById.of('test')],
             animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, 1)),
         pause,
-        StepObjects([MapObjectById.of('test')],
+        StepObjects.constantStep([MapObjectById.of('test')],
             animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, -1)),
         pause,
-        StepObjects([MapObjectById.of('test')],
+        StepObjects.constantStep([MapObjectById.of('test')],
             animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, 1)),
         pause,
-        StepObjects([MapObjectById.of('test')],
+        StepObjects.constantStep([MapObjectById.of('test')],
             animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, -1)),
         pause,
       ]);
@@ -1085,16 +1085,16 @@ void main() {
           duration: 1.second, times: 2, start: ShutterStart.up);
       var pause = Pause(((60 - 2) / 2).truncate().framesToDuration());
       expect(shutter.toEvents(), [
-        StepObjects([MapObjectById.of('test')],
+        StepObjects.constantStep([MapObjectById.of('test')],
             animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, -1)),
         pause,
-        StepObjects([MapObjectById.of('test')],
+        StepObjects.constantStep([MapObjectById.of('test')],
             animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, 1)),
         pause,
-        StepObjects([MapObjectById.of('test')],
+        StepObjects.constantStep([MapObjectById.of('test')],
             animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, -1)),
         pause,
-        StepObjects([MapObjectById.of('test')],
+        StepObjects.constantStep([MapObjectById.of('test')],
             animate: true, onTop: false, frames: 1, stepPerFrame: Point(0, 1)),
         pause,
       ]);

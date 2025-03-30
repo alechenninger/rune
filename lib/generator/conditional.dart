@@ -156,8 +156,10 @@ extension IfValueAsm on IfValue {
             loadX: d2,
             loadY: d3,
             asm: compareTo);
-      case DirectionExpression d:
-        throw 'todo';
+      case DirectionExpression():
+      case DoubleExpression():
+      case Vector2dExpression():
+        throw 'todo: compare($operand2)';
     }
   }
 }
@@ -222,10 +224,11 @@ Asm Function(Address src, [Address? src2]) _compare(
                   branches.branchIfNotEqual(),
                   _cmp(y1, y2, Size.w),
                 ])));
-      case DirectionExpression d:
-        throw 'todo';
+      case DirectionExpression():
       case OffsetPositionComponent():
-        throw 'todo';
+      case DoubleExpression():
+      case Vector2dExpression():
+        throw 'todo: _compare($operand1)';
     }
 
     return asm;

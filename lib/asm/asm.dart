@@ -18,6 +18,7 @@ export 'data.dart';
 export 'objects.dart';
 export 'jump_table.dart';
 export 'array.dart';
+// cannot export events.dart - massive conflicts
 
 /// Data constant
 const DcMnemonic dc = DcMnemonic();
@@ -94,7 +95,8 @@ Asm moveq(Address src, Address dst) => cmd('moveq', [src, dst]);
 /// as otherwise 128 would be sign extended to -128.
 Asm unsignedMoveL(Address src, Address dst) {
   if (src is Immediate && src.value <= 127) {
-    return moveq(src, dst);
+    // Size as byte because of moveq's limitations
+    return moveq(src.value.i, dst);
   }
   return move.l(src, dst);
 }

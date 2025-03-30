@@ -1439,3 +1439,88 @@ extension OffsetPositionComponentAsm on OffsetPositionComponent {
         });
   }
 }
+
+extension Vector2dExpressionAsm on Vector2dExpression {
+  Asm withVector({
+    required Memory memory,
+    required Asm Function(Address x, Address y) asm,
+    Labeller? labeller,
+  }) {
+    labeller ??= Labeller();
+    // TODO: need variable load addresses in case any of these
+    // become based on memory, because, for example,
+    // we may need to keep a4 clear.
+    return switch (this) {
+      Vector2dOfXY v =>
+        v.withVector(memory: memory, labeller: labeller, asm: asm),
+      PolarVectorExpression p =>
+        p.withVector(memory: memory, labeller: labeller, asm: asm),
+    };
+  }
+}
+
+extension Vector2dOfXYAsm on Vector2dOfXY {
+  Asm withVector({
+    required Memory memory,
+    required Asm Function(Address x, Address y) asm,
+    Labeller? labeller,
+  }) {
+    labeller ??= Labeller();
+    return x.withValue(
+        memory: memory,
+        labeller: labeller,
+        asm: (x) => y.withValue(
+            memory: memory, labeller: labeller, asm: (y) => asm(x, y)));
+  }
+}
+
+extension PolarVectorExpressionAsm on PolarVectorExpression {
+  Asm withVector({
+    required Memory memory,
+    required Asm Function(Address x, Address y) asm,
+    Labeller? labeller,
+  }) {
+    if (known(memory) case var p?) {
+      return asm(Longword(0x10000).signedMultiply(p.x).i,
+          Longword(0x10000).signedMultiply(p.y).i);
+    }
+
+    labeller ??= Labeller();
+    return position.withVector(
+        memory: memory,
+        asm: (x, y) {
+          var keep = labeller!.withContext('keep').nextLocal();
+          var xMove = labeller.withContext('xmove').nextLocal();
+          return Asm([
+            if (x != d0) move.l(x, d0),
+            if (y != d1) move.l(y, d1),
+            move.b(facing_dir(a4), d2),
+            btst(3.i, d2),
+            bne.s(xMove),
+            moveq(0.i, d0),
+            cmpi.b(FacingDir_Down.i, d2),
+            beq.s(keep),
+            neg.l(d1),
+            bra.s(keep),
+            label(xMove),
+            moveq(0.i, d1),
+            cmpi.b(FacingDir_Right.i, d2),
+            beq.s(keep),
+            neg.l(d0),
+            label(keep),
+          ]);
+        });
+  }
+}
+
+extension DoubleExpresionAsm on DoubleExpression {
+  Asm withValue({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    Labeller? labeller,
+  }) {
+    return switch (this) {
+      Double d => asm(Longword(0x10000).signedMultiply(d.value).i),
+    };
+  }
+}

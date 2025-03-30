@@ -738,8 +738,9 @@ EventFlag_Test001 = $0001'''));
 
   group('step object', () {
     test('with fractional negative step', () {
-      var scene =
-          Scene([StepObject(alys, stepPerFrame: Point(0, -0.5), frames: 7)]);
+      var scene = Scene([
+        StepObject.constantStep(alys, stepPerFrame: Point(0, -0.5), frames: 7)
+      ]);
 
       var program = Program();
       var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
@@ -748,7 +749,7 @@ EventFlag_Test001 = $0001'''));
           asm.event.withoutComments(),
           Asm([
             alys.toA4(Memory()),
-            moveq(0.toByte.i, d0),
+            moveq(0.i, d0),
             move.l(0xffff8000.toLongword.i, d1),
             moveq(6.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
@@ -758,8 +759,9 @@ EventFlag_Test001 = $0001'''));
     });
 
     test('with fractional step', () {
-      var scene =
-          Scene([StepObject(alys, stepPerFrame: Point(0, 0.5), frames: 7)]);
+      var scene = Scene([
+        StepObject.constantStep(alys, stepPerFrame: Point(0, 0.5), frames: 7)
+      ]);
 
       var program = Program();
       var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
@@ -768,7 +770,7 @@ EventFlag_Test001 = $0001'''));
           asm.event.withoutComments(),
           Asm([
             alys.toA4(Memory()),
-            moveq(0.toByte.i, d0),
+            moveq(0.i, d0),
             move.l(0x00008000.toLongword.i, d1),
             moveq(6.toByte.i, d2),
             jsr(Label('Event_StepObject').l),
@@ -778,8 +780,9 @@ EventFlag_Test001 = $0001'''));
     });
 
     test('with integer step 2 directions', () {
-      var scene =
-          Scene([StepObject(alys, stepPerFrame: Point(1, 1), frames: 7)]);
+      var scene = Scene([
+        StepObject.constantStep(alys, stepPerFrame: Point(1, 1), frames: 7)
+      ]);
 
       var program = Program();
       var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
@@ -800,7 +803,8 @@ EventFlag_Test001 = $0001'''));
     test('sets new position of object if known', () {
       var scene = Scene([
         SetContext((ctx) => ctx.positions[shay] = Position(0x100, 0x100)),
-        StepObject(shay, stepPerFrame: Point(0x1, 0), frames: 0x10),
+        StepObject.constantStep(shay,
+            stepPerFrame: Point(0x1, 0), frames: 0x10),
         // Shay should now be at 0x110, 0x100
         IndividualMoves()
           ..moves[shay] = (StepPath()
@@ -817,7 +821,8 @@ EventFlag_Test001 = $0001'''));
 
     test('does not set position for object if not known', () {
       var scene = Scene([
-        StepObject(alys, stepPerFrame: Point(0x1, 0), frames: 0x10),
+        StepObject.constantStep(alys,
+            stepPerFrame: Point(0x1, 0), frames: 0x10),
         IndividualMoves()
           ..moves[alys] = (StepPath()
             ..distance = 1.step

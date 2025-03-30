@@ -28,6 +28,7 @@ import 'package:quiver/check.dart';
 import 'package:quiver/collection.dart';
 import 'package:quiver/iterables.dart' show concat;
 import 'package:rune/generator/guild.dart';
+import 'package:rune/generator/step_object.dart';
 import 'package:rune/src/logging.dart';
 
 import '../asm/asm.dart';
@@ -1076,51 +1077,8 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void stepObject(StepObject step) {
     _addToEvent(step, (i) {
-      /// Current x and y positions in memory are stored
-      /// as a longword with fractional component.
-      /// The higher order word is the position,
-      /// but the lower order word can be used as a fractional part.
-      /// This allows moving a pixel to take longer than one frame
-      /// in the step objects loop,
-      /// since the pixel is only read from the higher order word.
-      /// This converts the double x and y positions
-      /// to their longword counterparts.
-      var x = (step.stepPerFrame.x * (1 << 4 * 4)).truncate();
-      var y = (step.stepPerFrame.y * (1 << 4 * 4)).truncate();
-
-      var current = _memory.positions[step.object];
-      if (current != null) {
-        var totalSteps = (step.stepPerFrame * step.frames).truncate();
-        _memory.positions[step.object] =
-            current + Position.fromPoint(totalSteps);
-      }
-
-      // Step will always execute at least once.
-      var additionalFrames = step.frames - 1;
-
-      return Asm([
-        step.object.toA4(_memory),
-        if (step.onTop) move.b(1.i, 5(a4)),
-        if (Size.b.fitsSigned(x))
-          moveq(x.toSignedByte.i, d0)
-        else
-          move.l(x.toSignedLongword.i, d0),
-        if (Size.b.fitsSigned(y))
-          moveq(y.toSignedByte.i, d1)
-        else
-          move.l(y.toSignedLongword.i, d1),
-        if (additionalFrames <= 127)
-          moveq(additionalFrames.toByte.i, d2)
-        else
-          move.w(additionalFrames.toWord.i, d2),
-        if (step.animate)
-          jsr(Label('Event_StepObject').l)
-        else
-          jsr(Label('Event_StepObjectNoAnimate').l),
-        if (step.onTop) clr.b(5(a4)),
-        move.w(curr_x_pos(a4), dest_x_pos(a4)),
-        move.w(curr_y_pos(a4), dest_y_pos(a4)),
-      ]);
+      return stepObjectToAsm(step,
+          memory: _memory, labeller: _labeller.withContext(i));
     });
   }
 
@@ -1128,7 +1086,8 @@ class SceneAsmGenerator implements EventVisitor {
   void stepObjects(StepObjects step) {
     if (step.objects.length == 1) {
       return stepObject(StepObject(step.objects.single,
-          stepPerFrame: step.stepPerFrame,
+          stepPerFrame: Vector2dOfXY(
+              Double(step.stepPerFrame.x), Double(step.stepPerFrame.y)),
           frames: step.frames,
           onTop: step.onTop,
           animate: step.animate));

@@ -414,7 +414,11 @@ class UnknownExpression extends Expression {
 class Value extends Expression implements Comparable<Value> {
   final int value;
 
-  const Value(this.value) : super.constant();
+  Value(this.value) : super.constant() {
+    if (value < 0) {
+      throw ArgumentError.value(value, 'value', 'must be >= 0');
+    }
+  }
 
   const Value.constant(this.value) : super.constant();
   const Value.boolean(bool bool)
@@ -732,6 +736,10 @@ abstract class SizedValue extends Value implements Sized {
   }
 
   static int _negativeToSigned(int value, Size size) {
+    if (!size.fitsSigned(value)) {
+      throw AsmError(value, 'value too large for signed ${size.bytes} bytes');
+    }
+
     if (value < 0) {
       return size.maxValue + value + 1;
     }
@@ -950,6 +958,11 @@ class Longword extends SizedValue {
       return Longword(value + other.value);
     }
     return super + other;
+  }
+
+  Longword signedMultiply(double multiplier) {
+    var result = (value * multiplier).truncate();
+    return Longword.signed(result);
   }
 }
 
