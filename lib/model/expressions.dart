@@ -359,8 +359,8 @@ sealed class DirectionExpression extends UnaryExpression {
   DirectionExpression get opposite;
   DirectionExpression turn(int times) => OffsetDirection(this, turns: times);
 
-  PolarVectorExpression multiplyVector(Vector2dExpression vector) =>
-      PolarVectorExpression(vector, this);
+  Vector2dProjectionExpression multiplyVector(Vector2dExpression vector) =>
+      Vector2dProjectionExpression(vector, this);
 }
 
 class DirectionOfVector extends DirectionExpression {
@@ -546,8 +546,8 @@ enum Direction implements DirectionExpression {
       };
 
   @override
-  PolarVectorExpression multiplyVector(Vector2dExpression vector) =>
-      PolarVectorExpression(vector, this);
+  Vector2dProjectionExpression multiplyVector(Vector2dExpression vector) =>
+      Vector2dProjectionExpression(vector, this);
 
   Path operator *(Steps magnitude) => Path(magnitude, this);
 
@@ -584,7 +584,7 @@ class Vector2dOfXY extends Vector2dExpression {
 
   @override
   String toString() {
-    return 'Vector2d{x: $x, y: $y}';
+    return 'Vector2dOfXY{$x, $y}';
   }
 
   @override
@@ -599,15 +599,15 @@ class Vector2dOfXY extends Vector2dExpression {
   int get hashCode => x.hashCode ^ y.hashCode;
 }
 
-class PolarVectorExpression extends Vector2dExpression {
-  final Vector2dExpression position;
+class Vector2dProjectionExpression extends Vector2dExpression {
+  final Vector2dExpression vector;
   final DirectionExpression direction;
 
-  PolarVectorExpression(this.position, this.direction);
+  Vector2dProjectionExpression(this.vector, this.direction);
 
   @override
   Point<double>? known(EventState state) {
-    var p = position.known(state);
+    var p = vector.known(state);
     var d = direction.known(state);
     if (p == null || d == null) return null;
     return Point((p.x * d.normal.x).toDouble(), (p.y * d.normal.y).toDouble());
@@ -615,19 +615,19 @@ class PolarVectorExpression extends Vector2dExpression {
 
   @override
   String toString() {
-    return 'PolarVectorExpression{position: $position, direction: $direction}';
+    return 'Vector2dProjectionExpression{position: $vector, direction: $direction}';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PolarVectorExpression &&
+      other is Vector2dProjectionExpression &&
           runtimeType == other.runtimeType &&
-          position == other.position &&
+          vector == other.vector &&
           direction == other.direction;
 
   @override
-  int get hashCode => position.hashCode ^ direction.hashCode;
+  int get hashCode => vector.hashCode ^ direction.hashCode;
 }
 
 /// An expression which evaluates to a character slot index (or null).

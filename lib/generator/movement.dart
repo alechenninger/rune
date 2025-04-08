@@ -1466,7 +1466,7 @@ extension Vector2dExpressionAsm on Vector2dExpression {
     return switch (this) {
       Vector2dOfXY v =>
         v.withVector(memory: memory, labeller: labeller, asm: asm),
-      PolarVectorExpression p => p.withVector(
+      Vector2dProjectionExpression p => p.withVector(
           memory: memory,
           labeller: labeller,
           destinationX: destinationX,
@@ -1491,7 +1491,7 @@ extension Vector2dOfXYAsm on Vector2dOfXY {
   }
 }
 
-extension PolarVectorExpressionAsm on PolarVectorExpression {
+extension Vector2dProjectionExpressionAsm on Vector2dProjectionExpression {
   Asm withVector({
     required Memory memory,
     required Asm Function(Address x, Address y) asm,
@@ -1505,7 +1505,11 @@ extension PolarVectorExpressionAsm on PolarVectorExpression {
     }
 
     labeller ??= Labeller();
-    return position.withVector(
+
+    // Implements a simple projection where the second vector
+    // is only a simple cardinal direction unit vector.
+    // This could be generalized to any two vectors but would be complicated.
+    return vector.withVector(
         memory: memory,
         labeller: labeller,
         destinationX: destinationX,

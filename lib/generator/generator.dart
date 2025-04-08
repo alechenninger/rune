@@ -1084,84 +1084,10 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void stepObjects(StepObjects step) {
-    if (step.objects.length == 1) {
-      return stepObject(StepObject(step.objects.single,
-          stepPerFrame: Vector2dOfXY(
-              Double(step.stepPerFrame.x), Double(step.stepPerFrame.y)),
-          frames: step.frames,
-          onTop: step.onTop,
-          animate: step.animate));
-    }
-
-    _addToEvent(step, (eventIndex) {
-      var x = (step.stepPerFrame.x * (1 << 4 * 4)).truncate();
-      var y = (step.stepPerFrame.y * (1 << 4 * 4)).truncate();
-
-      // Step will always execute at least once.
-      var additionalFrames = step.frames - 1;
-
-      var loop = Label('.stepObjectsLoop_$eventIndex');
-      _eventAsm.add(Asm([
-        if (additionalFrames <= 127)
-          moveq(additionalFrames.toByte.i, d2)
-        else
-          move.w(additionalFrames.toWord.i, d2),
-        label(loop)
-      ]));
-
-      // Adjust each object for each loop iteration (frame)
-      for (var obj in step.objects) {
-        _eventAsm.add(Asm([
-          // Force due to loop
-          obj.toA4(_memory, force: true),
-          if (step.onTop) move.b(1.i, 5(a4)),
-          if (Size.b.fitsSigned(x))
-            moveq(x.toSignedByte.i, d0)
-          else
-            move.l(x.toSignedLongword.i, d0),
-          if (Size.b.fitsSigned(y))
-            moveq(y.toSignedByte.i, d1)
-          else
-            move.l(y.toSignedLongword.i, d1),
-          if (step.animate)
-            jsr(Label('Event_StepObjectNoWait'))
-          else
-            jsr(Label('Event_StepObjectNoWaitNoAnimate').l),
-        ]));
-      }
-
-      // Now update sprites, wait for vint, and loop
-      _eventAsm.add(Asm([
-        movem.l(d2 / a4, -(sp)),
-        jsr(Label('Field_LoadSprites').l),
-        jsr(Label('Field_BuildSprites').l),
-        jsr(Label('AnimateTiles').l),
-        jsr(Label('RunMapUpdates').l),
-        jsr(Label('VInt_Prepare').l),
-        movem.l(sp.postIncrement(), d2 / a4),
-        dbf(d2, loop),
-      ]));
-
-      // Now reset all step constants and update memory
-      for (var obj in step.objects.reversed) {
-        _eventAsm.add(Asm([
-          obj.toA4(_memory),
-          moveq(0.i, d0),
-          if (x != 0) move.l(d0, x_step_constant(a4)),
-          if (y != 0) move.l(d0, y_step_constant(a4)),
-          // Set destination to current position.
-          // This is needed if routine will move to destination.
-          // If not set in that case, the object will move the next time
-          // the field object routine is run.
-          setDestination(x: curr_x_pos(a4), y: curr_y_pos(a4)),
-        ]));
-
-        if (_memory.positions[obj] case var current?) {
-          var totalSteps = (step.stepPerFrame * step.frames).truncate();
-          _memory.positions[obj] = current + Position.fromPoint(totalSteps);
-        }
-      }
-    });
+    _addToEvent(
+        step,
+        (i) => stepObjectsToAsm(step,
+            memory: _memory, labeller: _labeller.withContext(i)));
   }
 
   @override

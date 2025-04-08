@@ -95,7 +95,7 @@ class StepObjects extends Event {
   final bool animate;
 
   /// Relative movement per frame in pixels.
-  final Point<double> stepPerFrame;
+  final Vector2dExpression stepPerFrame;
 
   /// How many frames should the movement last. > 0.
   final int frames;
@@ -112,12 +112,10 @@ class StepObjects extends Event {
   StepObjects.constantStep(this.objects,
       {this.onTop = false,
       this.animate = true,
-      // required Point<double> stepPerFrame,
-      required this.stepPerFrame,
+      required Point<double> stepPerFrame,
       required this.frames})
-  /* : stepPerFrame =
-            Vector2dOfXY(Double(stepPerFrame.x), Double(stepPerFrame.y)) */
-  {
+      : stepPerFrame =
+            Vector2dOfXY(Double(stepPerFrame.x), Double(stepPerFrame.y)) {
     checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
     checkArgument(frames > 0, message: 'Frames must be greater than 0.');
   }
