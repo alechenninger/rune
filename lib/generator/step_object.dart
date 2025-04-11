@@ -133,7 +133,7 @@ Asm stepObjectsToAsm(StepObjects step,
       if (step.animate)
         jsr(Label('Event_StepObjectNoWait').l)
       else
-        jsr(Label('Event_StepObjectNoWaitAnimate').l),
+        jsr(Label('Event_StepObjectNoWaitNoAnimate').l),
       // Loop to next char...
     ]));
   }
