@@ -945,7 +945,7 @@ PartyArrangement? asmToArrangement(Byte b) {
   };
 }
 
-extension DirectionExpressionAsm on DirectionExpression {
+extension DirectionExpressionToAsm on DirectionExpression {
   /// Generates the ASM to retrieve the direction within some address.
   ///
   /// This address is passed to the [asm] callback.
@@ -957,50 +957,85 @@ extension DirectionExpressionAsm on DirectionExpression {
   ///
   /// Adjust [load1] and [load2] to change address registers used
   /// to avoid conflicts. These may be used in the resulting address.
-  Asm withDirection(
-      {required Memory memory,
-      required Asm Function(Address) asm,
-      Address destination = d0,
-      DirectAddressRegister load1 = a4,
-      DirectAddressRegister load2 = a3,
-      String? labelSuffix}) {
-    return switch (this) {
-      Direction d => asm(d.address),
-      DirectionOfVector d => d.withDirection(
-          labelSuffix: labelSuffix,
-          memory: memory,
-          asm: asm,
-          destination: destination,
-          load1: load1,
-          load2: load2,
-        ),
-      ObjectFaceDirection d =>
-        d.withDirection(memory: memory, asm: asm, load: load1),
-      OffsetDirection d => d.withDirection(
-          memory: memory,
-          asm: asm,
-          destination: destination,
-          load1: load1,
-          load2: load2,
-          labelSuffix: labelSuffix),
-    };
+  Asm withDirection({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    Address destination = d0,
+    DirectAddressRegister load1 = a4,
+    DirectAddressRegister load2 = a3,
+    String? labelSuffix,
+  }) {
+    return DirectionExpressionAsm.from(this).withDirection(
+        memory: memory,
+        asm: asm,
+        destination: destination,
+        load1: load1,
+        load2: load2,
+        labelSuffix: labelSuffix);
   }
 }
 
-extension DirectionOfVectorAsm on DirectionOfVector {
-  Asm withDirection(
-      {required Memory memory,
-      required Asm Function(Address) asm,
-      Address destination = d0,
-      DirectAddressRegister load1 = a4,
-      DirectAddressRegister load2 = a3,
-      String? labelSuffix}) {
-    var known = this.known(memory);
+abstract class DirectionExpressionAsm {
+  final DirectionExpression expression;
+
+  DirectionExpressionAsm(this.expression);
+
+  factory DirectionExpressionAsm.from(DirectionExpression expression) {
+    return switch (expression) {
+      Direction d => DirectionAsm(d),
+      DirectionOfVector d => DirectionOfVectorAsm(d),
+      ObjectFaceDirection d => ObjectFaceDirectionAsm(d),
+      OffsetDirection d => OffsetDirectionAsm(d),
+    };
+  }
+
+  Asm withDirection({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    Address destination = d0,
+    DirectAddressRegister load1 = a4,
+    DirectAddressRegister load2 = a3,
+    String? labelSuffix,
+  });
+}
+
+class DirectionAsm extends DirectionExpressionAsm {
+  final Direction direction;
+
+  DirectionAsm(this.direction) : super(direction);
+
+  @override
+  Asm withDirection({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    Address destination = d0,
+    DirectAddressRegister load1 = a4,
+    DirectAddressRegister load2 = a3,
+    String? labelSuffix,
+  }) =>
+      asm(direction.address);
+}
+
+class DirectionOfVectorAsm extends DirectionExpressionAsm {
+  final DirectionOfVector directionOfVector;
+
+  DirectionOfVectorAsm(this.directionOfVector) : super(directionOfVector);
+
+  @override
+  Asm withDirection({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    Address destination = d0,
+    DirectAddressRegister load1 = a4,
+    DirectAddressRegister load2 = a3,
+    String? labelSuffix,
+  }) {
+    var known = directionOfVector.known(memory);
     if (known != null) {
       return asm(known.address);
     }
 
-    if (playerIsFacingFrom) {
+    if (directionOfVector.playerIsFacingFrom) {
       return Asm([
         BySlot.one.toA(load1, memory),
         move.w(facing_dir(load1), destination),
@@ -1018,19 +1053,21 @@ extension DirectionOfVectorAsm on DirectionOfVector {
 
     return Asm([
       // Diff x
-      to.withX(memory: memory, asm: (x) => move.w(x, d2), load: load2),
-      from.withX(
+      directionOfVector.to
+          .withX(memory: memory, asm: (x) => move.w(x, d2), load: load2),
+      directionOfVector.from.withX(
           memory: memory,
           asm: (x) => x is Immediate ? subi.w(x, d2) : sub.w(x, d2),
           load: load1),
       // Diff y
-      to.withY(memory: memory, asm: (y) => move.w(y, d3), load: load2),
+      directionOfVector.to
+          .withY(memory: memory, asm: (y) => move.w(y, d3), load: load2),
       // not sure if below comment is still relevant
       // TODO(optimization): could consider allowing a force load of load1
       // even if not needed. this would be an optimization when using
       // updateobjfacing, because we wouldn't need to load later and
       // then have to deal with saving d0 to the stack
-      from.withY(
+      directionOfVector.from.withY(
           memory: memory,
           asm: (y) => y is Immediate ? subi.w(y, d3) : sub.w(y, d3),
           load: load1),
@@ -1077,38 +1114,54 @@ extension DirectionOfVectorAsm on DirectionOfVector {
       destination: addr);
 }
 
-extension ObjectFaceDirectionAsm on ObjectFaceDirection {
-  Asm withDirection(
-          {required Memory memory,
-          required Asm Function(Address) asm,
-          DirectAddressRegister load = a4}) =>
-      Asm([
-        obj.toA(load, memory),
-        asm(facing_dir(load)),
-      ]);
+class ObjectFaceDirectionAsm extends DirectionExpressionAsm {
+  final ObjectFaceDirection objectFaceDirection;
+
+  ObjectFaceDirectionAsm(this.objectFaceDirection) : super(objectFaceDirection);
+
+  @override
+  Asm withDirection({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    Address destination = d0,
+    DirectAddressRegister load1 = a4,
+    DirectAddressRegister load2 = a3,
+    String? labelSuffix,
+  }) {
+    return Asm([
+      objectFaceDirection.obj.toA(load1, memory),
+      asm(facing_dir(load1)),
+    ]);
+  }
 }
 
-extension OffsetDirectionAsm on OffsetDirection {
-  Asm withDirection(
-      {required Memory memory,
-      required Asm Function(Address) asm,
-      Address destination = d0,
-      DirectAddressRegister load1 = a4,
-      DirectAddressRegister load2 = a3,
-      String? labelSuffix}) {
+class OffsetDirectionAsm extends DirectionExpressionAsm {
+  final OffsetDirection offsetDirection;
+
+  OffsetDirectionAsm(this.offsetDirection) : super(offsetDirection);
+
+  @override
+  Asm withDirection({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    Address destination = d0,
+    DirectAddressRegister load1 = a4,
+    DirectAddressRegister load2 = a3,
+    String? labelSuffix,
+  }) {
     return Asm([
-      base.withDirection(
+      offsetDirection.base.withDirection(
         memory: memory,
         destination: destination,
         load1: load1,
         load2: load2,
         labelSuffix: labelSuffix,
-        asm: turns == 0
+        asm: offsetDirection.turns == 0
             ? asm
             : (d) {
                 var skip = Label('.skip${labelSuffix ?? ''}');
                 return Asm([
-                  ...(switch (turns) {
+                  ...(switch (offsetDirection.turns) {
                     1 => [
                         move.w(d, destination),
                         bchg(3.i, destination),
@@ -1137,13 +1190,57 @@ extension OffsetDirectionAsm on OffsetDirection {
   }
 }
 
-// TODO(refactor): separate class hierarchy for asm?
-// this is essentially trying to be polymorphic
-// so it might make sense to convert the model
-// to a parallel class hierarchy for generation
-// rather than use a bunch of extension methods and switch statements
+extension PositionExpressionToAsm on PositionExpression {
+  Asm withPosition(
+      {required Memory memory,
+      required Asm Function(Address x, Address y) asm,
+      DirectDataRegister loadX = d0,
+      DirectDataRegister loadY = d1,
+      DirectAddressRegister load = a4,
+      DirectAddressRegister load2 = a3}) {
+    return PositionExpressionAsm.from(this).withPosition(
+        memory: memory,
+        asm: asm,
+        loadX: loadX,
+        loadY: loadY,
+        load: load,
+        load2: load2);
+  }
 
-extension PositionExpressionAsm on PositionExpression {
+  Asm withX(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectDataRegister loadX = d1,
+      DirectAddressRegister load = a4}) {
+    return PositionExpressionAsm.from(this)
+        .withX(memory: memory, asm: asm, loadX: loadX, load: load);
+  }
+
+  Asm withY(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectDataRegister loadY = d2,
+      DirectAddressRegister load = a4}) {
+    return PositionExpressionAsm.from(this)
+        .withY(memory: memory, asm: asm, loadY: loadY, load: load);
+  }
+}
+
+// Position Expression ASM classes
+abstract class PositionExpressionAsm {
+  final PositionExpression expression;
+
+  PositionExpressionAsm(this.expression);
+
+  factory PositionExpressionAsm.from(PositionExpression expression) {
+    return switch (expression) {
+      Position p => PositionAsm(p),
+      PositionOfObject p => PositionOfObjectAsm(p),
+      PositionOfXY p => PositionOfXYAsm(p),
+      OffsetPosition p => OffsetPositionAsm(p),
+    };
+  }
+
   // TODO: technically position should return longwords,
   //   but we treat as word only
   Asm withPosition(
@@ -1152,159 +1249,27 @@ extension PositionExpressionAsm on PositionExpression {
       DirectDataRegister loadX = d0,
       DirectDataRegister loadY = d1,
       DirectAddressRegister load = a4,
-      DirectAddressRegister load2 = a3}) {
-    return switch (this) {
-      Position p => asm(p.x.toWord.i, p.y.toWord.i),
-      PositionOfObject p =>
-        p.withPosition(memory: memory, asm: asm, load: load),
-      PositionOfXY p =>
-        p.withPosition(memory: memory, asm: asm, loadX: load, loadY: load2),
-      OffsetPosition p => p.withPosition(
-          memory: memory,
-          asm: asm,
-          loadX: loadX,
-          loadY: loadY,
-          load: load,
-          load2: load2),
-    };
-  }
+      DirectAddressRegister load2 = a3});
 
   Asm withX(
       {required Memory memory,
       required Asm Function(Address) asm,
       DirectDataRegister loadX = d1,
-      DirectAddressRegister load = a4}) {
-    return switch (this) {
-      Position p => asm(p.x.toWord.i),
-      PositionOfObject p => p.withX(memory: memory, asm: asm, load: load),
-      PositionOfXY p => p.withX(memory: memory, asm: asm, load: load),
-      OffsetPosition p =>
-        p.withX(memory: memory, asm: asm, loadX: loadX, load: load),
-    };
-  }
+      DirectAddressRegister load = a4});
 
   Asm withY(
       {required Memory memory,
       required Asm Function(Address) asm,
       DirectDataRegister loadY = d2,
-      DirectAddressRegister load = a4}) {
-    return switch (this) {
-      Position p => asm(p.y.toWord.i),
-      PositionOfObject p => p.withY(memory: memory, asm: asm, load: load),
-      PositionOfXY p => p.withY(memory: memory, asm: asm, load: load),
-      OffsetPosition p =>
-        p.withY(memory: memory, asm: asm, loadY: loadY, load: load),
-    };
-  }
+      DirectAddressRegister load = a4});
 }
 
-extension PositionOfObjectAsm on PositionOfObject {
-  Asm loadX(Address to, {required Memory memory}) {
-    return withX(memory: memory, asm: (x) => move.w(x, to));
-  }
+class PositionAsm extends PositionExpressionAsm {
+  final Position position;
 
-  Asm loadY(Address to, {required Memory memory}) {
-    return withY(memory: memory, asm: (y) => move.w(y, to));
-  }
+  PositionAsm(this.position) : super(position);
 
-  Asm withPosition(
-      {required Memory memory,
-      required Asm Function(Address x, Address y) asm,
-      DirectAddressRegister load = a4}) {
-    var position = memory.positions[obj];
-    if (position != null) {
-      return asm(position.x.toWord.i, position.y.toWord.i);
-    }
-
-    load = memory.addressRegisterFor(obj) ?? load;
-
-    // Evaluate at runtime
-    return Asm([
-      obj.toA(load, memory),
-      asm(curr_x_pos(load), curr_y_pos(load)),
-    ]);
-  }
-
-  Asm withX(
-          {required Memory memory,
-          required Asm Function(Address) asm,
-          DirectAddressRegister load = a4}) =>
-      withPosition(memory: memory, asm: (x, _) => asm(x), load: load);
-
-  Asm withY(
-          {required Memory memory,
-          required Asm Function(Address) asm,
-          DirectAddressRegister load = a4}) =>
-      withPosition(memory: memory, asm: (_, y) => asm(y), load: load);
-}
-
-extension PositionOfXYAsm on PositionOfXY {
-  Asm withPosition(
-      {required Memory memory,
-      required Asm Function(Address x, Address y) asm,
-      DirectAddressRegister loadX = a4,
-      DirectAddressRegister loadY = a3}) {
-    return x.withValue(
-        memory: memory,
-        load: loadX,
-        asm: (x) {
-          return y.withValue(
-              memory: memory,
-              load: loadY,
-              asm: (y) {
-                return asm(x, y);
-              });
-        });
-  }
-
-  Asm withX(
-      {required Memory memory,
-      required Asm Function(Address) asm,
-      DirectAddressRegister load = a4}) {
-    return x.withValue(memory: memory, load: load, asm: (x) => asm(x));
-  }
-
-  Asm withY(
-      {required Memory memory,
-      required Asm Function(Address) asm,
-      DirectAddressRegister load = a4}) {
-    return y.withValue(memory: memory, load: load, asm: (y) => asm(y));
-  }
-}
-
-extension PositionComponentExpressionAsm on PositionComponentExpression {
-  Asm withValue(
-      {required Memory memory,
-      required Asm Function(Address c) asm,
-      DirectDataRegister loadVal = d0,
-      DirectAddressRegister load = a4}) {
-    return switch (this) {
-      PositionComponent p => asm(Word(p.value).i),
-      PositionComponentOfObject p =>
-        p.withValue(memory: memory, load: load, asm: asm),
-      OffsetPositionComponent p =>
-        p.withValue(memory: memory, loadVal: loadVal, load: load, asm: asm),
-    };
-  }
-}
-
-extension PositionComponentOfObjectAsm on PositionComponentOfObject {
-  Asm withValue(
-      {required Memory memory,
-      required Asm Function(Address a) asm,
-      DirectAddressRegister load = a4}) {
-    var offset = switch (component) { Axis.x => curr_x_pos, _ => curr_y_pos };
-
-    load = memory.addressRegisterFor(obj) ?? load;
-
-    return Asm([
-      obj.toA(load, memory),
-      asm(offset(load)),
-    ]);
-  }
-}
-
-extension OffsetPositionAsm on OffsetPosition {
+  @override
   Asm withPosition(
       {required Memory memory,
       required Asm Function(Address x, Address y) asm,
@@ -1312,19 +1277,153 @@ extension OffsetPositionAsm on OffsetPosition {
       DirectDataRegister loadY = d1,
       DirectAddressRegister load = a4,
       DirectAddressRegister load2 = a3}) {
-    if (known(memory) case var p?) {
+    return asm(position.x.toWord.i, position.y.toWord.i);
+  }
+
+  @override
+  Asm withX(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectDataRegister loadX = d1,
+      DirectAddressRegister load = a4}) {
+    return asm(position.x.toWord.i);
+  }
+
+  @override
+  Asm withY(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectDataRegister loadY = d2,
+      DirectAddressRegister load = a4}) {
+    return asm(position.y.toWord.i);
+  }
+}
+
+class PositionOfObjectAsm extends PositionExpressionAsm {
+  final PositionOfObject positionOfObject;
+
+  PositionOfObjectAsm(this.positionOfObject) : super(positionOfObject);
+
+  @override
+  Asm withPosition(
+      {required Memory memory,
+      required Asm Function(Address x, Address y) asm,
+      DirectDataRegister loadX = d0,
+      DirectDataRegister loadY = d1,
+      DirectAddressRegister load = a4,
+      DirectAddressRegister load2 = a3}) {
+    var position = memory.positions[positionOfObject.obj];
+    if (position != null) {
+      return asm(position.x.toWord.i, position.y.toWord.i);
+    }
+
+    load = memory.addressRegisterFor(positionOfObject.obj) ?? load;
+
+    // Evaluate at runtime
+    return Asm([
+      positionOfObject.obj.toA(load, memory),
+      asm(curr_x_pos(load), curr_y_pos(load)),
+    ]);
+  }
+
+  @override
+  Asm withX(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectDataRegister loadX = d1,
+      DirectAddressRegister load = a4}) {
+    return withPosition(memory: memory, asm: (x, _) => asm(x), load: load);
+  }
+
+  @override
+  Asm withY(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectDataRegister loadY = d2,
+      DirectAddressRegister load = a4}) {
+    return withPosition(memory: memory, asm: (_, y) => asm(y), load: load);
+  }
+}
+
+class PositionOfXYAsm extends PositionExpressionAsm {
+  final PositionOfXY positionOfXY;
+
+  PositionOfXYAsm(this.positionOfXY) : super(positionOfXY);
+
+  @override
+  Asm withPosition(
+      {required Memory memory,
+      required Asm Function(Address x, Address y) asm,
+      DirectDataRegister loadX = d0,
+      DirectDataRegister loadY = d1,
+      DirectAddressRegister load = a4,
+      DirectAddressRegister load2 = a3}) {
+    return positionOfXY.x.withValue(
+        memory: memory,
+        load: load,
+        asm: (x) {
+          return positionOfXY.y.withValue(
+              memory: memory,
+              load: load2,
+              asm: (y) {
+                return asm(x, y);
+              });
+        });
+  }
+
+  @override
+  Asm withX(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectDataRegister loadX = d1,
+      DirectAddressRegister load = a4}) {
+    return positionOfXY.x
+        .withValue(memory: memory, load: load, asm: (x) => asm(x));
+  }
+
+  @override
+  Asm withY(
+      {required Memory memory,
+      required Asm Function(Address) asm,
+      DirectDataRegister loadY = d2,
+      DirectAddressRegister load = a4}) {
+    return positionOfXY.y
+        .withValue(memory: memory, load: load, asm: (y) => asm(y));
+  }
+}
+
+class OffsetPositionAsm extends PositionExpressionAsm {
+  final OffsetPosition offsetPosition;
+
+  OffsetPositionAsm(this.offsetPosition) : super(offsetPosition);
+
+  @override
+  Asm withPosition(
+      {required Memory memory,
+      required Asm Function(Address x, Address y) asm,
+      DirectDataRegister loadX = d0,
+      DirectDataRegister loadY = d1,
+      DirectAddressRegister load = a4,
+      DirectAddressRegister load2 = a3}) {
+    if (offsetPosition.known(memory) case var p?) {
       return asm(p.x.toWord.i, p.y.toWord.i);
     }
 
-    return base.withPosition(
+    return offsetPosition.base.withPosition(
         memory: memory,
         asm: (x, y) {
           var computation = Asm.empty();
 
-          var xOp =
-              switch (offset.x) { > 0 => addi.w, < 0 => subi.w, _ => null };
-          var yOp =
-              switch (offset.y) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          var xOp = switch (offsetPosition.offset.x) {
+            > 0 => addi.w,
+            < 0 => subi.w,
+            _ => null
+          };
+          var yOp = switch (offsetPosition.offset.y) {
+            > 0 => addi.w,
+            < 0 => subi.w,
+            _ => null
+          };
           Address offsetX = loadX;
           Address offsetY = loadY;
 
@@ -1334,7 +1433,8 @@ extension OffsetPositionAsm on OffsetPosition {
             } else {
               computation.add(move.w(x, offsetX));
             }
-            computation.add(xOp(offset.x.abs().toWord.i, offsetX));
+            computation
+                .add(xOp(offsetPosition.offset.x.abs().toWord.i, offsetX));
           } else {
             offsetX = x;
           }
@@ -1345,7 +1445,8 @@ extension OffsetPositionAsm on OffsetPosition {
             } else {
               computation.add(move.w(y, offsetY));
             }
-            computation.add(yOp(offset.y.abs().toWord.i, offsetY));
+            computation
+                .add(yOp(offsetPosition.offset.y.abs().toWord.i, offsetY));
           } else {
             offsetY = y;
           }
@@ -1356,19 +1457,22 @@ extension OffsetPositionAsm on OffsetPosition {
         load2: load2);
   }
 
+  @override
   Asm withX(
       {required Memory memory,
-      required Asm Function(Address x) asm,
-      DirectDataRegister loadX = d0,
-      DirectAddressRegister load = a4,
-      DirectAddressRegister load2 = a3}) {
-    return base.withX(
+      required Asm Function(Address) asm,
+      DirectDataRegister loadX = d1,
+      DirectAddressRegister load = a4}) {
+    return offsetPosition.base.withX(
         memory: memory,
         asm: (x) {
           var computation = Asm.empty();
 
-          var xOp =
-              switch (offset.x) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          var xOp = switch (offsetPosition.offset.x) {
+            > 0 => addi.w,
+            < 0 => subi.w,
+            _ => null
+          };
           Address offsetX = loadX;
 
           if (xOp != null) {
@@ -1377,7 +1481,8 @@ extension OffsetPositionAsm on OffsetPosition {
             } else {
               computation.add(move.w(x, offsetX));
             }
-            computation.add(xOp(offset.x.abs().toWord.i, offsetX));
+            computation
+                .add(xOp(offsetPosition.offset.x.abs().toWord.i, offsetX));
           } else {
             offsetX = x;
           }
@@ -1387,19 +1492,22 @@ extension OffsetPositionAsm on OffsetPosition {
         load: load);
   }
 
+  @override
   Asm withY(
       {required Memory memory,
-      required Asm Function(Address x) asm,
-      DirectDataRegister loadY = d1,
-      DirectAddressRegister load = a4,
-      DirectAddressRegister load2 = a3}) {
-    return base.withY(
+      required Asm Function(Address) asm,
+      DirectDataRegister loadY = d2,
+      DirectAddressRegister load = a4}) {
+    return offsetPosition.base.withY(
         memory: memory,
         asm: (y) {
           var computation = Asm.empty();
 
-          var yOp =
-              switch (offset.y) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          var yOp = switch (offsetPosition.offset.y) {
+            > 0 => addi.w,
+            < 0 => subi.w,
+            _ => null
+          };
           Address offsetY = loadY;
 
           if (yOp != null) {
@@ -1408,7 +1516,8 @@ extension OffsetPositionAsm on OffsetPosition {
             } else {
               computation.add(move.w(y, offsetY));
             }
-            computation.add(yOp(offset.y.abs().toWord.i, offsetY));
+            computation
+                .add(yOp(offsetPosition.offset.y.abs().toWord.i, offsetY));
           } else {
             offsetY = y;
           }
@@ -1419,20 +1528,108 @@ extension OffsetPositionAsm on OffsetPosition {
   }
 }
 
-extension OffsetPositionComponentAsm on OffsetPositionComponent {
+extension PositionComponentExpressionToAsm on PositionComponentExpression {
   Asm withValue({
     required Memory memory,
     required Asm Function(Address) asm,
     DirectDataRegister loadVal = d0,
     DirectAddressRegister load = a4,
   }) {
-    return base.withValue(
+    return PositionComponentExpressionAsm.from(this)
+        .withValue(memory: memory, asm: asm, loadVal: loadVal, load: load);
+  }
+}
+
+// Position Component Expression ASM classes
+abstract class PositionComponentExpressionAsm {
+  final PositionComponentExpression expression;
+
+  PositionComponentExpressionAsm(this.expression);
+
+  factory PositionComponentExpressionAsm.from(
+      PositionComponentExpression expression) {
+    return switch (expression) {
+      PositionComponent p => PositionComponentAsm(p),
+      PositionComponentOfObject p => PositionComponentOfObjectAsm(p),
+      OffsetPositionComponent p => OffsetPositionComponentAsm(p),
+    };
+  }
+
+  Asm withValue({
+    required Memory memory,
+    required Asm Function(Address c) asm,
+    DirectDataRegister loadVal = d0,
+    DirectAddressRegister load = a4,
+  });
+}
+
+class PositionComponentAsm extends PositionComponentExpressionAsm {
+  final PositionComponent positionComponent;
+
+  PositionComponentAsm(this.positionComponent) : super(positionComponent);
+
+  @override
+  Asm withValue({
+    required Memory memory,
+    required Asm Function(Address c) asm,
+    DirectDataRegister loadVal = d0,
+    DirectAddressRegister load = a4,
+  }) {
+    return asm(Word(positionComponent.value).i);
+  }
+}
+
+class PositionComponentOfObjectAsm extends PositionComponentExpressionAsm {
+  final PositionComponentOfObject positionComponentOfObject;
+
+  PositionComponentOfObjectAsm(this.positionComponentOfObject)
+      : super(positionComponentOfObject);
+
+  @override
+  Asm withValue({
+    required Memory memory,
+    required Asm Function(Address a) asm,
+    DirectDataRegister loadVal = d0,
+    DirectAddressRegister load = a4,
+  }) {
+    var offset = switch (positionComponentOfObject.component) {
+      Axis.x => curr_x_pos,
+      _ => curr_y_pos
+    };
+
+    load = memory.addressRegisterFor(positionComponentOfObject.obj) ?? load;
+
+    return Asm([
+      positionComponentOfObject.obj.toA(load, memory),
+      asm(offset(load)),
+    ]);
+  }
+}
+
+class OffsetPositionComponentAsm extends PositionComponentExpressionAsm {
+  final OffsetPositionComponent offsetPositionComponent;
+
+  OffsetPositionComponentAsm(this.offsetPositionComponent)
+      : super(offsetPositionComponent);
+
+  @override
+  Asm withValue({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    DirectDataRegister loadVal = d0,
+    DirectAddressRegister load = a4,
+  }) {
+    return offsetPositionComponent.base.withValue(
         memory: memory,
         load: load,
         asm: (b) {
           var computation = Asm.empty();
 
-          var op = switch (offset) { > 0 => addi.w, < 0 => subi.w, _ => null };
+          var op = switch (offsetPositionComponent.offset) {
+            > 0 => addi.w,
+            < 0 => subi.w,
+            _ => null
+          };
           Address offsetVal = loadVal;
 
           if (op != null) {
@@ -1441,7 +1638,8 @@ extension OffsetPositionComponentAsm on OffsetPositionComponent {
             } else {
               computation.add(move.w(b, offsetVal));
             }
-            computation.add(op(offset.abs().toWord.i, offsetVal));
+            computation.add(
+                op(offsetPositionComponent.offset.abs().toWord.i, offsetVal));
           } else {
             offsetVal = b;
           }
@@ -1451,7 +1649,51 @@ extension OffsetPositionComponentAsm on OffsetPositionComponent {
   }
 }
 
-extension Vector2dExpressionAsm on Vector2dExpression {
+extension Vector2dExpressionToAsm on Vector2dExpression {
+  Asm withVector({
+    required Memory memory,
+    required Asm Function(Address x, Address y) asm,
+    Labeller? labeller,
+    DirectDataRegister destinationX = d0,
+    DirectDataRegister destinationY = d1,
+  }) {
+    return Vector2dExpressionAsm.from(this).withVector(
+        memory: memory,
+        asm: asm,
+        labeller: labeller,
+        destinationX: destinationX,
+        destinationY: destinationY);
+  }
+}
+
+// Vector2d Expression ASM classes
+abstract class Vector2dExpressionAsm {
+  final Vector2dExpression expression;
+
+  Vector2dExpressionAsm(this.expression);
+
+  factory Vector2dExpressionAsm.from(Vector2dExpression expression) {
+    return switch (expression) {
+      Vector2dOfXY v => Vector2dOfXYAsm(v),
+      Vector2dProjectionExpression p => Vector2dProjectionExpressionAsm(p),
+    };
+  }
+
+  Asm withVector({
+    required Memory memory,
+    required Asm Function(Address x, Address y) asm,
+    Labeller? labeller,
+    DirectDataRegister destinationX = d0,
+    DirectDataRegister destinationY = d1,
+  });
+}
+
+class Vector2dOfXYAsm extends Vector2dExpressionAsm {
+  final Vector2dOfXY vector2dOfXY;
+
+  Vector2dOfXYAsm(this.vector2dOfXY) : super(vector2dOfXY);
+
+  @override
   Asm withVector({
     required Memory memory,
     required Asm Function(Address x, Address y) asm,
@@ -1460,38 +1702,21 @@ extension Vector2dExpressionAsm on Vector2dExpression {
     DirectDataRegister destinationY = d1,
   }) {
     labeller ??= Labeller();
-    // TODO: need variable load addresses in case any of these
-    // become based on memory, because, for example,
-    // we may need to keep a4 clear.
-    return switch (this) {
-      Vector2dOfXY v =>
-        v.withVector(memory: memory, labeller: labeller, asm: asm),
-      Vector2dProjectionExpression p => p.withVector(
-          memory: memory,
-          labeller: labeller,
-          destinationX: destinationX,
-          destinationY: destinationY,
-          asm: asm),
-    };
-  }
-}
-
-extension Vector2dOfXYAsm on Vector2dOfXY {
-  Asm withVector({
-    required Memory memory,
-    required Asm Function(Address x, Address y) asm,
-    Labeller? labeller,
-  }) {
-    labeller ??= Labeller();
-    return x.withValue(
+    return DoubleExpressionAsm.from(vector2dOfXY.x).withValue(
         memory: memory,
         labeller: labeller,
-        asm: (x) => y.withValue(
+        asm: (x) => DoubleExpressionAsm.from(vector2dOfXY.y).withValue(
             memory: memory, labeller: labeller, asm: (y) => asm(x, y)));
   }
 }
 
-extension Vector2dProjectionExpressionAsm on Vector2dProjectionExpression {
+class Vector2dProjectionExpressionAsm extends Vector2dExpressionAsm {
+  final Vector2dProjectionExpression vector2dProjectionExpression;
+
+  Vector2dProjectionExpressionAsm(this.vector2dProjectionExpression)
+      : super(vector2dProjectionExpression);
+
+  @override
   Asm withVector({
     required Memory memory,
     required Asm Function(Address x, Address y) asm,
@@ -1499,7 +1724,7 @@ extension Vector2dProjectionExpressionAsm on Vector2dProjectionExpression {
     DirectDataRegister destinationX = d0,
     DirectDataRegister destinationY = d1,
   }) {
-    if (known(memory) case var p?) {
+    if (vector2dProjectionExpression.known(memory) case var p?) {
       return asm(Longword(0x10000).signedMultiply(p.x).i,
           Longword(0x10000).signedMultiply(p.y).i);
     }
@@ -1509,54 +1734,79 @@ extension Vector2dProjectionExpressionAsm on Vector2dProjectionExpression {
     // Implements a simple projection where the second vector
     // is only a simple cardinal direction unit vector.
     // This could be generalized to any two vectors but would be complicated.
-    return vector.withVector(
-        memory: memory,
-        labeller: labeller,
-        destinationX: destinationX,
-        destinationY: destinationY,
-        asm: (x, y) {
-          var keep = labeller!.withContext('keep').nextLocal();
-          var xMove = labeller.withContext('xmove').nextLocal();
-          return Asm([
-            if (x is! Immediate && x != destinationX) move.l(x, destinationX),
-            if (y is! Immediate && y != destinationY) move.l(y, destinationY),
-            direction.withDirection(
-                memory: memory,
-                destination: d2,
-                labelSuffix: labeller.suffixLocal(),
-                // We don't care about conflicting loads here,
-                // because the facing value is only used for this computation.
-                asm: (d) => Asm([
-                      btst(3.i, d),
-                      bne.s(xMove),
-                      moveq(0.i, destinationX),
-                      if (y is Immediate) move.l(y, destinationY),
-                      cmpi.b(FacingDir_Down.i, d),
-                      beq.s(keep),
-                      neg.l(destinationY),
-                      bra.s(keep),
-                      label(xMove),
-                      if (x is Immediate) move.l(x, destinationX),
-                      moveq(0.i, destinationY),
-                      cmpi.b(FacingDir_Right.i, d),
-                      beq.s(keep),
-                      neg.l(destinationX),
-                      label(keep),
-                      asm(destinationX, destinationY),
-                    ]))
-          ]);
-        });
+    return Vector2dExpressionAsm.from(vector2dProjectionExpression.vector)
+        .withVector(
+            memory: memory,
+            labeller: labeller,
+            destinationX: destinationX,
+            destinationY: destinationY,
+            asm: (x, y) {
+              var keep = labeller!.withContext('keep').nextLocal();
+              var xMove = labeller.withContext('xmove').nextLocal();
+              return Asm([
+                if (x is! Immediate && x != destinationX)
+                  move.l(x, destinationX),
+                if (y is! Immediate && y != destinationY)
+                  move.l(y, destinationY),
+                vector2dProjectionExpression.direction.withDirection(
+                    memory: memory,
+                    destination: d2,
+                    labelSuffix: labeller.suffixLocal(),
+                    // We don't care about conflicting loads here,
+                    // because the facing value is only used for this computation.
+                    asm: (d) => Asm([
+                          btst(3.i, d),
+                          bne.s(xMove),
+                          moveq(0.i, destinationX),
+                          if (y is Immediate) move.l(y, destinationY),
+                          cmpi.b(FacingDir_Down.i, d),
+                          beq.s(keep),
+                          neg.l(destinationY),
+                          bra.s(keep),
+                          label(xMove),
+                          if (x is Immediate) move.l(x, destinationX),
+                          moveq(0.i, destinationY),
+                          cmpi.b(FacingDir_Right.i, d),
+                          beq.s(keep),
+                          neg.l(destinationX),
+                          label(keep),
+                          asm(destinationX, destinationY),
+                        ]))
+              ]);
+            });
   }
 }
 
-extension DoubleExpresionAsm on DoubleExpression {
+// Double Expression ASM classes
+abstract class DoubleExpressionAsm {
+  final DoubleExpression expression;
+
+  DoubleExpressionAsm(this.expression);
+
+  factory DoubleExpressionAsm.from(DoubleExpression expression) {
+    return switch (expression) {
+      Double d => DoubleAsm(d),
+    };
+  }
+
+  Asm withValue({
+    required Memory memory,
+    required Asm Function(Address) asm,
+    Labeller? labeller,
+  });
+}
+
+class DoubleAsm extends DoubleExpressionAsm {
+  final Double doubleValue;
+
+  DoubleAsm(this.doubleValue) : super(doubleValue);
+
+  @override
   Asm withValue({
     required Memory memory,
     required Asm Function(Address) asm,
     Labeller? labeller,
   }) {
-    return switch (this) {
-      Double d => asm(Longword(0x10000).signedMultiply(d.value).i),
-    };
+    return asm(Longword(0x10000).signedMultiply(doubleValue.value).i);
   }
 }
