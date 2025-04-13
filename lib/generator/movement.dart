@@ -976,9 +976,8 @@ extension DirectionExpressionToAsm on DirectionExpression {
 }
 
 abstract class DirectionExpressionAsm {
-  final DirectionExpression expression;
-
-  DirectionExpressionAsm(this.expression);
+  // Empty constructor for subclassing
+  DirectionExpressionAsm();
 
   factory DirectionExpressionAsm.from(DirectionExpression expression) {
     return switch (expression) {
@@ -1002,7 +1001,7 @@ abstract class DirectionExpressionAsm {
 class DirectionAsm extends DirectionExpressionAsm {
   final Direction direction;
 
-  DirectionAsm(this.direction) : super(direction);
+  DirectionAsm(this.direction);
 
   @override
   Asm withDirection({
@@ -1019,7 +1018,7 @@ class DirectionAsm extends DirectionExpressionAsm {
 class DirectionOfVectorAsm extends DirectionExpressionAsm {
   final DirectionOfVector directionOfVector;
 
-  DirectionOfVectorAsm(this.directionOfVector) : super(directionOfVector);
+  DirectionOfVectorAsm(this.directionOfVector);
 
   @override
   Asm withDirection({
@@ -1117,7 +1116,7 @@ class DirectionOfVectorAsm extends DirectionExpressionAsm {
 class ObjectFaceDirectionAsm extends DirectionExpressionAsm {
   final ObjectFaceDirection objectFaceDirection;
 
-  ObjectFaceDirectionAsm(this.objectFaceDirection) : super(objectFaceDirection);
+  ObjectFaceDirectionAsm(this.objectFaceDirection);
 
   @override
   Asm withDirection({
@@ -1138,7 +1137,7 @@ class ObjectFaceDirectionAsm extends DirectionExpressionAsm {
 class OffsetDirectionAsm extends DirectionExpressionAsm {
   final OffsetDirection offsetDirection;
 
-  OffsetDirectionAsm(this.offsetDirection) : super(offsetDirection);
+  OffsetDirectionAsm(this.offsetDirection);
 
   @override
   Asm withDirection({
@@ -1228,9 +1227,8 @@ extension PositionExpressionToAsm on PositionExpression {
 
 // Position Expression ASM classes
 abstract class PositionExpressionAsm {
-  final PositionExpression expression;
-
-  PositionExpressionAsm(this.expression);
+  // Empty constructor for subclassing
+  PositionExpressionAsm();
 
   factory PositionExpressionAsm.from(PositionExpression expression) {
     return switch (expression) {
@@ -1267,7 +1265,7 @@ abstract class PositionExpressionAsm {
 class PositionAsm extends PositionExpressionAsm {
   final Position position;
 
-  PositionAsm(this.position) : super(position);
+  PositionAsm(this.position);
 
   @override
   Asm withPosition(
@@ -1302,7 +1300,7 @@ class PositionAsm extends PositionExpressionAsm {
 class PositionOfObjectAsm extends PositionExpressionAsm {
   final PositionOfObject positionOfObject;
 
-  PositionOfObjectAsm(this.positionOfObject) : super(positionOfObject);
+  PositionOfObjectAsm(this.positionOfObject);
 
   @override
   Asm withPosition(
@@ -1348,7 +1346,7 @@ class PositionOfObjectAsm extends PositionExpressionAsm {
 class PositionOfXYAsm extends PositionExpressionAsm {
   final PositionOfXY positionOfXY;
 
-  PositionOfXYAsm(this.positionOfXY) : super(positionOfXY);
+  PositionOfXYAsm(this.positionOfXY);
 
   @override
   Asm withPosition(
@@ -1395,7 +1393,7 @@ class PositionOfXYAsm extends PositionExpressionAsm {
 class OffsetPositionAsm extends PositionExpressionAsm {
   final OffsetPosition offsetPosition;
 
-  OffsetPositionAsm(this.offsetPosition) : super(offsetPosition);
+  OffsetPositionAsm(this.offsetPosition);
 
   @override
   Asm withPosition(
@@ -1542,9 +1540,8 @@ extension PositionComponentExpressionToAsm on PositionComponentExpression {
 
 // Position Component Expression ASM classes
 abstract class PositionComponentExpressionAsm {
-  final PositionComponentExpression expression;
-
-  PositionComponentExpressionAsm(this.expression);
+  // Empty constructor for subclassing
+  PositionComponentExpressionAsm();
 
   factory PositionComponentExpressionAsm.from(
       PositionComponentExpression expression) {
@@ -1566,7 +1563,7 @@ abstract class PositionComponentExpressionAsm {
 class PositionComponentAsm extends PositionComponentExpressionAsm {
   final PositionComponent positionComponent;
 
-  PositionComponentAsm(this.positionComponent) : super(positionComponent);
+  PositionComponentAsm(this.positionComponent);
 
   @override
   Asm withValue({
@@ -1582,8 +1579,7 @@ class PositionComponentAsm extends PositionComponentExpressionAsm {
 class PositionComponentOfObjectAsm extends PositionComponentExpressionAsm {
   final PositionComponentOfObject positionComponentOfObject;
 
-  PositionComponentOfObjectAsm(this.positionComponentOfObject)
-      : super(positionComponentOfObject);
+  PositionComponentOfObjectAsm(this.positionComponentOfObject);
 
   @override
   Asm withValue({
@@ -1609,8 +1605,7 @@ class PositionComponentOfObjectAsm extends PositionComponentExpressionAsm {
 class OffsetPositionComponentAsm extends PositionComponentExpressionAsm {
   final OffsetPositionComponent offsetPositionComponent;
 
-  OffsetPositionComponentAsm(this.offsetPositionComponent)
-      : super(offsetPositionComponent);
+  OffsetPositionComponentAsm(this.offsetPositionComponent);
 
   @override
   Asm withValue({
@@ -1668,9 +1663,8 @@ extension Vector2dExpressionToAsm on Vector2dExpression {
 
 // Vector2d Expression ASM classes
 abstract class Vector2dExpressionAsm {
-  final Vector2dExpression expression;
-
-  Vector2dExpressionAsm(this.expression);
+  // Empty constructor for subclassing
+  Vector2dExpressionAsm();
 
   factory Vector2dExpressionAsm.from(Vector2dExpression expression) {
     return switch (expression) {
@@ -1691,7 +1685,7 @@ abstract class Vector2dExpressionAsm {
 class Vector2dOfXYAsm extends Vector2dExpressionAsm {
   final Vector2dOfXY vector2dOfXY;
 
-  Vector2dOfXYAsm(this.vector2dOfXY) : super(vector2dOfXY);
+  Vector2dOfXYAsm(this.vector2dOfXY);
 
   @override
   Asm withVector({
@@ -1713,8 +1707,7 @@ class Vector2dOfXYAsm extends Vector2dExpressionAsm {
 class Vector2dProjectionExpressionAsm extends Vector2dExpressionAsm {
   final Vector2dProjectionExpression vector2dProjectionExpression;
 
-  Vector2dProjectionExpressionAsm(this.vector2dProjectionExpression)
-      : super(vector2dProjectionExpression);
+  Vector2dProjectionExpressionAsm(this.vector2dProjectionExpression);
 
   @override
   Asm withVector({
@@ -1779,9 +1772,8 @@ class Vector2dProjectionExpressionAsm extends Vector2dExpressionAsm {
 
 // Double Expression ASM classes
 abstract class DoubleExpressionAsm {
-  final DoubleExpression expression;
-
-  DoubleExpressionAsm(this.expression);
+  // Empty constructor for subclassing
+  DoubleExpressionAsm();
 
   factory DoubleExpressionAsm.from(DoubleExpression expression) {
     return switch (expression) {
@@ -1799,7 +1791,7 @@ abstract class DoubleExpressionAsm {
 class DoubleAsm extends DoubleExpressionAsm {
   final Double doubleValue;
 
-  DoubleAsm(this.doubleValue) : super(doubleValue);
+  DoubleAsm(this.doubleValue);
 
   @override
   Asm withValue({
