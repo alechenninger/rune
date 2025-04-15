@@ -178,6 +178,7 @@ abstract class Expression {
   }
 
   Expression operator +(Expression other) {
+    if (isKnownZero) return other;
     return ArithmeticExpression(ArithmeticOperator.add, this, other);
   }
 
@@ -537,6 +538,8 @@ class KnownConstantValue {
   }
 }
 
+// TODO(addressing modes): technically is MemoryLocation
+// but mem location is sealed in another package
 class Label extends Sized implements Address {
   static final _validLabelPattern =
       RegExp(r'^([A-Za-z\d_@.$]+[A-Za-z\d_]*|[+-/]+)$');

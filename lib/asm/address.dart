@@ -28,6 +28,10 @@ abstract class Address implements RegisterListOrAddress {
   static DirectAddressRegister a(int num) => DirectAddressRegister(num);
 }
 
+/// A fixed reference to a memory location. Excludes post-inc and pre-dec
+/// addressing modes.
+sealed class MemoryLocation extends Address {}
+
 sealed class RegisterListOrAddress {}
 
 sealed class RegisterListOrRegister implements RegisterListOrAddress {}
@@ -103,7 +107,8 @@ sealed class Register<T extends Register<T>>
   RegisterList operator /(Register<T> other);
 }
 
-abstract class OfAddressRegister implements Address {
+// Not a MemoryLocation because DirectAddressRegister is not a memory location.
+sealed class OfAddressRegister implements Address {
   int get register;
   OfAddressRegister withRegister(int num);
 }
@@ -128,7 +133,7 @@ class _Address implements Address {
 }
 
 /// Value at a fixed memory address
-class Absolute extends _Address {
+class Absolute extends _Address implements MemoryLocation {
   final Expression exp;
   final Size size;
   Absolute._({required this.exp, required this.size})
@@ -176,11 +181,13 @@ class DirectAddressRegister extends _Address
 
   IndirectAddressRegister plus(Expression exp) => indirect.plus(exp);
 
-  IndirectAddressRegister plusD(OffsetRegister dataRegister) =>
-      indirect.plusD(dataRegister);
+  IndirectAddressRegister plusD(DataRegisterWithSize dataRegister) =>
+      indirect.withRegisterDisplacement(dataRegister);
 
   IndirectAddressRegister get indirect => IndirectAddressRegister(register);
 
+  // annotate_overrides lint is a bug – this does not override the unary minus
+  // ignore: annotate_overrides
   PreDecAddress operator -() => PreDecAddress(register);
 
   PostIncAddress postIncrement() => PostIncAddress(register);
@@ -215,8 +222,8 @@ class DirectDataRegister extends _Address
   @override
   final int register;
 
-  OffsetRegister get w => OffsetRegister._(this, word);
-  OffsetRegister get l => OffsetRegister._(this, long);
+  DataRegisterWithSize get w => DataRegisterWithSize._(this, word);
+  DataRegisterWithSize get l => DataRegisterWithSize._(this, long);
 
   @override
   RegisterList operator -(Register other) {
@@ -240,11 +247,11 @@ class DirectDataRegister extends _Address
       register <= 7 ? DirectDataRegister(register + 1) : null;
 }
 
-class OffsetRegister {
+class DataRegisterWithSize {
   final DirectDataRegister data;
   final Size size;
 
-  OffsetRegister._(this.data, this.size);
+  DataRegisterWithSize._(this.data, this.size);
 
   @override
   String toString() => '$data.$size';
@@ -252,7 +259,7 @@ class OffsetRegister {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OffsetRegister &&
+      other is DataRegisterWithSize &&
           runtimeType == other.runtimeType &&
           data == other.data &&
           size == other.size;
@@ -262,11 +269,12 @@ class OffsetRegister {
 }
 
 /// Value in memory at an address pointed to by an address register
-class IndirectAddressRegister extends _Address implements OfAddressRegister {
+class IndirectAddressRegister extends _Address
+    implements OfAddressRegister, MemoryLocation {
   @override
   final int register;
   final Expression displacement;
-  final OffsetRegister? variableDisplacement;
+  final DataRegisterWithSize? variableDisplacement;
 
   IndirectAddressRegister(this.register,
       {this.displacement = Byte.zero, this.variableDisplacement})
@@ -286,16 +294,22 @@ class IndirectAddressRegister extends _Address implements OfAddressRegister {
           displacement: displacement,
           variableDisplacement: variableDisplacement);
 
-  IndirectAddressRegister plus(Expression exp) =>
+  IndirectAddressRegister withDisplacement(Expression exp) =>
       IndirectAddressRegister(register,
           displacement: exp, variableDisplacement: variableDisplacement);
 
-  IndirectAddressRegister plusD(OffsetRegister? offset) =>
+  IndirectAddressRegister plus(Expression exp) =>
+      IndirectAddressRegister(register,
+          displacement: displacement + exp,
+          variableDisplacement: variableDisplacement);
+
+  IndirectAddressRegister withRegisterDisplacement(
+          DataRegisterWithSize? offset) =>
       IndirectAddressRegister(register,
           displacement: displacement, variableDisplacement: offset);
 }
 
-extension IndirectRegister on (DirectAddressRegister, OffsetRegister) {
+extension IndirectRegister on (DirectAddressRegister, DataRegisterWithSize) {
   IndirectAddressRegister get a =>
       IndirectAddressRegister($1.register, variableDisplacement: $2);
 }
@@ -303,7 +317,7 @@ extension IndirectRegister on (DirectAddressRegister, OffsetRegister) {
 extension IndirectRegisterWithDisplacement on (
   Expression,
   DirectAddressRegister,
-  OffsetRegister
+  DataRegisterWithSize
 ) {
   IndirectAddressRegister get a => IndirectAddressRegister($2.register,
       displacement: $1, variableDisplacement: $3);
@@ -311,14 +325,14 @@ extension IndirectRegisterWithDisplacement on (
 
 extension ExpressionDisplacement on Expression {
   IndirectAddressRegister call(DirectAddressRegister a,
-          [OffsetRegister? offset]) =>
-      a.indirect.plus(this).plusD(offset);
+          [DataRegisterWithSize? offset]) =>
+      a.indirect.plus(this).withRegisterDisplacement(offset);
 }
 
 extension IntDisplacement on int {
   IndirectAddressRegister call(DirectAddressRegister a,
-          [OffsetRegister? offset]) =>
-      a.indirect.plus(toValue).plusD(offset);
+          [DataRegisterWithSize? offset]) =>
+      a.indirect.plus(toValue).withRegisterDisplacement(offset);
 }
 
 class PostIncAddress extends _Address {

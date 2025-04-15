@@ -678,9 +678,17 @@ Asm _waitForMovement(
   var startOfLoop = Labeller.withContext('wait_for_movement')
       .withContextsFrom(labeller)
       .nextLocal();
+  var done = labeller.withContext('wait_for_movements_done').nextLocal();
   return Asm([
     label(startOfLoop),
-    obj.toA4(memory, force: false),
+    // Force because this is in a loop, always need it at the start
+    obj.toA4(memory, force: true),
+    // Check step first because we want to avoid running the object if not nessary
+    // It can change their facing unexpectedly in some cases
+    moveq(0.i, d0),
+    move.w(x_step_duration(a4), d0),
+    or.w(y_step_duration(a4), d0),
+    beq.s(done),
     // We can't be sure of the routine at this point
     // –run whatever it is.
     jsr('RunSingleObject'.l),
@@ -691,11 +699,9 @@ Asm _waitForMovement(
     jsr(Label('RunMapUpdates').l),
     jsr(Label('VInt_Prepare').l),
     //movem.l(sp.postIncrement(), d0 - a4),
-    obj.toA4(memory, force: true), // force because we know a4 is overwritten
-    moveq(0.i, d0),
-    move.w(x_step_duration(a4), d0),
-    or.w(y_step_duration(a4), d0),
-    bne.s(startOfLoop),
+    // Loop back and check again
+    beq.s(startOfLoop),
+    label(done),
   ]);
 }
 
@@ -1705,9 +1711,9 @@ class Vector2dOfXYAsm extends Vector2dExpressionAsm {
 }
 
 class Vector2dProjectionExpressionAsm extends Vector2dExpressionAsm {
-  final Vector2dProjectionExpression vector2dProjectionExpression;
+  final Vector2dProjectionExpression expression;
 
-  Vector2dProjectionExpressionAsm(this.vector2dProjectionExpression);
+  Vector2dProjectionExpressionAsm(this.expression);
 
   @override
   Asm withVector({
@@ -1717,7 +1723,7 @@ class Vector2dProjectionExpressionAsm extends Vector2dExpressionAsm {
     DirectDataRegister destinationX = d0,
     DirectDataRegister destinationY = d1,
   }) {
-    if (vector2dProjectionExpression.known(memory) case var p?) {
+    if (expression.known(memory) case var p?) {
       return asm(Longword(0x10000).signedMultiply(p.x).i,
           Longword(0x10000).signedMultiply(p.y).i);
     }
@@ -1727,46 +1733,48 @@ class Vector2dProjectionExpressionAsm extends Vector2dExpressionAsm {
     // Implements a simple projection where the second vector
     // is only a simple cardinal direction unit vector.
     // This could be generalized to any two vectors but would be complicated.
-    return Vector2dExpressionAsm.from(vector2dProjectionExpression.vector)
-        .withVector(
-            memory: memory,
-            labeller: labeller,
-            destinationX: destinationX,
-            destinationY: destinationY,
-            asm: (x, y) {
-              var keep = labeller!.withContext('keep').nextLocal();
-              var xMove = labeller.withContext('xmove').nextLocal();
-              return Asm([
-                if (x is! Immediate && x != destinationX)
-                  move.l(x, destinationX),
-                if (y is! Immediate && y != destinationY)
-                  move.l(y, destinationY),
-                vector2dProjectionExpression.direction.withDirection(
-                    memory: memory,
-                    destination: d2,
-                    labelSuffix: labeller.suffixLocal(),
-                    // We don't care about conflicting loads here,
-                    // because the facing value is only used for this computation.
-                    asm: (d) => Asm([
-                          btst(3.i, d),
-                          bne.s(xMove),
-                          moveq(0.i, destinationX),
-                          if (y is Immediate) move.l(y, destinationY),
-                          cmpi.b(FacingDir_Down.i, d),
-                          beq.s(keep),
-                          neg.l(destinationY),
-                          bra.s(keep),
-                          label(xMove),
-                          if (x is Immediate) move.l(x, destinationX),
-                          moveq(0.i, destinationY),
-                          cmpi.b(FacingDir_Right.i, d),
-                          beq.s(keep),
-                          neg.l(destinationX),
-                          label(keep),
-                          asm(destinationX, destinationY),
-                        ]))
-              ]);
-            });
+    return Vector2dExpressionAsm.from(expression.vector).withVector(
+        memory: memory,
+        labeller: labeller,
+        destinationX: destinationX,
+        destinationY: destinationY,
+        asm: (x, y) {
+          var keep = labeller!.withContext('keep').nextLocal();
+          var xMove = labeller.withContext('xmove').nextLocal();
+          return Asm([
+            if (x is! Immediate && x != destinationX) move.l(x, destinationX),
+            if (y is! Immediate && y != destinationY) move.l(y, destinationY),
+            expression.direction.withDirection(
+                memory: memory,
+                destination: d2,
+                labelSuffix: labeller.suffixLocal(),
+                // We don't care about conflicting loads here,
+                // because the facing value is only used for this computation.
+                asm: (d) => Asm([
+                      switch (d) {
+                        Absolute a => btst(3.i, (a.exp + 1.toValue).l),
+                        IndirectAddressRegister a =>
+                          btst(3.i, a.plus(1.toValue)),
+                        _ => btst(3.i, d)
+                      },
+                      bne.s(xMove),
+                      moveq(0.i, destinationX),
+                      if (y is Immediate) move.l(y, destinationY),
+                      cmpi.w(FacingDir_Down.i, d),
+                      beq.s(keep),
+                      neg.l(destinationY),
+                      bra.s(keep),
+                      label(xMove),
+                      if (x is Immediate) move.l(x, destinationX),
+                      moveq(0.i, destinationY),
+                      cmpi.w(FacingDir_Right.i, d),
+                      beq.s(keep),
+                      neg.l(destinationX),
+                      label(keep),
+                      asm(destinationX, destinationY),
+                    ]))
+          ]);
+        });
   }
 }
 
