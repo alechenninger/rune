@@ -127,7 +127,7 @@ Asm stepObjectsToAsm(StepObjects step,
       obj.toA4(memory, force: true),
       if (step.onTop) move.b(1.i, 5(a4)),
       // Grab d0 and d1 from stack but leave the stack pointer there
-      move.l(sp, d1),
+      move.l(sp.indirect, d1),
       move.l(4(sp), d0),
       // Step object one frame
       if (step.animate)
