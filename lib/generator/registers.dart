@@ -12,21 +12,22 @@ class Registers {
     return Registers().._kept.addAll(_kept);
   }
 
-  Asm keep(PushToStack registers, {required Asm Function() around}) {
+  Asm keep(RegisterListOrRegister registers, Size size,
+      {required Asm Function() around}) {
     switch (registers) {
-      case NoneToPush():
+      case RegisterList l when l.isEmpty:
         return around();
-      case PushOneToStack one:
-        _kept.insert(0, one);
+      case DirectRegister one:
+        _kept.insert(0, PushOneToStack(one, size));
         var asm = around();
-        release(one.register);
+        release(one);
         return asm;
-      case PushManyToStack many:
-        for (var r in many.registers) {
-          _kept.insert(0, PushOneToStack(r, many.size));
+      case RegisterList list:
+        for (var r in list) {
+          _kept.insert(0, PushOneToStack(r, size));
         }
         var asm = around();
-        release(many.registers);
+        release(list);
         return asm;
     }
   }
@@ -34,20 +35,20 @@ class Registers {
   void release(RegisterListOrRegister registers) {
     var toRelease = Set.of(switch (registers) {
       RegisterList many => many,
-      Register register => [register]
+      DirectRegister register => [register]
     });
 
     for (var i = 0; i < _kept.length; i++) {
       var kept = _kept[i];
-      if (toRelease.remove(kept.register)) {
+      if (toRelease.remove(kept.push)) {
         _kept.removeAt(i);
       }
     }
   }
 
-  PushToStack _keep(Register r) {
+  PushToStack _keep(DirectRegister r) {
     for (var kept in _kept) {
-      if (kept.register == r) {
+      if (kept.push == r) {
         return kept;
       }
     }
@@ -65,7 +66,7 @@ class Registers {
     // If any of these registers are kept,
     // wrap `asm` with push/pop.
     switch (registers) {
-      case Register r:
+      case DirectRegister r:
         return _keep(r).wrap(asm);
       case RegisterList many:
         // TODO: could do merge logic here as optimization

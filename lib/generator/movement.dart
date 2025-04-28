@@ -646,13 +646,28 @@ class _MovementGenerator {
     asm.add(dir.withDirection(
         labelSuffix: labelSuffix,
         memory: _mem,
-        asm: (d) => Asm([
-              obj.toA4(_mem,
-                  maintain: d is Immediate
-                      ? NoneToPush()
-                      : PushToStack.one(d0, Size.b)),
-              updateObjFacing(d)
-            ])));
+        asm: (d) {
+          var (maybeDirectionToStack, dest) = switch (d) {
+            // If it's colliding with the address argument,
+            // push that to stack.
+            // We could move to d0 first, but that may collide too
+            // (as in above case).
+            OfAddressRegister d
+                when d.register == 4 && _mem.addressRegisterFor(obj) != a4 =>
+              (PushToStack.one(d, Size.w, popToAddress: d0), d0),
+            _ => (NoneToPush(), d)
+          };
+
+          return Asm([
+            maybeDirectionToStack.wrap(obj.toA4(_mem,
+                // Maintain here is only necessary sometimes
+                // depending on if moving to a4 requires other registers.
+                // Hence, this is here as argument instead of outside.
+                maintain:
+                    d == d0 ? PushToStack.one(d0, Size.w) : NoneToPush())),
+            updateObjFacing(dest)
+          ]);
+        }));
 
     _mem.putInAddress(a3, null);
 

@@ -1692,6 +1692,7 @@ void main() {
     late Memory testState;
     late GameMap map;
     late MapObject npc;
+    late MapObject npc2;
 
     setUp(() {
       map = GameMap(MapId.Test);
@@ -1700,6 +1701,11 @@ void main() {
           startPosition: Position(0x200, 0x200),
           spec: Npc(Sprite.PalmanMan1, WanderAround(down)));
       map.addObject(npc);
+      npc2 = MapObject(
+          id: 'testnpc2',
+          startPosition: Position(0x210, 0x200),
+          spec: Npc(Sprite.PalmanMan2, WanderAround(down)));
+      map.addObject(npc2);
 
       state = Memory()..currentMap = map;
       testState = state.branch();
@@ -1910,9 +1916,9 @@ void main() {
             label(Label(r'.down_1_Alys_0')),
             move.w(FacingDir_Down.i, d0),
             label(Label(r'.keep_1_Alys_0')),
-            move.b(d0, -sp),
+            move.w(d0, -sp),
             alys.toA4(testState),
-            move.b(sp.postIncrement(), d0),
+            move.w(sp.postIncrement(), d0),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
@@ -1972,6 +1978,52 @@ void main() {
     test('character 1 by name facing interaction object is noop', () {},
         skip: "i don't think this is possible "
             "unless we know slot one at compile time");
+
+    test('character faces direction another character is facing', () {
+      var moves = Face(alys.facing()).move(shay);
+      var asm = EventAsm.empty();
+      SceneAsmGenerator.forInteraction(
+          map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
+          withObject: const InteractionObject())
+        ..runEvent()
+        ..individualMoves(moves)
+        ..finish();
+      var expected = Asm([
+            alys.toA4(testState),
+            move.w(facing_dir(a4), -(sp)),
+            shay.toA4(testState),
+            move.w((sp).postIncrement(), d0),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]);
+      expect(
+          asm.withoutComments().skip(1).take(expected.length),
+          expected);
+    });
+
+    test('map object faces direction another object is facing', () {
+      var moves = Face(MapObjectById(npc.id).facing()).move(npc2);
+      var asm = EventAsm.empty();
+      SceneAsmGenerator.forInteraction(
+          map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
+          withObject: const InteractionObject())
+        ..runEvent()
+        ..individualMoves(moves)
+        ..finish();
+      var expected = Asm([
+            npc.toA4(testState),
+            move.w(facing_dir(a4), -(sp)),
+            npc2.toA4(testState),
+            move.w(sp.postIncrement(), d0),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]);
+      expect(
+          asm.withoutComments().tail(expected.length + 3).head(expected.length),
+          expected);
+    });
+
+    test('object faces direction another object is facing, known', () {});
+
+    test('object faces direction another object is facing, offset', () {});
   });
 
   group('instant moves generate asm', () {

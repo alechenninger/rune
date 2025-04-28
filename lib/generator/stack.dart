@@ -2,8 +2,8 @@ import '../asm/asm.dart';
 
 sealed class PushToStack {
   factory PushToStack.none() => const NoneToPush();
-  factory PushToStack.one(Register register, Size size) =>
-      PushOneToStack(register, size);
+  factory PushToStack.one(Address push, Size size, {Address? popToAddress}) =>
+      PushOneToStack(push, size, popToAddress: popToAddress);
 
   /// Cannot push [size] of [Size.b]
   /// (only word and longword) supported.
@@ -42,7 +42,6 @@ sealed class PushToStack {
 }
 
 abstract class PopFromStack {
-  PushToStack push();
   Asm asm();
 }
 
@@ -58,11 +57,6 @@ class NoneToPush implements PushToStack, PopFromStack {
   Asm asm() => Asm([]);
 
   @override
-  PushToStack push() {
-    return NoneToPush();
-  }
-
-  @override
   Asm wrap(Asm inner) => inner;
 
   @override
@@ -72,7 +66,10 @@ class NoneToPush implements PushToStack, PopFromStack {
 
   @override
   PushManyToStack? mergeOne(PushOneToStack other) {
-    return PushManyToStack(RegisterList.of([other.register]), other.size);
+    return switch (other.push) {
+      DirectRegister r => PushManyToStack(RegisterList.of([r]), other.size),
+      _ => null,
+    };
   }
 }
 
@@ -103,62 +100,73 @@ class PushManyToStack extends PushToStack {
 
   @override
   PushManyToStack? mergeOne(PushOneToStack other) {
-    return PushManyToStack(
-        RegisterList.of([...registers, other.register]), other.size);
+    if (size != other.size) return null;
+    switch (other.push) {
+      case DirectRegister r:
+        return PushManyToStack(RegisterList.of([...registers, r]), other.size);
+      default:
+        return null;
+    }
   }
 }
 
 class PushOneToStack extends PushToStack {
-  final Register register;
+  final Address push;
+  final Address popToAddress;
   final Size size;
 
-  const PushOneToStack(this.register, this.size);
+  const PushOneToStack(this.push, this.size, {Address? popToAddress})
+      : popToAddress = popToAddress ?? push;
 
   /// Merges two [PushOneToStack] instances into a [PushManyToStack]
   /// if they are of the same size. Otherwise, returns `null`.
   @override
   PushManyToStack? mergeOne(PushOneToStack other) {
     if (size != other.size) return null;
-    return PushManyToStack(RegisterList.of([register, other.register]), size);
+    switch ((push, other.push)) {
+      case (DirectRegister a, DirectRegister b):
+        return PushManyToStack(RegisterList.of([a, b]), size);
+      default:
+        return null;
+    }
   }
 
   /// Merges this [PushOneToStack] with [other] [PushManyToStack].
   @override
   PushManyToStack? mergeMany(PushManyToStack other) {
     if (size != other.size) return null;
-    return PushManyToStack(
-        RegisterList.of([register, ...other.registers]), size);
+    switch ((push, other.registers)) {
+      case (DirectRegister a, RegisterList b):
+        return PushManyToStack(RegisterList.of([a, ...b]), size);
+      default:
+        return null;
+    }
   }
 
   @override
   PopFromStack pop() {
-    return PopOneFromStack(register, size);
+    return PopOneFromStack(popToAddress, size);
   }
 
   @override
   Asm asm() => switch (size) {
-        Size.b => move.b(register, -(sp)),
-        Size.w => move.w(register, -(sp)),
-        Size.l => move.l(register, -(sp)),
+        Size.b => move.b(push, -(sp)),
+        Size.w => move.w(push, -(sp)),
+        Size.l => move.l(push, -(sp)),
       };
 }
 
 class PopOneFromStack extends PopFromStack {
-  final Register register;
+  final Address destination;
   final Size size;
 
-  PopOneFromStack(this.register, this.size);
-
-  @override
-  PushToStack push() {
-    return PushOneToStack(register, size);
-  }
+  PopOneFromStack(this.destination, this.size);
 
   @override
   Asm asm() => switch (size) {
-        Size.b => move.b(sp.postIncrement(), register),
-        Size.w => move.w(sp.postIncrement(), register),
-        Size.l => move.l(sp.postIncrement(), register),
+        Size.b => move.b(sp.postIncrement(), destination),
+        Size.w => move.w(sp.postIncrement(), destination),
+        Size.l => move.l(sp.postIncrement(), destination),
       };
 }
 
@@ -167,11 +175,6 @@ class PopManyFromStack extends PopFromStack {
   final Size size;
 
   PopManyFromStack(this.registers, this.size);
-
-  @override
-  PushToStack push() {
-    return PushManyToStack(registers, size);
-  }
 
   @override
   Asm asm() => switch (size) {

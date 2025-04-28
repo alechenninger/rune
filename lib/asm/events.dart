@@ -525,7 +525,11 @@ Asm characterByNameToA4(String name) {
 
 Asm updateObjFacing(Address direction) {
   return Asm([
-    if (direction != d0) moveq(direction, d0),
+    switch (direction) {
+      d0 => Asm.empty(),
+      Immediate i => moveq(i, d0),
+      Address a => move.w(a, d0),
+    },
     jsr(Label('Event_UpdateObjFacing').l),
   ]);
 }

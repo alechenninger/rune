@@ -107,10 +107,11 @@ class Memory implements EventState {
   }
 
   @Deprecated('untested')
-  Asm keep(PushToStack registers, {required Asm Function() around}) =>
+  Asm keep(RegisterListOrRegister registers, Size size,
+          {required Asm Function() around}) =>
       // For now intentionally omit from changes
       // Every branch must manage its own push/pop anyway
-      _sysState._registers.keep(registers, around: around);
+      _sysState._registers.keep(registers, size, around: around);
 
   @Deprecated('untested')
   Asm maintain(RegisterListOrRegister registers, Asm asm) =>

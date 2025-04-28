@@ -843,7 +843,7 @@ EventFlag_Test001 = $0001'''));
     });
 
     group('with vector expression', () {
-      test('polar vector', () {
+      test('projection', () {
         var scene = Scene([
           StepObject(alys,
               stepPerFrame:
@@ -859,18 +859,18 @@ EventFlag_Test001 = $0001'''));
             asm.event.withoutComments(),
             Asm([
               alys.toA4(Memory()),
-              btst(3.i, facing_dir(a4)),
+              btst(3.i, (facing_dir + 1.toValue)(a4)),
               bne.s(Label('.1_xmove')),
               moveq(0.i, d0),
               move.l(0x00008000.toLongword.i, d1),
-              cmpi.b(FacingDir_Down.i, facing_dir(a4)),
+              cmpi.w(FacingDir_Down.i, facing_dir(a4)),
               beq.s(Label('.1_keep')),
               neg.l(d1),
               bra.s(Label('.1_keep')),
               label(Label('.1_xmove')),
               move.l(0x00008000.toLongword.i, d0),
               moveq(0.i, d1),
-              cmpi.b(FacingDir_Right.i, facing_dir(a4)),
+              cmpi.w(FacingDir_Right.i, facing_dir(a4)),
               beq.s(Label('.1_keep')),
               neg.l(d0),
               label(Label('.1_keep')),
