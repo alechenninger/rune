@@ -254,6 +254,7 @@ final ranchOwnerEvents = [
   EventFlag('RanchOwnerFee'),
 ];
 
+// Reference: https://youtu.be/DZelfpM9Y90?si=o-8tUdgIwgd04O4s&t=13782
 final tinkerbellsDogEvents = [
   EventFlag('TinkerbellsDog'),
   EventFlag('RockyOwner'),

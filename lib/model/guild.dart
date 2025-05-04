@@ -5,14 +5,26 @@ import 'model.dart';
 sealed class GuildInteraction {}
 
 enum ClerkInteraction implements GuildInteraction {
+  /// Interaction before the job board is shown.
   welcome,
+  /// Interaction after the job board is shown, which persists during selection.
   jobBoard,
+  /// Interaction if the job selected is already completed.
   alreadyCompleted,
+  /// Interaction if no job is in progress, and all 8 jobs are completed.
   noJobsAvailable,
+  /// Interaction when leaving the job board, without selecting a job.
   farewell,
+  /// Interaction when selecting a job that is not yet available.
   jobNotYetAvailable,
+  /// Interaction when selecting the first job when it is no longer available.
+  /// This job is special cased 
+  /// (likely due to significance of the events at Mile).
   firstJobNoLongerAvailable,
+  /// Interaction when first job is in progress, but not finished,
+  /// after retrieving Elsydeon and Mile is wiped out.
   firstJobMileDead,
+  /// Interaction when selecting a job that is no longer available.
   jobNoLongerAvailable
 }
 
@@ -23,10 +35,15 @@ class JobInteraction implements GuildInteraction {
 }
 
 enum JobScene {
+  /// When the job is selected, before accepting or declining.
   prompt,
+  /// After the job is accepted.
   accept,
+  /// After the job is declined.
   decline,
+  /// When the job is in progress, but not completed.
   talk,
+  /// When the job is completed.
   complete;
 
   JobInteraction forJob(JobId id) => JobInteraction(id, this);
