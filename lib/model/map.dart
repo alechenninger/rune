@@ -29,6 +29,11 @@ class GameMap {
   // TODO: we may want a way to retrieve back
   //  whether an object was explicitly assigned an index or not
 
+  Iterable<MapElement> get elements sync* {
+    yield* objects;
+    yield* areas;
+  }
+
   Iterable<MapObject> get objects =>
       UnmodifiableListView(_objects.values.map((o) => o.object));
 
@@ -46,14 +51,12 @@ class GameMap {
   bool get isNotEmpty => _objects.isNotEmpty || _areas.isNotEmpty;
   bool get isEmpty => _objects.isEmpty && _areas.isEmpty;
 
-  //final onMove = <Event>[];
-
   bool containsObject(MapObjectId id) => _objects.containsKey(id);
 
   MapObject? object(MapObjectId id) => _objects[id]?.object;
 
   int? indexOf(MapObjectId id) => _iterateIndexedObjects()
-      .whereNotNull()
+      .nonNulls
       .firstWhereOrNull((indexed) => indexed.object.id == id)
       ?.index;
 
