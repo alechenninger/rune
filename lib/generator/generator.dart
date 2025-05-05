@@ -187,7 +187,12 @@ class Program {
           map.id.name, 'map', 'map with same id already added');
     }
 
-    return _maps[map.id] = compileMap(map, _config);
+    try {
+      return _maps[map.id] = compileMap(map, _config);
+    } catch (err, stack) {
+      throw GeneratorException(
+          'Failed to compile map. map=${map.id}', err, stack);
+    }
   }
 
   HuntersGuildAsm configureHuntersGuild(HuntersGuild guild,
@@ -3601,7 +3606,21 @@ class TestDialogTreeLookup extends DialogTreeLookup {
   }
 }
 
-class AsmGenerationException {
+class GeneratorException implements Exception {
+  final String message;
+  final Object? cause;
+  final StackTrace? causeTrace;
+
+  GeneratorException(this.message, this.cause, this.causeTrace);
+
+  @override
+  String toString() {
+    return 'GeneratorException{message: $message, cause: $cause, '
+        'causeTrace: $causeTrace}';
+  }
+}
+
+class AsmGenerationException implements Exception {
   final Memory memory;
   final Object? model;
   final Object? cause;
