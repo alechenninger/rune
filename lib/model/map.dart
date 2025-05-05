@@ -758,6 +758,17 @@ sealed class MapElement {}
 
 sealed class MapElementId {
   const MapElementId();
+
+  MapId? get impliedMap {
+    var parts = toString().split('_');
+    var possibleMapId = switch (parts.length) {
+      < 2 => null,
+      2 => parts.first,
+      var l => parts.sublist(0, l - 1).join('_'),
+    };
+    return MapId.values.firstWhereOrNull(
+        (id) => id.name.toLowerCase() == possibleMapId?.toLowerCase());
+  }
 }
 
 sealed class InteractiveMapElement
