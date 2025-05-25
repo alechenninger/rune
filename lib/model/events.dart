@@ -149,9 +149,9 @@ class Pause extends Event implements RunnableInDialog {
 
 /// Resets palettes and other state for showing the map.
 class PrepareMap extends Event {
-  final bool resetObjects;
+  final bool refreshObjects;
 
-  PrepareMap({this.resetObjects = false});
+  PrepareMap({this.refreshObjects = false});
 
   @override
   void visit(EventVisitor visitor) {
@@ -160,7 +160,7 @@ class PrepareMap extends Event {
 
   @override
   String toString() {
-    return 'PrepareMap{resetObjects: $resetObjects}';
+    return 'PrepareMap{resetObjects: $refreshObjects}';
   }
 
   @override
@@ -168,10 +168,10 @@ class PrepareMap extends Event {
       identical(this, other) ||
       other is PrepareMap &&
           runtimeType == other.runtimeType &&
-          resetObjects == other.resetObjects;
+          refreshObjects == other.refreshObjects;
 
   @override
-  int get hashCode => resetObjects.hashCode;
+  int get hashCode => refreshObjects.hashCode;
 }
 
 class LoadMap extends Event {
@@ -188,13 +188,16 @@ class LoadMap extends Event {
   /// or if this event should immediately render the updated field (`true`).
   final bool showField;
 
+  final bool refreshObjects;
+
   LoadMap(
       {required this.map,
       required this.startingPosition,
       required this.facing,
       PartyArrangement? arrangement,
       this.updateParty,
-      this.showField = false})
+      this.showField = false,
+      this.refreshObjects = true})
       : arrangement = arrangement ?? PartyArrangement.overlapping;
 
   @override
@@ -212,14 +215,28 @@ class LoadMap extends Event {
           startingPosition == other.startingPosition &&
           facing == other.facing &&
           arrangement == other.arrangement &&
-          updateParty == other.updateParty;
+          updateParty == other.updateParty &&
+          refreshObjects == other.refreshObjects;
 
   @override
-  int get hashCode => map.hashCode ^ showField.hashCode;
+  int get hashCode =>
+      map.hashCode ^
+      showField.hashCode ^
+      startingPosition.hashCode ^
+      facing.hashCode ^
+      arrangement.hashCode ^
+      updateParty.hashCode ^
+      refreshObjects.hashCode;
 
   @override
   String toString() {
-    return 'LoadMap{map: $map, showField: $showField}';
+    return 'LoadMap{map: $map, '
+        'startingPosition: $startingPosition, '
+        'facing: $facing, '
+        'arrangement: $arrangement, '
+        'updateParty: $updateParty, '
+        'showField: $showField, '
+        'refreshObjects: $refreshObjects}';
   }
 }
 

@@ -1894,7 +1894,7 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
 
     _addToEvent(prepareMap,
-        (eventIndex) => refreshMap(refreshObjects: prepareMap.resetObjects));
+        (eventIndex) => refreshMap(refreshObjects: prepareMap.refreshObjects));
 
     _memory.isMapInCram = true;
     _memory.isMapInVram = true;
@@ -1968,7 +1968,8 @@ class SceneAsmGenerator implements EventVisitor {
           startX: Word(x).i,
           startY: Word(y).i,
           facingDir: facing.constant.i,
-          partyArrangement: alignByte.i));
+          partyArrangement: alignByte.i,
+          refreshObjects: loadMap.refreshObjects));
 
       if (_memory.cameraLock != false) {
         _eventAsm.add(events_asm.lockCamera(false));

@@ -757,7 +757,8 @@ Asm changeMap(
     required Address startX,
     required Address startY,
     required Address facingDir,
-    required Address partyArrangement}) {
+    required Address partyArrangement,
+    bool refreshObjects = true}) {
   return Asm([
     move.w(to, Field_Map_Index.w),
     if (from != null) move.w(from, Field_Map_Index_2.w),
@@ -773,7 +774,7 @@ Asm changeMap(
         }),
     move.w(facingDir, Map_Start_Facing_Dir.w),
     move.w(partyArrangement, Map_Start_Char_Align.w),
-    refreshMap(refreshObjects: true),
+    refreshMap(refreshObjects: refreshObjects),
   ]);
 }
 
