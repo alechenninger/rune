@@ -2909,9 +2909,21 @@ class SceneAsmGenerator implements EventVisitor {
         if ((_memory.isMapInVram == true && _memory.isMapInCram == false) ||
             _memory.isDialogInCram == false) {
           _initVramAndCram();
+
+          if (_memory.isMapInVram == true) {
+            // Then field is also shown now.
+            _memory.isMapInCram = true;
+            _memory.isFieldShown = true;
+          }
         }
         _eventAsm.add(jsr(Label('Pal_FadeIn').l));
         _memory.isDisplayEnabled = true;
+
+        if (_memory.isFieldShown == true) {
+          // Only hide sprites in cutscenes if the field is not shown.
+          // It may have been revealed.
+          _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
+        }
       } else if (_memory.isDialogInCram == false) {
         _eventAsm.add(Asm([
           lea(Constant('Pal_Init_Line_3').l, a0),
@@ -2920,9 +2932,9 @@ class SceneAsmGenerator implements EventVisitor {
           trap(1.i),
         ]));
         _memory.isDialogInCram = true;
+        // Field not shown; hide sprites.
+        _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
       }
-
-      _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
     }
 
     /*
