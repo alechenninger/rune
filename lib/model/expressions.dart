@@ -68,6 +68,8 @@ extension PositionExpressions on PositionExpression {
       DirectionOfVector(from: other, to: this);
   DirectionOfVector towards(PositionExpression other) =>
       DirectionOfVector(from: this, to: other);
+  OffsetPosition offset(Position offset) =>
+      OffsetPosition(this, offset: offset);
 }
 
 class PositionOfObject extends PositionExpression {
@@ -389,6 +391,7 @@ class DirectionOfVector extends DirectionExpression {
       return null;
     }
     var vector = knownTo - knownFrom;
+    // TODO(movement): is there a way we can specify "no change to direction"?
     if (vector.x == 0 && vector.y == 0) return Direction.up;
     var angle = atan2(vector.y, vector.x) * 180 / pi;
     return switch (angle) {
