@@ -116,6 +116,11 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 0x2e),
   FieldRoutine.asm(Word(0x9c), Label('FieldObj_Penguin'),
       spriteMappingTiles: 0x90),
+  FieldRoutine.asm(Word(0x158), Label('FieldObj_FireplaceFire'),
+      spriteMappingTiles: 0x1b),
+  FieldRoutine.asm(Word(0x314), Label('loc_4BDF0'), spriteMappingTiles: 0xE),
+  FieldRoutine.asm(Word(0x318), Label('loc_4BE38'), spriteMappingTiles: 0xE),
+  FieldRoutine.asm(Word(0x31c), Label('loc_4BE80'), spriteMappingTiles: 0xE),
 ]);
 
 class FieldRoutineRepository {
