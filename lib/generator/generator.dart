@@ -1173,26 +1173,27 @@ class SceneAsmGenerator implements EventVisitor {
       // if (_isProcessingInteraction) {
       //   return EventAsm.of(doInteractionUpdatesLoop(Word(frames)));
       // } else {
-      return _waitFrames(frames);
+      return _waitFrames(frames, runObjects: pause.runObjects);
     }
 
     switch (pause.duringDialog) {
-      case true:
-        _generateQueueInCurrentMode();
-        _runOrContinueDialog(pause);
-        var (asm, routines) = PauseCode(frames.toByte).toAsm(_memory);
-        _addToDialog(asm);
-        _postAsm.addAll(routines);
-        break;
       case false:
         _addToEvent(pause, generateEvent);
         break;
-      case null:
+      case null when !pause.runObjects:
+        // Not running objects so can do either
         _addToEventOrDialog(pause, inDialog: () {
           var (asm, routines) = PauseCode(frames.toByte).toAsm(_memory);
           _addToDialog(asm);
           _postAsm.addAll(routines);
         }, inEvent: generateEvent);
+        break;
+      case _: // true or null with runObjects
+        _generateQueueInCurrentMode();
+        _runOrContinueDialog(pause);
+        var (asm, routines) = PauseCode(frames.toByte).toAsm(_memory);
+        _addToDialog(asm);
+        _postAsm.addAll(routines);
         break;
     }
   }
@@ -1900,6 +1901,10 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.isMapInVram = true;
     _memory.isDialogInCram = true;
     _memory.stepSpeed = StepSpeed.normal();
+
+    if (prepareMap.refreshObjects) {
+      _memory.resetRoutines();
+    }
   }
 
   @override
@@ -2003,6 +2008,10 @@ class SceneAsmGenerator implements EventVisitor {
       // Reposition party in memory using the new position and arrangement.
       // TODO(loadmap): take into account num characters
       _memory.positions[BySlot(i)] = arrangement.offsets[i - 1] + startPos;
+    }
+
+    if (loadMap.refreshObjects) {
+      _memory.resetRoutines();
     }
   }
 
@@ -2667,11 +2676,14 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  Asm _waitFrames(int frames) {
+  Asm _waitFrames(int frames, {bool runObjects = false}) {
     checkArgument(frames >= 0, message: 'frames must be non-negative');
     if (frames == 0) return Asm.empty();
 
-    if (_memory.isFieldShown == false || (_memory.panelsShown ?? 0) > 0) {
+    if (runObjects) {
+      return doMainUpdatesLoop(Word(frames - 1));
+    } else if (_memory.isFieldShown == false ||
+        (_memory.panelsShown ?? 0) > 0) {
       return frames == 1 ? vIntPrepare() : vIntPrepareLoop(Word(frames - 1));
     } else {
       return doMapUpdateLoop(Word(frames - 1));
@@ -2920,7 +2932,7 @@ class SceneAsmGenerator implements EventVisitor {
         _eventAsm.add(jsr(Label('Pal_FadeIn').l));
         _memory.isDisplayEnabled = true;
 
-        if (_memory.isFieldShown == true) {
+        if (_memory.isFieldShown == false) {
           // Only hide sprites in cutscenes if the field is not shown.
           // It may have been revealed.
           _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));

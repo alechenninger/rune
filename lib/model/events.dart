@@ -1,5 +1,6 @@
 import 'dart:core';
 
+import 'package:quiver/check.dart';
 import 'package:rune/generator/generator.dart';
 
 import 'model.dart';
@@ -108,17 +109,26 @@ class Pause extends Event implements RunnableInDialog {
   ///
   /// If `null`, will use either depending on surrounding events.
   final bool? duringDialog;
+  final bool runObjects;
 
-  Pause(this.duration, {this.duringDialog = false});
+  Pause(this.duration, {this.duringDialog = false, this.runObjects = false}) {
+    checkArgument(!(runObjects && duringDialog == true),
+        message: "Cannot run objects while pausing during dialog.");
+  }
 
   Dialog asDialogEvent() {
+    if (runObjects) {
+      throw StateError("Cannot convert to dialog event if running objects.");
+    }
     return Dialog(spans: [DialogSpan("", pause: duration)]);
   }
 
   @override
-  bool canRunInDialog([EventState? state]) => duringDialog != false;
+  bool canRunInDialog([EventState? state]) =>
+      duringDialog != false && !runObjects;
 
-  Pause inDialog() => Pause(duration, duringDialog: true);
+  Pause inDialog() =>
+      Pause(duration, duringDialog: true, runObjects: runObjects);
 
   @override
   Asm generateAsm(AsmGenerator generator, AsmContext ctx) {
@@ -132,7 +142,9 @@ class Pause extends Event implements RunnableInDialog {
 
   @override
   String toString() {
-    return 'Pause{$duration, duringDialog: $duringDialog}';
+    return 'Pause{$duration, '
+        'duringDialog: $duringDialog, '
+        'runObjects: $runObjects}';
   }
 
   @override
@@ -141,7 +153,8 @@ class Pause extends Event implements RunnableInDialog {
       other is Pause &&
           runtimeType == other.runtimeType &&
           duration == other.duration &&
-          duringDialog == other.duringDialog;
+          duringDialog == other.duringDialog &&
+          runObjects == other.runObjects;
 
   @override
   int get hashCode => duration.hashCode ^ duringDialog.hashCode;

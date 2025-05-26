@@ -445,6 +445,11 @@ Asm doMapUpdateLoop(Word additionalFrames) {
   return Asm([move.w(additionalFrames.i, d0), jsr(Label('DoMapUpdateLoop').l)]);
 }
 
+Asm doMainUpdatesLoop(Word additionalFrames) {
+  return Asm(
+      [move.w(additionalFrames.i, d0), jsr(Label('DoMainUpdatesLoop').l)]);
+}
+
 @Deprecated('currently broken, but interesting idea')
 Asm doInteractionUpdatesLoop(Word additionalFrames) {
   return Asm([

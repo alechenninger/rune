@@ -51,6 +51,34 @@ void main() {
               ..distance = 2.steps
               ..delay = 3.steps)));
     });
+
+    test('face == steppath', () {
+      expect(
+          Face(up)..delay = 1.step,
+          equals(StepPath()
+            ..facing = up
+            ..delay = 1.step));
+      expect(
+          StepPath()
+            ..facing = up
+            ..delay = 1.step,
+          equals(Face(up)..delay = 1.step));
+    });
+
+    test('face == steppaths', () {
+      expect(
+          Face(up)..delay = 1.step,
+          equals(StepPaths()
+            ..step(StepPath()
+              ..facing = up
+              ..delay = 1.step)));
+      expect(
+          StepPaths()
+            ..step(StepPath()
+              ..facing = up
+              ..delay = 1.step),
+          equals(Face(up)..delay = 1.step));
+    });
   });
 
   group('step paths', () {
@@ -520,7 +548,7 @@ void main() {
       expect(scene.toString(), '''Scene{
       SetFlag{EventFlag{Talk_Test_obj_Test_0_PrincipalMeeting_1}}
       Dialog{speaker: Unnamed Speaker, hidePanelsOnClose: false, spans: [DialogSpan{text: Hi after Hahn joined, italic: false, events: []}]}
-      Pause{0:00:01.000000, duringDialog: false}
+      Pause{0:00:01.000000, duringDialog: false, runObjects: false}
 }''');
     });
 
@@ -540,7 +568,7 @@ void main() {
 
       expect(scene.toString(), '''Scene{
       Dialog{speaker: Unnamed Speaker, hidePanelsOnClose: false, spans: [DialogSpan{text: Hi, italic: false, events: []}]}
-      Pause{0:00:01.000000, duringDialog: false}
+      Pause{0:00:01.000000, duringDialog: false, runObjects: false}
       IfFlag{EventFlag{PrincipalMeeting}, 
       isSet:
                SetFlag{EventFlag{Talk_Test_obj_Test_0_PrincipalMeeting_1}}

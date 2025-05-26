@@ -304,6 +304,11 @@ class Memory implements EventState {
     _apply(UpdateRoutine(obj, r));
   }
 
+  @override
+  void resetRoutines() {
+    _apply(ResetRoutines());
+  }
+
   T _apply<T>(StateChange<T> change) {
     _changes.add(change);
     return change.apply(this);
@@ -747,5 +752,17 @@ class UpdateRoutine extends StateChange {
     } on ResolveException catch (_) {
       // Fall through; object may not be relevant in this state
     }
+  }
+}
+
+class ResetRoutines extends StateChange {
+  @override
+  apply(Memory memory) {
+    memory._eventState.resetRoutines();
+  }
+
+  @override
+  mayApply(Memory memory) {
+    memory._eventState.resetRoutines();
   }
 }

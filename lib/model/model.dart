@@ -371,6 +371,10 @@ class EventState {
     }
   }
 
+  void resetRoutines() {
+    _routines.clear();
+  }
+
   @override
   String toString() {
     return 'EventState{'
