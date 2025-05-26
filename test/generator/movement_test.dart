@@ -854,17 +854,18 @@ void main() {
             Asm([
               label(Label('.wait_for_movement_1_MapObjecttestnpc_0')),
               lea(0xFFFFC300.w, a4),
+              moveq(0.i, d0),
+              move.w(x_step_duration(a4), d0),
+              or.w(y_step_duration(a4), d0),
+              beq.s(Label('.1_MapObjecttestnpc_0_wait_for_movements_done')),
               jsr(Label('RunSingleObject').l),
               jsr(Label('Field_LoadSprites').l),
               jsr(Label('Field_BuildSprites').l),
               jsr(Label('AnimateTiles').l),
               jsr(Label('RunMapUpdates').l),
               jsr(Label('VInt_Prepare').l),
-              lea(0xFFFFC300.w, a4),
-              moveq(0.i, d0),
-              move.w(x_step_duration(a4), d0),
-              or.w(y_step_duration(a4), d0),
-              bne.s(Label('.wait_for_movement_1_MapObjecttestnpc_0')),
+              bra.s(Label('.wait_for_movement_1_MapObjecttestnpc_0')),
+              label(Label('.1_MapObjecttestnpc_0_wait_for_movements_done')),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(curr_x_pos(a4), dest_x_pos(a4)),
               move.w(curr_y_pos(a4), dest_y_pos(a4)),
@@ -1989,15 +1990,13 @@ void main() {
         ..individualMoves(moves)
         ..finish();
       var expected = Asm([
-            alys.toA4(testState),
-            move.w(facing_dir(a4), -(sp)),
-            shay.toA4(testState),
-            move.w((sp).postIncrement(), d0),
-            jsr(Label('Event_UpdateObjFacing').l),
-          ]);
-      expect(
-          asm.withoutComments().skip(1).take(expected.length),
-          expected);
+        alys.toA4(testState),
+        move.w(facing_dir(a4), -(sp)),
+        shay.toA4(testState),
+        move.w((sp).postIncrement(), d0),
+        jsr(Label('Event_UpdateObjFacing').l),
+      ]);
+      expect(asm.withoutComments().skip(1).take(expected.length), expected);
     });
 
     test('map object faces direction another object is facing', () {
@@ -2010,12 +2009,12 @@ void main() {
         ..individualMoves(moves)
         ..finish();
       var expected = Asm([
-            npc.toA4(testState),
-            move.w(facing_dir(a4), -(sp)),
-            npc2.toA4(testState),
-            move.w(sp.postIncrement(), d0),
-            jsr(Label('Event_UpdateObjFacing').l),
-          ]);
+        npc.toA4(testState),
+        move.w(facing_dir(a4), -(sp)),
+        npc2.toA4(testState),
+        move.w(sp.postIncrement(), d0),
+        jsr(Label('Event_UpdateObjFacing').l),
+      ]);
       expect(
           asm.withoutComments().tail(expected.length + 3).head(expected.length),
           expected);

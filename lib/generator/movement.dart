@@ -715,7 +715,7 @@ Asm _waitForMovement(
     jsr(Label('VInt_Prepare').l),
     //movem.l(sp.postIncrement(), d0 - a4),
     // Loop back and check again
-    beq.s(startOfLoop),
+    bra.s(startOfLoop),
     label(done),
   ]);
 }
