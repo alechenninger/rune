@@ -2921,22 +2921,14 @@ class SceneAsmGenerator implements EventVisitor {
         // but consider this intentional
         if ((_memory.isMapInVram == true && _memory.isMapInCram == false) ||
             _memory.isDialogInCram == false) {
+          // Clear VRAM
           _initVramAndCram();
-
-          if (_memory.isMapInVram == true) {
-            // Then field is also shown now.
-            _memory.isMapInCram = true;
-            _memory.isFieldShown = true;
-          }
+          _memory.isMapInVram = false;
+          // Line 3 is initialized
+          _memory.isDialogInCram = true;
         }
         _eventAsm.add(jsr(Label('Pal_FadeIn').l));
         _memory.isDisplayEnabled = true;
-
-        if (_memory.isFieldShown == false) {
-          // Only hide sprites in cutscenes if the field is not shown.
-          // It may have been revealed.
-          _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
-        }
       } else if (_memory.isDialogInCram == false) {
         _eventAsm.add(Asm([
           lea(Constant('Pal_Init_Line_3').l, a0),
@@ -2945,7 +2937,14 @@ class SceneAsmGenerator implements EventVisitor {
           trap(1.i),
         ]));
         _memory.isDialogInCram = true;
-        // Field not shown; hide sprites.
+      }
+
+      if (_memory.isMapInVram == true) {
+        // If map was in VRAM, then now field is shown.
+        // Don't hide sprites.
+        _memory.isFieldShown = true;
+      } else {
+        // No field means no sprites.
         _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
       }
     }

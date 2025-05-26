@@ -244,6 +244,36 @@ main() {
         ]));
   });
 
+  test('fade in while map in vram does not hide sprites', () {
+    var scene = Scene([
+      FadeOut(),
+      LoadMap(
+          map: map,
+          startingPosition: Position(0x200, 0x200),
+          facing: Direction.down),
+      Dialog.parse('Hi', speaker: alys),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(asm.event.withoutComments().trim().head(-1), Asm([
+      jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+      move.b(MapId.Test.world.toAsm.i, (World_Index).w),
+      move.w(Constant('MapID_Test').i, (Field_Map_Index).w),
+      move.w(Constant('MapID_Test').i, (Field_Map_Index_2).w),
+      move.w(0x40.toWord.i, (Map_Start_X_Pos).w),
+      move.w(0x40.toWord.i, (Map_Start_Y_Pos).w),
+      move.w(Constant('FacingDir_Down').i, (Map_Start_Facing_Dir).w),
+      move.w(0.i, (Map_Start_Char_Align).w),
+      bclr(3.i, (Map_Load_Flags).w),
+      jsr(Label('RefreshMap').l),
+      jsr(Label('Pal_FadeIn').l),
+      moveq(0.toByte.i, d0),
+      jsr(Label('Event_GetAndRunDialogue3').l),
+    ]));
+  });
+
   test('after fading out, does not fade in before map change', () {
     var scene = Scene([
       FadeOut(),
