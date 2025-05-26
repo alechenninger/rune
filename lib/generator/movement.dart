@@ -1379,10 +1379,12 @@ class PositionOfXYAsm extends PositionExpressionAsm {
       DirectAddressRegister load2 = a3}) {
     return positionOfXY.x.withValue(
         memory: memory,
+        loadVal: loadX,
         load: load,
         asm: (x) {
           return positionOfXY.y.withValue(
               memory: memory,
+              loadVal: loadY,
               load: load2,
               asm: (y) {
                 return asm(x, y);
