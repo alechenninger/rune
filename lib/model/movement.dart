@@ -345,10 +345,11 @@ class IndividualMoves extends Event implements RunnableInDialog {
     if (speed != other.speed) return null;
 
     var result = IndividualMoves();
+    result.speed = speed;
+    result.collideLead = collideLead;
     result.moves.addAll(moves);
 
-    for (var MapEntry(key: moveable, value: move)
-        in other.delayed(duration).moves.entries) {
+    for (var MapEntry(key: moveable, value: move) in other.moves.entries) {
       if (result.moves[moveable] case var existing?) {
         if (existing.append(move) case var appended?) {
           result.moves[moveable] = appended;
@@ -356,7 +357,7 @@ class IndividualMoves extends Event implements RunnableInDialog {
           return null;
         }
       } else {
-        result.moves[moveable] = move;
+        result.moves[moveable] = move.delayed(duration);
       }
     }
     return result;
