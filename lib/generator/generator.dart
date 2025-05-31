@@ -2248,9 +2248,6 @@ class SceneAsmGenerator implements EventVisitor {
   void addMoney(AddMoney addMoney) {
     _checkNotFinished();
 
-    // addi.l	#300, (Current_Money).w
-    // 	addi.l	#100, (Current_Money).w
-
     if (addMoney.meseta == 0) {
       return;
     }
