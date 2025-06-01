@@ -1959,11 +1959,24 @@ class SceneAsmGenerator implements EventVisitor {
             _eventAsm.add(events_asm.fadeOut());
             _memory.isMapInCram = false;
             _memory.isDialogInCram = false;
+
+            // Remove panels while in fade out if present.
+            if ((_memory.panelsShown ?? 0) > 0) {
+              _eventAsm.add(jsr(Label('Panel_DestroyAll').l));
+              _memory.panelsShown = 0;
+            }
           }
           _eventAsm.add(jsr(Label('Pal_FadeIn').l));
           _eventAsm.add(jsr(Label('VInt_Prepare').l));
           _memory.isDisplayEnabled = true;
         }
+      }
+
+      // If by this point, there are still panels, remove them.
+      // Otherwise map change will corrupt them.
+      if ((_memory.panelsShown ?? 0) > 0) {
+        _eventAsm.add(jsr(Label('Panel_DestroyAll').l));
+        _memory.panelsShown = 0;
       }
 
       _eventAsm.add(move.b(newMap.id.world.toAsm.i, World_Index.w));
