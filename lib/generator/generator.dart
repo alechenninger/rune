@@ -2886,7 +2886,13 @@ class SceneAsmGenerator implements EventVisitor {
     // TODO: call generatequeueincurrentmode here instead of before calling this method
 
     _context.getAndIncrementEventCount();
-    _expectFacePlayerFirstIfInteraction();
+
+    if (_gameMode case InteractionMode m
+        when _lastEventInCurrentDialog == null && m.isWithObject) {
+      // This is an interaction and we're not starting with face player,
+      // so signal not to.
+      _addToDialog(dc.b(Bytes.of(0xf3)));
+    }
 
     switch (_gameMode) {
       case InteractionMode() || EventMode(isInDialogLoop: true):
@@ -2897,6 +2903,19 @@ class SceneAsmGenerator implements EventVisitor {
         }
         break;
       case EventMode m:
+        if (_memory.dialogTriggered == false &&
+            m.priorMode is InteractionMode) {
+          // This is the first dialog coming from an interaction,
+          // so play selection sound.
+          // Normally, this happens in the engine when interacting,
+          // but only when there is no event, because it knows there is dialog.
+          // We do it here so that the sound is only played
+          // on only the first dialog event
+          // (unlike the original, which plays it for every dialog event).
+          _eventAsm.add(
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l));
+          _memory.dialogTriggered = true;
+        }
         _runDialog(m);
         break;
       case RunEventMode():
@@ -2906,15 +2925,6 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _lastEventInCurrentDialog = event;
-  }
-
-  void _expectFacePlayerFirstIfInteraction() {
-    if (!_inEvent &&
-        _isInteractingWithObject &&
-        _lastEventInCurrentDialog == null) {
-      // Not starting with face player, so signal not to.
-      _addToDialog(dc.b(Bytes.of(0xf3)));
-    }
   }
 
   void _runDialog(EventMode mode) {

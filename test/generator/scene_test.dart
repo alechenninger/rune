@@ -133,6 +133,7 @@ ${dialog2.toAsm()}
           mapAsm.events.withoutComments().trim(),
           Asm([
             setLabel('Event_GrandCross_Test_testObj'),
+            move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
             getAndRunDialog3LowDialogId(Byte.one.i),
             generateEventAsm([moves], origState).withoutComments(),
             returnFromInteractionEvent()
@@ -173,6 +174,7 @@ ${dialog2.toAsm()}
             Asm([
               setLabel('Event_GrandCross_Test_0'),
               jsr(Label('Interaction_UpdateObj').l),
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
               getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([
                 IndividualMoves()..moves[alys] = (StepPath()..distance = 1.step)
@@ -262,6 +264,7 @@ ${dialog2.toAsm()}
             Asm([
               setLabel('Event_GrandCross_Test_0'),
               jsr(Label('Interaction_UpdateObj').l),
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
               getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([moves], origState).withoutComments(),
               popAndRunDialog3,
@@ -323,6 +326,7 @@ ${dialog2.toAsm()}
             Asm([
               setLabel('Event_GrandCross_Test_0'),
               jsr(Label('Interaction_UpdateObj').l),
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
               getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([move1], origState).withoutComments(),
               popAndRunDialog3,
@@ -370,6 +374,7 @@ ${dialog2.toAsm()}
             mapAsm.events.withoutComments().trim(),
             Asm([
               setLabel('Event_GrandCross_Test_0'),
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
               getAndRunDialog3LowDialogId(Byte.one.i),
               generateEventAsm([pause]).withoutComments(),
               returnFromInteractionEvent()
@@ -1515,7 +1520,9 @@ ${dialog2.toAsm()}
         expect(
             asm.events.withoutComments().trim().skip(1),
             Asm([
-              moveq(Byte(2).i, d0), // 0 is start, 1 is unset, 2 is set
+              // 0 is check & unset, 1 set (run event), 2 is set dialog
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
+              moveq(Byte(2).i, d0),
               jsr(Label('Event_GetAndRunDialogue3').l),
               alys.toA4(Memory()),
               updateObjFacing(down.address),

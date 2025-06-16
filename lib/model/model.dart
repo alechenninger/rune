@@ -253,17 +253,20 @@ class EventState {
   }
 
   EventState._branch(EventState from) : slots = from.slots.branch() {
-    _facing.addAll(from._facing);
     _positions = Positions._(this);
     positions.addAll(from.positions);
     startingAxis = from.startingAxis;
     followLead = from.followLead;
     cameraLock = from.cameraLock;
     isFieldShown = from.isFieldShown;
+    onExitRunBattle = from.onExitRunBattle;
     dialogPortrait = from.dialogPortrait;
     keepDialog = from.keepDialog;
     currentMap = from.currentMap;
+    stepSpeed = from.stepSpeed;
+    dialogTriggered = from.dialogTriggered;
     panelsShown = from.panelsShown;
+    _facing.addAll(from._facing);
     _routines.addAll(from._routines);
   }
 
@@ -301,6 +304,8 @@ class EventState {
     // TODO: correct this based on story state
     return Character.allCharacters;
   }
+
+  bool? dialogTriggered = false;
 
   int? panelsShown = 0;
   void addPanel() {

@@ -72,6 +72,7 @@ main() {
         expect(
             asm.events.withoutComments().trim().skip(1),
             Asm([
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
               getAndRunDialog3LowDialogId(Byte(1).i),
               tst.b(Constant('Yes_No_Option').w),
               beq.w(Label('.4_yes_choice')),
@@ -148,6 +149,7 @@ main() {
         expect(
             asm.events.withoutComments().trim().skip(1),
             Asm([
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
               getAndRunDialog3LowDialogId(Byte(1).i),
               tst.b(Constant('Yes_No_Option').w),
               beq.w(Label('.3_yes_choice')),

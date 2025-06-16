@@ -46,6 +46,7 @@ void main() {
         expect(
             asm.events.withoutComments().withoutEmptyLines().skip(1),
             Asm([
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
               getAndRunDialog3LowDialogId(1.toByte.i),
               lea(0xFFFFC300.w, a4),
               move.b(0x2.toByte.i, dialogue_id(a4)),

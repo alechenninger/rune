@@ -309,6 +309,15 @@ class Memory implements EventState {
     _apply(ResetRoutines());
   }
 
+  @override
+  set dialogTriggered(bool? triggered) {
+    _apply(SetValue<bool>(triggered, (mem) => mem._eventState.dialogTriggered,
+        (val, mem) => mem._eventState.dialogTriggered = val));
+  }
+
+  @override
+  bool? get dialogTriggered => _eventState.dialogTriggered;
+
   T _apply<T>(StateChange<T> change) {
     _changes.add(change);
     return change.apply(this);
