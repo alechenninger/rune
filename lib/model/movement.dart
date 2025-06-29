@@ -302,29 +302,56 @@ class IndividualMoves extends Event implements RunnableInDialog {
   bool get isEmpty => moves.isEmpty;
 
   AbsoluteMoves? get asAbsoluteMoves {
-    var moves = AbsoluteMoves();
+    var (abs, _) = asAbsoluteAndFacing;
+    return abs;
+  }
+
+  (AbsoluteMoves?, IndividualMoves?) get asAbsoluteAndFacing {
+    AbsoluteMoves? absolute;
+    IndividualMoves? facing;
     Axis? startingAxis;
 
-    for (var MapEntry(key: obj, value: move) in this.moves.entries) {
-      var (OffsetPosition? destination, Axis? axis) = switch (move) {
-        StepPath move when move.willNotFace => (
-            move.asPositionExpressionFrom(obj.position()),
-            null
-          ),
-        StepPaths move => move.asPositionExpressionFrom(obj.position()),
-        _ => (null, null)
-      };
-      if (destination == null) return null;
+    bool moveAbsoluteTo(
+        FieldObject obj, OffsetPosition destination, Axis? axis) {
       if (startingAxis == null) {
         startingAxis = axis;
       } else if (startingAxis != axis) {
-        return null;
+        return false;
       }
-      moves.destinations[obj] = destination;
+      absolute ??= AbsoluteMoves();
+      absolute!.destinations[obj] = destination;
+      return true;
     }
 
-    moves.speed = speed;
-    return moves;
+    face(FieldObject obj, RelativeMovement direction) {
+      facing ??= IndividualMoves();
+      facing!.moves[obj] = direction;
+    }
+
+    for (var MapEntry(key: obj, value: move) in moves.entries) {
+      switch (move) {
+        case RelativeMovement m when m.justFacing:
+          face(obj, m);
+          break;
+        case StepPath move when move.willNotFace:
+          var dest = move.asPositionExpressionFrom(obj.position());
+          if (!moveAbsoluteTo(obj, dest, null)) return (null, null);
+          break;
+        case StepPaths move:
+          var (dest, axis) = move.asPositionExpressionFrom(obj.position());
+          if (dest == null) {
+            return (null, null);
+          }
+          if (!moveAbsoluteTo(obj, dest, axis)) return (null, null);
+          break;
+
+        default:
+          return (null, null);
+      }
+    }
+
+    absolute?.speed = speed;
+    return (absolute, facing);
   }
 
   IndividualMoves delayed(Steps delay) {
@@ -596,6 +623,9 @@ abstract class RelativeMovement {
 
   /// If this movement represents an object standing still (doing nothing).
   bool get still => duration == 0.steps && facing == null;
+
+  /// If all this movement will do is face.
+  bool get justFacing => duration == 0.steps && facing != null;
 
   /// Attempt to append the movement [m] to this one.
   ///

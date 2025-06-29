@@ -2903,6 +2903,7 @@ class SceneAsmGenerator implements EventVisitor {
         }
         break;
       case EventMode m:
+        // TODO(dialog): consider if this should trigger regardless of prior mode
         if (_memory.dialogTriggered == false &&
             m.priorMode is InteractionMode) {
           // This is the first dialog coming from an interaction,
