@@ -37,7 +37,7 @@ Asm stepObjectToAsm(StepObject step,
       destinationY: d1,
       asm: (x, y) => Asm([
             step.object.toA4(memory),
-            if (step.onTop) move.b(1.i, 5(a4)),
+            if (step.onTop) bset(0.i, priority_flag(a4)),
             switch (x) {
               d0 => Asm.empty(),
               // Use unsigned because we expect
@@ -60,7 +60,7 @@ Asm stepObjectToAsm(StepObject step,
               jsr(Label('Event_StepObject').l)
             else
               jsr(Label('Event_StepObjectNoAnimate').l),
-            if (step.onTop) clr.b(5(a4)),
+            if (step.onTop) bclr(0.i, priority_flag(a4)),
             move.w(curr_x_pos(a4), dest_x_pos(a4)),
             move.w(curr_y_pos(a4), dest_y_pos(a4)),
           ]));
@@ -125,7 +125,7 @@ Asm stepObjectsToAsm(StepObjects step,
     // Load character
     asm.add(Asm([
       obj.toA4(memory, force: true),
-      if (step.onTop) move.b(1.i, 5(a4)),
+      if (step.onTop) bset(0.i, priority_flag(a4)),
       // Grab d0 and d1 from stack but leave the stack pointer there
       move.l(sp.indirect, d1),
       move.l(4(sp), d0),

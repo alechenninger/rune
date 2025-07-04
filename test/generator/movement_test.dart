@@ -1589,6 +1589,90 @@ void main() {
               dc.l([Label('TestScene_0_1_0_AbsoluteMoves')]),
             ]));
       });
+
+      test('multiple characters following leader requires animate bit', () {
+        // Given a party move (follow leader),
+        // bit 1 of priority_flag should be set in order to ensure
+        // all characters animate correctly, during dialog.
+        var event = AbsoluteMoves()
+          ..destinations[BySlot.one] = Position(0x1a0, 0x1f0)
+          ..followLeader = true
+          ..waitForMovements = false;
+        var dialog = Dialog(spans: DialogSpan.parse('hello', events: [event]));
+
+        var (asm, postRoutines) = dialog.toGeneratedAsm(
+            state
+              ..cameraLock = true
+              ..followLead = false,
+            labeller: Labeller.localTo('TestScene').withContext(0),
+            fieldRoutines: defaultFieldRoutines);
+
+        expect(postRoutines, [
+          Asm([
+            label(Label('TestScene_0_0_0_AbsoluteMoves')),
+            followLeader(true),
+            BySlot.one.toA4(testState),
+            setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            bset(1.i, priority_flag(a4)),
+            BySlot.two.toA4(testState),
+            bset(1.i, priority_flag(a4)),
+            BySlot.three.toA4(testState),
+            bset(1.i, priority_flag(a4)),
+            BySlot.four.toA4(testState),
+            bset(1.i, priority_flag(a4)),
+            BySlot.five.toA4(testState),
+            bset(1.i, priority_flag(a4)),
+            rts,
+          ])
+        ]);
+
+        expect(
+            asm,
+            Asm([
+              dc.b(Bytes.ascii('hello')),
+              dc.b([ControlCodes.action, Byte(0xf)]),
+              dc.l([Label('TestScene_0_0_0_AbsoluteMoves')])
+            ]));
+      });
+
+      test('resets address register state', () {
+        // Movements set address registers,
+        // however these are lost within the dialog loop
+        // Test that characters are re-loaded into a4 seemingly redundantly
+        var dialog = Dialog(
+            spans: DialogSpan.parse('hello', events: [
+          (AbsoluteMoves()
+            ..destinations[shay] = Position(0x1a0, 0x1f0)
+            ..followLeader = false
+            ..waitForMovements = false),
+          WaitForMovements([shay])
+        ]));
+
+        var (asm, postRoutines) = dialog.toGeneratedAsm(
+            state..cameraLock = true,
+            labeller: Labeller.localTo('TestScene').withContext(0),
+            fieldRoutines: defaultFieldRoutines);
+
+        expect(postRoutines, [
+          Asm([
+            label(Label('TestScene_0_0_0_AbsoluteMoves')),
+            followLeader(false),
+            shay.toA4(testState),
+            bset(1.i, priority_flag(a4)),
+            setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
+            rts,
+          ]),
+          Asm([
+            label(Label('TestScene_0_0_1_WaitForMovements')),
+            jsr(Label('Event_MoveCharacters').l),
+            // Should expect "redundant" load
+            shay.toA4(testState..unknownAddressRegisters()),
+            bclr(1.i, priority_flag(a4)),
+            move.b(1.toByte.i, FieldObj_Step_Offset.w),
+            rts
+          ])
+        ]);
+      });
     });
   });
 

@@ -87,8 +87,8 @@ class DialogAsm extends Asm {
 typedef DialogAndRoutines = (Asm dialog, List<Asm> post);
 
 sealed class DialogEvent {
-  /// Returns the ASM for the dialog event and 
-  /// any routines that need to be added to post-event ASM 
+  /// Returns the ASM for the dialog event and
+  /// any routines that need to be added to post-event ASM
   /// in separate subroutines.
   DialogAndRoutines toAsm(Memory state,
       {required Labeller labeller,
@@ -205,6 +205,10 @@ class FaceInDialogRoutine extends DialogEvent {
       dc.l([routineLbl])
     ]);
 
+    // a0 and a1 are set by assembly for run routine dialog action routine
+    // But a0-a4 are also popped from stack.
+    state.unknownAddressRegisters();
+
     return (dialog, [routine]);
   }
 
@@ -296,7 +300,7 @@ class AbsoluteMovesInDialog extends DialogEvent {
     var routineLbl = labeller.withContext('AbsoluteMoves').next();
     var routine = Asm([
       label(routineLbl),
-      absoluteMovesToAsm(moves, state, labeller: labeller),
+      absoluteMovesToAsm(moves, state, labeller: labeller, duringDialog: true),
       rts
     ]);
 
@@ -304,6 +308,10 @@ class AbsoluteMovesInDialog extends DialogEvent {
       dc.b([ControlCodes.action, Byte(0xf)]),
       dc.l([routineLbl])
     ]);
+
+    // a0 and a1 are set by assembly for run routine dialog action routine
+    // But a0-a4 are also popped from stack.
+    state.unknownAddressRegisters();
 
     return (dialog, [routine]);
   }
@@ -328,6 +336,10 @@ class WaitForMovementsInDialog extends DialogEvent {
       dc.b([ControlCodes.action, Byte(0xf)]),
       dc.l([routineLbl])
     ]);
+
+    // a0 and a1 are set by assembly for run routine dialog action routine
+    // But a0-a4 are also popped from stack.
+    state.unknownAddressRegisters();
 
     return (dialog, [routine]);
   }

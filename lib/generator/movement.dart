@@ -270,7 +270,7 @@ int Function(RelativeMove<FieldObject>, RelativeMove<FieldObject>)
 }
 
 EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
-    {int? eventIndex, Labeller? labeller}) {
+    {int? eventIndex, Labeller? labeller, bool duringDialog = false}) {
   // We assume we don't know the current positions,
   // so we don't know which move is longer.
   // Just start all in parallel.
@@ -317,7 +317,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
     // TODO: need to set animate flag when not waiting for movements and remove from dialog generation
     if (!moves.waitForMovements &&
         // If follow leader is set, we'll set the flags for all slots later
-        (obj.isNotCharacter || !moves.followLeader)) {
+        (obj.isNotCharacter || (duringDialog && !moves.followLeader))) {
       asm.add(bset(1.i, priority_flag(a4)));
     }
 
@@ -383,7 +383,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
       state.putInAddress(a3, null);
       state.putInAddress(a5, null);
       state.putInAddress(a6, null);
-    } else if (moves.followLeader) {
+    } else if (moves.followLeader && duringDialog) {
       // Because we're following the leader, other characters will move that
       // weren't referenced in destinations.
       // Because we are not waiting for movements, we need to set their animate
@@ -428,11 +428,13 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
         move.w(dest_y_pos(a4), d1),
         jsr(Label('Event_MoveCharacter').l),
         // Reset move in dialog bit
-        // TODO: this could erroneously change an object that normally animates
+        // TODO(correctness): this could erroneously change an object that normally animates
         bclr(1.i, priority_flag(a4)),
       ]),
     if (chars.isNotEmpty) jsr(Label('Event_MoveCharacters').l),
     // Reset move in dialog bit
+    // This is only set in case we moved in dialog,
+    // but it doesn't hurt to clear
     for (var char in chars)
       Asm([
         char.toA4(memory),

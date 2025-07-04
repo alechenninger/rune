@@ -724,7 +724,6 @@ class SceneAsmGenerator implements EventVisitor {
         _ => false
       };
 
-  // i think this should always be true if mode == event?
   /// Whether or not we are generating in the context of an existing event.
   ///
   /// This is necessary to understand whether, when in dialog mode, we can pop
