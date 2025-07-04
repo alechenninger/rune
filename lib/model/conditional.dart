@@ -152,6 +152,7 @@ const storyEvents = [
   EventFlag('KyraJoined'),
   EventFlag('InnerSanctuary'),
   //EventFlag('InnerSanctGuard1'),
+  // Grand Cross - EventFlag('MetHasari') – might be necessary for talk.
   EventFlag('LutzRevelation'),
   EventFlag('EclipseTorchStolen'),
   EventFlag('AirCastleFound'),
