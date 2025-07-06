@@ -853,6 +853,12 @@ class SceneAsmGenerator implements EventVisitor {
         break;
       default:
         // Other modes (event, run event) support events.
+        // TODO: Note that in order for run event to support events,
+        // it has to lazily transition to event mode anyway.
+        // So we may just want to do that here
+        // if the event type required is 'event'.
+        // We already have _addToEventOrRunEvent if we know it's okay
+        // in either mode.
         break;
     }
   }
@@ -2924,8 +2930,14 @@ class SceneAsmGenerator implements EventVisitor {
         _runDialog(m);
         break;
       case RunEventMode():
-        // NOTE: It is dangerous to runEvent() without knowing the event type
+        // We need to switch to event mode,
+        // though we don't know what the type is.
         // We assume event, but it may not be.
+        // This can be dangerous, but currently this is done because
+        // we rely on lazily entering event mode from a run event.
+        // If it's actually a problem,
+        // an exception will be thrown later in generation,
+        // so in practice it's probably not an issue.
         var m = runEvent(type: EventType.event);
         _runDialog(m);
         break;
@@ -3215,14 +3227,16 @@ class SceneAsmGenerator implements EventVisitor {
 
     switch (_gameMode) {
       case RunEventMode():
-        // We have to switch modes, but we don't know what events are coming,
-        // so we cannot pick the right event type.
-        // This probably means we got here without a conditional.
-        // A run event intentionally doesn't try to pick the right event type
-        // up front, because it doesn't make sense.
-        throw StateError('got event ASM but in RunEvent mode. '
-            'can only modify run event ASM. '
-            '(likely missing conditional at start of scene)');
+        // We need to switch to event mode,
+        // though we don't know what the type is.
+        // We assume event, but it may not be.
+        // This can be dangerous, but currently this is done because
+        // we rely on lazily entering event mode from a run event.
+        // If it's actually a problem,
+        // an exception will be thrown later in generation,
+        // so in practice it's probably not an issue.
+        runEvent(type: EventType.event);
+        break;
       case EventMode():
         _terminateDialog(
             hidePanels: false,

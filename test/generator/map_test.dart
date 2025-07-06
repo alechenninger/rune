@@ -2371,23 +2371,25 @@ void main() {
       });
     });
 
-    test('requires conditional in run event if event first', () {
+    test('fails if dialog without field in non-cutscene mode (event-first)',
+        () {
       // Given a run event scene with no conditional in the beginning,
       // generation should fail.
       testMap.addEvent(
           SceneId('testrun'),
           Scene([
             Pause(3.seconds),
+            FadeOut(),
+            Dialog(spans: [DialogSpan('Hi')]),
           ]));
       expect(() => program.addMap(testMap), throwsA(isA<GeneratorException>()));
     });
 
-    test('fails if dialog without field in non-cutscene mode', () {
+    test('fails if dialog without field in non-cutscene mode (dialog-first)',
+        () {
       testMap.addEvent(
           SceneId('testrun'),
           Scene([
-            // This happens because dialog is first in the run event
-            // as opposed to conditional or event
             Dialog(spans: [DialogSpan('Hi')]),
             FadeOut(),
             Dialog(spans: [DialogSpan('Hi')]),
