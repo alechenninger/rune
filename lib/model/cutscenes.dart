@@ -278,4 +278,19 @@ class PanelByIndex implements Panel {
   final int index;
 
   PanelByIndex(this.index);
+
+  @override
+  String toString() {
+    return 'PanelByIndex{index: $index}';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PanelByIndex &&
+          runtimeType == other.runtimeType &&
+          index == other.index;
+
+  @override
+  int get hashCode => index.hashCode;
 }

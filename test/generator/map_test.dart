@@ -19,6 +19,7 @@ void main() {
     testMap = GameMap(MapId.Test);
     program = Program(
         eventPointers: EventPointers.empty(),
+        cutscenePointers: EventPointers.empty(),
         runEvents: JumpTable(
             jump: bra.w, newIndex: Byte.new, labels: [RunEvent_NoEvent]));
     testEventRoutines = TestEventRoutines();
@@ -2046,6 +2047,15 @@ void main() {
               rts,
             ]));
       });
+
+      test('event pointer', () {
+        expect(
+          program.eventPointers,
+          Asm([
+            dc.l([Label('Event_GrandCross_testrun3')], comment: r'$0000'),
+          ]),
+        );
+      });
     });
 
     group('with nested event flag checks generates', () {
@@ -2336,8 +2346,68 @@ void main() {
     });
 
     group('with cutscenes', () {
-      // TODO: ensure cutscenes are run when needed
-      // TODO: ensure cutscene pointers are created
+      setUp(() {
+        testMap.addEvent(
+            SceneId('testrun'),
+            Scene([
+              IfFlag(EventFlag('testflag'), isUnset: [
+                SetFlag(EventFlag('testflag')),
+                Dialog(spans: [DialogSpan('Hi')]),
+                FadeOut(),
+                ShowPanel(PanelByIndex(0)),
+                Dialog(spans: [DialogSpan('Hi')]),
+              ])
+            ]));
+
+        asm = program.addMap(testMap);
+      });
+
+      test('ensure cutscene event is run', () {
+        expect(
+            program.cutscenesPointers,
+            Asm([
+              dc.l([Label('Event_GrandCross_testrun2')], comment: r'$0000'),
+            ]));
+      });
+    });
+
+    test('requires conditional in run event if event first', () {
+      // Given a run event scene with no conditional in the beginning,
+      // generation should fail.
+      testMap.addEvent(
+          SceneId('testrun'),
+          Scene([
+            Pause(3.seconds),
+          ]));
+      expect(() => program.addMap(testMap), throwsA(isA<GeneratorException>()));
+    });
+
+    test('fails if dialog without field in non-cutscene mode', () {
+      testMap.addEvent(
+          SceneId('testrun'),
+          Scene([
+            // This happens because dialog is first in the run event
+            // as opposed to conditional or event
+            Dialog(spans: [DialogSpan('Hi')]),
+            FadeOut(),
+            Dialog(spans: [DialogSpan('Hi')]),
+          ]));
+      expect(() => program.addMap(testMap), throwsA(isA<GeneratorException>()));
+    });
+
+    test('does not fail if panel without field in non-cutscene mode', () {
+      testMap.addEvent(
+          SceneId('testrun'),
+          Scene([
+            Dialog(spans: [DialogSpan('Hi')]),
+            FadeOut(),
+            ShowPanel(PanelByIndex(0)),
+          ]));
+      expect(
+        () => program.addMap(testMap),
+        returnsNormally,
+        reason: 'ShowPanel without field should not fail',
+      );
     });
   });
 }

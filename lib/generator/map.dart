@@ -53,6 +53,10 @@ class MapAsm {
       areas,
       '; events',
       events,
+      '; run event routines',
+      runEventRoutines,
+      '; run event indices',
+      runEventIndices,
     ].join('\n');
   }
 }

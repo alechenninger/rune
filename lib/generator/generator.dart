@@ -1355,6 +1355,9 @@ class SceneAsmGenerator implements EventVisitor {
             // this won't run an event immediately.
             // The purpose of this is to catch if we need a cutscene
             // while we know what events will be visited.
+            // TODO: This assumes that when not needed,
+            // we are okay with dialog. But in the case of a RunEvent,
+            // this is not true.
             runEventIfNeeded(ifFlag.isSet,
                 nameSuffix: '_${ifFlag.flag.name}_set');
 
@@ -2054,6 +2057,8 @@ class SceneAsmGenerator implements EventVisitor {
 
         if (_memory.isDisplayEnabled == false) {
           if (_memory.isMapInVram == true) {
+            // Note: Just a panel without map does not require cutscene mode
+            // Confirmed this with emulator.
             _initVramAndCram();
           }
           _eventAsm.add(jsr(Label('Pal_FadeIn').l));
@@ -2919,7 +2924,9 @@ class SceneAsmGenerator implements EventVisitor {
         _runDialog(m);
         break;
       case RunEventMode():
-        var m = runEvent();
+        // NOTE: It is dangerous to runEvent() without knowing the event type
+        // We assume event, but it may not be.
+        var m = runEvent(type: EventType.event);
         _runDialog(m);
         break;
     }
@@ -2965,6 +2972,11 @@ class SceneAsmGenerator implements EventVisitor {
         _memory.isFieldShown = true;
       } else {
         // No field means no sprites.
+        // If we are not in cutscene mode, though, this won't work.
+        if (mode.type != EventType.cutscene) {
+          throw StateError('dialog without field, but not in cutscene mode. '
+              'this will cause sprites to be rendered erroneously.');
+        }
         _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
       }
     }
@@ -3203,8 +3215,14 @@ class SceneAsmGenerator implements EventVisitor {
 
     switch (_gameMode) {
       case RunEventMode():
-        runEvent();
-        break;
+        // We have to switch modes, but we don't know what events are coming,
+        // so we cannot pick the right event type.
+        // This probably means we got here without a conditional.
+        // A run event intentionally doesn't try to pick the right event type
+        // up front, because it doesn't make sense.
+        throw StateError('got event ASM but in RunEvent mode. '
+            'can only modify run event ASM. '
+            '(likely missing conditional at start of scene)');
       case EventMode():
         _terminateDialog(
             hidePanels: false,
