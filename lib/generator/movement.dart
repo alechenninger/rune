@@ -1072,18 +1072,24 @@ class DirectionOfVectorAsm extends DirectionExpressionAsm {
     //     from == Slot.one.position()) {}
 
     labelSuffix ??= '';
+    var xRegister = d2;
+    var yRegister = d3;
+    var xMagnitude = d4;
+    var yMagnitude = d5;
 
-    return Asm([
+    // Generate first part up until zero vector branch
+    var answer = Asm([
       // Diff x
       directionOfVector.to
-          .withX(memory: memory, asm: (x) => move.w(x, d2), load: load2),
+          .withX(memory: memory, asm: (x) => move.w(x, xRegister), load: load2),
       directionOfVector.from.withX(
           memory: memory,
-          asm: (x) => x is Immediate ? subi.w(x, d2) : sub.w(x, d2),
+          asm: (x) =>
+              x is Immediate ? subi.w(x, xRegister) : sub.w(x, xRegister),
           load: load1),
       // Diff y
       directionOfVector.to
-          .withY(memory: memory, asm: (y) => move.w(y, d3), load: load2),
+          .withY(memory: memory, asm: (y) => move.w(y, yRegister), load: load2),
       // not sure if below comment is still relevant
       // TODO(optimization): could consider allowing a force load of load1
       // even if not needed. this would be an optimization when using
@@ -1091,23 +1097,29 @@ class DirectionOfVectorAsm extends DirectionExpressionAsm {
       // then have to deal with saving d0 to the stack
       directionOfVector.from.withY(
           memory: memory,
-          asm: (y) => y is Immediate ? subi.w(y, d3) : sub.w(y, d3),
+          asm: (y) =>
+              y is Immediate ? subi.w(y, yRegister) : sub.w(y, yRegister),
           load: load1),
       // Compute the magnitudes of the deltas
-      move.w(d2, d4),
+      // To do this we need absolute values first
+      move.w(xRegister, xMagnitude),
       bpl.s(Label('.positive_dx$labelSuffix')),
-      neg.w(d4),
+      neg.w(xMagnitude), // d4 = abs(dx)
       label(Label('.positive_dx$labelSuffix')),
-      move.w(d3, d5),
+      move.w(yRegister, yMagnitude),
       bpl.s(Label('.positive_dy$labelSuffix')),
-      neg.w(d5),
+      neg.w(yMagnitude), // d5 = abs(dy)
       label(Label('.positive_dy$labelSuffix')),
-      // Compare magnitudes
-      cmp.w(d4, d5),
+      // Now compare magnitudes
+      cmp.w(xMagnitude, yMagnitude),
+      // If y is greater, determine up or down
       bgt.s(Label('.checky$labelSuffix')),
 
-      // Check horizontal
-      tst.w(d2),
+      // Not, so check if equal (zero vector)
+      beq.s(Label('.zerovector$labelSuffix')),
+
+      // Else, determine left or right
+      tst.w(xRegister),
       bpl.s(Label('.right$labelSuffix')),
       move.w(FacingDir_Left.i, destination),
       bra.s(Label('.keep$labelSuffix')), // keep
@@ -1117,17 +1129,46 @@ class DirectionOfVectorAsm extends DirectionExpressionAsm {
 
       // Check vertical
       label(Label('.checky$labelSuffix')),
-      tst.w(d3),
+      tst.w(yRegister),
       bpl.s(Label('.down$labelSuffix')),
       move.w(FacingDir_Up.i, destination),
       bra.s(Label('.keep$labelSuffix')), // keep
 
       label(Label('.down$labelSuffix')),
       move.w(FacingDir_Down.i, destination),
+      bra.s(Label('.keep$labelSuffix')), // keep
 
-      label(Label('.keep$labelSuffix')),
-      asm(destination)
+      label(Label('.zerovector$labelSuffix'))
     ]);
+
+    // To process zero branch, we may manipulate memory.
+    // But because this is a branch, we need to track what it changes.
+    // Before processing the ASM callback, we'll need to reset memory
+    // so the callback code can safely deal with this branch
+    // optionally being hit.
+    var zeroBranch = memory.branch();
+
+    answer.add(Asm([
+      directionOfVector.zeroValue.withDirection(
+          // Note use of zeroBranch here
+          memory: zeroBranch,
+          asm: (d) => d == destination ? Asm.empty() : move.w(d, destination),
+          destination: destination,
+          labelSuffix: labelSuffix,
+          load1: load1,
+          load2: load2),
+      label(Label('.keep$labelSuffix')),
+    ]));
+
+    // Now bubble up ambiguity of registers etc to memory
+    for (var c in zeroBranch.changes) {
+      c.mayApply(memory);
+    }
+
+    // Run callback (which may use memory)
+    answer.add(asm(destination));
+
+    return answer;
   }
 
   Asm load(Address addr, Memory memory) => withDirection(
@@ -1150,9 +1191,10 @@ class ObjectFaceDirectionAsm extends DirectionExpressionAsm {
     DirectAddressRegister load2 = a3,
     String? labelSuffix,
   }) {
+    var load = memory.addressRegisterFor(objectFaceDirection.obj) ?? load1;
     return Asm([
-      objectFaceDirection.obj.toA(load1, memory),
-      asm(facing_dir(load1)),
+      objectFaceDirection.obj.toA(load, memory),
+      asm(facing_dir(load)),
     ]);
   }
 }

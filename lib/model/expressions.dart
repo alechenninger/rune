@@ -366,10 +366,21 @@ sealed class DirectionExpression extends UnaryExpression {
 }
 
 class DirectionOfVector extends DirectionExpression {
+  /// The direction to use if the vector is zero.
+  final DirectionExpression zeroValue;
   final PositionExpression from;
   final PositionExpression to;
 
-  DirectionOfVector({required this.from, required this.to});
+  DirectionOfVector(
+      {required this.from, required this.to, DirectionExpression? zeroValue})
+      : zeroValue = zeroValue ?? _defaultDirectionFor(from);
+
+  static DirectionExpression _defaultDirectionFor(PositionExpression from) {
+    return switch (from) {
+      PositionOfObject p => p.obj.facing(),
+      _ => Direction.up, // default direction for other expressions
+    };
+  }
 
   @Deprecated("It's wrong if the player or object has moved")
   bool get playerIsFacingFrom =>
