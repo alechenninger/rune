@@ -904,23 +904,25 @@ class ConstantReader {
   }
 }
 
-class ByteIterable extends IterableBase<Byte> {
+class DataIterable<T extends Sized> extends IterableBase<T> {
   final ConstantReader _reader;
+  final T Function(ConstantReader) _readFunction;
 
-  ByteIterable(this._reader);
+  DataIterable(this._reader, this._readFunction);
 
   @override
-  Iterator<Byte> get iterator => _ByteIterator(_reader);
+  Iterator<T> get iterator => _DataIterator(_reader, _readFunction);
 }
 
-class _ByteIterator implements Iterator<Byte> {
+class _DataIterator<T extends Sized> implements Iterator<T> {
   final ConstantReader _reader;
-  Byte? _current;
+  final T Function(ConstantReader) _readFunction;
+  T? _current;
 
-  _ByteIterator(this._reader);
+  _DataIterator(this._reader, this._readFunction);
 
   @override
-  Byte get current => switch (_current) {
+  T get current => switch (_current) {
         null => throw StateError('iterator has not started or is finished'),
         var c => c
       };
@@ -928,11 +930,15 @@ class _ByteIterator implements Iterator<Byte> {
   @override
   bool moveNext() {
     try {
-      _current = _reader.readByte();
+      _current = _readFunction(_reader);
       return true;
     } catch (e) {
       _current = null;
       return false;
     }
   }
+}
+
+class ByteIterable extends DataIterable<Byte> {
+  ByteIterable(ConstantReader reader) : super(reader, (r) => r.readByte());
 }
