@@ -594,8 +594,8 @@ class OverlapCharacters extends Event {
 extension ObjectExpressions on FieldObject {
   PositionOfObject position() => PositionOfObject(this);
   ObjectFaceDirection facing() => ObjectFaceDirection(this);
-  DirectionOfVector towards(FieldObject other) =>
-      DirectionOfVector(from: position(), to: other.position());
+  DirectionOfVector towards(FieldObject other) => DirectionOfVector(
+      from: position(), to: other.position(), zeroValue: facing());
 }
 
 abstract class RelativeMovement {
