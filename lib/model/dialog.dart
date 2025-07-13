@@ -336,6 +336,7 @@ abstract mixin class Speaker {
   static final DezoPenguin = NpcSpeaker(Portrait.none, 'Dezo Penguin');
   static final EsperComrade = NpcSpeaker(Portrait.Esper, 'Esper Comrade');
   static final Hasari = NpcSpeaker(Portrait.EsperChief, 'Hasari');
+  static final TaSuuk = NpcSpeaker(Portrait.GumbiousPriest, 'Ta Suuk');
 
   @override
   String toString() => name;
