@@ -298,6 +298,10 @@ abstract mixin class Speaker {
     DezoPenguin,
     EsperComrade,
     Hasari,
+    TaSuuk,
+    XeAThoul,
+    XeAThoulLeft,
+    XeAThoulRight
   ];
 
   static final Map<String, Speaker> _byName = allSpeakers.groupFoldBy(
@@ -337,6 +341,11 @@ abstract mixin class Speaker {
   static final EsperComrade = NpcSpeaker(Portrait.Esper, 'Esper Comrade');
   static final Hasari = NpcSpeaker(Portrait.EsperChief, 'Hasari');
   static final TaSuuk = NpcSpeaker(Portrait.GumbiousPriest, 'Ta Suuk');
+  static final XeAThoul = NpcSpeaker(Portrait.XeAThoul, 'Xe-A-Thoul');
+  static final XeAThoulLeft =
+      NpcSpeaker(Portrait.XeAThoulLeft, 'Xe-A-Thoul (Left)');
+  static final XeAThoulRight =
+      NpcSpeaker(Portrait.XeAThoulRight, 'Xe-A-Thoul (Right)');
 
   @override
   String toString() => name;
@@ -408,7 +417,8 @@ enum Portrait {
   GumbiousBishop,
   Lashiec,
   XeAThoul,
-  XeAThoul2,
+  XeAThoulLeft,
+  XeAThoulRight,
   FortuneTeller,
   DElmLars,
   AlysWounded,

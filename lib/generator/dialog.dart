@@ -991,8 +991,8 @@ final _portraits = const [
   Portrait.GumbiousBishop, // dc.l	ArtNem_GumbiousBishopDialPortrait	; $1B
   Portrait.Lashiec, // dc.l	ArtNem_LashiecDialPortrait	; $1C
   Portrait.XeAThoul, // dc.l	ArtNem_XeAThoulDialPortrait	; $1D
-  Portrait.XeAThoul2, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1E
-  Portrait.XeAThoul2, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1F
+  Portrait.XeAThoulLeft, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1E
+  Portrait.XeAThoulRight, // dc.l	ArtNem_XeAThoulDialPortrait2	; $1F
   Portrait.FortuneTeller, // dc.l	ArtNem_FortuneTellerDialPortrait	; $20
   Portrait.DElmLars, // dc.l	ArtNem_DElmLarsDialPortrait	; $21
   Portrait.AlysWounded, // dc.l	ArtNem_AlysWoundedDialPortrait	; $22
