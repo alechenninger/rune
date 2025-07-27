@@ -476,6 +476,11 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
               load = memory.addressRegisterFor(obj) ?? load;
 
               var scriptable = generator.scriptable(obj);
+
+              // TODO: why would we need to set the routine for instant moves?
+              // Removing would be a behavior change though–instant moves
+              // could also mean, "move here and stay here permanently"
+              // If we don't change the routine, this may not be the case.
               if (!scriptable) {
                 memory.setRoutine(obj, scriptableObjectRoutine);
               }
@@ -519,8 +524,26 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
             load1: load == a4 ? a3 : a4,
             load2: load == a4 ? a2 : a3,
             asm: (d) {
+              // Facing may require changing the routine
+              // (e.g. some routines will always set facing a certain direction)
               var scriptable = generator.scriptable(obj);
-              if (!scriptable) {
+              if (!scriptable
+                  // &&
+                  // TODO: technically facing has meant "permanently face" in most cases
+                  // if we don't set scriptable, it may not be permanent.
+                  // how should we handle this?
+                  // obj spec can say, "supports scripting direction"
+                  // and "supports scripting movement."
+                  // if it does, we can reuse AS LONG AS
+                  // the object is also configured to retain original routine
+                  // if it is configured to retain original routine, and
+                  // that routine is not scriptable,
+                  // we would 'just' automatically switch it back at the end
+                  // of the scene. (not just after the move because it might
+                  // undo the movement)
+                  // so what we do is dependent on the object spec and state.
+                  // obj.routine(defaultFieldRoutines)?.faceable == false
+                  ) {
                 memory.setRoutine(obj, scriptableObjectRoutine);
               }
 
@@ -530,7 +553,8 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
                 //  we may need to wait for movements to finish.
                 if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
                 move.w(d, facing_dir(load)),
-                if (!scriptable) ...[
+                // Only needed if we didn't already set the position.
+                if (!scriptable && position == null) ...[
                   move.w(curr_x_pos(load), dest_x_pos(load)),
                   move.w(curr_y_pos(load), dest_y_pos(load)),
                 ]
@@ -748,12 +772,19 @@ extension FieldObjectAsm on FieldObject {
     };
   }
 
-  Address routine(FieldRoutineRepository fieldRoutines) {
+  Address routineAddress(FieldRoutineRepository fieldRoutines) {
     return switch (this) {
       Character c => c.routineAddress,
       MapObject m => m.routine(fieldRoutines).label.l,
       // Slot could be loaded from memory and field obj jump think
       _ => throw UnsupportedError('routine for $this')
+    };
+  }
+
+  FieldRoutine? routine(FieldRoutineRepository fieldRoutines) {
+    return switch (this) {
+      MapObject o => o.routine(fieldRoutines),
+      _ => null,
     };
   }
 
