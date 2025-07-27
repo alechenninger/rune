@@ -121,6 +121,8 @@ final defaultFieldRoutines = FieldRoutineRepository([
   FieldRoutine.asm(Word(0x314), Label('loc_4BDF0'), spriteMappingTiles: 0xE),
   FieldRoutine.asm(Word(0x318), Label('loc_4BE38'), spriteMappingTiles: 0xE),
   FieldRoutine.asm(Word(0x31c), Label('loc_4BE80'), spriteMappingTiles: 0xE),
+  FieldRoutine.asm(Word(0x15c), Label('FieldObj_EclipseTorch'),
+      animatesInEvents: true, spriteMappingTiles: 0x10)
 ]);
 
 class FieldRoutineRepository {
@@ -259,19 +261,30 @@ class FieldRoutine<T extends MapObjectSpec> {
 
   final bool animatesInEvents;
 
+  /// Whether or not this routine is compatible with the scriptable object
+  /// routine.
+  final bool compatibleWithScriptRoutine;
+
+  /// Whether or not this routine supports changing facing direction.
+  final bool faceable;
+
   final SpecFactory factory;
 
   const FieldRoutine(this.index, this.label, this.factory,
       {this.spriteMappingTiles = _defaultVramTilesPerSprite,
       this.ramArt,
       this.vramAnimated = false,
-      this.animatesInEvents = false});
+      this.animatesInEvents = false,
+      this.compatibleWithScriptRoutine = true,
+      this.faceable = false});
 
   FieldRoutine.asm(this.index, this.label,
       {this.spriteMappingTiles = _defaultVramTilesPerSprite,
       this.ramArt,
       this.vramAnimated = false,
-      this.animatesInEvents = false})
+      this.animatesInEvents = false,
+      this.compatibleWithScriptRoutine = true,
+      this.faceable = false})
       : factory = SpecFactory.asm(index);
 
   SpriteVramMapping? spriteVramMapping(MapObjectSpec spec) {
