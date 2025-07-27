@@ -1059,7 +1059,7 @@ class SceneAsmGenerator implements EventVisitor {
       _addToEventOrDialog(moves,
           inDialog: () {
             var (asm, routines) = AbsoluteMovesInDialog(moves)
-                .toAsm(_memory, labeller: _labeller);
+                .toAsm(_memory, labeller: _labeller.withContext(_eventCounter));
 
             _postAsm.addAll(routines);
             _addToDialog(asm);
