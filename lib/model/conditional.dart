@@ -330,10 +330,10 @@ typedef Values = (ModelExpression, ModelExpression);
 class Condition {
   final IMap<ChoiceId, bool> _choices;
   final IMap<EventFlag, bool> _flags;
-  final IMap<Values, BranchCondition> _values;
+  final IMap<Values, Comparison> _values;
 
   Condition(Map<EventFlag, bool> flags,
-      {Map<Values, BranchCondition>? values, Map<ChoiceId, bool>? choices})
+      {Map<Values, Comparison>? values, Map<ChoiceId, bool>? choices})
       : _flags = flags.lock,
         _values = (values ?? {}).lock,
         _choices = (choices ?? {}).lock;
@@ -373,11 +373,11 @@ class Condition {
 
   bool isKnownUnset(EventFlag flag) => this[flag] == false;
 
-  BranchCondition? branchFor(Values operand) => _values[operand];
+  Comparison? branchFor(Values operand) => _values[operand];
 
   bool? choiceFor(ChoiceId operand) => _choices[operand];
 
-  Condition withBranch(Values operand, BranchCondition branch) {
+  Condition withBranch(Values operand, Comparison branch) {
     if (branchFor(operand) == branch) return this;
     return Condition._(
         _flags, (_values.unlock..[operand] = branch).lock, _choices);
@@ -387,6 +387,14 @@ class Condition {
     if (choiceFor(operand) == branch) return this;
     return Condition._(
         _flags, _values, (_choices.unlock..[operand] = branch).lock);
+  }
+
+  Condition withCondition(Condition condition) {
+    if (isSatisfiedBy(condition)) return this;
+    return Condition._(
+        (_flags.unlock..addAll(condition._flags.unlockView)).lock,
+        (_values.unlock..addAll(condition._values.unlockView)).lock,
+        (_choices.unlock..addAll(condition._choices.unlockView)).lock);
   }
 
   /// This condition is satisfied by another condition
@@ -466,7 +474,7 @@ sealed class BranchableCondition<T, U> {
   BranchableCondition<T, U> withBranch(T operand, U branch);
 }
 
-class ValueCondition extends BranchableCondition<Values, BranchCondition> {
+class ValueCondition extends BranchableCondition<Values, Comparison> {
   final Condition condition;
 
   ValueCondition(this.condition);
@@ -481,12 +489,12 @@ class ValueCondition extends BranchableCondition<Values, BranchCondition> {
   ValueCondition get branchOnValues => this;
 
   @override
-  BranchCondition? branchFor(Values operand) {
+  Comparison? branchFor(Values operand) {
     return condition.branchFor(operand);
   }
 
   @override
-  ValueCondition withBranch(Values operand, BranchCondition branch) {
+  ValueCondition withBranch(Values operand, Comparison branch) {
     if (branchFor(operand) == branch) return this;
     return ValueCondition(condition.withBranch(operand, branch));
   }
@@ -539,7 +547,9 @@ class ChoiceCondition extends BranchableCondition<ChoiceId, bool> {
   }
 }
 
-class IfFlag extends Event {
+sealed class IfEvent extends Event {}
+
+class IfFlag extends IfEvent {
   final EventFlag flag;
   final List<Event> isSet;
   final List<Event> isUnset;
@@ -624,16 +634,16 @@ class SetFlag extends Event {
   int get hashCode => flag.hashCode ^ anyTime.hashCode;
 }
 
-final class IfValue<T extends ModelExpression> extends Event {
+final class IfValue<T extends ModelExpression> extends IfEvent {
   final T operand1, operand2;
 
-  final _branches = <Branch>[];
+  final _branches = <ComparisonBranch>[];
 
   /// True if this is a simple equals or not comparison.
   late final bool boolean;
 
   /// Branch with no events, if there is one.
-  BranchCondition? emptyBranch;
+  Comparison? emptyBranch;
 
   /// [comparedTo] is subtracted from [operand1] (`op1 - comparedTo`)
   IfValue(
@@ -647,19 +657,19 @@ final class IfValue<T extends ModelExpression> extends Event {
     required T comparedTo,
   }) : operand2 = comparedTo {
     var boolean = true;
-    var conditions = <BranchCondition>{};
+    var conditions = <Comparison>{};
 
-    void addBranch(BranchCondition condition, List<Event> events) {
+    void addBranch(Comparison condition, List<Event> events) {
       if (events.isEmpty) return;
       for (var c in condition.parts) {
         if (!conditions.add(c)) {
           throw ModelException('condition already defined: $c');
         }
       }
-      if (condition != BranchCondition.eq && condition != BranchCondition.neq) {
+      if (condition != Comparison.eq && condition != Comparison.neq) {
         boolean = false;
       }
-      _branches.add(Branch(condition, events));
+      _branches.add(ComparisonBranch(condition, events));
     }
 
     addBranch(eq, equal);
@@ -673,7 +683,7 @@ final class IfValue<T extends ModelExpression> extends Event {
       throw ArgumentError('must provide at least one branch with events');
     }
 
-    emptyBranch = BranchCondition.canonical
+    emptyBranch = Comparison.canonical
         .difference(conditions)
         .reduceOrNull((value, element) => value.or(element));
 
@@ -681,7 +691,7 @@ final class IfValue<T extends ModelExpression> extends Event {
   }
 
   /// Branches which have any events, "canonical" branches last.
-  List<Branch> get branches => List.unmodifiable(_branches);
+  List<ComparisonBranch> get branches => List.unmodifiable(_branches);
 
   @override
   void visit(EventVisitor visitor) {
@@ -696,13 +706,14 @@ final class IfValue<T extends ModelExpression> extends Event {
           // to prevent generic type from being checked
           operand1 == other.operand1 &&
           operand2 == other.operand2 &&
-          const ListEquality<Branch>().equals(_branches, other._branches);
+          const ListEquality<ComparisonBranch>()
+              .equals(_branches, other._branches);
 
   @override
   int get hashCode =>
       operand1.hashCode ^
       operand2.hashCode ^
-      const ListEquality<Branch>().hash(_branches);
+      const ListEquality<ComparisonBranch>().hash(_branches);
 
   @override
   String toString() {
@@ -710,14 +721,14 @@ final class IfValue<T extends ModelExpression> extends Event {
   }
 }
 
-const gte = BranchCondition.gte;
-const lte = BranchCondition.lte;
-const neq = BranchCondition.neq;
-const eq = BranchCondition.eq;
-const gt = BranchCondition.gt;
-const lt = BranchCondition.lt;
+const gte = Comparison.gte;
+const lte = Comparison.lte;
+const neq = Comparison.neq;
+const eq = Comparison.eq;
+const gt = Comparison.gt;
+const lt = Comparison.lt;
 
-enum BranchCondition {
+enum Comparison {
   gte,
   lte,
   neq,
@@ -730,7 +741,7 @@ enum BranchCondition {
   bool get isEqual => parts.contains(eq);
   bool get isNotEqual => !isEqual;
 
-  BranchCondition or(BranchCondition other) {
+  Comparison or(Comparison other) {
     var parts = {...this.parts, ...other.parts};
 
     if (parts.containsAll(const [gt, eq])) return gte;
@@ -742,14 +753,14 @@ enum BranchCondition {
 
   /// Decomposes a condition into canonical set of positive "parts":
   /// one or more of [gt], [eq], or [lt] (see [canonical]).
-  Set<BranchCondition> get parts => switch (this) {
+  Set<Comparison> get parts => switch (this) {
         gte => {gt, eq},
         lte => {lt, eq},
         neq => {gt, lt},
         _ => {this}
       };
 
-  BranchCondition get invert {
+  Comparison get invert {
     return switch (this) {
       gte => lt,
       lte => gt,
@@ -761,31 +772,41 @@ enum BranchCondition {
   }
 }
 
-class Branch {
-  final BranchCondition condition;
+class ComparisonBranch {
+  final Comparison comparison;
   final List<Event> events;
 
-  Branch(this.condition, this.events);
-  Branch.empty(this.condition) : events = const [];
+  ComparisonBranch(this.comparison, this.events);
+  ComparisonBranch.empty(this.comparison) : events = const [];
 
   bool get isEmpty => events.isEmpty;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Branch &&
+      other is ComparisonBranch &&
           runtimeType == other.runtimeType &&
-          condition == other.condition &&
+          comparison == other.comparison &&
           const ListEquality<Event>().equals(events, other.events);
 
   @override
   int get hashCode =>
-      condition.hashCode ^ const ListEquality<Event>().hash(events);
+      comparison.hashCode ^ const ListEquality<Event>().hash(events);
 
   @override
   String toString() {
-    return 'Branch{$condition, $events}';
+    return 'ComparisonBranch{$comparison, $events}';
   }
+}
+
+class Branch {
+  final Condition condition;
+  final List<Event> events;
+
+  Branch(this.condition, {Iterable<Event> events = const []})
+      : events = List.unmodifiable(Scene(events).asOf(condition).events);
+
+  Scene toScene() => Scene(events);
 }
 
 class ChoiceId {

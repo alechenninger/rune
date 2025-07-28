@@ -1509,7 +1509,7 @@ class SceneAsmGenerator implements EventVisitor {
 
       // Add remaining branch instructions for final comparison
       for (var (b, lbl) in branches.excludingFallThrough) {
-        asm.add(b.condition.mnemonicUnsigned(lbl));
+        asm.add(b.comparison.mnemonicUnsigned(lbl));
       }
 
       // Now run branches, fall through first since it by definition

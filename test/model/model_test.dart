@@ -795,6 +795,77 @@ void main() {
           ]));
     });
 
+    group('branches()', () {
+      test('find leaf branches', () {
+        // First test with a scene that has only one deeply nested leaf branch with events that aren't just conditional checks
+        var scene = Scene([
+          IfFlag(EventFlag('flag1'), isUnset: [
+            IfFlag(EventFlag('flag2'), isUnset: [
+              IfValue(BySlot.one.position().component(Axis.y),
+                  comparedTo: PositionComponent(0x100, Axis.y),
+                  lessOrEqual: [
+                    Dialog(spans: [DialogSpan('Leaf branch 1')]),
+                    SetFlag(EventFlag('storyevent')),
+                  ])
+            ])
+          ])
+        ]);
+
+        var branches = scene.branches();
+
+        expect(branches, hasLength(1));
+
+        var branch = branches.first;
+
+        expect(
+            branch.condition,
+            Condition({
+              EventFlag('flag1'): false,
+              EventFlag('flag2'): false
+            }, values: {
+              (
+                BySlot.one.position().component(Axis.y),
+                PositionComponent(0x100, Axis.y)
+              ): Comparison.lte
+            }));
+      });
+
+      test('ignores SetContext', () {
+        var scene = Scene([
+          IfFlag(EventFlag('flag1'), isUnset: [
+            SetContext((s) {}),
+            IfFlag(EventFlag('flag2'), isUnset: [
+              SetContext((s) {}),
+              IfValue(BySlot.one.position().component(Axis.y),
+                  comparedTo: PositionComponent(0x100, Axis.y),
+                  lessOrEqual: [
+                    Dialog(spans: [DialogSpan('Leaf branch 1')]),
+                    SetFlag(EventFlag('storyevent')),
+                  ])
+            ])
+          ])
+        ]);
+
+        var branches = scene.branches();
+
+        expect(branches, hasLength(1));
+
+        var branch = branches.first;
+
+        expect(
+            branch.condition,
+            Condition({
+              EventFlag('flag1'): false,
+              EventFlag('flag2'): false
+            }, values: {
+              (
+                BySlot.one.position().component(Axis.y),
+                PositionComponent(0x100, Axis.y)
+              ): Comparison.lte
+            }));
+      });
+    });
+
     group('condense', () {
       test('top level', () {
         var scene = Scene([

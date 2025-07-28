@@ -4,11 +4,11 @@ import '../model/model.dart';
 import 'memory.dart';
 import 'movement.dart';
 
-class BranchLabels extends Iterable<(Branch, Label?)> {
+class BranchLabels extends Iterable<(ComparisonBranch, Label?)> {
   final String _prefix;
-  final Map<BranchCondition, (Branch, Label)> _labels = {};
-  final BranchCondition? emptyBranch;
-  late final Branch fallThrough;
+  final Map<Comparison, (ComparisonBranch, Label)> _labels = {};
+  final Comparison? emptyBranch;
+  late final ComparisonBranch fallThrough;
   final Label _continueLbl;
   bool _continued = false;
 
@@ -21,33 +21,34 @@ class BranchLabels extends Iterable<(Branch, Label?)> {
     // because equals requires comparison of all values
     // (cannot short-circuit).
     fallThrough = (ifValue.operand1 is! UnaryExpression && branches.length <= 2)
-        ? branches.lastWhere((b) => b.condition.isEqual,
+        ? branches.lastWhere((b) => b.comparison.isEqual,
             orElse: () => branches.last)
         : branches.last;
 
     if (emptyBranch case var b?) {
-      _labels[b] = (Branch.empty(b), _continueLbl);
+      _labels[b] = (ComparisonBranch.empty(b), _continueLbl);
       _continued = true;
     }
 
     for (var branch in branches) {
       // Fall through branch is not labeled unless necessary
-      if (branch.condition == fallThrough.condition) continue;
+      if (branch.comparison == fallThrough.comparison) continue;
       _label(branch);
     }
   }
 
-  Label _label(Branch branch) {
-    var label = labelFor(branch.condition);
-    _labels[branch.condition] = (branch, label);
+  Label _label(ComparisonBranch branch) {
+    var label = labelFor(branch.comparison);
+    _labels[branch.comparison] = (branch, label);
     return label;
   }
 
   @override
-  Iterator<(Branch, Label?)> get iterator => fallThroughFirst.iterator;
+  Iterator<(ComparisonBranch, Label?)> get iterator =>
+      fallThroughFirst.iterator;
 
-  Iterable<(Branch, Label?)> get fallThroughFirst sync* {
-    if (!_labels.containsKey(fallThrough.condition)) {
+  Iterable<(ComparisonBranch, Label?)> get fallThroughFirst sync* {
+    if (!_labels.containsKey(fallThrough.comparison)) {
       yield (fallThrough, null);
     }
 
@@ -56,29 +57,30 @@ class BranchLabels extends Iterable<(Branch, Label?)> {
     }
   }
 
-  bool containsBranch(BranchCondition b) => _labels.containsKey(b);
+  bool containsBranch(Comparison b) => _labels.containsKey(b);
 
-  Label? get labeledFallThrough => _labels[fallThrough.condition]?.$2;
+  Label? get labeledFallThrough => _labels[fallThrough.comparison]?.$2;
   Label? get continued => _continued ? _continueLbl : null;
   Label labelContinue() {
     _continued = true;
     return _continueLbl;
   }
 
-  Label labelFor(BranchCondition c) {
+  Label labelFor(Comparison c) {
     return Label('$_prefix${c.name}');
   }
 
-  operator [](BranchCondition condition) => _labels[condition];
+  operator [](Comparison condition) => _labels[condition];
 
-  Iterable<(Branch, Label)> get excludingFallThrough => _labels.entries
-      .where((e) => e.key != fallThrough.condition)
-      .map((e) => e.value);
+  Iterable<(ComparisonBranch, Label)> get excludingFallThrough =>
+      _labels.entries
+          .where((e) => e.key != fallThrough.comparison)
+          .map((e) => e.value);
 
   Asm branchIfNotEqual() {
     var asm = Asm.empty();
     for (var (branch, label) in notEqualBranches()) {
-      asm.add(branch.condition.mnemonicUnsigned(label));
+      asm.add(branch.comparison.mnemonicUnsigned(label));
     }
     if (asm.isEmpty) {
       throw StateError('no branches to jump to');
@@ -87,13 +89,13 @@ class BranchLabels extends Iterable<(Branch, Label?)> {
   }
 
   /// May label fall through if it is a not-equal branch.
-  Iterable<(Branch, Label)> notEqualBranches() sync* {
-    if (fallThrough.condition.isNotEqual &&
-        !containsBranch(fallThrough.condition)) {
+  Iterable<(ComparisonBranch, Label)> notEqualBranches() sync* {
+    if (fallThrough.comparison.isNotEqual &&
+        !containsBranch(fallThrough.comparison)) {
       _label(fallThrough);
     }
     for (var (branch, label) in _labels.values) {
-      if (branch.condition.isNotEqual) {
+      if (branch.comparison.isNotEqual) {
         yield (branch, label);
       }
     }
@@ -256,7 +258,7 @@ Asm _cmp(Address src, Address dst, Size size, {DirectDataRegister dR = d0}) {
   ]);
 }
 
-extension BranchConditionAsm on BranchCondition {
+extension BranchConditionAsm on Comparison {
   BranchMnemonic get mnemonicUnsigned => switch (this) {
         eq => beq,
         gt => bhi,

@@ -696,6 +696,45 @@ class Scene extends IterableBase<Event> {
     return findBranch(_events);
   }
 
+  Iterable<Branch> branches() sync* {
+    yield* _branches(_events, Condition.empty());
+  }
+
+  Iterable<Branch> _branches(Iterable<Event> events, Condition current) sync* {
+    IfEvent? conditional;
+    for (var event in events) {
+      switch (event) {
+        case IfEvent e when conditional == null:
+          // If we have not yet found a conditional event, set it.
+          conditional = e;
+          break;
+        case SetContext():
+          continue;
+        default:
+          // There is something other than just a single conditional event,
+          // so yield this branch and end.
+          // We do not recurse further in this case: only return "leaf" branches.
+          yield Branch(current, events: events);
+          return;
+      }
+    }
+
+    // There was a single conditional event.
+    // In this case, recurse into each of its branches.
+    switch (conditional) {
+      case IfFlag e:
+        yield* _branches(e.isSet, current.withSet(e.flag));
+        yield* _branches(e.isUnset, current.withNotSet(e.flag));
+      case IfValue e:
+        for (var branch in e.branches) {
+          yield* _branches(branch.events,
+              current.withBranch((e.operand1, e.operand2), branch.comparison));
+        }
+      case null:
+        return;
+    }
+  }
+
   /// Recurses through all branches and hastens the scene by...
   ///
   /// - Removing pauses
@@ -757,17 +796,17 @@ class Scene extends IterableBase<Event> {
           case IfValue e:
             var branches = {
               for (var b in e.branches)
-                b.condition: condenseRecursively([...b.events])
+                b.comparison: condenseRecursively([...b.events])
             };
             events[i] = IfValue(
               e.operand1,
               comparedTo: e.operand2,
-              equal: branches[BranchCondition.eq] ?? [],
-              greater: branches[BranchCondition.gt] ?? [],
-              less: branches[BranchCondition.lt] ?? [],
-              greaterOrEqual: branches[BranchCondition.gte] ?? [],
-              lessOrEqual: branches[BranchCondition.lte] ?? [],
-              notEqual: branches[BranchCondition.neq] ?? [],
+              equal: branches[Comparison.eq] ?? [],
+              greater: branches[Comparison.gt] ?? [],
+              less: branches[Comparison.lt] ?? [],
+              greaterOrEqual: branches[Comparison.gte] ?? [],
+              lessOrEqual: branches[Comparison.lte] ?? [],
+              notEqual: branches[Comparison.neq] ?? [],
             );
         }
       }
@@ -784,12 +823,15 @@ class Scene extends IterableBase<Event> {
     }
   }
 
-  /// Find all branches recursively, including [events],
-  /// that satisfy the [matching] Condition with [current].
-  /// Visit each branch with [visitor].
+  /// Visits the [events] list with the provided [visitor] if
+  /// the [current] condition is satisfied by the [matching] condition.
   ///
-  /// A branch is not recursed further once it matches the [matching] condition.
+  /// Recurses through conditional checks within `events`
+  /// to find a matching branch.
+  /// Once a matching branch is found, it is visited with the [visitor], and
+  /// that event list is no longer recursed.
   ///
+  /// The `events` may be mutated by the visitor in order to modify the branch.
   /// If the branch is not top-level (`events`),
   /// the corresponding [IfFlag] event will be replaced.
   ///
@@ -1032,5 +1074,3 @@ class SceneId {
   @override
   int get hashCode => id.hashCode;
 }
-
-// TODO(refactor): should just be an enum?
