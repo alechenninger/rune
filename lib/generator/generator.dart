@@ -2995,23 +2995,32 @@ class SceneAsmGenerator implements EventVisitor {
     // todo if null, have to check somehow?
     // todo: not sure if this is right
     if (_memory.isFieldShown == false) {
+      // No field means no sprites.
+      // If we are not in cutscene mode, though, this won't work.
+      if (mode.type != EventType.cutscene) {
+        throw StateError('dialog without field, but not in cutscene mode. '
+            'this will cause sprites to be rendered erroneously.');
+      }
+
       if (_memory.isDisplayEnabled == false) {
-        // if cram cleared but vram not,
-        // fading in will cause artifacts
-        // otherwise, fade in may fade in map,
-        // but consider this intentional
-        // TODO: maybe this should not be intentional
-        if ((_memory.isMapInVram == true && _memory.isMapInCram == false) ||
-            _memory.isDialogInCram == false) {
+        // If map is in VRAM, then we need to clear VRAM & CRAM
+        // before fading for dialog.
+        // If dialog is not in CRAM, we do the same to reset CRAM for dialog.
+        if (_memory.isMapInVram == true || _memory.isDialogInCram == false) {
           // Clear VRAM
           _initVramAndCram();
           _memory.isMapInVram = false;
+          _memory.isMapInCram = false;
           // Line 3 is initialized
           _memory.isDialogInCram = true;
         }
         _eventAsm.add(jsr(Label('Pal_FadeIn').l));
         _memory.isDisplayEnabled = true;
       } else if (_memory.isDialogInCram == false) {
+        // Display is enabled but dialog not in CRAM,
+        // so load its palette line.
+        // Otherwise we assume VRAM & CRAM state is good
+        // because field is not shown while display is enabled.
         _eventAsm.add(Asm([
           lea(Constant('Pal_Init_Line_3').l, a0),
           lea(Constant('Palette_Line_3').w, a1),
@@ -3021,19 +3030,8 @@ class SceneAsmGenerator implements EventVisitor {
         _memory.isDialogInCram = true;
       }
 
-      if (_memory.isMapInVram == true) {
-        // If map was in VRAM, then now field is shown.
-        // Don't hide sprites.
-        _memory.isFieldShown = true;
-      } else {
-        // No field means no sprites.
-        // If we are not in cutscene mode, though, this won't work.
-        if (mode.type != EventType.cutscene) {
-          throw StateError('dialog without field, but not in cutscene mode. '
-              'this will cause sprites to be rendered erroneously.');
-        }
-        _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
-      }
+      // Required for dialog while field faded
+      _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
     }
 
     /*

@@ -244,13 +244,15 @@ main() {
         ]));
   });
 
-  test('fade in while map in vram does not hide sprites', () {
+  test('load map while fade out requires explicit fade in to fade in field',
+      () {
     var scene = Scene([
       FadeOut(),
       LoadMap(
           map: map,
           startingPosition: Position(0x200, 0x200),
           facing: Direction.down),
+      // We no longer expect this to fade in the map
       Dialog.parse('Hi', speaker: alys),
     ]);
 
@@ -270,7 +272,10 @@ main() {
           move.w(0.i, (Map_Start_Char_Align).w),
           bclr(3.i, (Map_Load_Flags).w),
           jsr(Label('RefreshMap').l),
+          jsr(Label('ClearSpriteTableBuf').l),
+          jsr(Label('InitVRAMAndCRAMAfterFadeOut').l),
           jsr(Label('Pal_FadeIn').l),
+          move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w),
           moveq(0.toByte.i, d0),
           jsr(Label('Event_GetAndRunDialogue3').l),
         ]));
