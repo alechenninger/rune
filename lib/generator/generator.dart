@@ -536,17 +536,24 @@ $F2 = Determines actions during dialogues. The byte after this has the following
   $C = After the Profound Darkness battle, it updates stuff when Elsydeon breaks
   */
 EventType? sceneEventType(List<Event> events,
-    {FieldObject? interactingWith, bool checkBranches = false}) {
-  // SetContext is not a perceivable event, so ignore
-  events = events.whereNot((e) => e is SetContext).toList(growable: false);
+    {FieldObject? interactingWith,
+    bool checkBranches = false,
+    bool fieldShown = true}) {
+  // Note: SetContext is not a perceivable event,
+  // so it is ignored in a few code paths.
 
   // In interactions, each branch will be evaluated separately
   // so it doesn't matter what's in each branch.
   // FIXME(cutscenes): if there is an inline if,
   //  I think we still need to check branches.
-  if (events.length == 1 && events[0] is IfFlag) return null;
+  if (events.whereNot((e) => e is SetContext).length == 1 &&
+      events[0] is IfFlag) {
+    return null;
+  }
 
-  bool isLast(int i) => i == events.length - 1;
+  bool isLast(int i) =>
+      events.skip(i + 1).whereNot((e) => e is SetContext).isEmpty;
+
   bool hasDialogAfter(int i) => events.skip(i + 1).any((e) => e is Dialog);
 
   // One of dialog checks must pass for each event.
@@ -554,10 +561,12 @@ EventType? sceneEventType(List<Event> events,
   // If there are no more checks, it must require an event.
   var dialogCheck = 0;
   var dialogChecks = <bool Function(Event, int, bool)>[
+    // FacePlayer as first event is allowed in interaction
     (event, i, _) =>
         event is FacePlayer &&
         (event.object == interactingWith ||
             event.object == const InteractionObject()),
+    // If not first face player, check for dialog loop actions supported
     (event, i, hasDialogAfter) =>
         // Events need dialog after, otherwise their order
         // creates unwanted dialog windows.
@@ -583,15 +592,26 @@ EventType? sceneEventType(List<Event> events,
             isLast(i) &&
             sceneEventType(event.ifNo) == null &&
             sceneEventType(event.ifYes) == null),
+    // If hiding panels on close, it must be the last event
     (event, i, _) => event is Dialog && event.hidePanelsOnClose && isLast(i),
   ];
 
-  var faded = false;
+  var state = EventState();
   var needsEvent = false;
 
   event:
   for (int i = 0; i < events.length; i++) {
     var event = events[i];
+
+    if (event case SetContext e) {
+      e.call(state);
+      if (state.isFieldShown == false) {
+        // Requires an event in order to fade in.
+        needsEvent = true;
+      }
+      continue;
+    }
+
     for (var cIdx = dialogCheck;
         cIdx < dialogChecks.length && !needsEvent;
         cIdx++) {
@@ -605,10 +625,10 @@ EventType? sceneEventType(List<Event> events,
     needsEvent = true;
 
     if (event is FadeOut) {
-      faded = true;
+      state.isFieldShown = false;
     } else if (event is FadeInField || (event is LoadMap && event.showField)) {
-      faded = false;
-    } else if (event is Dialog && faded) {
+      state.isFieldShown = true;
+    } else if (event is Dialog && state.isFieldShown == false) {
       return EventType.cutscene;
     }
   }
@@ -640,6 +660,8 @@ class GenerationContext {
 
   var _eventCounter = 1;
   int get eventCounter => _eventCounter;
+
+  int get eventsGenerated => _eventCounter - 1;
 
   int getAndIncrementEventCount() => _eventCounter++;
 
@@ -815,6 +837,17 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.currentMap = inMap;
     _memory.loadedDialogTree = _dialogTrees.forMap(inMap.id);
     _stateGraph[Condition.empty()] = _memory;
+  }
+
+  /// Sets system state to follow when Map_Load_Flag bit 7 is set
+  /// just before a scene begins. This often happens after boss battles.
+  ///
+  /// Without Pal_fadeIn, the display is disabled.
+  _sceneBeginsWithMapNotFadedIn() {
+    checkState(_context.eventsGenerated == 0,
+        message: 'expected beginning of scene, but already generated events');
+    _memory.isDisplayEnabled = false;
+    _memory.isFieldShown = false;
   }
 
   void scene(Scene scene) {
@@ -1207,6 +1240,15 @@ class SceneAsmGenerator implements EventVisitor {
   void setContext(SetContext set) {
     _checkNotFinished();
     set(_memory);
+    if (_memory.isFieldShown == false &&
+        _context.eventsGenerated == 0 &&
+        _gameMode is EventMode) {
+      /// This must mean we've entered a scene with Map_Load_Flag bit 7 set.
+      /// This often happens after boss battles.
+      /// In this case, Pal_FadeIn is never run.
+      /// Without Pal_fadeIn, the display is disabled.
+      _memory.isDisplayEnabled = false;
+    }
   }
 
   @override
@@ -2958,6 +3000,7 @@ class SceneAsmGenerator implements EventVisitor {
         // fading in will cause artifacts
         // otherwise, fade in may fade in map,
         // but consider this intentional
+        // TODO: maybe this should not be intentional
         if ((_memory.isMapInVram == true && _memory.isMapInCram == false) ||
             _memory.isDialogInCram == false) {
           // Clear VRAM

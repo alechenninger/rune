@@ -768,6 +768,16 @@ EventFlag_Test001 = $0001'''));
         ]));
   });
 
+  group('scene event type', () {
+    test('needs cutscene if scene starts already faded out with dialog', () {
+      var type = sceneEventType([
+        SetContext((ctx) => ctx.isFieldShown = false),
+        Dialog.parse('Hello', speaker: alys),
+      ]);
+      expect(type, EventType.cutscene);
+    });
+  });
+
   group('step object', () {
     test('with fractional negative step', () {
       var scene = Scene([
