@@ -492,20 +492,23 @@ class Slots {
 
   void restorePreviousParty(
       [Function(int index, Character? prior, Character? current)? onRestore]) {
-    if (_priorParty case var priorParty?) {
-      for (var i = 1; i <= 5; i++) {
-        var prior = priorParty[i];
-        var current = _party[i];
-        onRestore?.call(i, prior, current);
-        if (prior == null) {
-          _party.remove(i);
-        } else {
-          _party.inverse.remove(prior);
-          _party[i] = prior;
-        }
+    // This previously only iterated if priorParty was set,
+    // but has been altered to fire callbacks in case
+    // we need to restore, but the prior party is not known.
+    // This can happen, e.g., if a prior scene saves the party,
+    // and the next scene immediately follows.
+    for (var i = 1; i <= 5; i++) {
+      var prior = _priorParty?[i];
+      var current = _party[i];
+      onRestore?.call(i, prior, current);
+      if (prior == null) {
+        _party.remove(i);
+      } else {
+        _party.inverse.remove(prior);
+        _party[i] = prior;
       }
-      _priorParty = null;
     }
+    _priorParty = null;
   }
 
   /// 1-indexed (first slot is 1, there is no slot 0).

@@ -2468,7 +2468,12 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.slots.restorePreviousParty((i, prior, current) {
         if (_memory.slots.partyOrderMaintained) {
           if (i == 5) return;
-        } else if (prior == current) {
+        } else
+        // If both are the same, nothing to do.
+        // However if they are both null,
+        // we don't know whether they changed or not,
+        // so do the swap just in case.
+        if (prior == current && current != null) {
           return;
         }
         _eventAsm.add(Asm([
