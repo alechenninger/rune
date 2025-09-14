@@ -271,6 +271,13 @@ int Function(RelativeMove<FieldObject>, RelativeMove<FieldObject>)
 
 EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
     {int? eventIndex, Labeller? labeller, bool duringDialog = false}) {
+  // NOTE: currently duringDialog is not used.
+  // It was used to control animate bit setting when not waiting for movements.
+  // However this appears to be incorrect as the bit should be set,
+  // so that if dialog starts after event mode,
+  // while characters are still moving,
+  // they will keep moving while dialog is up.
+
   // We assume we don't know the current positions,
   // so we don't know which move is longer.
   // Just start all in parallel.
@@ -317,7 +324,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
     // TODO: need to set animate flag when not waiting for movements and remove from dialog generation
     if (!moves.waitForMovements &&
         // If follow leader is set, we'll set the flags for all slots later
-        (obj.isNotCharacter || (duringDialog && !moves.followLeader))) {
+        (obj.isNotCharacter || !moves.followLeader)) {
       asm.add(bset(1.i, priority_flag(a4)));
     }
 
@@ -383,7 +390,7 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
       state.putInAddress(a3, null);
       state.putInAddress(a5, null);
       state.putInAddress(a6, null);
-    } else if (moves.followLeader && duringDialog) {
+    } else if (moves.followLeader) {
       // Because we're following the leader, other characters will move that
       // weren't referenced in destinations.
       // Because we are not waiting for movements, we need to set their animate
