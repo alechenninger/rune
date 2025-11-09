@@ -1915,6 +1915,10 @@ class SceneAsmGenerator implements EventVisitor {
           dbf(d7, Label('.flash${i}_$sequence')),
         ]));
 
+        // Loop steps once every 4 frames.
+        // From white, worst case is 7 steps.
+        // So, need 28 frames to ensure palette is restored.
+        // If we're doing a partial flash, we take a percentage of this.
         var additionalRestoreFrames = max(0, (percent * 28 - 1).ceil());
         var loop = Label('.restore_palette${i}_$sequence');
 
@@ -1935,8 +1939,7 @@ class SceneAsmGenerator implements EventVisitor {
         doFlash(partial, 1, 0);
       }
 
-      // TODO(flash): maybe allow 0 frames?
-      doFlash(1, min(1, flash.flashed.toFrames()), flash.calm.toFrames());
+      doFlash(1, flash.flashed.toFrames(), flash.calm.toFrames());
     });
   }
 
