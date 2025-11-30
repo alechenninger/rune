@@ -887,9 +887,9 @@ class Scene extends IterableBase<Event> {
   /// If [createSequence] is `true`, `whenSet` will be set with the current
   /// scene, thus creating a sequence if the scene is played again.
   ///
-  /// Advancing to the next branch in sequence can be controlled however
+  /// Advancing to the next branch in sequence can be conditional, however,
   /// by setting the [advanceSequenceWhenSet] flag. If provided, advancing the
-  /// sequence will be conditional on the `advanceSequenceWhenSet` flag.
+  /// sequence will only happen when the `advanceSequenceWhenSet` flag is set.
   void addBranch(Iterable<Event> branch,
       {required EventFlag whenSet,
       bool createSequence = false,
