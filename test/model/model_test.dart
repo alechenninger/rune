@@ -864,6 +864,252 @@ void main() {
               ): Comparison.lte
             }));
       });
+
+      test('returns single branch for flat scene with no conditionals', () {
+        var scene = Scene([
+          Dialog(spans: [DialogSpan('Hello')]),
+          SetFlag(EventFlag('test')),
+        ]);
+
+        var branches = scene.branches();
+
+        expect(branches, hasLength(1));
+        expect(branches.first.condition, Condition.empty());
+        // Note: Scene reorders SetFlag before Dialog
+        expect(branches.first.events, [
+          SetFlag(EventFlag('test')),
+          Dialog(spans: [DialogSpan('Hello')]),
+        ]);
+      });
+
+      test('returns empty for empty scene', () {
+        var scene = Scene([]);
+
+        var branches = scene.branches();
+
+        expect(branches, isEmpty);
+      });
+
+      test('returns both branches of a simple IfFlag', () {
+        var scene = Scene([
+          IfFlag(EventFlag('test'), isSet: [
+            Dialog(spans: [DialogSpan('Set branch')]),
+          ], isUnset: [
+            Dialog(spans: [DialogSpan('Unset branch')]),
+          ])
+        ]);
+
+        var branches = scene.branches().toList();
+
+        expect(branches, hasLength(2));
+
+        expect(branches[0].condition, Condition({EventFlag('test'): true}));
+        expect(branches[0].events, [
+          Dialog(spans: [DialogSpan('Set branch')])
+        ]);
+
+        expect(branches[1].condition, Condition({EventFlag('test'): false}));
+        expect(branches[1].events, [
+          Dialog(spans: [DialogSpan('Unset branch')])
+        ]);
+      });
+
+      test('nested IfFlags produce combined conditions', () {
+        var scene = Scene([
+          IfFlag(EventFlag('outer'), isSet: [
+            IfFlag(EventFlag('inner'), isSet: [
+              Dialog(spans: [DialogSpan('Both set')]),
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Outer set, inner unset')]),
+            ])
+          ], isUnset: [
+            Dialog(spans: [DialogSpan('Outer unset')]),
+          ])
+        ]);
+
+        var branches = scene.branches().toList();
+
+        expect(branches, hasLength(3));
+
+        expect(branches[0].condition,
+            Condition({EventFlag('outer'): true, EventFlag('inner'): true}));
+
+        expect(branches[1].condition,
+            Condition({EventFlag('outer'): true, EventFlag('inner'): false}));
+
+        expect(branches[2].condition, Condition({EventFlag('outer'): false}));
+      });
+
+      test('stops at first non-conditional event (does not recurse past it)',
+          () {
+        var scene = Scene([
+          IfFlag(EventFlag('outer'), isSet: [
+            Dialog(spans: [DialogSpan('Content before nested')]),
+            IfFlag(EventFlag('inner'), isSet: [
+              Dialog(spans: [DialogSpan('Should not be a separate branch')]),
+            ], isUnset: [])
+          ], isUnset: [
+            Dialog(spans: [DialogSpan('Outer unset')]),
+          ])
+        ]);
+
+        var branches = scene.branches().toList();
+
+        // Should have 2 branches, not 3 - the nested IfFlag is part of the
+        // "outer set" branch, not recursed into separately
+        expect(branches, hasLength(2));
+
+        expect(branches[0].condition, Condition({EventFlag('outer'): true}));
+        // The branch contains both the dialog and the nested IfFlag
+        expect(branches[0].events, hasLength(2));
+
+        expect(branches[1].condition, Condition({EventFlag('outer'): false}));
+      });
+
+      test('IfValue branches produce value conditions', () {
+        var scene = Scene([
+          IfValue(BySlot.one.position().component(Axis.x),
+              comparedTo: PositionComponent(0x200, Axis.x),
+              greater: [
+                Dialog(spans: [DialogSpan('Greater')]),
+              ],
+              equal: [
+                Dialog(spans: [DialogSpan('Equal')]),
+              ],
+              less: [
+                Dialog(spans: [DialogSpan('Less')]),
+              ])
+        ]);
+
+        var branches = scene.branches().toList();
+
+        expect(branches, hasLength(3));
+
+        var key = (
+          BySlot.one.position().component(Axis.x),
+          PositionComponent(0x200, Axis.x)
+        );
+
+        // Order is: equal, greater, less (based on addBranch order in IfValue)
+        expect(branches[0].condition, Condition({}, values: {key: eq}));
+        expect(branches[1].condition, Condition({}, values: {key: gt}));
+        expect(branches[2].condition, Condition({}, values: {key: lt}));
+      });
+
+      test('mixed IfFlag and IfValue produce combined conditions', () {
+        var scene = Scene([
+          IfFlag(EventFlag('flag'), isSet: [
+            IfValue(alys.position().component(Axis.y),
+                comparedTo: PositionComponent(0x100, Axis.y),
+                lessOrEqual: [
+                  Dialog(spans: [DialogSpan('Flag set and y <= 0x100')]),
+                ],
+                greater: [
+                  Dialog(spans: [DialogSpan('Flag set and y > 0x100')]),
+                ])
+          ], isUnset: [
+            Dialog(spans: [DialogSpan('Flag unset')]),
+          ])
+        ]);
+
+        var branches = scene.branches().toList();
+
+        expect(branches, hasLength(3));
+
+        var valueKey = (
+          alys.position().component(Axis.y),
+          PositionComponent(0x100, Axis.y)
+        );
+
+        // Order: greater added before lessOrEqual in IfValue constructor
+        expect(
+            branches[0].condition,
+            Condition({EventFlag('flag'): true},
+                values: {valueKey: Comparison.gt}));
+
+        expect(
+            branches[1].condition,
+            Condition({EventFlag('flag'): true},
+                values: {valueKey: Comparison.lte}));
+
+        expect(branches[2].condition, Condition({EventFlag('flag'): false}));
+      });
+
+      test('branch events are filtered by condition via asOf', () {
+        // The Branch constructor applies scene.asOf(condition) to the events
+        var scene = Scene([
+          IfFlag(EventFlag('a'), isSet: [
+            IfFlag(EventFlag('b'), isSet: [
+              Dialog(spans: [DialogSpan('a and b set')]),
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('a set, b unset')]),
+            ])
+          ], isUnset: [
+            Dialog(spans: [DialogSpan('a unset')]),
+          ])
+        ]);
+
+        var branches = scene.branches().toList();
+
+        // Each branch's events should be the simplified view as of its condition
+        expect(branches[0].events, [
+          Dialog(spans: [DialogSpan('a and b set')])
+        ]);
+        expect(branches[1].events, [
+          Dialog(spans: [DialogSpan('a set, b unset')])
+        ]);
+        expect(branches[2].events, [
+          Dialog(spans: [DialogSpan('a unset')])
+        ]);
+      });
+
+      test('toScene converts branch back to Scene', () {
+        var scene = Scene([
+          IfFlag(EventFlag('test'), isSet: [
+            Dialog(spans: [DialogSpan('Set')]),
+            SetFlag(EventFlag('marker')),
+          ], isUnset: [
+            Dialog(spans: [DialogSpan('Unset')]),
+          ])
+        ]);
+
+        var branches = scene.branches().toList();
+        var setBranch = branches[0].toScene();
+
+        expect(
+            setBranch,
+            Scene([
+              Dialog(spans: [DialogSpan('Set')]),
+              SetFlag(EventFlag('marker')),
+            ]));
+      });
+
+      test('empty branch in IfFlag is not yielded', () {
+        var scene = Scene([
+          IfFlag(EventFlag('test'), isSet: [
+            Dialog(spans: [DialogSpan('Set')]),
+          ], isUnset: [] // Empty branch
+              )
+        ]);
+
+        var branches = scene.branches().toList();
+
+        // Only the set branch should be yielded
+        expect(branches, hasLength(1));
+        expect(branches[0].condition, Condition({EventFlag('test'): true}));
+      });
+
+      test('scene with only SetContext events returns no branches', () {
+        var scene = Scene([
+          SetContext((s) {}),
+          SetContext((s) {}),
+        ]);
+
+        var branches = scene.branches();
+
+        // SetContext is ignored, so effectively empty
+        expect(branches, isEmpty);
+      });
     });
 
     group('condense', () {
