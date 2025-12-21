@@ -608,7 +608,7 @@ class Scene extends IterableBase<Event> {
   /// as of the given [Condition].
   ///
   /// Unreachable branches are pruned.
-  /// 
+  ///
   /// To modify the scene in place, use [assume].
   Scene asOf(Condition asOf) {
     return Scene(_asOf(_events, asOf, Condition.empty()));
