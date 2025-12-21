@@ -13,7 +13,7 @@ EventAsm debugStart({
   required List<model.EventFlag> flagsSet,
   required EventFlags eventFlags,
   required model.LoadMap loadMap,
-  // TODO: items! (e.g. for key items)
+  List<model.ItemId> items = const [],
 }) {
   var startingMap = loadMap.map.id;
   var x = loadMap.startingPosition.x ~/ 8;
@@ -34,6 +34,10 @@ EventAsm debugStart({
       setEventFlag(eventFlags.toConstantValue(f)),
     ],
     if (flagsSet.isNotEmpty) newLine(),
+    if (items.isNotEmpty) ...[
+      _addItems(items),
+      newLine(),
+    ],
     move.b(World.values.indexOf(startingMap.world).i, Constant('World_Index').w,
         comment: startingMap.world.name),
     move.w(startingMap.toAsm.i, Field_Map_Index.w),
@@ -76,4 +80,13 @@ Asm _loadParty(List<model.Character> party) {
 Asm _addMacro(model.Character c) {
   if (c == model.shay) return Asm.empty();
   return Asm([moveq(c.charIdAddress, d0), jsr(Label('Event_AddMacro').l)]);
+}
+
+Asm _addItems(List<model.ItemId> items) {
+  var asm = Asm.empty();
+  for (var item in items) {
+    asm.add(jsr(Label('GetFreeInventorySlot').l));
+    asm.add(move.b(Constant(item.toConstant).i, a0.indirect));
+  }
+  return asm;
 }

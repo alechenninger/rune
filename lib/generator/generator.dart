@@ -63,6 +63,7 @@ typedef DebugOptions = ({
   List<EventFlag> eventFlags,
   List<Character> party,
   LoadMap loadMap,
+  List<ItemId> items,
 });
 
 final _log = Logger('generator');
@@ -135,7 +136,8 @@ class Program {
         party: debugOptions.party,
         flagsSet: debugOptions.eventFlags,
         eventFlags: _eventFlags,
-        loadMap: debugOptions.loadMap);
+        loadMap: debugOptions.loadMap,
+        items: debugOptions.items);
 
     _scenes[SceneId('gamestart')] = SceneAsm(event: asm);
     return asm;

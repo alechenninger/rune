@@ -44,6 +44,7 @@ export 'party.dart';
 export 'sound.dart';
 export 'text.dart';
 export 'guild.dart';
+export 'item.dart';
 
 class Game {
   // todo: should also include non-interaction Scenes?
