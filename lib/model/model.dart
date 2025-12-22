@@ -246,6 +246,7 @@ abstract class EventVisitor {
   void restoreSavedParty(RestoreSavedPartyOrder restoreParty);
   void onExitRunBattle(OnExitRunBattle setExit);
   void onNextInteraction(OnNextInteraction onNext);
+  void returnControl(ReturnControl returnControl);
 }
 
 class EventState {

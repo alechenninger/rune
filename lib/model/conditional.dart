@@ -560,9 +560,7 @@ class IfFlag extends IfEvent {
             Scene(isSet).asOf(Condition({flag: true})).events),
         isUnset = List.unmodifiable(
             Scene(isUnset).asOf(Condition({flag: false})).events);
-
-  @override
-  void visit(EventVisitor visitor) {
+@override void visit(EventVisitor visitor) {
     visitor.ifFlag(this);
   }
 

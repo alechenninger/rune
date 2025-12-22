@@ -279,3 +279,30 @@ class AddMoney extends Event {
   @override
   int get hashCode => meseta.hashCode;
 }
+
+/// Returns control to the player early, exiting the current scene.
+///
+/// This performs all necessary cleanup (hiding panels, fading in field,
+/// unlocking camera, resetting step speed) based on the current game mode.
+///
+/// When used inside a conditional branch (IfFlag, IfValue), only that branch
+/// is terminated; other branches and subsequent events outside the conditional
+/// are unaffected.
+class ReturnControl extends Event {
+  const ReturnControl();
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.returnControl(this);
+  }
+
+  @override
+  String toString() => 'ReturnControl{}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is ReturnControl;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+}

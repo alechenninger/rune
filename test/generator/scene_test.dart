@@ -1197,7 +1197,6 @@ ${dialog2.toAsm()}
 
       late DialogTrees dialog;
       late EventAsm asm;
-      late SceneAsmGenerator generator;
       late TestEventRoutines eventRoutines;
 
       setUp(() {
@@ -1207,7 +1206,7 @@ ${dialog2.toAsm()}
       });
 
       test('in event, flag is checked in event code', () {
-        generator = SceneAsmGenerator.forInteraction(
+        SceneAsmGenerator.forInteraction(
             map, SceneId('interact'), dialog, asm, eventRoutines);
         // todo:
       }, skip: 'TODO:write test');
@@ -1553,6 +1552,525 @@ ${dialog2.toAsm()}
 
           expect(() => generator.runEvent(), throwsStateError);
         });
+      });
+    });
+  });
+
+  group('ReturnControl', () {
+    var sceneId = SceneId('testscene');
+
+    test('outside conditional forces rts at end', () {
+      var eventAsm1 = EventAsm.empty();
+      var eventAsm2 = EventAsm.empty();
+
+      // Scene with ReturnControl
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm1)
+        ..pause(Pause(1.second))
+        ..returnControl(ReturnControl())
+        ..finish();
+
+      // Scene ending normally
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm2)
+        ..pause(Pause(1.second))
+        ..finish();
+
+      expect(
+          eventAsm1.withoutComments(), eventAsm2.withoutComments()..add(rts));
+    });
+
+    test('in IfFlag isSet branch terminates only that branch', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          Pause(1.second),
+          ReturnControl(),
+        ], isUnset: [
+          Pause(2.seconds),
+        ]))
+        ..pause(Pause(3.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.Test_unset1')),
+            // isSet branch: pause then return
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            rts,
+            bra.w(Label('.Test_cont1')),
+            // isUnset branch: pause then continue
+            setLabel('.Test_unset1'),
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            setLabel('.Test_cont1'),
+            // After IfFlag
+            move.w(Word(0x00B3).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('in IfValue branch terminates only that branch', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..ifValue(IfValue(hahn.slot(), comparedTo: NullSlot(), notEqual: [
+          Pause(1.second),
+          ReturnControl(),
+        ], equal: [
+          Pause(2.seconds),
+        ]))
+        ..pause(Pause(3.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(hahn.charIdAddress, d0),
+            jsr(Label('FindCharacterSlot').l),
+            cmpi.b(0xFF.i, d1),
+            beq(Label('.1_eq')),
+            // notEqual branch: pause then return
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            rts,
+            bra(Label('.1_continue')),
+            // equal branch: pause then continue
+            setLabel('.1_eq'),
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            setLabel('.1_continue'),
+            // After IfValue
+            move.w(Word(0x00B3).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('in IfFlag isUnset branch terminates only that branch', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          Pause(1.second),
+        ], isUnset: [
+          Pause(2.seconds),
+          ReturnControl(),
+        ]))
+        ..pause(Pause(3.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.Test_unset1')),
+            // isSet branch: pause then continue
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            bra.w(Label('.Test_cont1')),
+            // isUnset branch: pause then return
+            setLabel('.Test_unset1'),
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            rts,
+            setLabel('.Test_cont1'),
+            // After IfFlag
+            move.w(Word(0x00B3).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('in only IfFlag branch defined with ReturnControl', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          Pause(1.second),
+          ReturnControl(),
+        ]))
+        ..pause(Pause(2.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.Test_unset1')),
+            // isSet branch: pause then return
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            rts,
+            // No isUnset branch, just continue
+            setLabel('.Test_unset1'),
+            // After IfFlag
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('in IfValue equal branch terminates only that branch', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..ifValue(IfValue(hahn.slot(),
+            comparedTo: NullSlot(),
+            notEqual: [Pause(1.second)],
+            equal: [Pause(2.seconds), ReturnControl()]))
+        ..pause(Pause(3.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(hahn.charIdAddress, d0),
+            jsr(Label('FindCharacterSlot').l),
+            cmpi.b(0xFF.i, d1),
+            beq(Label('.1_eq')),
+            // notEqual branch: pause then continue
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            bra(Label('.1_continue')),
+            // equal branch: pause then return
+            setLabel('.1_eq'),
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            rts,
+            setLabel('.1_continue'),
+            // After IfValue
+            move.w(Word(0x00B3).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('in only IfValue branch defined with ReturnControl', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..ifValue(IfValue(hahn.slot(),
+            comparedTo: NullSlot(),
+            notEqual: [Pause(1.second), ReturnControl()]))
+        ..pause(Pause(2.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(hahn.charIdAddress, d0),
+            jsr(Label('FindCharacterSlot').l),
+            cmpi.b(0xFF.i, d1),
+            beq(Label('.1_continue')),
+            // notEqual branch: pause then return
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            rts,
+            // No equal branch, just continue
+            setLabel('.1_continue'),
+            // After IfValue
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('nested IfFlag with ReturnControl in inner branch', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..ifFlag(IfFlag(EventFlag('Outer'), isSet: [
+          IfFlag(EventFlag('Inner'), isSet: [
+            Pause(1.second),
+            ReturnControl(),
+          ])
+        ]))
+        ..pause(Pause(2.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            moveq(Constant('EventFlag_Outer').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.Outer_unset1')),
+            // Outer isSet branch: nested IfFlag
+            moveq(Constant('EventFlag_Inner').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.Inner_unset2')),
+            // Inner isSet branch: pause then return
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            rts,
+            setLabel('.Inner_unset2'),
+            setLabel('.Outer_unset1'),
+            // After outer IfFlag
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('after FadeOut, ReturnControl fades in field', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..fadeOut(FadeOut())
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          Pause(1.second),
+          ReturnControl(),
+        ]))
+        ..pause(Pause(2.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            // FadeOut
+            jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+            // IfFlag
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.Test_unset2')),
+            // isSet branch: pause, fade in, then return
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('VInt_PrepareLoop').l),
+            // FadeInField cleanup
+            movea.l(Constant('Map_Palettes_Addr').w, a0),
+            jsr(Label('LoadMapPalette').l),
+            jsr(Label('Pal_FadeIn').l),
+            rts,
+            // isUnset continues
+            setLabel('.Test_unset2'),
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('with panel shown, ReturnControl hides panels', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..showPanel(ShowPanel(PrincipalPanel.principal))
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          Pause(1.second),
+          ReturnControl(),
+        ]))
+        ..pause(Pause(2.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            // ShowPanel
+            move.w(Word(PrincipalPanel.principal.panelIndex).i, d0),
+            jsr(Label('Panel_Create').l),
+            jsr(Label('DMAPlanes_VInt').l),
+            // IfFlag
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.Test_unset2')),
+            // isSet branch: pause, hide panels, then return
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('VInt_PrepareLoop').l),
+            // HideTopPanels cleanup
+            jsr(Label('Panel_Destroy').l),
+            jsr(Label('DMAPlanes_VInt').l),
+            rts,
+            // isUnset continues
+            setLabel('.Test_unset2'),
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    test('with camera locked, ReturnControl unlocks camera', () {
+      var eventAsm = EventAsm.empty();
+
+      SceneAsmGenerator.forEvent(sceneId, DialogTrees(), eventAsm)
+        ..lockCamera(LockCamera())
+        ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+          Pause(1.second),
+          ReturnControl(),
+        ]))
+        ..pause(Pause(2.seconds))
+        ..finish();
+
+      expect(
+          eventAsm.withoutComments(),
+          EventAsm([
+            // LockCamera
+            bset(Byte(0x02).i, Constant('Char_Move_Flags').w),
+            // IfFlag
+            moveq(Constant('EventFlag_Test').i, d0),
+            jsr(Label('EventFlags_Test').l),
+            beq.w(Label('.Test_unset2')),
+            // isSet branch: pause, unlock camera, then return
+            move.w(Word(0x003B).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            // UnlockCamera cleanup
+            bclr(Byte(0x02).i, Constant('Char_Move_Flags').w),
+            rts,
+            // isUnset continues
+            setLabel('.Test_unset2'),
+            move.w(Word(0x0077).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+          ]));
+    });
+
+    group('in RunEvent mode', () {
+      var map = GameMap(MapId.Test);
+      var config = ProgramConfiguration.empty();
+
+      test('immediate ReturnControl branches to RunEvent_NoEvent', () {
+        var eventAsm = EventAsm.empty();
+        var runEventAsm = Asm.empty();
+
+        SceneAsmGenerator.forRunEvent(sceneId,
+            inMap: map,
+            eventAsm: eventAsm,
+            runEventAsm: runEventAsm,
+            config: config)
+          ..ifFlag(IfFlag(EventFlag('Test'), isSet: [
+            ReturnControl(),
+          ]))
+          ..pause(Pause(2.seconds))
+          ..finish();
+
+        // isSet branch has no events, just ReturnControl -> RunEvent_NoEvent
+        // isUnset continues to the pause event
+        expect(
+            runEventAsm.withoutComments(),
+            Asm([
+              moveq(Constant('EventFlag_Test').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.Test_unset1')),
+              // isSet branch: no event, go to no-op
+              bra.w(Label('RunEvent_NoEvent')),
+              setLabel('.Test_unset1'),
+              // isUnset: dispatch to pause event
+              move.w(Word(0x0000).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+            ]));
+      });
+
+      test('nested IfFlag with immediate ReturnControl in inner branch', () {
+        var eventAsm = EventAsm.empty();
+        var runEventAsm = Asm.empty();
+
+        SceneAsmGenerator.forRunEvent(sceneId,
+            inMap: map,
+            eventAsm: eventAsm,
+            runEventAsm: runEventAsm,
+            config: config)
+          ..ifFlag(IfFlag(EventFlag('Outer'), isSet: [
+            ReturnControl(),
+          ], isUnset: [
+            IfFlag(EventFlag('Inner'), isSet: [
+              Pause(1.second),
+            ])
+          ]))
+          ..pause(Pause(2.seconds))
+          ..finish();
+
+        expect(
+            runEventAsm.withoutComments(),
+            Asm([
+              moveq(Constant('EventFlag_Outer').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.Outer_unset1')),
+              // Outer isSet: immediate return
+              bra.w(Label('RunEvent_NoEvent')),
+              bra.w(Label('.Outer_cont1')),
+              setLabel('.Outer_unset1'),
+              // Outer isUnset: check inner flag
+              moveq(Constant('EventFlag_Inner').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.Inner_unset2')),
+              // Inner isSet: dispatch to pause event
+              move.w(Word(0x0001).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              setLabel('.Inner_unset2'),
+              setLabel('.Outer_cont1'),
+              // Continue to second pause event
+              move.w(Word(0x0002).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+            ]));
+      });
+
+      test('IfValue with immediate ReturnControl branches to RunEvent_NoEvent',
+          () {
+        var eventAsm = EventAsm.empty();
+        var runEventAsm = Asm.empty();
+
+        SceneAsmGenerator.forRunEvent(sceneId,
+            inMap: map,
+            eventAsm: eventAsm,
+            runEventAsm: runEventAsm,
+            config: config)
+          ..ifValue(IfValue(hahn.slot(), comparedTo: NullSlot(), notEqual: [
+            ReturnControl(),
+          ]))
+          ..pause(Pause(2.seconds))
+          ..finish();
+
+        expect(
+            runEventAsm.withoutComments(),
+            Asm([
+              moveq(hahn.charIdAddress, d0),
+              jsr(Label('FindCharacterSlot').l),
+              cmpi.b(0xFF.i, d1),
+              beq(Label('.1_continue')),
+              // notEqual: immediate return
+              bra.w(Label('RunEvent_NoEvent')),
+              setLabel('.1_continue'),
+              // equal: dispatch to pause event
+              move.w(Word(0x0000).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+            ]));
+      });
+
+      test('IfFlag containing IfValue with immediate ReturnControl', () {
+        var eventAsm = EventAsm.empty();
+        var runEventAsm = Asm.empty();
+
+        SceneAsmGenerator.forRunEvent(sceneId,
+            inMap: map,
+            eventAsm: eventAsm,
+            runEventAsm: runEventAsm,
+            config: config)
+          ..ifFlag(IfFlag(EventFlag('Outer'), isSet: [
+            IfValue(hahn.slot(), comparedTo: NullSlot(), notEqual: [
+              ReturnControl(),
+            ])
+          ]))
+          ..pause(Pause(2.seconds))
+          ..finish();
+
+        expect(
+            runEventAsm.withoutComments(),
+            Asm([
+              moveq(Constant('EventFlag_Outer').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.Outer_unset1')),
+              // Outer isSet: check hahn slot
+              moveq(hahn.charIdAddress, d0),
+              jsr(Label('FindCharacterSlot').l),
+              cmpi.b(0xFF.i, d1),
+              beq(Label('.2_continue')),
+              // notEqual: immediate return
+              bra.w(Label('RunEvent_NoEvent')),
+              setLabel('.2_continue'),
+              setLabel('.Outer_unset1'),
+              // Continue to pause event
+              move.w(Word(0x0001).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+            ]));
       });
     });
   });

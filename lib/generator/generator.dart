@@ -888,12 +888,16 @@ class SceneAsmGenerator implements EventVisitor {
         break;
       default:
         // Other modes (event, run event) support events.
+
         // TODO: Note that in order for run event to support events,
         // it has to lazily transition to event mode anyway.
         // So we may just want to do that here
         // if the event type required is 'event'.
         // We already have _addToEventOrRunEvent if we know it's okay
         // in either mode.
+        // This would require though that needsEventMode
+        // can distinguish between events that must be run in event proper,
+        // and cannot run in "run event" mode.
         break;
     }
   }
@@ -1572,14 +1576,17 @@ class SceneAsmGenerator implements EventVisitor {
 
         _gameMode = startingMode;
 
-        // If the prior branch didn't already return, we need to jump
-        // ahead to continue.
+        // If the prior branch didn't already return
+        // (we are still executing in that branch),
+        // we need to jump ahead to continue
+        // before running this branch.
         // This is not needed with the fallback branch,
         // since there is no branch before it.
+
         // TODO(if value/run events): if we put value based states in condition
         //  graph, we could make this check less hacky
-        var lastBranchFinished =
-            _gameMode is RunEventMode && asm.lastOrNull == rts.single;
+        var lastBranchFinished = _gameMode is RunEventMode &&
+            const {'rts', 'bra', 'jmp'}.contains(asm.lastOrNull?.cmd);
         if (!lastBranchFinished) {
           asm.add(bra(branches.labelContinue()));
         }
@@ -2573,6 +2580,12 @@ class SceneAsmGenerator implements EventVisitor {
     });
   }
 
+  @override
+  void returnControl(ReturnControl returnControl) {
+    _checkNotFinished();
+    _finish(force: true);
+  }
+
   void finish(
       {bool appendNewline = false, bool allowIncompleteDialogTrees = false}) {
     // todo: also apply all changes for current mem across graph
@@ -2587,7 +2600,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  void _finish({bool appendNewline = false}) {
+  void _finish({bool appendNewline = false, bool force = false}) {
     // If we're in dialog loop,
     // we don't want to generate
     // because that would cause an unwanted interrupt
@@ -2600,11 +2613,11 @@ class SceneAsmGenerator implements EventVisitor {
     switch (_gameMode) {
       case EventMode(priorMode: InteractionMode(), type: EventType.cutscene):
         if (needToShowField) {
-          if (_replaceDialogRoutine != null) {
+          if (_replaceDialogRoutine case var replaceDialog?) {
             // dialog 5 will fade out the whole screen
             // before map reload happens
             // (destroy window -> fade out -> destroy panels)
-            _replaceDialogRoutine!(5);
+            replaceDialog(5);
           } else {
             // todo: but what if there isn't dialog?
             //  do we need to do palfadout?
@@ -2681,7 +2694,10 @@ class SceneAsmGenerator implements EventVisitor {
           fadeInField(FadeInField());
         }
 
-        if (prior != null || _postAsm.isNotEmpty) {
+        // NOTE: It is somewhat legacy behavior that we don't always add rts
+        // There are some scenes where we add manual assembly after the event
+        // code. We could move these to manual ASM blocks inside the script.
+        if (prior != null || _postAsm.isNotEmpty || force) {
           _eventAsm.add(rts);
         }
 
