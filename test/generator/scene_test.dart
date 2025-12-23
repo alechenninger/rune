@@ -1920,7 +1920,11 @@ ${dialog2.toAsm()}
 
     group('in RunEvent mode', () {
       var map = GameMap(MapId.Test);
-      var config = ProgramConfiguration.empty();
+      late ProgramConfiguration config;
+
+      setUp(() {
+        config = ProgramConfiguration.empty();
+      });
 
       test('immediate ReturnControl branches to RunEvent_NoEvent', () {
         var eventAsm = EventAsm.empty();
@@ -1989,13 +1993,13 @@ ${dialog2.toAsm()}
               jsr(Label('EventFlags_Test').l),
               beq.w(Label('.Inner_unset2')),
               // Inner isSet: dispatch to pause event
-              move.w(Word(0x0001).i, Constant('Event_Index').w),
+              move.w(Word(0x0000).i, Constant('Event_Index').w),
               moveq(1.i, d7),
               rts,
               setLabel('.Inner_unset2'),
               setLabel('.Outer_cont1'),
               // Continue to second pause event
-              move.w(Word(0x0002).i, Constant('Event_Index').w),
+              move.w(Word(0x0001).i, Constant('Event_Index').w),
               moveq(1.i, d7),
               rts,
             ]));
@@ -2067,9 +2071,143 @@ ${dialog2.toAsm()}
               setLabel('.2_continue'),
               setLabel('.Outer_unset1'),
               // Continue to pause event
+              move.w(Word(0x0000).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+            ]));
+      });
+
+      test('deeply nested IfValue with ReturnControl abort branch', () {
+        // Structure:
+        // IfFlag(BaseFlag) isUnset:
+        //   IfValue(y(alys) < y(rune)) less:
+        //     IfFlag(StoryFlag)
+        //       isSet:
+        //         IfValue(x(alys) = x(rune)) equal:
+        //           IfValue(y(shay) > y(hahn)) greater:
+        //             ReturnControl
+        //         dialog event
+        //       isUnset:
+        //         IfValue(x(alys) = x(rune)) equal:
+        //           IfValue(y(shay) > y(hahn)) greater:
+        //             ReturnControl
+        //         dialog event
+        var eventAsm = EventAsm.empty();
+        var runEventAsm = Asm.empty();
+
+        var scene = Scene([
+          IfFlag(EventFlag('BaseFlag'), isSet: [], isUnset: [
+            IfValue(alys.position().component(Axis.y),
+                comparedTo: rune.position().component(Axis.y),
+                less: [
+                  IfFlag(EventFlag('StoryFlag'), isSet: [
+                    IfValue(alys.position().component(Axis.x),
+                        comparedTo: rune.position().component(Axis.x),
+                        equal: [
+                          IfValue(shay.position().component(Axis.y),
+                              comparedTo: hahn.position().component(Axis.y),
+                              greater: [ReturnControl()]),
+                        ]),
+                    Pause(1.second),
+                  ], isUnset: [
+                    IfValue(alys.position().component(Axis.x),
+                        comparedTo: rune.position().component(Axis.x),
+                        equal: [
+                          IfValue(shay.position().component(Axis.y),
+                              comparedTo: hahn.position().component(Axis.y),
+                              greater: [ReturnControl()]),
+                        ]),
+                    Pause(2.seconds),
+                  ]),
+                ]),
+          ]),
+        ]);
+
+        SceneAsmGenerator.forRunEvent(sceneId,
+            inMap: map,
+            eventAsm: eventAsm,
+            runEventAsm: runEventAsm,
+            config: config)
+          ..scene(scene)
+          ..finish();
+
+        expect(
+            runEventAsm.withoutComments(),
+            Asm([
+              // Check BaseFlag
+              moveq(Constant('EventFlag_BaseFlag').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              bne.w(Label('.BaseFlag_set1')),
+              // BaseFlag isUnset: compare y(alys) < y(rune)
+              moveq(rune.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              lea(a4.indirect, a3),
+              moveq(alys.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(curr_y_pos(a4), d0),
+              cmp.w(curr_y_pos(a3), d0),
+              bcc(Label('.2_continue')),
+              // y(alys) < y(rune): check StoryFlag
+              moveq(Constant('EventFlag_StoryFlag').i, d0),
+              jsr(Label('EventFlags_Test').l),
+              beq.w(Label('.StoryFlag_unset3')),
+              // StoryFlag isSet: compare x(alys) = x(rune)
+              moveq(rune.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              lea(a4.indirect, a3),
+              moveq(alys.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(curr_x_pos(a4), d0),
+              cmp.w(curr_x_pos(a3), d0),
+              bne(Label('.4_continue')),
+              // x(alys) = x(rune): compare y(shay) > y(hahn)
+              moveq(hahn.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              lea(a4.indirect, a3),
+              moveq(shay.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(curr_y_pos(a4), d0),
+              cmp.w(curr_y_pos(a3), d0),
+              bls(Label('.5_continue')),
+              // y(shay) > y(hahn): ReturnControl
+              bra.w(Label('RunEvent_NoEvent')),
+              setLabel('.5_continue'),
+              setLabel('.4_continue'),
+              // dispatch to event 0 (1 second pause)
+              move.w(Word(0x0000).i, Constant('Event_Index').w),
+              moveq(1.i, d7),
+              rts,
+              setLabel('.StoryFlag_unset3'),
+              // StoryFlag isUnset: compare x(alys) = x(rune)
+              moveq(rune.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              lea(a4.indirect, a3),
+              moveq(alys.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(curr_x_pos(a4), d0),
+              cmp.w(curr_x_pos(a3), d0),
+              bne(Label('.7_continue')),
+              // x(alys) = x(rune): compare y(shay) > y(hahn)
+              moveq(hahn.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              lea(a4.indirect, a3),
+              moveq(shay.charIdAddress, d0),
+              jsr(Label('Event_GetCharacter').l),
+              move.w(curr_y_pos(a4), d0),
+              cmp.w(curr_y_pos(a3), d0),
+              bls(Label('.8_continue')),
+              // y(shay) > y(hahn): ReturnControl
+              bra.w(Label('RunEvent_NoEvent')),
+              setLabel('.8_continue'),
+              setLabel('.7_continue'),
+              // dispatch to event 1 (2 second pause)
               move.w(Word(0x0001).i, Constant('Event_Index').w),
               moveq(1.i, d7),
               rts,
+              setLabel('.2_continue'),
+              setLabel('.BaseFlag_set1'),
+              // all other cases: no event
+              bra.w(Label('RunEvent_NoEvent')),
             ]));
       });
     });
