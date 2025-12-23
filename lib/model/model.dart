@@ -737,7 +737,7 @@ class Scene extends IterableBase<Event> {
         yield* _branches(e.isSet, current.withSet(e.flag));
         yield* _branches(e.isUnset, current.withNotSet(e.flag));
       case IfValue e:
-        for (var branch in e.branches) {
+        for (var branch in e.comparisonBranches) {
           yield* _branches(branch.events,
               current.withBranch((e.operand1, e.operand2), branch.comparison));
         }
@@ -806,7 +806,7 @@ class Scene extends IterableBase<Event> {
 
           case IfValue e:
             var branches = {
-              for (var b in e.branches)
+              for (var b in e.comparisonBranches)
                 b.comparison: condenseRecursively([...b.events])
             };
             events[i] = IfValue(
@@ -859,27 +859,32 @@ class Scene extends IterableBase<Event> {
     var added = false;
 
     for (int i = 0; i < events.length; i++) {
-      var e = events[i];
-      if (e is IfFlag) {
-        var replace = false;
-        // Check set branch
-        var ifSet = current.withSet(e.flag);
-        var isSetBranch = [...e.isSet];
-        var isUnsetBranch = [...e.isUnset];
+      if (events[i] case IfEvent e) {
+        var replacements = <Branch>[];
 
-        if (!ifSet.conflictsWith(matching)) {
-          replace = _visitBranch(isSetBranch, visitor, ifSet, matching);
+        for (var branch in e.branches()) {
+          // Assume this branch...
+          var condition = current.withCondition(branch.condition);
+          var events = branch.events;
+
+          // Visit this branch if it does not conflict.
+          // In may not satisfy it, but we recurse
+          // in case nested condition(s) eventually do.
+          if (!condition.conflictsWith(matching)) {
+            // May be modified – copy.
+            events = [...events];
+            // Replace if we modified the branch
+            // or any prior branches needed replacement
+            if (_visitBranch(events, visitor, condition, matching)) {
+              replacements.add(Branch(branch.condition, events: events));
+            }
+          }
         }
 
-        var ifUnset = current.withNotSet(e.flag);
-        if (!ifUnset.conflictsWith(matching)) {
-          replace = _visitBranch(isUnsetBranch, visitor, ifUnset, matching);
-        }
-
-        if (replace) {
+        if (replacements.isNotEmpty) {
           added = true;
-          events[i] =
-              IfFlag(e.flag, isSet: isSetBranch, isUnset: isUnsetBranch);
+          // Rebuild the conditional event with the replaced branches
+          events[i] = e.withBranches(replacements);
         }
       }
     }

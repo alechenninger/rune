@@ -682,6 +682,325 @@ void main() {
           ]));
     });
 
+    test('adds branch with simple single-level asOf condition', () {
+      var scene = Scene([
+        IfFlag(EventFlag('A'), isSet: [
+          Dialog(spans: [DialogSpan('A is set')])
+        ], isUnset: [
+          Dialog(spans: [DialogSpan('A is not set')])
+        ])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('New branch')])
+      ],
+          whenSet: EventFlag('NewFlag'),
+          asOf: Condition({EventFlag('A'): true}));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('A'), isSet: [
+              IfFlag(EventFlag('NewFlag'), isSet: [
+                Dialog(spans: [DialogSpan('New branch')])
+              ], isUnset: [
+                Dialog(spans: [DialogSpan('A is set')])
+              ])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('A is not set')])
+            ])
+          ]));
+    });
+
+    test('adds branch to flat scene without asOf', () {
+      var scene = Scene([
+        Dialog(spans: [DialogSpan('Hello world')])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('This is after the quest')])
+      ], whenSet: EventFlag('Quest1'));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('Quest1'), isSet: [
+              Dialog(spans: [DialogSpan('This is after the quest')])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Hello world')])
+            ])
+          ]));
+    });
+
+    test('adds branch with createSequence sets the flag', () {
+      var scene = Scene([
+        Dialog(spans: [DialogSpan('Hello world')])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('This is after the quest')])
+      ], whenSet: EventFlag('Quest1'), createSequence: true);
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('Quest1'), isSet: [
+              Dialog(spans: [DialogSpan('This is after the quest')])
+            ], isUnset: [
+              SetFlag(EventFlag('Quest1')),
+              Dialog(spans: [DialogSpan('Hello world')])
+            ])
+          ]));
+    });
+
+    test('adds branch with createSequence and advanceSequenceWhenSet', () {
+      var scene = Scene([
+        Dialog(spans: [DialogSpan('Hello world')])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('This is after the quest')])
+      ],
+          whenSet: EventFlag('Quest1'),
+          createSequence: true,
+          advanceSequenceWhenSet: EventFlag('AdvanceCondition'));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('Quest1'), isSet: [
+              Dialog(spans: [DialogSpan('This is after the quest')])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Hello world')]),
+              IfFlag(EventFlag('AdvanceCondition'),
+                  isSet: [SetFlag(EventFlag('Quest1'))]),
+            ])
+          ]));
+    });
+
+    test('adds branch to empty scene', () {
+      var scene = Scene([]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('Branch content')])
+      ], whenSet: EventFlag('Flag1'));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('Flag1'), isSet: [
+              Dialog(spans: [DialogSpan('Branch content')])
+            ], isUnset: [])
+          ]));
+    });
+
+    test('adds multiple branches successively', () {
+      var scene = Scene([
+        Dialog(spans: [DialogSpan('Initial dialog')])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('First branch')])
+      ], whenSet: EventFlag('Flag1'));
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('Second branch')])
+      ], whenSet: EventFlag('Flag2'));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('Flag2'), isSet: [
+              Dialog(spans: [DialogSpan('Second branch')])
+            ], isUnset: [
+              IfFlag(EventFlag('Flag1'), isSet: [
+                Dialog(spans: [DialogSpan('First branch')])
+              ], isUnset: [
+                Dialog(spans: [DialogSpan('Initial dialog')])
+              ])
+            ])
+          ]));
+    });
+
+    test('adds branch as of deeply nested condition', () {
+      var scene = Scene([
+        IfFlag(EventFlag('A'), isSet: [
+          IfFlag(EventFlag('B'), isSet: [
+            Dialog(spans: [DialogSpan('A and B set')])
+          ], isUnset: [
+            Dialog(spans: [DialogSpan('A set, B unset')])
+          ])
+        ], isUnset: [
+          Dialog(spans: [DialogSpan('A unset')])
+        ])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('New branch')])
+      ],
+          whenSet: EventFlag('NewFlag'),
+          asOf: Condition({EventFlag('A'): true, EventFlag('B'): true}));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('A'), isSet: [
+              IfFlag(EventFlag('B'), isSet: [
+                IfFlag(EventFlag('NewFlag'), isSet: [
+                  Dialog(spans: [DialogSpan('New branch')])
+                ], isUnset: [
+                  Dialog(spans: [DialogSpan('A and B set')])
+                ])
+              ], isUnset: [
+                Dialog(spans: [DialogSpan('A set, B unset')])
+              ])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('A unset')])
+            ])
+          ]));
+    });
+
+    test('adds branch with multiple events', () {
+      var scene = Scene([
+        Dialog(spans: [DialogSpan('Hello')])
+      ]);
+
+      scene.addBranch([
+        SetFlag(EventFlag('SomeFlag')),
+        Dialog(spans: [DialogSpan('Branch dialog 1')]),
+        Pause(Duration(seconds: 1)),
+        Dialog(spans: [DialogSpan('Branch dialog 2')]),
+      ], whenSet: EventFlag('BranchFlag'));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('BranchFlag'), isSet: [
+              SetFlag(EventFlag('SomeFlag')),
+              Dialog(spans: [DialogSpan('Branch dialog 1')]),
+              Pause(Duration(seconds: 1)),
+              Dialog(spans: [DialogSpan('Branch dialog 2')]),
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Hello')])
+            ])
+          ]));
+    });
+
+    test('adds branch preserves existing SetFlag events', () {
+      var scene = Scene([
+        SetFlag(EventFlag('ExistingFlag')),
+        Dialog(spans: [DialogSpan('Hello')])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('Branch content')])
+      ], whenSet: EventFlag('BranchFlag'));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('BranchFlag'), isSet: [
+              Dialog(spans: [DialogSpan('Branch content')])
+            ], isUnset: [
+              SetFlag(EventFlag('ExistingFlag')),
+              Dialog(spans: [DialogSpan('Hello')])
+            ])
+          ]));
+    });
+
+    test('adds branch as of deeply nested IfFlag and IfValue condition', () {
+      var scene = Scene([
+        IfFlag(EventFlag('StoryProgress'), isSet: [
+          IfValue(alys.position().component(Axis.x),
+              comparedTo: PositionComponent(0x200, Axis.x),
+              greater: [
+                IfFlag(EventFlag('QuestStarted'), isSet: [
+                  Dialog(spans: [DialogSpan('Quest in progress, far right')])
+                ], isUnset: [
+                  Dialog(spans: [DialogSpan('No quest, far right')])
+                ])
+              ],
+              lessOrEqual: [
+                IfFlag(EventFlag('QuestStarted'), isSet: [
+                  IfValue(shay.position().component(Axis.y),
+                      comparedTo: PositionComponent(0x100, Axis.y),
+                      greater: [
+                        Dialog(spans: [DialogSpan('Quest active, Shay below')])
+                      ],
+                      lessOrEqual: [
+                        Dialog(spans: [DialogSpan('Quest active, Shay above')])
+                      ])
+                ], isUnset: [
+                  Dialog(spans: [DialogSpan('No quest, left side')])
+                ])
+              ])
+        ], isUnset: [
+          Dialog(spans: [DialogSpan('Story not progressed')])
+        ])
+      ]);
+
+      // Add branch at a deeply nested condition combining flags and values
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('Special event triggered!')])
+      ],
+          whenSet: EventFlag('SpecialEvent'),
+          asOf: Condition({
+            EventFlag('StoryProgress'): true,
+            EventFlag('QuestStarted'): true
+          }, values: {
+            (
+              alys.position().component(Axis.x),
+              PositionComponent(0x200, Axis.x)
+            ): Comparison.lte,
+            (
+              shay.position().component(Axis.y),
+              PositionComponent(0x100, Axis.y)
+            ): Comparison.gt
+          }));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('StoryProgress'), isSet: [
+              IfValue(alys.position().component(Axis.x),
+                  comparedTo: PositionComponent(0x200, Axis.x),
+                  greater: [
+                    IfFlag(EventFlag('QuestStarted'), isSet: [
+                      Dialog(
+                          spans: [DialogSpan('Quest in progress, far right')])
+                    ], isUnset: [
+                      Dialog(spans: [DialogSpan('No quest, far right')])
+                    ])
+                  ],
+                  lessOrEqual: [
+                    IfFlag(EventFlag('QuestStarted'), isSet: [
+                      IfValue(shay.position().component(Axis.y),
+                          comparedTo: PositionComponent(0x100, Axis.y),
+                          greater: [
+                            IfFlag(EventFlag('SpecialEvent'), isSet: [
+                              Dialog(spans: [
+                                DialogSpan('Special event triggered!')
+                              ])
+                            ], isUnset: [
+                              Dialog(spans: [
+                                DialogSpan('Quest active, Shay below')
+                              ])
+                            ])
+                          ],
+                          lessOrEqual: [
+                            Dialog(
+                                spans: [DialogSpan('Quest active, Shay above')])
+                          ])
+                    ], isUnset: [
+                      Dialog(spans: [DialogSpan('No quest, left side')])
+                    ])
+                  ])
+            ], isUnset: [
+              Dialog(spans: [DialogSpan('Story not progressed')])
+            ])
+          ]));
+    });
+
     test('assumes condition, removing unreachable outer branch', () {
       var scene = Scene([
         IfFlag(EventFlag('HahnJoined'), isSet: [
@@ -1401,6 +1720,57 @@ void main() {
     test('empty conditions satisfy and do not conflict', () {
       expect(Condition.empty().isSatisfiedBy(Condition.empty()), isTrue);
       expect(Condition.empty().conflictsWith(Condition.empty()), isFalse);
+    });
+
+    test('withCondition adds flags from other condition', () {
+      var c1 = Condition({EventFlag('a'): true});
+      var c2 = Condition({EventFlag('b'): false});
+
+      var combined = c1.withCondition(c2);
+
+      expect(
+          combined, Condition({EventFlag('a'): true, EventFlag('b'): false}));
+    });
+
+    test('withCondition on empty condition returns other condition', () {
+      var empty = Condition.empty();
+      var other = Condition({EventFlag('a'): true});
+
+      var combined = empty.withCondition(other);
+
+      expect(combined, Condition({EventFlag('a'): true}));
+    });
+
+    test('withCondition adds values from other condition', () {
+      var c1 = Condition({EventFlag('a'): true});
+      var c2 = Condition({}, values: {(alys.position(), rune.position()): gt});
+
+      var combined = c1.withCondition(c2);
+
+      expect(
+          combined,
+          Condition({EventFlag('a'): true},
+              values: {(alys.position(), rune.position()): gt}));
+    });
+
+    test('withCondition empty with values returns condition with values', () {
+      var empty = Condition.empty();
+      var other =
+          Condition({}, values: {(alys.position(), rune.position()): gt});
+
+      var combined = empty.withCondition(other);
+
+      expect(combined,
+          Condition({}, values: {(alys.position(), rune.position()): gt}));
+    });
+
+    test('withCondition returns this if other is empty', () {
+      var c1 = Condition({EventFlag('a'): true});
+      var empty = Condition.empty();
+
+      var combined = c1.withCondition(empty);
+
+      expect(identical(combined, c1), isTrue);
     });
   });
 

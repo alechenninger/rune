@@ -338,6 +338,14 @@ class Condition {
         _values = (values ?? {}).lock,
         _choices = (choices ?? {}).lock;
 
+  Condition.of(
+      {Map<EventFlag, bool>? flags,
+      Map<Values, Comparison>? values,
+      Map<ChoiceId, bool>? choices})
+      : _flags = (flags ?? {}).lock,
+        _values = (values ?? {}).lock,
+        _choices = (choices ?? {}).lock;
+
   const Condition.empty()
       : _flags = const IMapConst({}),
         _values = const IMapConst({}),
@@ -373,12 +381,12 @@ class Condition {
 
   bool isKnownUnset(EventFlag flag) => this[flag] == false;
 
-  Comparison? branchFor(Values operand) => _values[operand];
+  Comparison? comparisonFor(Values operand) => _values[operand];
 
   bool? choiceFor(ChoiceId operand) => _choices[operand];
 
   Condition withBranch(Values operand, Comparison branch) {
-    if (branchFor(operand) == branch) return this;
+    if (comparisonFor(operand) == branch) return this;
     return Condition._(
         _flags, (_values.unlock..[operand] = branch).lock, _choices);
   }
@@ -390,7 +398,8 @@ class Condition {
   }
 
   Condition withCondition(Condition condition) {
-    if (isSatisfiedBy(condition)) return this;
+    // If this condition already includes the other condition, return this.
+    if (condition.isSatisfiedBy(this)) return this;
     return Condition._(
         (_flags.unlock..addAll(condition._flags.unlockView)).lock,
         (_values.unlock..addAll(condition._values.unlockView)).lock,
@@ -414,7 +423,7 @@ class Condition {
     for (var MapEntry(key: values, value: branch) in _values.entries) {
       // TODO: is equal comparison appropriate?
       // does eq or lt satisfy lte?
-      if (other.branchFor(values) != branch) return false;
+      if (other.comparisonFor(values) != branch) return false;
     }
     for (var MapEntry(key: choice, value: state) in _choices.entries) {
       if (other.choiceFor(choice) != state) return false;
@@ -438,7 +447,7 @@ class Condition {
       if (current != null && current != state) return true;
     }
     for (var MapEntry(key: values, value: branch) in other._values.entries) {
-      var current = branchFor(values);
+      var current = comparisonFor(values);
       if (current != null && current != branch) return true;
     }
     for (var MapEntry(key: choice, value: state) in other._choices.entries) {
@@ -490,7 +499,7 @@ class ValueCondition extends BranchableCondition<Values, Comparison> {
 
   @override
   Comparison? branchFor(Values operand) {
-    return condition.branchFor(operand);
+    return condition.comparisonFor(operand);
   }
 
   @override
@@ -547,7 +556,20 @@ class ChoiceCondition extends BranchableCondition<ChoiceId, bool> {
   }
 }
 
-sealed class IfEvent extends Event {}
+sealed class IfEvent extends Event {
+  /// Returns an equivalent [Condition] for each branch with its events.
+  ///
+  /// See [Branch].
+  Set<Branch> branches();
+
+  /// Returns a new IfEvent with the given branches overridden.
+  ///
+  /// If any of the branch conditions are not expressible with the current
+  /// event comparison, an error is thrown.
+  ///
+  /// Existing branches not mentioned in [branches] are preserved.
+  IfEvent withBranches(Iterable<Branch> branches);
+}
 
 class IfFlag extends IfEvent {
   final EventFlag flag;
@@ -560,8 +582,34 @@ class IfFlag extends IfEvent {
             Scene(isSet).asOf(Condition({flag: true})).events),
         isUnset = List.unmodifiable(
             Scene(isUnset).asOf(Condition({flag: false})).events);
-@override void visit(EventVisitor visitor) {
+  @override
+  void visit(EventVisitor visitor) {
     visitor.ifFlag(this);
+  }
+
+  @override
+  Set<Branch> branches() => {
+        Branch(Condition({flag: true}), events: isSet),
+        Branch(Condition({flag: false}), events: isUnset),
+      };
+
+  @override
+  IfEvent withBranches(Iterable<Branch> branches) {
+    var isSet = this.isSet;
+    var isUnset = this.isUnset;
+
+    for (var branch in branches) {
+      if (branch.condition == Condition({flag: true})) {
+        isSet = branch.events;
+      } else if (branch.condition == Condition({flag: false})) {
+        isUnset = branch.events;
+      } else {
+        throw ArgumentError.value(
+            branch, 'branches', 'expected branch for flag $flag only');
+      }
+    }
+
+    return IfFlag(flag, isSet: isSet, isUnset: isUnset);
   }
 
   @override
@@ -689,7 +737,80 @@ final class IfValue<T extends ModelExpression> extends IfEvent {
   }
 
   /// Branches which have any events, "canonical" branches last.
-  List<ComparisonBranch> get branches => List.unmodifiable(_branches);
+  List<ComparisonBranch> get comparisonBranches => List.unmodifiable(_branches);
+
+  @override
+  Set<Branch> branches() => {
+        for (var branch in _branches)
+          Branch(
+              Condition.of(values: {(operand1, operand2): branch.comparison}),
+              events: branch.events),
+      };
+
+  @override
+  IfValue<T> withBranches(Iterable<Branch> branches) {
+    List<Event> equal = const [];
+    List<Event> notEqual = const [];
+    List<Event> greater = const [];
+    List<Event> greaterOrEqual = const [];
+    List<Event> less = const [];
+    List<Event> lessOrEqual = const [];
+
+    // Initialize from existing branches
+    for (var existing in _branches) {
+      switch (existing.comparison) {
+        case Comparison.eq:
+          equal = existing.events;
+        case Comparison.neq:
+          notEqual = existing.events;
+        case Comparison.gt:
+          greater = existing.events;
+        case Comparison.gte:
+          greaterOrEqual = existing.events;
+        case Comparison.lt:
+          less = existing.events;
+        case Comparison.lte:
+          lessOrEqual = existing.events;
+      }
+    }
+
+    // Apply updates from provided branches - match conditions exactly
+    for (var branch in branches) {
+      var comparison = branch.condition.comparisonFor((operand1, operand2));
+      // Verify condition only contains this comparison (no extra flags/values)
+      if (comparison == null ||
+          branch.condition !=
+              Condition.of(values: {(operand1, operand2): comparison})) {
+        throw ArgumentError.value(branch, 'branches',
+            'expected branch for values ($operand1, $operand2) only');
+      }
+      switch (comparison) {
+        case Comparison.eq:
+          equal = branch.events;
+        case Comparison.neq:
+          notEqual = branch.events;
+        case Comparison.gt:
+          greater = branch.events;
+        case Comparison.gte:
+          greaterOrEqual = branch.events;
+        case Comparison.lt:
+          less = branch.events;
+        case Comparison.lte:
+          lessOrEqual = branch.events;
+      }
+    }
+
+    return IfValue(
+      operand1,
+      comparedTo: operand2,
+      equal: equal,
+      notEqual: notEqual,
+      greater: greater,
+      greaterOrEqual: greaterOrEqual,
+      less: less,
+      lessOrEqual: lessOrEqual,
+    );
+  }
 
   @override
   void visit(EventVisitor visitor) {

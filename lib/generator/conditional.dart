@@ -15,7 +15,7 @@ class BranchLabels extends Iterable<(ComparisonBranch, Label?)> {
   BranchLabels(this._prefix, IfValue ifValue)
       : emptyBranch = ifValue.emptyBranch,
         _continueLbl = Label('${_prefix}continue') {
-    var branches = ifValue.branches;
+    var branches = ifValue.comparisonBranches;
 
     // Should fall through on an equals branch if not a unary expression,
     // because equals requires comparison of all values
