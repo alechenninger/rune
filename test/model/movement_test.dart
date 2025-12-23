@@ -439,5 +439,41 @@ void main() {
 
       expect(moves.justFacing, isNull);
     });
+
+    test('asAbsoluteAndFacing sets starting axis from first movement axis', () {
+      // Movement: 2 steps down, 2 steps left (first axis is y)
+      var moves = IndividualMoves()
+        ..moves[BySlot(1)] = (StepPaths()
+          ..step(StepPath()
+            ..direction = down
+            ..distance = 2.steps)
+          ..step(StepPath()
+            ..direction = left
+            ..distance = 2.steps));
+
+      var (absolute, _) = moves.asAbsoluteAndFacing;
+
+      expect(absolute, isNotNull);
+      expect(absolute!.startingAxis, Axis.y,
+          reason: 'First movement is down, so starting axis should be y');
+    });
+
+    test('asAbsoluteAndFacing sets starting axis x when first movement is horizontal', () {
+      // Movement: 3 steps right, 2 steps up (first axis is x)
+      var moves = IndividualMoves()
+        ..moves[BySlot(1)] = (StepPaths()
+          ..step(StepPath()
+            ..direction = right
+            ..distance = 3.steps)
+          ..step(StepPath()
+            ..direction = up
+            ..distance = 2.steps));
+
+      var (absolute, _) = moves.asAbsoluteAndFacing;
+
+      expect(absolute, isNotNull);
+      expect(absolute!.startingAxis, Axis.x,
+          reason: 'First movement is right, so starting axis should be x');
+    });
   });
 }

@@ -351,6 +351,9 @@ class IndividualMoves extends Event implements RunnableInDialog {
     }
 
     absolute?.speed = speed;
+    if (startingAxis case Axis axis) {
+      absolute?.startingAxis = axis;
+    }
     return (absolute, facing);
   }
 
