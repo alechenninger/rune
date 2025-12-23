@@ -458,7 +458,9 @@ void main() {
           reason: 'First movement is down, so starting axis should be y');
     });
 
-    test('asAbsoluteAndFacing sets starting axis x when first movement is horizontal', () {
+    test(
+        'asAbsoluteAndFacing sets starting axis x when first movement is horizontal',
+        () {
       // Movement: 3 steps right, 2 steps up (first axis is x)
       var moves = IndividualMoves()
         ..moves[BySlot(1)] = (StepPaths()
