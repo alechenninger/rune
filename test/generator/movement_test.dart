@@ -952,6 +952,44 @@ void main() {
           ]));
     });
 
+    test('just facing does not modify movement speed', () {
+      var program = Program();
+      var sceneAsm = program.addScene(
+          SceneId('testscene'),
+          Scene([
+            SetContext((ctx) {
+              ctx.followLead = false;
+              ctx.slots[1] = alys;
+              ctx.positions[alys] = Position(0x50, 0x50);
+            }),
+            // First do a slow movement
+            IndividualMoves()
+              ..speed = StepSpeed.slowWalk
+              ..moves[alys] = (StepPath()
+                ..distance = 1.step
+                ..direction = Direction.right),
+            // Then just face - should not modify speed before the facing
+            IndividualMoves()..moves[alys] = Face(left),
+          ]));
+
+      // The facing event should not set FieldObj_Step_Offset before facing,
+      // since there's no actual movement. The reset to default happens after.
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            move.b(0.toByte.i, FieldObj_Step_Offset.w),
+            lea(Constant('Character_1').w, a4),
+            move.w(Word(0x60).i, d0),
+            move.w(Word(0x50).i, d1),
+            jsr(Label('Event_MoveCharacter').l),
+            // No FieldObj_Step_Offset change before the facing command
+            moveq(FacingDir_Left.i, d0),
+            jsr(Label('Event_UpdateObjFacing').l),
+            // Reset to default after the scene
+            move.b(Byte.one.i, FieldObj_Step_Offset.w),
+          ]));
+    });
+
     test('facing and movement adjusts facing then movement', () {
       var moves = IndividualMoves()
         ..moves[hahn] = (StepPath()

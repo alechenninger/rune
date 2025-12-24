@@ -58,7 +58,6 @@ extension IndividualMovesToAsm on IndividualMoves {
             move.value.distance > 0.steps)) {
       asm.add(followLeader(ctx.followLead = followLead));
     }
-    generator.setSpeed(speed);
 
     if (collideLead) {
       asm.add(Asm([
@@ -116,8 +115,6 @@ extension IndividualMovesToAsm on IndividualMoves {
         maxSteps = maxStepsYFirst;
       }
 
-      generator.setStartingAxis(firstAxis);
-
       // If no movement code is generated because all moves are delayed, we'll
       // have to add an artificial delay later.
       var allDelay = true;
@@ -145,6 +142,11 @@ extension IndividualMovesToAsm on IndividualMoves {
             // However, if this is a relative movement, we must already
             // know where the object is to prevent collision problems.
             generator.ensureScriptable(moveable);
+
+            // May be no-ops, but here to keep adjustments lazy
+            // and only when necessary (e.g. not when only facing)
+            generator.setStartingAxis(firstAxis);
+            generator.setSpeed(speed);
 
             asm.add(moveable.position().withPosition(
                 memory: ctx,
