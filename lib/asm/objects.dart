@@ -313,6 +313,7 @@ final _fieldObjectsJmpTbl = BiMap<Label, Word>()
     Label('FieldObj_Pennant'): Word(0x36C),
     Label('FieldObj_SandWormCarving'): Word(0x370),
     Label('loc_4FA30'): Word(0x374),
+    Label('FieldObj_EsperUp'): Word(0x378),
   });
 
 Map<Label, Word> get fieldObjectsJmpTbl {
