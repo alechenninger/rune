@@ -2470,8 +2470,10 @@ loc_742A4:
       });
 
       test('resets slot positions if new character position is not known', () {
-        // if we knew all slot positions, but now swap some
-        // we should no longer know positions for swapped slots
+        // Characters don't physically move when swapping slots.
+        // If we knew slot positions but not which characters were in those slots,
+        // after swapping we need to look up by the NEW character's position.
+        // If we don't know the new character's position, we don't know the slot's position.
         var newPositions = <Position?>[null, null, null, null, null];
 
         var scene = Scene([
@@ -2496,13 +2498,14 @@ loc_742A4:
 
         Program().addScene(SceneId('testscene'), scene, startingMap: map);
 
+        // We only knew alys was in slot 2, so only alys/slot 2's position is known.
+        // The other characters' positions were never set, so they're unknown.
         expect(newPositions, [null, Position(0x100, 0x110), null, null, null]);
       });
 
       test('sets slot position if new character position is known', () {
-        // if we swap a character into a slot
-        // and we know the character's position
-        // then we should know the slot's position
+        // If we know the character's position before the swap,
+        // we still know it after (characters don't physically move).
         Position? newSlot1Position;
         Position? newSlot2Position;
 
@@ -2521,8 +2524,149 @@ loc_742A4:
 
         Program().addScene(SceneId('testscene'), scene, startingMap: map);
 
+        // rune's position was known, so slot 1 (now rune) has that position.
+        // alys's position was never set, so slot 2 is unknown.
         expect(newSlot1Position, Position(0x100, 0x100));
         expect(newSlot2Position, isNull);
+      });
+
+      test(
+          'change party preserves character positions '
+          '(characters do not physically move)', () {
+        // When we change party order, characters don't physically move.
+        // They stay at their x/y positions, only the slot assignment changes.
+        // Position memory tracks by character, so positions are unchanged.
+
+        Position? slot1PositionAfterChange;
+        Position? slot2PositionAfterChange;
+        Position? runePositionAfterChange;
+        Position? alysPositionAfterChange;
+
+        var scene = Scene([
+          // Set up known party order and positions
+          SetContext((ctx) {
+            ctx.slots[1] = alys;
+            ctx.slots[2] = rune;
+            ctx.positions[BySlot(1)] = Position(0x100, 0x100);
+            ctx.positions[BySlot(2)] = Position(0x200, 0x200);
+          }),
+          // Change party order: swap rune to slot 1, alys to slot 2
+          ChangePartyOrder([rune, alys], saveCurrentParty: false),
+          // Check what position memory thinks slots are at
+          SetContext((ctx) {
+            slot1PositionAfterChange = ctx.positions[BySlot(1)];
+            slot2PositionAfterChange = ctx.positions[BySlot(2)];
+            runePositionAfterChange = ctx.positions[rune];
+            alysPositionAfterChange = ctx.positions[alys];
+          }),
+        ]);
+
+        Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+        // Characters don't move - they keep their original positions:
+        // - rune was at (0x200, 0x200), still is
+        // - alys was at (0x100, 0x100), still is
+        // So after the swap:
+        // - Slot 1 = rune @ (0x200, 0x200)
+        // - Slot 2 = alys @ (0x100, 0x100)
+        expect(runePositionAfterChange, Position(0x200, 0x200));
+        expect(alysPositionAfterChange, Position(0x100, 0x100));
+        expect(slot1PositionAfterChange, Position(0x200, 0x200));
+        expect(slot2PositionAfterChange, Position(0x100, 0x100));
+      });
+
+      test(
+          'restore saved party clears slot position memory '
+          'when prior order is unknown', () {
+        // Scenario:
+        // 1. Change party order (saving current, but prior is unknown)
+        // 2. Move characters around
+        // 3. Restore saved party
+        // 4. Move camera to Slot 1
+        //
+        // The camera movement in 4 should NOT use the old Slot 1 position
+        // because after restoring, Slot 1 has a different character.
+        // Since the original order is unknown, we can't know which character
+        // is in Slot 1 after restore, so position should be unknown.
+
+        var scene = Scene([
+          // We don't know the party order at the start (no SetContext for slots)
+          // Change party order, explicitly moving rune to Slot 1
+          // This saves the current (unknown) party order
+          ChangePartyOrder([rune, alys], saveCurrentParty: true),
+          // Move the characters around (establishing positions in memory)
+          AbsoluteMoves()
+            ..destinations[BySlot(1)] = Position(0x200, 0x200)
+            ..destinations[BySlot(2)] = Position(0x300, 0x300),
+          // Restore saved party order (to the unknown prior order)
+          RestoreSavedPartyOrder(),
+          // Now move camera to Slot 1 position
+          MoveCamera(BySlot.one.position()),
+        ]);
+
+        var asm = Program()
+            .addScene(SceneId('testscene'), scene, startingMap: map)
+            .event
+            .withoutComments();
+
+        // The camera movement should load position at runtime,
+        // not use the cached position (0x200, 0x200).
+        // It should use the a4 register to get the current position.
+        expect(
+            asm.tail(5),
+            Asm([
+              BySlot.one.toA4(testMemory),
+              move.w(curr_x_pos(a4), d0),
+              move.w(curr_y_pos(a4), d1),
+              move.w(1.i, d2),
+              jsr(Label('Event_MoveCamera').l),
+            ]));
+      });
+
+      test(
+          'restore saved party updates slot position memory '
+          'when restoring known prior order', () {
+        // When prior order IS known, positions should track the characters.
+        // Characters don't physically move - they stay at their x/y positions.
+
+        Position? slot1PositionAfterRestore;
+        Position? slot2PositionAfterRestore;
+
+        var scene = Scene([
+          // Set up known party order
+          SetContext((ctx) {
+            ctx.slots[1] = alys;
+            ctx.slots[2] = rune;
+            ctx.slots[3] = hahn;
+          }),
+          // Change party order, saving current
+          // After this: slot 1 = rune, slot 2 = alys
+          ChangePartyOrder([rune, alys, hahn], saveCurrentParty: true),
+          // Move the characters around (establishing positions in memory)
+          // rune (in slot 1) is at (0x200, 0x200)
+          // alys (in slot 2) is at (0x300, 0x300)
+          SetContext((ctx) {
+            ctx.positions[BySlot(1)] = Position(0x200, 0x200);
+            ctx.positions[BySlot(2)] = Position(0x300, 0x300);
+          }),
+          // Restore saved party order
+          // After this: slot 1 = alys, slot 2 = rune
+          RestoreSavedPartyOrder(),
+          // Check what position memory thinks slots are at
+          SetContext((ctx) {
+            slot1PositionAfterRestore = ctx.positions[BySlot(1)];
+            slot2PositionAfterRestore = ctx.positions[BySlot(2)];
+          }),
+        ]);
+
+        Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+        // After restore, Slot 1 = alys, Slot 2 = rune
+        // Characters don't physically move, so:
+        // - alys (now in slot 1) is still at (0x300, 0x300)
+        // - rune (now in slot 2) is still at (0x200, 0x200)
+        expect(slot1PositionAfterRestore, Position(0x300, 0x300));
+        expect(slot2PositionAfterRestore, Position(0x200, 0x200));
       });
     });
   });

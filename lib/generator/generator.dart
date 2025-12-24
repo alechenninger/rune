@@ -2412,6 +2412,11 @@ class SceneAsmGenerator implements EventVisitor {
 
       var newParty = changeParty.party;
 
+      // Capture positions by character before the swap.
+      // Characters don't physically move when swapping slots - they stay at their
+      // x/y positions. Only slot assignments change.
+      var prior = _memory.branch();
+
       if (changeParty.maintainOrder) {
         _eventAsm.add(Asm([
           loadPartySlots(
@@ -2455,14 +2460,15 @@ class SceneAsmGenerator implements EventVisitor {
           maintainOrder: changeParty.maintainOrder);
 
       // Reset slot positions now that slots have changed.
+      // Characters don't physically move - they stay at their x/y positions.
+      // We need to ensure the new slot→character mapping resolves to the
+      // character's actual (unchanged) position.
       for (var slot in Slots.all) {
         var char = newParty.length >= slot ? newParty[slot - 1] : null;
         if (char != null) {
-          // If we know the character, and we know the char's position,
-          // this will reset their new slot to the correct position.
-          // Their old slot is not yet adjusted.
-          // This loop will reset it.
-          _memory.positions[char] = _memory.positions[char];
+          // Use the character's prior position (they didn't move).
+          // If we didn't know their position before, we still don't.
+          _memory.positions[char] = prior.positions[char];
         } else {
           _memory.positions[BySlot(slot)] = null;
         }
@@ -2477,6 +2483,11 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
 
     _addToEvent(restoreParty, (_) {
+      // Capture positions by character before the swap.
+      // Characters don't physically move when swapping slots - they stay at their
+      // x/y positions. Only slot assignments change.
+      var prior = _memory.branch();
+
       _memory.slots.restorePreviousParty((i, prior, current) {
         if (_memory.slots.partyOrderMaintained) {
           if (i == 5) return;
@@ -2494,6 +2505,23 @@ class SceneAsmGenerator implements EventVisitor {
           jsr(Label('Event_SwapCharacter').l),
         ]));
       });
+
+      // Reset slot positions now that slots have been restored.
+      // Characters don't physically move - they stay at their x/y positions.
+      // We need to ensure the new slot→character mapping resolves to the
+      // character's actual (unchanged) position.
+      for (var slot in Slots.all) {
+        var char = _memory.slots[slot];
+        if (char != null) {
+          // Use the character's prior position (they didn't move).
+          // If we didn't know their position before, we still don't.
+          _memory.positions[char] = prior.positions[char];
+        } else {
+          // If we don't know the character in the slot after restore,
+          // clear the position for all possible characters in this slot.
+          _memory.positions[BySlot(slot)] = null;
+        }
+      }
     });
   }
 
