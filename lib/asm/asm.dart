@@ -632,10 +632,9 @@ enum _Token {
   pseudo,
 }
 
-final _number = RegExp(r'^(\$[0-9a-fA-F]+|\d+)$');
-
 class ConstantIterator implements Iterator<Sized> {
   final Iterator<Instruction> _asm;
+  // ignore: unused_field
   final Constants _constants;
   late Queue<Sized> _remainingLineConstants;
   bool _done = false;
@@ -727,6 +726,7 @@ class ConstantReader {
   //   like facing direction
   // could probably define a global default constant table since they are...
   // well... constants :)
+  // ignore: unused_field
   final Map<Constant, SizedValue> _constantTable = {};
   final _queue = Queue<Sized>();
 

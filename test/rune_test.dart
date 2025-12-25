@@ -20,6 +20,7 @@ void main() {
     // 273295 (inclusive)
     // 273800 (ish)
 
+    // ignore: unused_local_variable
     var parsed = Asm.fromRaw(raw);
 
     // var mapsAsm = Asm.fromRaw(maps.join('\n'));

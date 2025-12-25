@@ -5,6 +5,7 @@ import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  // ignore: unused_local_variable
   var portrait = Bytes.of(1);
 
   test('line wrap', () {

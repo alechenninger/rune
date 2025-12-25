@@ -1,6 +1,3 @@
-import 'package:collection/collection.dart';
-
-import '../asm/data.dart';
 import 'model.dart';
 
 class Party extends Moveable {

@@ -3,7 +3,6 @@ import 'package:collection/collection.dart';
 import '../model/model.dart';
 import 'generator.dart';
 import 'registers.dart';
-import 'stack.dart';
 
 abstract class StateChange<T> {
   T apply(Memory memory);

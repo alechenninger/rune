@@ -110,9 +110,9 @@ sealed class DialogEvent {
           when e.showDialogBox &&
               (e.portrait == null || e.portrait == state.dialogPortrait):
         return PanelCode(e.panel.panelIndex.toWord);
-      case HideTopPanels e:
+      case HideTopPanels _:
         throw 'todo';
-      case HideAllPanels e:
+      case HideAllPanels _:
         throw 'todo';
       case Pause p when p.duringDialog != false:
         var additionalFrames = p.duration.toFrames() - 1;

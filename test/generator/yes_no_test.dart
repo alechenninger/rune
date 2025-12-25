@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable
+
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
 import 'package:rune/generator/dialog.dart';

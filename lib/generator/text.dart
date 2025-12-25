@@ -20,6 +20,7 @@ const _perPaletteLine = 0x2000;
 // last you can fit is * 26.
 // TODO: why is this? there's more room in the buffer but maybe it's off screen.
 const _maxPosition = _planeABuffer + _perLineOffset * 27;
+// ignore: unused_element
 const _planeABufferEnd = _planeABuffer + 0x1000;
 const _maxOffsets = (_maxPosition - _planeABuffer) ~/ _perLineOffset;
 

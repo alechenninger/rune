@@ -23,8 +23,7 @@ SceneAsm _sceneToAsm(SceneId? sceneId, Scene scene, DialogTree dialogTree,
     AsmContext ctx, AsmGenerator generator) {
   var newDialogs = <DialogAsm>[];
   // todo: handle hitting max trees!
-  var currentDialogId = dialogTree.nextDialogId!,
-      dialogIdOffset = currentDialogId;
+  var currentDialogId = dialogTree.nextDialogId!;
   var currentDialog = DialogAsm.empty();
   var lastEventBreak = -1;
 

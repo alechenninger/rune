@@ -1460,6 +1460,7 @@ void main() {
 
   group('experiments with parsing asm', () {
     test('parses a map', () {
+      // ignore: unused_local_variable
       var asm = Asm.fromRaw(tonoeAsm);
       // TODO
       // var map = asmToMap(Label('Map_Tonoe'), asm);

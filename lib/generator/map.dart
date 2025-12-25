@@ -845,7 +845,9 @@ class SpriteVramMapping {
 
   SpriteVramMapping? merge(SpriteVramMapping other) {
     if (!const IterableEquality<int>()
-        .equals(duplicateOffsets, other.duplicateOffsets)) return null;
+        .equals(duplicateOffsets, other.duplicateOffsets)) {
+      return null;
+    }
     if (animated || other.animated) return null;
     if (art != other.art) return null;
     if (art == null || other.art == null) return null;

@@ -260,7 +260,9 @@ Asm _addRelativePosition(Position position, Address x, Address y) {
   ]);
 }
 
+// Unused due to bug
 int Function(RelativeMove<FieldObject>, RelativeMove<FieldObject>)
+    // ignore: unused_element
     _longestFirst(EventState ctx) {
   return (RelativeMove<FieldObject> move1, RelativeMove<FieldObject> move2) {
     var comparison = move2.movement.duration.compareTo(move1.movement.duration);

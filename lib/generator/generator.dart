@@ -115,22 +115,6 @@ class Program {
             spriteVramOffsets: vramTileOffsets ?? _defaultSpriteVramOffsets,
             builtInSprites: builtInSprites ?? _defaultBuiltInSprites);
 
-  /// Returns event index by which [routine] can be referenced.
-  ///
-  /// The event code must be added separate with the exact label of [routine].
-  @Deprecated('use ProgramConfiguration instead')
-  Word _addEventPointer(Label routine) {
-    return _config.events.add(routine);
-  }
-
-  /// Returns event index by which [routine] can be referenced.
-  ///
-  /// The event code must be added separate with the exact label of [routine].
-  @Deprecated('use ProgramConfiguration instead')
-  Word _addCutscenePointer(Label routine) {
-    return _config.cutscenes.add(routine);
-  }
-
   EventAsm debugStart(DebugOptions debugOptions) {
     var asm = debug.debugStart(
         party: debugOptions.party,
@@ -839,17 +823,6 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.currentMap = inMap;
     _memory.loadedDialogTree = _dialogTrees.forMap(inMap.id);
     _stateGraph[Condition.empty()] = _memory;
-  }
-
-  /// Sets system state to follow when Map_Load_Flag bit 7 is set
-  /// just before a scene begins. This often happens after boss battles.
-  ///
-  /// Without Pal_fadeIn, the display is disabled.
-  _sceneBeginsWithMapNotFadedIn() {
-    checkState(_context.eventsGenerated == 0,
-        message: 'expected beginning of scene, but already generated events');
-    _memory.isDisplayEnabled = false;
-    _memory.isFieldShown = false;
   }
 
   void scene(Scene scene) {
@@ -3725,11 +3698,6 @@ what is steps per second?
 abstract class DialogTreeLookup {
   Future<DialogTree> byLabel(Label lbl);
 }
-
-// todo: unused, but consider adding to DialogTrees if needed
-final _defaultDialogs = <MapId, DialogTree>{};
-DialogTree _defaultDialogTree(MapId map) =>
-    _defaultDialogs[map] ?? DialogTree();
 
 class DialogTrees {
   final _trees = <MapId?, DialogTree>{};
