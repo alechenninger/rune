@@ -1156,10 +1156,11 @@ class DirectionOfVectorAsm extends DirectionExpressionAsm {
       cmp.w(xMagnitude, yMagnitude),
       // If y is greater, determine up or down
       bgt.s(Label('.checky$labelSuffix')),
-
-      // Not, so check if equal (zero vector)
+      // If dY ≤ dX, then check if dX == zero
+      // dY cannot be less than zero, so if dX is zero,
+      // both are zero.
+      tst.w(xMagnitude),
       beq.s(Label('.zerovector$labelSuffix')),
-
       // Else, determine left or right
       tst.w(xRegister),
       bpl.s(Label('.right$labelSuffix')),
