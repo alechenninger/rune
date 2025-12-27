@@ -2113,42 +2113,43 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void hideAllPanels(HideAllPanels hidePanels) {
     _checkNotFinished();
+    _addToEventOrDialog(hidePanels, inDialog: () {
+      var panelsShown = _memory.panelsShown;
+      if (panelsShown == 0) return;
+      var (asm, routines) =
+          HideAllPanelsCode(instantly: hidePanels.instantly).toAsm(_memory);
+      _addToDialog(asm);
+      _postAsm.addAll(routines);
+    }, inEvent: (i) {
+      var panelsShown = _memory.panelsShown;
+      if (panelsShown == 0) return Asm.empty();
+      if (hidePanels.instantly) {
+        return Asm([
+          if (panelsShown == null) ...[
+            moveq(0.i, d0),
+            move.b(Constant('Panel_Num').w, d0),
+            subq.b(1.i, d0),
+          ] else
+            unsignedMoveL((panelsShown - 1).i, d0),
+          label(Label('.${i}_nextPanel')),
+          jsr(Label('Panel_Destroy').l),
+          dbf(d0, Label('.${i}_nextPanel')),
+          jsr(Label('DMAPlanes_VInt').l),
+        ]);
+      }
 
-    // FIXME: state check is broken due to possibly queued generations
-    var panelsShown = _memory.panelsShown;
-    if (panelsShown == 0) return;
+      if (panelsShown == 1) {
+        // Not required but tiny optimization and appeases tests
+        return Asm([
+          jsr(Label('Panel_Destroy').l),
+          jsr(Label('DMAPlanes_VInt').l),
+        ]);
+      }
 
-    if (panelsShown == 1) {
-      hideTopPanels(HideTopPanels(1));
-      return;
-    }
-
-    if (hidePanels.instantly) {
-      _addToEvent(
-          hidePanels,
-          (i) => Asm([
-                if (panelsShown == null) ...[
-                  moveq(0.i, d0),
-                  move.b(Constant('Panel_Num').w, d0),
-                  subq.b(1.i, d0),
-                ] else
-                  unsignedMoveL((panelsShown - 1).i, d0),
-                label(Label('.${i}_nextPanel')),
-                jsr(Label('Panel_Destroy').l),
-                dbf(d0, Label('.${i}_nextPanel')),
-                jsr(Label('DMAPlanes_VInt').l),
-              ]));
-
+      return jsr(Label('Panel_DestroyAll').l);
+    }, after: () {
       _memory.panelsShown = 0;
-    } else {
-      _addToEventOrDialog(hidePanels, inDialog: () {
-        _addToDialog(dc.b([ControlCodes.action, Byte.two]));
-      }, inEvent: (_) {
-        return jsr(Label('Panel_DestroyAll').l);
-      }, after: () {
-        _memory.panelsShown = 0;
-      });
-    }
+    });
   }
 
   @override
@@ -2157,27 +2158,15 @@ class SceneAsmGenerator implements EventVisitor {
 
     // todo(hide top panels): support instantly
     if (hidePanels.instantly) {
+      // Would require event (no equivalent dialog control code)
       throw UnimplementedError('HideTopPanels.instantly');
     }
 
     _addToEventOrDialog(hidePanels, inDialog: () {
-      var panels = hidePanels.panelsToHide;
-      var panelsShown = _memory.panelsShown;
-
-      if (panelsShown == 0) return;
-
-      if (panelsShown != null) {
-        panels = min(panels, panelsShown);
-      }
-
-      _memory.removePanels(panels);
-
-      _addToDialog(Asm([
-        for (var i = 0; i < panels; i++) dc.b([ControlCodes.action, Byte.one]),
-        // todo: this is used often but not always, how to know when?
-        // it might be if the field is not faded out, but not always
-        if (_memory.isFieldShown == true) dc.b([ControlCodes.action, Byte(6)]),
-      ]));
+      var (asm, routines) =
+          HideTopPanelsCode(hidePanels.panelsToHide).toAsm(_memory);
+      _addToDialog(asm);
+      _postAsm.addAll(routines);
     }, inEvent: (eventIndex) {
       var panels = hidePanels.panelsToHide;
       var panelsShown = _memory.panelsShown;
@@ -2212,7 +2201,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void playSound(PlaySound playSound) {
     _addToEventOrDialog(playSound, inDialog: () {
-      var (asm, routines) = SoundCode(playSound.sound.sfxId).toAsm(_memory);
+      var (asm, routines) = SoundCode(playSound.sound.soundId).toAsm(_memory);
       _addToDialog(asm);
       _postAsm.addAll(routines);
     }, inEvent: (_) {
@@ -2223,7 +2212,7 @@ class SceneAsmGenerator implements EventVisitor {
         if (_lastEventInCurrentDialog is PlaySound ||
             _lastEventInCurrentDialog is PlayMusic)
           _waitFrames(1),
-        move.b(playSound.sound.sfxId.i, Constant('Sound_Index').l),
+        move.b(playSound.sound.soundId.i, Constant('Sound_Index').l),
       ]);
     });
   }
@@ -2251,7 +2240,8 @@ class SceneAsmGenerator implements EventVisitor {
         // depending on how dialog generation is managed this may miss cases
         // TODO(frame perfect): may need to run tiles/map updates
         if (_lastEventInCurrentDialog is PlaySound ||
-            _lastEventInCurrentDialog is PlayMusic)
+            _lastEventInCurrentDialog is PlayMusic ||
+            _lastEventInCurrentDialog is StopMusic)
           _waitFrames(1),
         move.b(musicId.i, Constant('Sound_Index').l),
         move.b(musicId.i, Constant('Saved_Sound_Index').w)

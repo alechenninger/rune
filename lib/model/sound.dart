@@ -3,7 +3,7 @@ import 'package:quiver/iterables.dart';
 import 'model.dart';
 
 class PlaySound extends Event implements RunnableInDialog {
-  final SoundEffect sound;
+  final Sound sound;
 
   PlaySound(this.sound);
 

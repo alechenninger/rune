@@ -68,7 +68,7 @@ enum PanelPlane {
   foreground,
 }
 
-class HideTopPanels extends Event {
+class HideTopPanels extends Event implements RunnableInDialog {
   final int panelsToHide;
   final bool instantly;
 
@@ -95,9 +95,14 @@ class HideTopPanels extends Event {
 
   @override
   int get hashCode => panelsToHide.hashCode;
+
+  @override
+  bool canRunInDialog([EventState? state]) {
+    return !instantly;
+  }
 }
 
-class HideAllPanels extends Event {
+class HideAllPanels extends Event implements RunnableInDialog {
   final bool instantly;
 
   const HideAllPanels({this.instantly = false});
@@ -119,6 +124,13 @@ class HideAllPanels extends Event {
 
   @override
   int get hashCode => 0;
+
+  @override
+  bool canRunInDialog([EventState? state]) {
+    // If panels shown is null, and not instant, we can't do it in dialog
+    // To do non-instant, we need to know how many there are
+    return state == null || instantly || state.panelsShown != null;
+  }
 }
 
 sealed class FadeSpeed {

@@ -103,17 +103,17 @@ sealed class DialogEvent {
           _ => FaceInDialogRoutine(m),
         };
       case PlaySound e:
-        return SoundCode(e.sound.sfxId);
+        return SoundCode(e.sound.soundId);
       case PlayMusic e:
         return SoundCode(e.music.musicId);
       case ShowPanel e
           when e.showDialogBox &&
               (e.portrait == null || e.portrait == state.dialogPortrait):
         return PanelCode(e.panel.panelIndex.toWord);
-      case HideTopPanels _:
-        throw 'todo';
-      case HideAllPanels _:
-        throw 'todo';
+      case HideTopPanels e:
+        return HideTopPanelsCode(e.panelsToHide);
+      case HideAllPanels e:
+        return HideAllPanelsCode(instantly: e.instantly);
       case Pause p when p.duringDialog != false:
         var additionalFrames = p.duration.toFrames() - 1;
         return PauseCode(additionalFrames.toByte);
@@ -153,6 +153,70 @@ class PanelCode extends DialogEvent {
       {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
     state.addPanel();
     return (panel(panelIndex), const []);
+  }
+}
+
+class HideTopPanelsCode extends DialogEvent {
+  final int panelsToHide;
+
+  HideTopPanelsCode(this.panelsToHide);
+
+  @override
+  DialogAndRoutines toAsm(Memory memory,
+      {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
+    var panels = panelsToHide;
+    var panelsShown = memory.panelsShown;
+    if (panelsShown != null) {
+      panels = min(panels, panelsShown);
+    }
+
+    memory.removePanels(panels);
+
+    var asm = Asm([
+      for (var i = 0; i < panels; i++) dc.b([ControlCodes.action, Byte.one]),
+      // todo: this is used often but not always, how to know when?
+      // it might be if the field is not faded out, but not always
+      if (memory.isFieldShown == true && panelsToHide > 0)
+        dc.b([ControlCodes.action, Byte(6)]),
+    ]);
+
+    return (asm, const []);
+  }
+}
+
+class HideAllPanelsCode extends DialogEvent {
+  final bool instantly;
+
+  HideAllPanelsCode({this.instantly = false});
+
+  @override
+  DialogAndRoutines toAsm(Memory state,
+      {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
+    var panelsShown = state.panelsShown;
+    if (panelsShown == 0) {
+      return (Asm.empty(), const []);
+    }
+
+    // If instantly, can use control code.
+    // Otherwise, have to loop with one at a time.
+    if (instantly) {
+      state.panelsShown = 0;
+      return (
+        Asm([
+          dc.b([ControlCodes.action, Byte.two]),
+          if (state.isFieldShown == true) dc.b([ControlCodes.action, Byte(6)]),
+        ]),
+        const []
+      );
+    }
+
+    if (panelsShown == null) {
+      throw StateError('cannot hide all panels one at a time '
+          'when number of shown panels is unknown');
+    }
+
+    return HideTopPanelsCode(panelsShown)
+        .toAsm(state, labeller: labeller, fieldRoutines: fieldRoutines);
   }
 }
 
