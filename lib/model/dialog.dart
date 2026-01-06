@@ -304,6 +304,7 @@ abstract mixin class Speaker {
     XeAThoulRight,
     VoiceOfLaShiec,
     LaShiec,
+    Archbishop,
   ];
 
   static final Map<String, Speaker> _byName = allSpeakers.groupFoldBy(
@@ -350,6 +351,7 @@ abstract mixin class Speaker {
       NpcSpeaker(Portrait.XeAThoulRight, 'Xe-A-Thoul (Right)');
   static final VoiceOfLaShiec = NpcSpeaker(Portrait.none, 'Voice of LaShiec');
   static final LaShiec = NpcSpeaker(Portrait.Lashiec, 'LaShiec');
+  static final Archbishop = NpcSpeaker(Portrait.GumbiousBishop, 'Archbishop');
 
   @override
   String toString() => name;
