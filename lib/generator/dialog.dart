@@ -174,10 +174,12 @@ class HideTopPanelsCode extends DialogEvent {
 
     var asm = Asm([
       for (var i = 0; i < panels; i++) dc.b([ControlCodes.action, Byte.one]),
-      // todo: this is used often but not always, how to know when?
+      // TODO(correctness): this is used often but not always, how to know when?
       // it might be if the field is not faded out, but not always
-      if (memory.isFieldShown == true && panelsToHide > 0)
-        dc.b([ControlCodes.action, Byte(6)]),
+      // Removed this for now as it can cause issues if palettes change due to panel palette
+      // See: Return to Motavia when getting Hydrofoil
+      // if (memory.isFieldShown == true && panelsToHide > 0)
+      //   dc.b([ControlCodes.action, Byte(6)]),
     ]);
 
     return (asm, const []);
@@ -204,7 +206,8 @@ class HideAllPanelsCode extends DialogEvent {
       return (
         Asm([
           dc.b([ControlCodes.action, Byte.two]),
-          if (state.isFieldShown == true) dc.b([ControlCodes.action, Byte(6)]),
+          // See comment in HideTopPanelsCode
+          // if (state.isFieldShown == true) dc.b([ControlCodes.action, Byte(6)]),
         ]),
         const []
       );
