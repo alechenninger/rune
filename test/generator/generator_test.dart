@@ -1982,6 +1982,36 @@ EventFlag_Test001 = $0001'''));
           ]));
     });
 
+    test('offset position component compared to scalar', () {
+      var scene = Scene([
+        IfValue(
+          OffsetPositionComponent(rune.position().component(Axis.y),
+              offset: 0x40),
+          comparedTo: PositionComponent(0x200, Axis.y),
+          greater: [Face(down).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            move.w(curr_y_pos(a4), d0),
+            addi.w(0x40.toWord.i, d0),
+            cmpi.w(0x200.toWord.i, d0),
+            bls(Label('.1_continue')),
+
+            // gt branch
+            updateObjFacing(down.address),
+
+            // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
     test('slot routine compared to null', () {
       var scene = Scene([
         IfValue(

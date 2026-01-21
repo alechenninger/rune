@@ -226,8 +226,10 @@ Asm Function(Address src, [Address? src2]) _compare(
                   branches.branchIfNotEqual(),
                   _cmp(y1, y2, Size.w),
                 ])));
+      case OffsetPositionComponent c:
+        asm.add(
+            c.withValue(memory: memory, asm: (dst) => _cmp(src, dst, Size.w)));
       case DirectionExpression():
-      case OffsetPositionComponent():
       case DoubleExpression():
       case Vector2dExpression():
         throw 'todo: _compare($operand1)';
