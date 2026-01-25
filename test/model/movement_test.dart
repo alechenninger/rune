@@ -478,4 +478,82 @@ void main() {
           reason: 'First movement is right, so starting axis should be x');
     });
   });
+
+  group('AbsoluteMoves.canRunInDialog', () {
+    test('allows movement when we know slot 1 contains a different character',
+        () {
+      // We know Alys is in slot 1, but don't know where Shay is.
+      // Camera is not locked.
+      // We want to move Shay.
+      // This should be allowed because we know Shay is NOT in slot 1
+      // (since Alys is in slot 1).
+      var state = EventState()
+        ..addCharacter(alys,
+            slot: 1, position: Position(100, 100), facing: up);
+      // Note: Shay's slot is unknown (not added to state)
+
+      var moves = AbsoluteMoves()
+        ..waitForMovements = false
+        ..destinations[shay] = OffsetPosition(
+            shay.position(), offset: Position(0, -0x10));
+
+      expect(moves.canRunInDialog(state), isTrue,
+          reason: 'Should allow movement of Shay since we know Alys is in slot 1, '
+              'therefore Shay cannot be in slot 1 even if we don\'t know Shay\'s exact slot');
+    });
+
+    test('disallows movement when character might be in slot 1', () {
+      // We don't know what's in any slot, and camera is not locked.
+      var state = EventState();
+
+      var moves = AbsoluteMoves()
+        ..waitForMovements = false
+        ..destinations[shay] = OffsetPosition(
+            shay.position(), offset: Position(0, -0x10));
+
+      expect(moves.canRunInDialog(state), isFalse,
+          reason: 'Should not allow movement when we don\'t know if Shay is in slot 1');
+    });
+
+    test('allows movement when camera is locked even if slot unknown', () {
+      var state = EventState()..cameraLock = true;
+
+      var moves = AbsoluteMoves()
+        ..waitForMovements = false
+        ..destinations[shay] = OffsetPosition(
+            shay.position(), offset: Position(0, -0x10));
+
+      expect(moves.canRunInDialog(state), isTrue,
+          reason: 'Should allow movement when camera is locked');
+    });
+
+    test('disallows movement when character is known to be in slot 1', () {
+      var state = EventState()
+        ..addCharacter(alys,
+            slot: 1, position: Position(100, 100), facing: up);
+
+      var moves = AbsoluteMoves()
+        ..waitForMovements = false
+        ..destinations[alys] = OffsetPosition(
+            alys.position(), offset: Position(0, -0x10));
+
+      expect(moves.canRunInDialog(state), isFalse,
+          reason: 'Should not allow movement of slot 1 character without camera lock');
+    });
+
+    test('disallows movement of explicit slot 1 even when we don\'t know who\'s in it', () {
+      // We don't know who's in slot 1, but we're explicitly moving BySlot(1).
+      // This should be disallowed because moving slot 1 will move the camera.
+      var state = EventState();
+
+      var moves = AbsoluteMoves()
+        ..waitForMovements = false
+        ..destinations[BySlot(1)] = OffsetPosition(
+            BySlot(1).position(), offset: Position(0, -0x10));
+
+      expect(moves.canRunInDialog(state), isFalse,
+          reason: 'Should not allow movement of explicit slot 1 reference without camera lock, '
+              'even if we don\'t know which character is in that slot');
+    });
+  });
 }

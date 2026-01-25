@@ -64,6 +64,18 @@ class SystemState {
     .._isMapInCram = _isMapInCram
     .._isMapInVram = _isMapInVram
     .._displayEnabled = _displayEnabled;
+
+  @override
+  String toString() {
+    return 'SystemState{registers: $_registers, '
+        'inAddress: $_inAddress, '
+        'hasSavedDialogPosition: $_hasSavedDialogPosition, '
+        'loadedDialogTree: $_loadedDialogTree, '
+        'isMapInCram: $_isMapInCram, '
+        'isDialogInCram: $_isDialogInCram, '
+        'isMapInVram: $_isMapInVram, '
+        'displayEnabled: $_displayEnabled}';
+  }
 }
 
 class Memory implements EventState {

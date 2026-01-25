@@ -452,8 +452,18 @@ class AbsoluteMoves extends Event implements RunnableInDialog {
     // Assume okay if no state provided
     if (state == null) return true;
     // If none are slot 1, okay (because no camera movement possible).
-    if (destinations.keys
-        .every((o) => o.slotAsOf(state) != null && o.slotAsOf(state) != 1)) {
+    // This requires us to be sure we know what's in slot 1.'
+    var isSlot1Known = state.slots[1] != null;
+    if (destinations.keys.every((o) {
+      return switch (o.slotAsOf(state)) {
+        // If we don't know this object's slot, then allow if we know slot 1
+        null => isSlot1Known,
+        // If it's slot 1, have to check camera lock
+        1 => false,
+        // Otherwise, allow
+        _ => true,
+      };
+    })) {
       return true;
     }
     // Otherwise, only allowed if camera is locked.
