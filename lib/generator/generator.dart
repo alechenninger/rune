@@ -1030,11 +1030,17 @@ class SceneAsmGenerator implements EventVisitor {
   void overlapCharacters(OverlapCharacters overlap) {
     _checkNotFinished();
     _addToEvent(overlap, (_) {
+      // Set speed if different from current context
+      if (_memory.stepSpeed != overlap.speed) {
+        _eventAsm.add(setStepSpeed(overlap.speed.offset.i));
+        _memory.stepSpeed = overlap.speed;
+      }
+      _eventAsm.add(jsr(Label('Event_OverlapCharacters').l));
+      // Reset to normal speed after overlap
       if (_memory.stepSpeed != StepSpeed.normal()) {
         _eventAsm.add(setStepSpeed(StepSpeed.normal().offset.i));
         _memory.stepSpeed = StepSpeed.normal();
       }
-      _eventAsm.add(jsr(Label('Event_OverlapCharacters').l));
     });
   }
 

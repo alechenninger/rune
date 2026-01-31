@@ -587,6 +587,8 @@ class InstantMoves extends Event {
 }
 
 class OverlapCharacters extends Event {
+  StepSpeed speed = StepSpeed.normal();
+
   @override
   void visit(EventVisitor visitor) {
     visitor.overlapCharacters(this);
@@ -595,13 +597,15 @@ class OverlapCharacters extends Event {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OverlapCharacters && runtimeType == other.runtimeType;
+      other is OverlapCharacters &&
+          runtimeType == other.runtimeType &&
+          speed == other.speed;
 
   @override
-  int get hashCode => runtimeType.hashCode;
+  int get hashCode => runtimeType.hashCode ^ speed.hashCode;
 
   @override
-  String toString() => 'OverlapCharacters{}';
+  String toString() => 'OverlapCharacters{speed: $speed}';
 }
 
 extension ObjectExpressions on FieldObject {

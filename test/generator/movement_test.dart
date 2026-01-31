@@ -2503,4 +2503,109 @@ void main() {
       });
     });
   });
+
+  group('overlap characters generate asm', () {
+    test('with default speed', () {
+      var program = Program();
+      var sceneAsm = program.addScene(
+          SceneId('testscene'),
+          Scene([
+            SetContext((ctx) {
+              ctx.followLead = false;
+              ctx.slots[1] = alys;
+            }),
+            OverlapCharacters()
+          ]));
+
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            jsr(Label('Event_OverlapCharacters').l),
+          ]));
+    });
+
+    test('with slow speed', () {
+      var program = Program();
+      var sceneAsm = program.addScene(
+          SceneId('testscene'),
+          Scene([
+            SetContext((ctx) {
+              ctx.followLead = false;
+              ctx.slots[1] = alys;
+            }),
+            OverlapCharacters()..speed = StepSpeed.slowWalk
+          ]));
+
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            move.b(0.toByte.i, FieldObj_Step_Offset.w),
+            jsr(Label('Event_OverlapCharacters').l),
+            move.b(Byte.one.i, FieldObj_Step_Offset.w),
+          ]));
+    });
+
+    test('with very slow speed', () {
+      var program = Program();
+      var sceneAsm = program.addScene(
+          SceneId('testscene'),
+          Scene([
+            SetContext((ctx) {
+              ctx.followLead = false;
+              ctx.slots[1] = alys;
+            }),
+            OverlapCharacters()..speed = StepSpeed.verySlowWalk
+          ]));
+
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            move.b(3.toByte.i, FieldObj_Step_Offset.w),
+            jsr(Label('Event_OverlapCharacters').l),
+            move.b(Byte.one.i, FieldObj_Step_Offset.w),
+          ]));
+    });
+
+    test('with fast speed resets from different context speed', () {
+      var program = Program();
+      var sceneAsm = program.addScene(
+          SceneId('testscene'),
+          Scene([
+            SetContext((ctx) {
+              ctx.followLead = false;
+              ctx.slots[1] = alys;
+              ctx.stepSpeed = StepSpeed.slowWalk;
+            }),
+            OverlapCharacters()..speed = StepSpeed.fast
+          ]));
+
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            move.b(Byte.one.i, FieldObj_Step_Offset.w),
+            jsr(Label('Event_OverlapCharacters').l),
+          ]));
+    });
+
+    test('does not set speed when context already matches', () {
+      var program = Program();
+      var sceneAsm = program.addScene(
+          SceneId('testscene'),
+          Scene([
+            SetContext((ctx) {
+              ctx.followLead = false;
+              ctx.slots[1] = alys;
+              ctx.stepSpeed = StepSpeed.slowWalk;
+            }),
+            OverlapCharacters()..speed = StepSpeed.slowWalk
+          ]));
+
+      expect(
+          sceneAsm.event.withoutComments().trim(),
+          Asm([
+            jsr(Label('Event_OverlapCharacters').l),
+            move.b(Byte.one.i, FieldObj_Step_Offset.w),
+          ]));
+    });
+  });
 }
