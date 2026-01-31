@@ -559,5 +559,22 @@ void main() {
               'Should not allow movement of explicit slot 1 reference without camera lock, '
               'even if we don\'t know which character is in that slot');
     });
+
+    test('allows movement of slot 1 when camera is locked', () {
+      // Alys is in slot 1, and camera is locked.
+      // This should be allowed because the camera won't move.
+      var state = EventState()
+        ..addCharacter(alys, slot: 1, position: Position(100, 100), facing: up)
+        ..cameraLock = true;
+
+      var moves = AbsoluteMoves()
+        ..waitForMovements = false
+        ..destinations[alys] =
+            OffsetPosition(alys.position(), offset: Position(0, -0x10));
+
+      expect(moves.canRunInDialog(state), isTrue,
+          reason:
+              'Should allow movement of slot 1 character when camera is locked');
+    });
   });
 }
