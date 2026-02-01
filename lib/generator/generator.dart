@@ -3984,6 +3984,7 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_Zelan_F1'): Word(0x3b9),
   Label('Map_Kuran_F3'): Word(0x3b9),
   Label('Map_GaruberkTower_Part7'): Word(0x252),
+  Label('Map_SoldiersTempleOutside'): Word(0x281),
 }.map((l, o) => MapEntry(labelToMapId(l), o));
 
 final _defaultBuiltInSprites = {
