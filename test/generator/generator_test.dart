@@ -928,6 +928,39 @@ EventFlag_Test001 = $0001'''));
             ]));
       });
     });
+
+    test(
+        'multiple objects with x-only step: '
+        'per-object stack reload puts x in d0, y in d1', () {
+      // After movem.l(d0-d1, -(sp)), the 68k pushes highest register first:
+      //   d1 written then decrements, then d0 written then decrements.
+      //   So sp+0 = d0's value (x step), sp+4 = d1's value (y step).
+      // Per-object reload must restore to the correct registers.
+      var scene = Scene([
+        StepObjects(
+          [alys, shay],
+          stepPerFrame: Vector2dOfXY.constant(1.0, 0.0),
+          frames: 10,
+        )
+      ]);
+
+      var program = Program();
+      var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          containsAllInOrder(Asm([
+            // alys: x step from top of stack must go into d0,
+            //       y step from sp+4 must go into d1
+            move.l(sp.indirect, d0),
+            move.l(4(sp), d1),
+            jsr(Label('Event_StepObjectNoWait').l),
+            // shay: same pattern
+            move.l(sp.indirect, d0),
+            move.l(4(sp), d1),
+            jsr(Label('Event_StepObjectNoWait').l),
+          ])));
+    });
   });
 
   group('move camera', () {

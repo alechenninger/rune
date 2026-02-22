@@ -126,9 +126,11 @@ Asm stepObjectsToAsm(StepObjects step,
     asm.add(Asm([
       obj.toA4(memory, force: true),
       if (step.onTop) bset(0.i, priority_flag(a4)),
-      // Grab d0 and d1 from stack but leave the stack pointer there
-      move.l(sp.indirect, d1),
-      move.l(4(sp), d0),
+      // Grab d0 and d1 from stack but leave the stack pointer there.
+      // After movem.l(d0-d1, -(sp)), the 68k pushes highest register first:
+      // d1 is pushed first, then d0, so sp points to d0 (x) and sp+4 holds d1 (y).
+      move.l(sp.indirect, d0),
+      move.l(4(sp), d1),
       // Step object one frame
       if (step.animate)
         jsr(Label('Event_StepObjectNoWait').l)
