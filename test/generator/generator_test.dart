@@ -930,12 +930,12 @@ EventFlag_Test001 = $0001'''));
     });
 
     test(
-        'multiple objects with x-only step: '
-        'per-object stack reload puts x in d0, y in d1', () {
-      // After movem.l(d0-d1, -(sp)), the 68k pushes highest register first:
-      //   d1 written then decrements, then d0 written then decrements.
-      //   So sp+0 = d0's value (x step), sp+4 = d1's value (y step).
-      // Per-object reload must restore to the correct registers.
+        'multiple objects with x-only step '
+        'generates balanced stack ops for full event', () {
+      // Verifies the entire generated event including:
+      // - movem.l d0-d1 pushes exactly 8 bytes (not 12 with a spurious a0)
+      // - lea ($08, sp) cleans up exactly those 8 bytes
+      // - per-object stack reload puts x in d0 (sp+0), y in d1 (sp+4)
       var scene = Scene([
         StepObjects(
           [alys, shay],
@@ -947,19 +947,60 @@ EventFlag_Test001 = $0001'''));
       var program = Program();
       var asm = program.addScene(SceneId('testscene'), scene, startingMap: map);
 
+      var loop = Label('.1_stepobjectsloop');
+
       expect(
           asm.event.withoutComments(),
-          containsAllInOrder(Asm([
-            // alys: x step from top of stack must go into d0,
-            //       y step from sp+4 must go into d1
+          Asm([
+            // Load x and y step constants
+            move.l(0x00010000.toLongword.i, d0),
+            moveq(0.i, d1),
+            // Loop counter (frames - 1)
+            moveq(9.toByte.i, d2),
+            // Push d0 (x step) and d1 (y step) — must be exactly 8 bytes
+            movem.l(d0 - d1, -(sp)),
+
+            // Loop start
+            label(loop),
+
+            // Object 1 (alys): load into a4, restore step from stack
+            characterByIdToA4(Constant('CharID_Alys').i),
             move.l(sp.indirect, d0),
             move.l(4(sp), d1),
             jsr(Label('Event_StepObjectNoWait').l),
-            // shay: same pattern
+
+            // Object 2 (shay): load into a4, restore step from stack
+            characterByIdToA4(Constant('CharID_Chaz').i),
             move.l(sp.indirect, d0),
             move.l(4(sp), d1),
             jsr(Label('Event_StepObjectNoWait').l),
-          ])));
+
+            // Per-frame rendering
+            movem.l(d2 / a4, -(sp)),
+            jsr(Label('Field_LoadSprites').l),
+            jsr(Label('Field_BuildSprites').l),
+            jsr(Label('AnimateTiles').l),
+            jsr(Label('RunMapUpdates').l),
+            jsr(Label('VInt_Prepare').l),
+            movem.l(sp.postIncrement(), d2 / a4),
+            dbf(d2, loop),
+
+            // Clean up the 8 bytes pushed before the loop
+            lea(8(sp), sp),
+
+            // Reset step constants and destinations (reversed order)
+            // shay first (already in a4 from last loop iteration, no toA4)
+            moveq(0.i, d0),
+            move.l(d0, x_step_constant(a4)),
+            move.w(curr_x_pos(a4), dest_x_pos(a4)),
+            move.w(curr_y_pos(a4), dest_y_pos(a4)),
+            // then alys (needs loading)
+            characterByIdToA4(Constant('CharID_Alys').i),
+            moveq(0.i, d0),
+            move.l(d0, x_step_constant(a4)),
+            move.w(curr_x_pos(a4), dest_x_pos(a4)),
+            move.w(curr_y_pos(a4), dest_y_pos(a4)),
+          ]));
     });
   });
 

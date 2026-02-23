@@ -228,7 +228,7 @@ class DirectDataRegister extends _Address
   @override
   RegisterList operator -(DirectRegister other) {
     var (maxDataRegister, maxAddressRegister) = switch (other) {
-      DirectDataRegister() => (other.register, 0),
+      DirectDataRegister() => (other.register, -1),
       DirectAddressRegister() => (7, other.register),
     };
     return RegisterList.of([
