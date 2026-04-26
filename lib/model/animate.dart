@@ -164,6 +164,184 @@ enum ShutterStart {
   const ShutterStart(this.step);
 }
 
+enum TurnTimingPreset { quickToSlow, constant, slowToQuick, easeInOut }
+
+extension TurnTimingPresetValues on TurnTimingPreset {
+  Duration get startDelay => switch (this) {
+        TurnTimingPreset.quickToSlow => Duration.zero,
+        TurnTimingPreset.constant => const Duration(milliseconds: 120),
+        TurnTimingPreset.slowToQuick => const Duration(milliseconds: 250),
+        TurnTimingPreset.easeInOut => const Duration(milliseconds: 80),
+      };
+
+  Duration get endDelay => switch (this) {
+        TurnTimingPreset.quickToSlow => const Duration(milliseconds: 250),
+        TurnTimingPreset.constant => const Duration(milliseconds: 120),
+        TurnTimingPreset.slowToQuick => Duration.zero,
+        TurnTimingPreset.easeInOut => const Duration(milliseconds: 160),
+      };
+
+  double get curve => switch (this) {
+        TurnTimingPreset.quickToSlow => 2,
+        TurnTimingPreset.constant => 1,
+        TurnTimingPreset.slowToQuick => 2,
+        TurnTimingPreset.easeInOut => 0.5,
+      };
+}
+
+class TurnObject extends Event {
+  final FieldObject object;
+  final int quarterTurns;
+
+  /// Delay before the first turn.
+  final Duration preDelay;
+
+  /// Delay after the last turn.
+  final Duration postDelay;
+
+  /// Delay for the first pause between turns.
+  final Duration startDelay;
+
+  /// Delay for the last pause between turns.
+  final Duration endDelay;
+
+  /// Easing curve used to interpolate delays between turns.
+  final double curve;
+
+  TurnObject(this.object,
+      {required this.quarterTurns,
+      this.preDelay = Duration.zero,
+      this.postDelay = Duration.zero,
+      required this.startDelay,
+      Duration? endDelay,
+      this.curve = 1.0})
+      : endDelay = endDelay ?? startDelay {
+    checkArgument(quarterTurns != 0, message: 'quarterTurns must be non-zero.');
+    checkArgument(preDelay >= Duration.zero,
+        message: 'preDelay must be non-negative.');
+    checkArgument(postDelay >= Duration.zero,
+        message: 'postDelay must be non-negative.');
+    checkArgument(startDelay >= Duration.zero,
+        message: 'startDelay must be non-negative.');
+    checkArgument(this.endDelay >= Duration.zero,
+        message: 'endDelay must be non-negative.');
+    checkArgument(curve > 0, message: 'curve must be greater than 0.');
+  }
+
+  TurnObject.preset(this.object,
+      {required this.quarterTurns,
+      required TurnTimingPreset timingPreset,
+      this.preDelay = Duration.zero,
+      this.postDelay = Duration.zero})
+      : startDelay = timingPreset.startDelay,
+        endDelay = timingPreset.endDelay,
+        curve = timingPreset.curve {
+    checkArgument(quarterTurns != 0, message: 'quarterTurns must be non-zero.');
+    checkArgument(preDelay >= Duration.zero,
+        message: 'preDelay must be non-negative.');
+    checkArgument(postDelay >= Duration.zero,
+        message: 'postDelay must be non-negative.');
+    checkArgument(startDelay >= Duration.zero,
+        message: 'startDelay must be non-negative.');
+    checkArgument(endDelay >= Duration.zero,
+        message: 'endDelay must be non-negative.');
+    checkArgument(curve > 0, message: 'curve must be greater than 0.');
+  }
+
+  List<Event> toEvents() {
+    var turns = quarterTurns.abs();
+    var turnDirection = quarterTurns.isNegative ? -1 : 1;
+    var pauses = _betweenTurnDelays(turns);
+    var events = <Event>[];
+
+    if (preDelay > Duration.zero) {
+      events.add(Pause(preDelay));
+    }
+
+    for (var i = 0; i < turns; i++) {
+      var movement = StepPath()..facing = object.facing().turn(turnDirection);
+      events.add(IndividualMoves()..moves[object] = movement);
+
+      if (i < pauses.length && pauses[i] > Duration.zero) {
+        events.add(Pause(pauses[i]));
+      }
+    }
+
+    if (postDelay > Duration.zero) {
+      events.add(Pause(postDelay));
+    }
+
+    return events;
+  }
+
+  List<Duration> _betweenTurnDelays(int turns) {
+    var count = max(0, turns - 1);
+    if (count == 0) {
+      return const [];
+    }
+
+    if (count == 1) {
+      return [startDelay];
+    }
+
+    return [for (var i = 0; i < count; i++) _delayAt(i, count)];
+  }
+
+  Duration _delayAt(int index, int count) {
+    var t = index / (count - 1);
+    var eased = pow(t, curve).toDouble();
+    return _lerpDuration(startDelay, endDelay, eased);
+  }
+
+  Duration _lerpDuration(Duration start, Duration end, double t) {
+    var microseconds =
+        start.inMicroseconds + (end.inMicroseconds - start.inMicroseconds) * t;
+    return Duration(microseconds: microseconds.round());
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    for (var event in toEvents()) {
+      event.visit(visitor);
+    }
+  }
+
+  @override
+  String toString() {
+    return 'TurnObject('
+        'object: $object, '
+        'quarterTurns: $quarterTurns, '
+        'preDelay: $preDelay, '
+        'startDelay: $startDelay, '
+        'endDelay: $endDelay, '
+        'postDelay: $postDelay, '
+        'curve: $curve)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is TurnObject &&
+        other.object == object &&
+        other.quarterTurns == quarterTurns &&
+        other.preDelay == preDelay &&
+        other.startDelay == startDelay &&
+        other.endDelay == endDelay &&
+        other.postDelay == postDelay &&
+        other.curve == curve;
+  }
+
+  @override
+  int get hashCode =>
+      object.hashCode ^
+      quarterTurns.hashCode ^
+      preDelay.hashCode ^
+      startDelay.hashCode ^
+      endDelay.hashCode ^
+      postDelay.hashCode ^
+      curve.hashCode;
+}
+
 class ShutterObjects extends Event {
   final List<FieldObject> objects;
   final Duration duration;

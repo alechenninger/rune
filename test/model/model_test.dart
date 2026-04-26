@@ -1774,6 +1774,195 @@ void main() {
     });
   });
 
+  group('turn object', () {
+    IndividualMoves turnEvent(FieldObject object, int quarterTurns) {
+      return IndividualMoves()
+        ..moves[object] =
+            (StepPath()..facing = object.facing().turn(quarterTurns));
+    }
+
+    List<Steps> betweenTurnDelays(TurnObject turn) {
+      var events = turn.toEvents();
+      var delays = <Steps>[];
+
+      for (var i = 1; i < events.length - 1; i++) {
+        var event = events[i];
+        if (event is! Pause) continue;
+        if (events[i - 1] is IndividualMoves &&
+            events[i + 1] is IndividualMoves) {
+          delays.add(event.duration.toFrames().steps);
+        }
+      }
+
+      return delays;
+    }
+
+    test('validates constructor arguments', () {
+      expect(
+          () => TurnObject(alys,
+              quarterTurns: 0,
+              startDelay: Duration.zero,
+              endDelay: Duration.zero),
+          throwsArgumentError);
+
+      expect(
+          () => TurnObject(alys,
+              quarterTurns: 1,
+              startDelay: const Duration(milliseconds: -1),
+              endDelay: Duration.zero),
+          throwsArgumentError);
+
+      expect(
+          () => TurnObject(alys,
+              quarterTurns: 1,
+              startDelay: Duration.zero,
+              endDelay: const Duration(milliseconds: -1)),
+          throwsArgumentError);
+
+      expect(
+          () => TurnObject(alys,
+              quarterTurns: 1,
+              startDelay: Duration.zero,
+              endDelay: Duration.zero,
+              curve: 0),
+          throwsArgumentError);
+
+      expect(
+          () => TurnObject(alys,
+              quarterTurns: 1,
+              preDelay: const Duration(milliseconds: -1),
+              startDelay: Duration.zero,
+              endDelay: Duration.zero),
+          throwsArgumentError);
+
+      expect(
+          () => TurnObject(alys,
+              quarterTurns: 1,
+              postDelay: const Duration(milliseconds: -1),
+              startDelay: Duration.zero,
+              endDelay: Duration.zero),
+          throwsArgumentError);
+    });
+
+    test('decomposes clockwise turns into individual facing events', () {
+      var turn = TurnObject(alys,
+          quarterTurns: 2, startDelay: Duration.zero, endDelay: Duration.zero);
+
+      expect(turn.toEvents(), [
+        turnEvent(alys, 1),
+        turnEvent(alys, 1),
+      ]);
+    });
+
+    test('decomposes counterclockwise turns into individual facing events', () {
+      var turn = TurnObject(alys,
+          quarterTurns: -2, startDelay: Duration.zero, endDelay: Duration.zero);
+
+      expect(turn.toEvents(), [
+        turnEvent(alys, -1),
+        turnEvent(alys, -1),
+      ]);
+    });
+
+    test('endDelay defaults to startDelay when omitted', () {
+      var turn = TurnObject(alys, quarterTurns: 1, startDelay: 0.2.seconds);
+
+      expect(turn.endDelay, 0.2.seconds);
+    });
+
+    test('bookend turns have no delay and timing is between turns', () {
+      var turn = TurnObject(alys,
+          quarterTurns: 3,
+          preDelay: 0.1.seconds,
+          startDelay: 0.2.seconds,
+          endDelay: 0.4.seconds,
+          postDelay: 0.1.seconds,
+          curve: 1);
+
+      expect(turn.toEvents(), [
+        Pause(0.1.seconds),
+        turnEvent(alys, 1),
+        Pause(0.2.seconds),
+        turnEvent(alys, 1),
+        Pause(0.4.seconds),
+        turnEvent(alys, 1),
+        Pause(0.1.seconds),
+      ]);
+    });
+
+    test('timing schedule supports fast to slow profile', () {
+      var turn = TurnObject(alys,
+          quarterTurns: 4,
+          startDelay: Duration.zero,
+          endDelay: 1.second,
+          curve: 2);
+
+      expect(betweenTurnDelays(turn), [15.steps, 60.steps]);
+    });
+
+    test('timing schedule supports constant rate profile', () {
+      var turn = TurnObject(alys,
+          quarterTurns: 4,
+          startDelay: 0.2.seconds,
+          endDelay: 0.2.seconds,
+          curve: 1);
+
+      expect(betweenTurnDelays(turn), [12.steps, 12.steps, 12.steps]);
+    });
+
+    test('timing schedule supports slow to fast profile', () {
+      var turn = TurnObject(alys,
+          quarterTurns: 4,
+          startDelay: 1.second,
+          endDelay: Duration.zero,
+          curve: 2);
+
+      expect(betweenTurnDelays(turn), [60.steps, 45.steps]);
+    });
+
+    test('multi-phase timing can be represented by split turn events', () {
+      var phase1 = TurnObject(alys,
+          quarterTurns: 3,
+          startDelay: Duration.zero,
+          endDelay: 1.second,
+          curve: 1);
+      var phase2 = TurnObject(alys,
+          quarterTurns: 3,
+          startDelay: 1.second,
+          endDelay: Duration.zero,
+          curve: 1);
+
+      expect([...betweenTurnDelays(phase1), ...betweenTurnDelays(phase2)],
+          [60.steps, 60.steps]);
+    });
+
+    test('preset mapping resolves to canonical numeric values', () {
+      var quickToSlow = TurnObject.preset(alys,
+          quarterTurns: 1, timingPreset: TurnTimingPreset.quickToSlow);
+      expect(quickToSlow.startDelay, Duration.zero);
+      expect(quickToSlow.endDelay, const Duration(milliseconds: 250));
+      expect(quickToSlow.curve, 2);
+
+      var constant = TurnObject.preset(alys,
+          quarterTurns: 1, timingPreset: TurnTimingPreset.constant);
+      expect(constant.startDelay, const Duration(milliseconds: 120));
+      expect(constant.endDelay, const Duration(milliseconds: 120));
+      expect(constant.curve, 1);
+
+      var slowToQuick = TurnObject.preset(alys,
+          quarterTurns: 1, timingPreset: TurnTimingPreset.slowToQuick);
+      expect(slowToQuick.startDelay, const Duration(milliseconds: 250));
+      expect(slowToQuick.endDelay, Duration.zero);
+      expect(slowToQuick.curve, 2);
+
+      var easeInOut = TurnObject.preset(alys,
+          quarterTurns: 1, timingPreset: TurnTimingPreset.easeInOut);
+      expect(easeInOut.startDelay, const Duration(milliseconds: 80));
+      expect(easeInOut.endDelay, const Duration(milliseconds: 160));
+      expect(easeInOut.curve, 0.5);
+    });
+  });
+
   group('shutter objects', () {
     test('starts down by default', () {
       var shutter = ShutterObjects([MapObjectById.of('test')],
