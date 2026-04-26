@@ -31,6 +31,8 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 8, vramAnimated: true),
   FieldRoutine.asm(Word(0x70), Label('FieldObj_NPCRune'),
       spriteMappingTiles: 8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x37C), Label('FieldObj_NPCSeth'),
+      spriteMappingTiles: 8, vramAnimated: true),
   FieldRoutine(
       Word(0x138),
       Label('loc_490B8'),
