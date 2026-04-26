@@ -3985,6 +3985,9 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   Label('Map_Kuran_F3'): Word(0x3b9),
   Label('Map_GaruberkTower_Part7'): Word(0x252),
   Label('Map_SoldiersTempleOutside'): Word(0x281),
+  // Kept same as LadeaTower_F5 for convenience
+  // since they share the chest barrier graphic
+  Label('Map_SoldiersTemple'): Word(0x2e6),
 }.map((l, o) => MapEntry(labelToMapId(l), o));
 
 final _defaultBuiltInSprites = {
