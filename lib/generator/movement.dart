@@ -15,6 +15,10 @@ const FacingDir_Up = Constant('FacingDir_Up');
 const FacingDir_Down = Constant('FacingDir_Down');
 const FacingDir_Left = Constant('FacingDir_Left');
 const FacingDir_Right = Constant('FacingDir_Right');
+const Camera_X_Step_Counter_FG = Constant('Camera_X_Step_Counter_FG');
+const Camera_Y_Step_Counter_FG = Constant('Camera_Y_Step_Counter_FG');
+const Camera_X_Step_Counter_BG = Constant('Camera_X_Step_Counter_BG');
+const Camera_Y_Step_Counter_BG = Constant('Camera_Y_Step_Counter_BG');
 
 final scriptableObjectRoutine = AsmRoutineModel(Word(0x194));
 
@@ -442,13 +446,27 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
         // TODO(correctness): this could erroneously change an object that normally animates
         bclr(1.i, priority_flag(a4)),
       ]),
-    if (chars.isNotEmpty) jsr(Label('Event_MoveCharacters').l),
+    if (chars.isNotEmpty)
+      Asm([
+        for (var char in chars) ...[
+          char.toA4(memory),
+          jsr(Label('Event_DoWaitForCharacter').l),
+        ],
+        // Match Event_MoveCharacters post-wait cleanup.
+        jsr(Label('Field_UpdateObjects').l),
+        moveq(0.i, d0),
+        move.l(d0, Camera_X_Step_Counter_FG.w),
+        move.l(d0, Camera_Y_Step_Counter_FG.w),
+        move.l(d0, Camera_X_Step_Counter_BG.w),
+        move.l(d0, Camera_Y_Step_Counter_BG.w),
+      ]),
     // Reset move in dialog bit
     // This is only set in case we moved in dialog,
     // but it doesn't hurt to clear
     for (var char in chars)
       Asm([
-        char.toA4(memory),
+        // Force due to likely register changes above
+        char.toA4(memory, force: true),
         bclr(1.i, priority_flag(a4)),
       ]),
     // Reset speed

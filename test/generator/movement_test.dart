@@ -1702,7 +1702,14 @@ void main() {
           ]),
           Asm([
             label(Label('TestScene_0_0_1_WaitForMovements')),
-            jsr(Label('Event_MoveCharacters').l),
+            shay.toA4(testState..unknownAddressRegisters()),
+            jsr(Label('Event_DoWaitForCharacter').l),
+            jsr(Label('Field_UpdateObjects').l),
+            moveq(0.i, d0),
+            move.l(d0, Constant('Camera_X_Step_Counter_FG').w),
+            move.l(d0, Constant('Camera_Y_Step_Counter_FG').w),
+            move.l(d0, Constant('Camera_X_Step_Counter_BG').w),
+            move.l(d0, Constant('Camera_Y_Step_Counter_BG').w),
             // Should expect "redundant" load
             shay.toA4(testState..unknownAddressRegisters()),
             bclr(1.i, priority_flag(a4)),
