@@ -233,6 +233,7 @@ abstract class EventVisitor {
   void fadeOut(FadeOut fadeOut);
   void fadeInField(FadeInField fadeIn);
   void increaseTone(IncreaseTone increase);
+  void restoreTone(RestoreTone restore);
   void flashScreen(FlashScreen flash);
   void prepareMap(PrepareMap prepareMap);
   void loadMap(LoadMap changeMap);

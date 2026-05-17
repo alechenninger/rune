@@ -9,7 +9,14 @@ class IncreaseTone extends Event {
   /// Time to wait with increased tone.
   final Duration wait;
 
-  IncreaseTone({required this.percent, this.wait = Duration.zero}) {
+  /// Save the current palette to restore later.
+  final bool savePalette;
+
+  IncreaseTone({
+    required this.percent,
+    this.wait = Duration.zero,
+    this.savePalette = false,
+  }) {
     checkArgument(percent >= 0 && percent <= 1,
         message: 'percent must be between 0 and 1');
     checkArgument(wait >= Duration.zero, message: 'wait must be non-negative');
@@ -18,6 +25,25 @@ class IncreaseTone extends Event {
   @override
   void visit(EventVisitor visitor) {
     visitor.increaseTone(this);
+  }
+}
+
+class RestoreTone extends Event {
+  /// 1 is 100% white.
+  final double percent;
+
+  /// Time to wait with restored tone.
+  final Duration wait;
+
+  RestoreTone({required this.percent, this.wait = Duration.zero}) {
+    checkArgument(percent >= 0 && percent <= 1,
+        message: 'percent must be between 0 and 1');
+    checkArgument(wait >= Duration.zero, message: 'wait must be non-negative');
+  }
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.restoreTone(this);
   }
 }
 

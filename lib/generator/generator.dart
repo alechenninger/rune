@@ -1847,6 +1847,17 @@ class SceneAsmGenerator implements EventVisitor {
   void increaseTone(IncreaseTone increase) {
     _checkNotFinished();
 
+    if (increase.savePalette) {
+      _addToEvent(increase, (_) {
+        return Asm([
+          lea(Palette_Table_Buffer.w, a0),
+          lea(Palette_Table_Buffer_2.w, a1),
+          move.w(0x3F.i, d7),
+          trap(1.i),
+        ]);
+      });
+    }
+
     // It takes 28 frames max to go fully white from any palette.
     var frames = (increase.percent * 28).ceil();
 
@@ -1867,6 +1878,32 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     pause(Pause(increase.wait));
+  }
+
+  @override
+  void restoreTone(RestoreTone restore) {
+    _checkNotFinished();
+
+    // It takes 28 frames max to go fully white from any palette.
+    var frames = (restore.percent * 28).ceil();
+
+    if (frames > 0) {
+      _addToEvent(restore, (eventIndex) {
+        var extraFrames = frames - 1;
+        return Asm([
+          if (extraFrames <= 128)
+            moveq(extraFrames.toByte.i, d7)
+          else
+            move.w(extraFrames.i, d7),
+          label(Label('.restore_tone$eventIndex')),
+          jsr(Pal_DecreaseToneToPal2.l),
+          _waitFrames(1),
+          dbf(d7, Label('.restore_tone$eventIndex')),
+        ]);
+      });
+    }
+
+    pause(Pause(restore.wait));
   }
 
   @override
