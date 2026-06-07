@@ -124,7 +124,13 @@ final defaultFieldRoutines = FieldRoutineRepository([
   FieldRoutine.asm(Word(0x318), Label('loc_4BE38'), spriteMappingTiles: 0xE),
   FieldRoutine.asm(Word(0x31c), Label('loc_4BE80'), spriteMappingTiles: 0xE),
   FieldRoutine.asm(Word(0x15c), Label('FieldObj_EclipseTorch'),
-      animatesInEvents: true, spriteMappingTiles: 0x10)
+      animatesInEvents: true, spriteMappingTiles: 0x10),
+  // Add one more to correct position of GiLeFarg sprite
+  // Not sure if GiLeFarge needs repositioning or if the DeVars sprite
+  // actually needs one more tile
+  // I assume it does.
+  FieldRoutine.asm(Word(0x2A0), Label('FieldObj_DeVars'),
+      spriteMappingTiles: 0x49)
 ]);
 
 class FieldRoutineRepository {
