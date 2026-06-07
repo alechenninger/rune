@@ -652,6 +652,7 @@ class TextAsmRef {
 
 class Plane {
   final _cells = List<TextAsmRef?>.filled(0x1000, null);
+  // Starting cell by text
   final _texts = <TextAsmRef, int>{};
 
   var _bufferDirty = false;
