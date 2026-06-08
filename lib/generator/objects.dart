@@ -130,7 +130,10 @@ final defaultFieldRoutines = FieldRoutineRepository([
   // actually needs one more tile
   // I assume it does.
   FieldRoutine.asm(Word(0x2A0), Label('FieldObj_DeVars'),
-      spriteMappingTiles: 0x49)
+      spriteMappingTiles: 0x49),
+  // Same deal
+  FieldRoutine.asm(Word(0x2B0), Label('FieldObj_SaLews'),
+      spriteMappingTiles: 0x33),
 ]);
 
 class FieldRoutineRepository {
