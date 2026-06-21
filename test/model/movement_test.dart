@@ -482,8 +482,7 @@ void main() {
       var withFollowLead = IndividualMoves()
         ..followLead = true
         ..moves[BySlot(1)] = Face(up);
-      var withoutFollowLead = IndividualMoves()
-        ..moves[BySlot(1)] = Face(up);
+      var withoutFollowLead = IndividualMoves()..moves[BySlot(1)] = Face(up);
 
       expect(withFollowLead, isNot(withoutFollowLead));
       expect(withFollowLead.hashCode, isNot(withoutFollowLead.hashCode));
@@ -493,8 +492,7 @@ void main() {
       var first = IndividualMoves()
         ..followLead = true
         ..moves[BySlot(1)] = Face(up);
-      var second = IndividualMoves()
-        ..moves[BySlot(2)] = Face(down);
+      var second = IndividualMoves()..moves[BySlot(2)] = Face(down);
 
       expect(first.andThen(second), isNull);
     });
