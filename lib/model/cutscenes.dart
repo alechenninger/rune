@@ -182,7 +182,11 @@ class Normal extends FadeSpeed {
   int get hashCode => toString().hashCode;
 }
 
-class FadeOut extends Event {
+sealed class FadeEvent extends Event {
+  const FadeEvent();
+}
+
+class FadeOut extends FadeEvent {
   final FadeSpeed speed;
 
   const FadeOut() : speed = const Normal();
@@ -212,7 +216,7 @@ class FadeOut extends Event {
   int get hashCode => speed.hashCode;
 }
 
-class FadeInField extends Event {
+class FadeInField extends FadeEvent {
   final FadeSpeed speed;
 
   const FadeInField({bool instantly = false})
