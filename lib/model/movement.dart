@@ -282,6 +282,7 @@ class IndividualMoves extends Event implements RunnableInDialog {
   Map<FieldObject, RelativeMovement> moves = {};
   StepSpeed speed = StepSpeed.fast;
   bool collideLead = false;
+  bool followLead = false;
 
   Map<FieldObject, DirectionExpression>? get justFacing {
     var result = <FieldObject, DirectionExpression>{};
@@ -359,6 +360,9 @@ class IndividualMoves extends Event implements RunnableInDialog {
 
   IndividualMoves delayed(Steps delay) {
     var result = IndividualMoves();
+    result.speed = speed;
+    result.collideLead = collideLead;
+    result.followLead = followLead;
     for (var MapEntry(key: obj, value: move) in moves.entries) {
       result.moves[obj] = move.delayed(delay);
     }
@@ -372,11 +376,13 @@ class IndividualMoves extends Event implements RunnableInDialog {
     if (other.moves.isEmpty) return this;
     if (moves.isEmpty) return other;
     if (collideLead != other.collideLead) return null;
+    if (followLead != other.followLead) return null;
     if (speed != other.speed) return null;
 
     var result = IndividualMoves();
     result.speed = speed;
     result.collideLead = collideLead;
+    result.followLead = followLead;
     result.moves.addAll(moves);
 
     for (var MapEntry(key: moveable, value: move) in other.moves.entries) {
@@ -412,7 +418,8 @@ class IndividualMoves extends Event implements RunnableInDialog {
 
   @override
   String toString() {
-    return 'IndividualMoves{moves: $moves, speed: $speed}';
+    return 'IndividualMoves{moves: $moves, speed: $speed, '
+        'followLead: $followLead}';
   }
 
   @override
@@ -421,10 +428,12 @@ class IndividualMoves extends Event implements RunnableInDialog {
       other is IndividualMoves &&
           runtimeType == other.runtimeType &&
           const MapEquality().equals(moves, other.moves) &&
-          speed == other.speed;
+          speed == other.speed &&
+          followLead == other.followLead;
 
   @override
-  int get hashCode => const MapEquality().hash(moves) ^ speed.hashCode;
+  int get hashCode =>
+      const MapEquality().hash(moves) ^ speed.hashCode ^ followLead.hashCode;
 }
 
 class AbsoluteMoves extends Event implements RunnableInDialog {

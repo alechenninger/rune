@@ -477,6 +477,27 @@ void main() {
       expect(absolute!.startingAxis, Axis.x,
           reason: 'First movement is right, so starting axis should be x');
     });
+
+    test('followLead affects equality and hashCode', () {
+      var withFollowLead = IndividualMoves()
+        ..followLead = true
+        ..moves[BySlot(1)] = Face(up);
+      var withoutFollowLead = IndividualMoves()
+        ..moves[BySlot(1)] = Face(up);
+
+      expect(withFollowLead, isNot(withoutFollowLead));
+      expect(withFollowLead.hashCode, isNot(withoutFollowLead.hashCode));
+    });
+
+    test('andThen does not combine moves with different followLead values', () {
+      var first = IndividualMoves()
+        ..followLead = true
+        ..moves[BySlot(1)] = Face(up);
+      var second = IndividualMoves()
+        ..moves[BySlot(2)] = Face(down);
+
+      expect(first.andThen(second), isNull);
+    });
   });
 
   group('AbsoluteMoves.canRunInDialog', () {

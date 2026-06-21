@@ -25,6 +25,87 @@ void main() {
   }
 
   group('generates asm for individual movements', () {
+    group('party follows validation', () {
+      test('allows moving slot 1 when party follows', () {
+        var ctx = Memory()..followLead = false;
+
+        var moves = IndividualMoves()
+          ..followLead = true
+          ..moves[BySlot.one] = (StepPath()
+            ..distance = 1.step
+            ..direction = up);
+
+        expect(() => moves.toAsm(ctx), returnsNormally);
+      });
+
+      test('rejects moving slot 2 when party follows', () {
+        var ctx = Memory();
+
+        var moves = IndividualMoves()
+          ..followLead = true
+          ..moves[BySlot.two] = (StepPath()
+            ..distance = 1.step
+            ..direction = up);
+
+        expect(() => moves.toAsm(ctx), throwsA(isA<StateError>()));
+      });
+
+      test('allows moving character in slot 1 when party follows', () {
+        var ctx = Memory()
+          ..followLead = false
+          ..slots[1] = shay;
+
+        var moves = IndividualMoves()
+          ..followLead = true
+          ..moves[shay] = (StepPath()
+            ..distance = 1.step
+            ..direction = up);
+
+        expect(() => moves.toAsm(ctx), returnsNormally);
+      });
+
+      test('rejects moving character outside slot 1 when party follows', () {
+        var ctx = Memory()
+          ..slots[1] = alys
+          ..slots[2] = shay;
+
+        var moves = IndividualMoves()
+          ..followLead = true
+          ..moves[shay] = (StepPath()
+            ..distance = 1.step
+            ..direction = up);
+
+        expect(() => moves.toAsm(ctx), throwsA(isA<StateError>()));
+      });
+
+      test('rejects facing non-leader character when party follows', () {
+        var ctx = Memory()
+          ..slots[1] = alys
+          ..slots[2] = shay;
+
+        var moves = IndividualMoves()
+          ..followLead = true
+          ..moves[shay] = Face(up);
+
+        expect(() => moves.toAsm(ctx), throwsA(isA<StateError>()));
+      });
+
+      test('allows npc references when party follows', () {
+        var npc = MapObject(
+            id: 'testnpc',
+            startPosition: Position(0x200, 0x200),
+            spec: Npc(Sprite.PalmanMan1, WanderAround(down)));
+        var map = GameMap(MapId.Test)..addObject(npc);
+        var ctx = Memory()..currentMap = map;
+
+        var moves = IndividualMoves()
+          ..followLead = true
+          ..moves[npc] = Face(up);
+
+        expect(() => moves.toAsm(ctx), returnsNormally);
+      });
+    });
+
     group('step in one direction', () {
       test('move right, after previously not following leader', () {
         var ctx = Memory();

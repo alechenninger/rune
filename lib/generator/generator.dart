@@ -1175,11 +1175,13 @@ class SceneAsmGenerator implements EventVisitor {
     _addToEvent(move, (i) {
       var moves = IndividualMoves()
         ..moves[BySlot(1)] = move.movement
-        ..speed = move.speed;
-      return moves.toAsm(_memory,
-          fieldRoutines: _fieldRoutines,
-          labeller: _labeller.withContext(i),
-          followLead: true);
+        ..speed = move.speed
+        ..followLead = true;
+      return moves.toAsm(
+        _memory,
+        fieldRoutines: _fieldRoutines,
+        labeller: _labeller.withContext(i),
+      );
     });
   }
 

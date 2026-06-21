@@ -42,9 +42,7 @@ if independent moves == follow lead moves, just use follow lead flag
 
 extension IndividualMovesToAsm on IndividualMoves {
   EventAsm toAsm(Memory ctx,
-      {Labeller? labeller,
-      FieldRoutineRepository? fieldRoutines,
-      bool followLead = false}) {
+      {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
     labeller ??= Labeller();
     fieldRoutines ??= defaultFieldRoutines;
 
@@ -55,6 +53,12 @@ extension IndividualMovesToAsm on IndividualMoves {
     // when there's nothing left to do.
     var remainingMoves = Map.of(moves.map(
         (moveable, movement) => MapEntry(moveable.resolve(ctx), movement)));
+
+    if (followLead) {
+      for (var obj in remainingMoves.keys) {
+        _throwIfIndependentPartyFollower(obj, ctx);
+      }
+    }
 
     if (ctx.followLead != followLead &&
         remainingMoves.entries.any((move) =>
@@ -208,6 +212,14 @@ extension IndividualMovesToAsm on IndividualMoves {
   }
 }
 
+void _throwIfIndependentPartyFollower(FieldObject obj, EventState state) {
+  if (obj is Character && obj.slotAsOf(state) != 1 ||
+      obj is BySlot && obj.index > 1) {
+    throw StateError(
+        'cannot move $obj independently when follow leader flag is set');
+  }
+}
+
 Asm _moveObject({
   required MovementLookahead movement,
   required FieldObject object,
@@ -315,11 +327,8 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
     var pos = dest.value;
     var isLast = i == length - 1;
 
-    if (moves.followLeader &&
-        (obj is Character && obj.slotAsOf(state) != 1 ||
-            (obj is BySlot && obj.index > 1))) {
-      throw StateError(
-          'cannot move $obj independently when follow leader flag is set');
+    if (moves.followLeader) {
+      _throwIfIndependentPartyFollower(obj, state);
     }
 
     generator.asm.add(obj.toA4(generator._mem));
