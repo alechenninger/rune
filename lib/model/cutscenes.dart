@@ -9,14 +9,29 @@ class ShowPanel extends Event implements RunnableInDialog {
   final bool runMapUpdates;
   final PanelPlane plane;
 
+  /// If true, the panel will be queued in RAM for display,
+  /// and not necessarily immediately show to the player.
+  /// Use if you intentionally want to only load the panel, queued,
+  /// for some later event with a plane buffer copy to cause the panel
+  /// to be displayed.
+  ///
+  /// Cannot be used with [showDialogBox] true.
+  ///
+  /// If the display is disabled, the event will still cause a fade in,
+  /// regardless of whether [queueForDisplay] is true or false.
+  final bool queueForDisplay;
+
   ShowPanel(this.panel,
       {bool showDialogBox = false,
       this.portrait,
       this.runMapUpdates = false,
-      this.plane = PanelPlane.foreground})
+      this.plane = PanelPlane.foreground,
+      this.queueForDisplay = false})
       : showDialogBox = showDialogBox || portrait != null {
     checkArgument(!(showDialogBox && plane == PanelPlane.background),
         message: 'Cannot show dialog box in background');
+    checkArgument(!(showDialogBox && queueForDisplay),
+        message: 'Cannot queue panel for display while showing dialog box');
   }
 
   ShowPanel inDialog() {
@@ -40,6 +55,7 @@ class ShowPanel extends Event implements RunnableInDialog {
         'portrait: $portrait, '
         'showDialogBox: $showDialogBox, '
         'runMapUpdates: $runMapUpdates, '
+        'queueForDisplay: $queueForDisplay, '
         'plane: $plane}';
   }
 
@@ -52,6 +68,7 @@ class ShowPanel extends Event implements RunnableInDialog {
           portrait == other.portrait &&
           showDialogBox == other.showDialogBox &&
           runMapUpdates == other.runMapUpdates &&
+          queueForDisplay == other.queueForDisplay &&
           plane == other.plane;
 
   @override
@@ -60,6 +77,7 @@ class ShowPanel extends Event implements RunnableInDialog {
       portrait.hashCode ^
       showDialogBox.hashCode ^
       runMapUpdates.hashCode ^
+      queueForDisplay.hashCode ^
       plane.hashCode;
 }
 

@@ -210,7 +210,10 @@ const storyEvents = [
   EventFlag('CourageTowerChests'),
   EventFlag('LeRoofStory1'),
   EventFlag('LeRoofStory2'),
-  //EventFlag('InnerSanctGuard2'),
+  // InnerSanctGuard2 is optional in original, but not in GC
+  // For now keeping out as LeRoofStory2 for timeline still works,
+  // as you can't talk to Hasari otherwise
+  // EventFlag('InnerSanctGuard2'),
   EventFlag('ElsydeonCave'),
   EventFlag('Elsydeon'),
   EventFlag('Reunion'),

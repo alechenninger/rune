@@ -108,6 +108,23 @@ main() {
         ]));
   });
 
+  test('queued panel does not dma planes immediately', () {
+    var scene = Scene([
+      ShowPanel(PanelByIndex(0x2b), queueForDisplay: true),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().head(3),
+        Asm([
+          move.w(0x2b.toWord.i, d0),
+          jsr(Label('Panel_Create').l),
+          jsr(Label('Panel_Destroy').l),
+        ]));
+  });
+
   test('fade during cutscene then panel fades in automatically', () {
     var scene = Scene([
       FadeOut(),

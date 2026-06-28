@@ -2149,7 +2149,7 @@ class SceneAsmGenerator implements EventVisitor {
             jsr('Panel_Create'.toLabel.l)
           else
             jsr('Panel_Create_B'.toLabel.l),
-          dmaPlanesVInt(),
+          if (!showPanel.queueForDisplay) dmaPlanesVInt(),
         ]);
       });
     }
