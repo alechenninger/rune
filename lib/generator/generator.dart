@@ -4027,6 +4027,11 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
   // Kept same as LadeaTower_F5 for convenience
   // since they share the chest barrier graphic
   Label('Map_SoldiersTemple'): Word(0x2e6),
+  // Technically not loaded into VRAM at the start of map,
+  // but compiler needs it anyway.
+  Label('Map_MotaSpaceport'): Word(0x21d),
+  // Same for dezo
+  Label('Map_DezoSpaceport'): Word(0x21d),
 }.map((l, o) => MapEntry(labelToMapId(l), o));
 
 final _defaultBuiltInSprites = {

@@ -134,6 +134,26 @@ final defaultFieldRoutines = FieldRoutineRepository([
   // Same deal
   FieldRoutine.asm(Word(0x2B0), Label('FieldObj_SaLews'),
       spriteMappingTiles: 0x33),
+  FieldRoutine.asm(Word(0x2C8), Label('FieldObj_NPCRajaSpaceport'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2CC), Label('FieldObj_NPCKyraSpaceport'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2D0), Label('FieldObj_NPCGryzSpaceport'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2D4), Label('FieldObj_NPCHahnSpaceport'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2D8), Label('FieldObj_NPCDemiSpaceport'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2DC), Label('FieldObj_GryzSpaceportWaiting'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2E0), Label('FieldObj_HahnSpaceportWaiting'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2E4), Label('FieldObj_DemiSpaceportWaiting'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2E8), Label('FieldObj_RajaSpaceportWaiting'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
+  FieldRoutine.asm(Word(0x2EC), Label('FieldObj_KyraSpaceportWaiting'),
+      spriteMappingTiles: 0x8, vramAnimated: true),
 ]);
 
 class FieldRoutineRepository {
