@@ -933,20 +933,20 @@ void main() {
         expect(
             sceneAsm.event.withoutComments().trim(),
             Asm([
-              label(Label('.wait_for_movement_1_MapObjecttestnpc_0')),
+              label(Label('.wait_for_movement_1_MapObjecttestnpc_0_0')),
               lea(0xFFFFC300.w, a4),
               moveq(0.i, d0),
               move.w(x_step_duration(a4), d0),
               or.w(y_step_duration(a4), d0),
-              beq.s(Label('.1_MapObjecttestnpc_0_wait_for_movements_done')),
+              beq.s(Label('.1_MapObjecttestnpc_0_0_wait_for_movements_done')),
               jsr(Label('RunSingleObject').l),
               jsr(Label('Field_LoadSprites').l),
               jsr(Label('Field_BuildSprites').l),
               jsr(Label('AnimateTiles').l),
               jsr(Label('RunMapUpdates').l),
               jsr(Label('VInt_Prepare').l),
-              bra.s(Label('.wait_for_movement_1_MapObjecttestnpc_0')),
-              label(Label('.1_MapObjecttestnpc_0_wait_for_movements_done')),
+              bra.s(Label('.wait_for_movement_1_MapObjecttestnpc_0_0')),
+              label(Label('.1_MapObjecttestnpc_0_0_wait_for_movements_done')),
               move.w(0x8194.toWord.i, a4.indirect),
               move.w(curr_x_pos(a4), dest_x_pos(a4)),
               move.w(curr_y_pos(a4), dest_y_pos(a4)),
@@ -1894,6 +1894,52 @@ void main() {
                   .known(mem),
               Direction.right);
         });
+
+        test('zero vector uses current facing', () {
+          var position = Position(0x50, 0x50);
+          mem.setSlot(1, shay);
+          mem.positions[BySlot.one] = position;
+          mem.positions[shay] = position;
+          mem.setFacing(BySlot.one, Direction.left);
+
+          expect(BySlot.one.position().towards(shay.position()).known(mem),
+              Direction.left);
+        });
+
+        group('is known zero', () {
+          test('identical position expressions are known zero', () {
+            var direction =
+                DirectionOfVector(from: shay.position(), to: shay.position());
+
+            expect(direction.isKnownZero(mem), isTrue);
+          });
+
+          test('unknown positions have unknown zero status', () {
+            var direction =
+                DirectionOfVector(from: shay.position(), to: rune.position());
+
+            expect(direction.isKnownZero(mem), isNull);
+          });
+
+          test('known positions determine zero status', () {
+            mem.positions[shay] = Position(0x50, 0x50);
+            mem.positions[rune] = Position(0x50, 0x50);
+            var direction =
+                DirectionOfVector(from: shay.position(), to: rune.position());
+
+            expect(direction.isKnownZero(mem), isTrue);
+
+            mem.positions[rune] = Position(0x60, 0x50);
+
+            expect(direction.isKnownZero(mem), isFalse);
+          });
+
+          test('non-vector directions are known non-zero', () {
+            expect(Direction.up.isKnownZero(mem), isFalse);
+            expect(shay.facing().isKnownZero(mem), isFalse);
+            expect(Direction.up.turn(1).isKnownZero(mem), isFalse);
+          });
+        });
       });
     });
   });
@@ -1935,35 +1981,35 @@ void main() {
             move.w(curr_y_pos(a3), d3),
             sub.w(curr_y_pos(a4), d3),
             move.w(d2, d4),
-            bpl.s(Label(r'.positive_dx_1_Slot1_0')),
+            bpl.s(Label(r'.positive_dx_1_Slot1_0_0')),
             neg.w(d4),
-            label(Label(r'.positive_dx_1_Slot1_0')),
+            label(Label(r'.positive_dx_1_Slot1_0_0')),
             move.w(d3, d5),
-            bpl.s(Label(r'.positive_dy_1_Slot1_0')),
+            bpl.s(Label(r'.positive_dy_1_Slot1_0_0')),
             neg.w(d5),
-            label(Label(r'.positive_dy_1_Slot1_0')),
+            label(Label(r'.positive_dy_1_Slot1_0_0')),
             cmp.w(d4, d5),
-            bgt.s(Label(r'.checky_1_Slot1_0')),
+            bgt.s(Label(r'.checky_1_Slot1_0_0')),
             tst.w(d4),
-            beq.s(Label(r'.zerovector_1_Slot1_0')),
+            beq.s(Label(r'.zerovector_1_Slot1_0_0')),
             tst.w(d2),
-            bpl.s(Label(r'.right_1_Slot1_0')),
+            bpl.s(Label(r'.right_1_Slot1_0_0')),
             move.w(FacingDir_Left.i, d0),
-            bra.s(Label(r'.keep_1_Slot1_0')),
-            label(Label(r'.right_1_Slot1_0')),
+            bra.s(Label(r'.keep_1_Slot1_0_0')),
+            label(Label(r'.right_1_Slot1_0_0')),
             move.w(FacingDir_Right.i, d0),
-            bra.s(Label(r'.keep_1_Slot1_0')),
-            label(Label(r'.checky_1_Slot1_0')),
+            bra.s(Label(r'.keep_1_Slot1_0_0')),
+            label(Label(r'.checky_1_Slot1_0_0')),
             tst.w(d3),
-            bpl.s(Label(r'.down_1_Slot1_0')),
+            bpl.s(Label(r'.down_1_Slot1_0_0')),
             move.w(FacingDir_Up.i, d0),
-            bra.s(Label(r'.keep_1_Slot1_0')),
-            label(Label(r'.down_1_Slot1_0')),
+            bra.s(Label(r'.keep_1_Slot1_0_0')),
+            label(Label(r'.down_1_Slot1_0_0')),
             move.w(FacingDir_Down.i, d0),
-            bra.s(Label(r'.keep_1_Slot1_0')),
-            label(Label('.zerovector_1_Slot1_0')),
+            bra.s(Label(r'.keep_1_Slot1_0_0')),
+            label(Label('.zerovector_1_Slot1_0_0')),
             move.w(facing_dir(a4), d0),
-            label(Label(r'.keep_1_Slot1_0')),
+            label(Label(r'.keep_1_Slot1_0_0')),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
@@ -1982,35 +2028,35 @@ void main() {
             move.w(curr_y_pos(a3), d3),
             sub.w(curr_y_pos(a4), d3),
             move.w(d2, d4),
-            bpl.s(Label(r'.positive_dx_1_Alys_0')),
+            bpl.s(Label(r'.positive_dx_1_Alys_0_0')),
             neg.w(d4),
-            label(Label(r'.positive_dx_1_Alys_0')),
+            label(Label(r'.positive_dx_1_Alys_0_0')),
             move.w(d3, d5),
-            bpl.s(Label(r'.positive_dy_1_Alys_0')),
+            bpl.s(Label(r'.positive_dy_1_Alys_0_0')),
             neg.w(d5),
-            label(Label(r'.positive_dy_1_Alys_0')),
+            label(Label(r'.positive_dy_1_Alys_0_0')),
             cmp.w(d4, d5),
-            bgt.s(Label(r'.checky_1_Alys_0')),
+            bgt.s(Label(r'.checky_1_Alys_0_0')),
             tst.w(d4),
-            beq.s(Label(r'.zerovector_1_Alys_0')),
+            beq.s(Label(r'.zerovector_1_Alys_0_0')),
             tst.w(d2),
-            bpl.s(Label(r'.right_1_Alys_0')),
+            bpl.s(Label(r'.right_1_Alys_0_0')),
             move.w(FacingDir_Left.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.right_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.right_1_Alys_0_0')),
             move.w(FacingDir_Right.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.checky_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.checky_1_Alys_0_0')),
             tst.w(d3),
-            bpl.s(Label(r'.down_1_Alys_0')),
+            bpl.s(Label(r'.down_1_Alys_0_0')),
             move.w(FacingDir_Up.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.down_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.down_1_Alys_0_0')),
             move.w(FacingDir_Down.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label('.zerovector_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label('.zerovector_1_Alys_0_0')),
             move.w(facing_dir(a4), d0),
-            label(Label(r'.keep_1_Alys_0')),
+            label(Label(r'.keep_1_Alys_0_0')),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
@@ -2036,35 +2082,35 @@ void main() {
             move.w(curr_y_pos(a3), d3),
             sub.w(curr_y_pos(a4), d3),
             move.w(d2, d4),
-            bpl.s(Label(r'.positive_dx_1_Alys_0')),
+            bpl.s(Label(r'.positive_dx_1_Alys_0_0')),
             neg.w(d4),
-            label(Label(r'.positive_dx_1_Alys_0')),
+            label(Label(r'.positive_dx_1_Alys_0_0')),
             move.w(d3, d5),
-            bpl.s(Label(r'.positive_dy_1_Alys_0')),
+            bpl.s(Label(r'.positive_dy_1_Alys_0_0')),
             neg.w(d5),
-            label(Label(r'.positive_dy_1_Alys_0')),
+            label(Label(r'.positive_dy_1_Alys_0_0')),
             cmp.w(d4, d5),
-            bgt.s(Label(r'.checky_1_Alys_0')),
+            bgt.s(Label(r'.checky_1_Alys_0_0')),
             tst.w(d4),
-            beq.s(Label(r'.zerovector_1_Alys_0')),
+            beq.s(Label(r'.zerovector_1_Alys_0_0')),
             tst.w(d2),
-            bpl.s(Label(r'.right_1_Alys_0')),
+            bpl.s(Label(r'.right_1_Alys_0_0')),
             move.w(FacingDir_Left.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.right_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.right_1_Alys_0_0')),
             move.w(FacingDir_Right.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.checky_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.checky_1_Alys_0_0')),
             tst.w(d3),
-            bpl.s(Label(r'.down_1_Alys_0')),
+            bpl.s(Label(r'.down_1_Alys_0_0')),
             move.w(FacingDir_Up.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.down_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.down_1_Alys_0_0')),
             move.w(FacingDir_Down.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label('.zerovector_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label('.zerovector_1_Alys_0_0')),
             move.w(facing_dir(a4), d0),
-            label(Label(r'.keep_1_Alys_0')),
+            label(Label(r'.keep_1_Alys_0_0')),
             jsr(Label('Event_UpdateObjFacing').l),
             // Must be loaded again due to UpdateObjFacing routine
             // see 'todo' above
@@ -2075,35 +2121,35 @@ void main() {
             move.w(curr_y_pos(a3), d3),
             sub.w(curr_y_pos(a4), d3),
             move.w(d2, d4),
-            bpl.s(Label(r'.positive_dx_1_Shay_1')),
+            bpl.s(Label(r'.positive_dx_1_Shay_0_1')),
             neg.w(d4),
-            label(Label(r'.positive_dx_1_Shay_1')),
+            label(Label(r'.positive_dx_1_Shay_0_1')),
             move.w(d3, d5),
-            bpl.s(Label(r'.positive_dy_1_Shay_1')),
+            bpl.s(Label(r'.positive_dy_1_Shay_0_1')),
             neg.w(d5),
-            label(Label(r'.positive_dy_1_Shay_1')),
+            label(Label(r'.positive_dy_1_Shay_0_1')),
             cmp.w(d4, d5),
-            bgt.s(Label(r'.checky_1_Shay_1')),
+            bgt.s(Label(r'.checky_1_Shay_0_1')),
             tst.w(d4),
-            beq.s(Label(r'.zerovector_1_Shay_1')),
+            beq.s(Label(r'.zerovector_1_Shay_0_1')),
             tst.w(d2),
-            bpl.s(Label(r'.right_1_Shay_1')),
+            bpl.s(Label(r'.right_1_Shay_0_1')),
             move.w(FacingDir_Left.i, d0),
-            bra.s(Label(r'.keep_1_Shay_1')),
-            label(Label(r'.right_1_Shay_1')),
+            bra.s(Label(r'.keep_1_Shay_0_1')),
+            label(Label(r'.right_1_Shay_0_1')),
             move.w(FacingDir_Right.i, d0),
-            bra.s(Label(r'.keep_1_Shay_1')),
-            label(Label(r'.checky_1_Shay_1')),
+            bra.s(Label(r'.keep_1_Shay_0_1')),
+            label(Label(r'.checky_1_Shay_0_1')),
             tst.w(d3),
-            bpl.s(Label(r'.down_1_Shay_1')),
+            bpl.s(Label(r'.down_1_Shay_0_1')),
             move.w(FacingDir_Up.i, d0),
-            bra.s(Label(r'.keep_1_Shay_1')),
-            label(Label(r'.down_1_Shay_1')),
+            bra.s(Label(r'.keep_1_Shay_0_1')),
+            label(Label(r'.down_1_Shay_0_1')),
             move.w(FacingDir_Down.i, d0),
-            bra.s(Label(r'.keep_1_Shay_1')),
-            label(Label('.zerovector_1_Shay_1')),
+            bra.s(Label(r'.keep_1_Shay_0_1')),
+            label(Label('.zerovector_1_Shay_0_1')),
             move.w(facing_dir(a4), d0),
-            label(Label(r'.keep_1_Shay_1')),
+            label(Label(r'.keep_1_Shay_0_1')),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
@@ -2123,36 +2169,36 @@ void main() {
             move.w(curr_y_pos(a3), d3),
             subi.w(0x200.toWord.i, d3),
             move.w(d2, d4),
-            bpl.s(Label(r'.positive_dx_1_Alys_0')),
+            bpl.s(Label(r'.positive_dx_1_Alys_0_0')),
             neg.w(d4),
-            label(Label(r'.positive_dx_1_Alys_0')),
+            label(Label(r'.positive_dx_1_Alys_0_0')),
             move.w(d3, d5),
-            bpl.s(Label(r'.positive_dy_1_Alys_0')),
+            bpl.s(Label(r'.positive_dy_1_Alys_0_0')),
             neg.w(d5),
-            label(Label(r'.positive_dy_1_Alys_0')),
+            label(Label(r'.positive_dy_1_Alys_0_0')),
             cmp.w(d4, d5),
-            bgt.s(Label(r'.checky_1_Alys_0')),
+            bgt.s(Label(r'.checky_1_Alys_0_0')),
             tst.w(d4),
-            beq.s(Label(r'.zerovector_1_Alys_0')),
+            beq.s(Label(r'.zerovector_1_Alys_0_0')),
             tst.w(d2),
-            bpl.s(Label(r'.right_1_Alys_0')),
+            bpl.s(Label(r'.right_1_Alys_0_0')),
             move.w(FacingDir_Left.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.right_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.right_1_Alys_0_0')),
             move.w(FacingDir_Right.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.checky_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.checky_1_Alys_0_0')),
             tst.w(d3),
-            bpl.s(Label(r'.down_1_Alys_0')),
+            bpl.s(Label(r'.down_1_Alys_0_0')),
             move.w(FacingDir_Up.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label(r'.down_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label(r'.down_1_Alys_0_0')),
             move.w(FacingDir_Down.i, d0),
-            bra.s(Label(r'.keep_1_Alys_0')),
-            label(Label('.zerovector_1_Alys_0')),
+            bra.s(Label(r'.keep_1_Alys_0_0')),
+            label(Label('.zerovector_1_Alys_0_0')),
             alys.toA4(testState),
             move.w(facing_dir(a4), d0),
-            label(Label(r'.keep_1_Alys_0')),
+            label(Label(r'.keep_1_Alys_0_0')),
             move.w(d0, -sp),
             alys.toA4(testState..putInAddress(a4, null)),
             move.w(sp.postIncrement(), d0),
@@ -2172,6 +2218,50 @@ void main() {
           Asm([
             alys.toA4(testState),
             moveq(FacingDir_Right.i, d0),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
+    });
+
+    test('skips update when object faces its own direction', () {
+      state.setFacing(shay, Direction.down);
+      var expectedState = state.branch();
+      var moves = Face(shay.facing()).move(shay);
+      var asm = moves.toAsm(state);
+
+      expect(asm.withoutComments(), Asm([shay.toA4(expectedState)]));
+    });
+
+    test('skips update for zero-vector identical expressions', () {
+      var moves = Face(shay.position().towards(shay.position())).move(shay);
+      var asm = moves.toAsm(state);
+
+      expect(asm.withoutComments(), Asm([shay.toA4(testState)]));
+    });
+
+    test('skips update for zero-vector name resolving to known slot', () {
+      state.setSlot(1, shay);
+      state.positions[shay] = Position(0x100, 0x100);
+      var expectedState = state.branch();
+      var moves =
+          Face(shay.position().towards(BySlot.one.position())).move(shay);
+      var asm = moves.toAsm(state);
+
+      expect(asm.withoutComments(), Asm([shay.toA4(expectedState)]));
+    });
+
+    test('preserves another object facing for a zero-vector fallback', () {
+      var direction = DirectionOfVector(
+          from: shay.position(), to: shay.position(), zeroValue: alys.facing());
+      var moves = Face(direction).move(shay);
+      var asm = moves.toAsm(state);
+
+      expect(
+          asm,
+          Asm([
+            alys.toA4(testState),
+            move.w(facing_dir(a4), -(sp)),
+            shay.toA4(testState),
+            move.w(sp.postIncrement(), d0),
             jsr(Label('Event_UpdateObjFacing').l),
           ]));
     });
@@ -2259,6 +2349,72 @@ void main() {
     test('object faces direction another object is facing, known', () {});
 
     test('object faces direction another object is facing, offset', () {});
+
+    test('compatible moves of the same object by different references merge',
+        () {
+      state.setSlot(1, shay);
+      state.followLead = false;
+      state.positions[shay] = Position(0x100, 0x100);
+      var moves = IndividualMoves()
+        ..moves[BySlot.one] = (StepPath()
+          ..direction = Direction.right
+          ..distance = 1.step)
+        ..moves[shay] = (StepPath()
+          ..direction = Direction.right
+          ..distance = 1.step);
+
+      moves.toAsm(state);
+
+      expect(state.positions[shay], Position(0x120, 0x100));
+    });
+
+    test(
+        'two incompatible moves of the same object by different references is an error',
+        () {
+      state.setSlot(1, shay);
+      var moves = IndividualMoves()
+        ..moves[shay] = Face(down)
+        ..moves[BySlot.one] = Face(BySlot.one.towards(shay));
+
+      expect(() => moves.toAsm(state), throwsArgumentError);
+    });
+
+    test('self-facing does not drop movement', () {
+      state.setSlot(1, shay);
+      state.positions[shay] = Position(0x100, 0x100);
+      state.setFacing(shay, Direction.down);
+      var moves = IndividualMoves()
+        ..moves[BySlot.one] = (StepPaths()
+          ..step(StepPath()
+            ..direction = Direction.right
+            ..distance = 1.step)
+          ..face(BySlot.one.towards(shay)));
+
+      expect(moves.toAsm(state), isNotEmpty);
+      expect(state.positions[shay], Position(0x110, 0x100));
+      expect(state.getFacing(shay), Direction.right);
+    });
+
+    test('facing-only paths include batch and list index in labels', () {
+      state.setSlot(1, shay);
+      var direction = BySlot.one.towards(shay);
+      var moves = IndividualMoves()
+        ..moves[shay] = (StepPaths()
+          ..face(direction)
+          ..step(StepPath()
+            ..delay = 1.step
+            ..facing = direction));
+
+      var labels = moves
+          .toAsm(state)
+          .map((line) => line.label)
+          .whereType<String>()
+          .toList();
+
+      expect(labels.toSet(), hasLength(labels.length));
+      expect(labels, contains('.positive_dx_Shay_0_0'));
+      expect(labels, contains('.positive_dx_Shay_2_0'));
+    });
   });
 
   group('instant moves generate asm', () {
@@ -2293,6 +2449,21 @@ void main() {
           Asm([
             alys.toA4(Memory()),
             move.w(FacingDir_Up.i, facing_dir(a4)),
+            move.l(a4, -sp),
+            jsr(Label('Field_UpdateObjects').l),
+            move.l(sp.postIncrement(), a4),
+          ]));
+    });
+
+    test('object facing accepts an indirect direction address', () {
+      var moves = InstantMoves()..move(shay, face: shay.facing());
+      var asm = generate([moves]);
+      expect(
+          asm,
+          Asm([
+            shay.toA3(Memory()),
+            shay.toA4(Memory()),
+            move.w(facing_dir(a3), facing_dir(a4)),
             move.l(a4, -sp),
             jsr(Label('Field_UpdateObjects').l),
             move.l(sp.postIncrement(), a4),

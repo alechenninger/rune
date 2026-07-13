@@ -51,8 +51,22 @@ extension IndividualMovesToAsm on IndividualMoves {
 
     // We're going to loop through all movements and remove those from the map
     // when there's nothing left to do.
-    var remainingMoves = Map.of(moves.map(
-        (moveable, movement) => MapEntry(moveable.resolve(ctx), movement)));
+    var remainingMoves = <FieldObject, RelativeMovement>{};
+
+    for (var MapEntry(key: moveable, value: movement) in moves.entries) {
+      remainingMoves.update(
+        moveable.resolve(ctx),
+        (existing) =>
+            existing.append(movement) ??
+            // This can occur non-obviously if the object is referred to
+            // in two different ways that resolve to the same object.
+            // E.g. by slot and also by name, when slot is known.
+            (throw ArgumentError(
+              'same object attempted two incompatible moves',
+            )),
+        ifAbsent: () => movement,
+      );
+    }
 
     if (followLead) {
       for (var obj in remainingMoves.keys) {
@@ -74,7 +88,7 @@ extension IndividualMovesToAsm on IndividualMoves {
       ]));
     }
 
-    while (remainingMoves.isNotEmpty) {
+    for (var moveBatch = 0; remainingMoves.isNotEmpty; moveBatch++) {
       // I tried using a sorted set but iterator was bugged and skipped elements
       var movesList = remainingMoves.entries
           .map((e) => RelativeMove(e.key, e.value))
@@ -170,7 +184,7 @@ extension IndividualMovesToAsm on IndividualMoves {
             if (facing != null &&
                 facing != ctx.getFacing(moveable) &&
                 movement.continuousPaths.first.length == 0.steps) {
-              generator.updateFacing(moveable, facing, i,
+              generator.updateFacing(moveable, facing, moveBatch, i,
                   fieldRoutines: fieldRoutines);
             }
           }
@@ -679,9 +693,13 @@ class _MovementGenerator {
         _mem.getRoutine(obj) == scriptableObjectRoutine;
   }
 
-  void updateFacing(FieldObject obj, DirectionExpression dir, int moveIndex,
+  void updateFacing(
+      FieldObject obj, DirectionExpression dir, int moveBatch, int moveIndex,
       {required FieldRoutineRepository fieldRoutines}) {
-    var labeller = _labeller.withContext(obj).withContext(moveIndex);
+    var labeller = _labeller
+        .withContext(obj)
+        .withContext(moveBatch)
+        .withContext(moveIndex);
     var labelSuffix = labeller.suffixLocal();
 
     // This ensures facing doesn't change during subsequent movements.
@@ -711,6 +729,20 @@ class _MovementGenerator {
         labelSuffix: labelSuffix,
         memory: _mem,
         asm: (d) {
+          // If d is indirect address
+          // and the offset is facing_dir
+          // and the object is the object we're going to move
+          // then do nothing (it's a no-op).
+          // This is not always reachable, though,
+          // because d is often a data register,
+          // which may have just been set from e.g. facing_dir(a4)
+          if (d case IndirectAddressRegister d
+              when (d.displacement == facing_dir ||
+                      d.displacement == Byte(6)) &&
+                  _mem.addressRegisterFor(obj)?.register == d.register) {
+            return comment("no-op: $obj facing their own direction by ref");
+          }
+
           var (maybeDirectionToStack, dest) = switch (d) {
             // If it's colliding with the address argument,
             // push that to stack.
@@ -1124,6 +1156,21 @@ class DirectionOfVectorAsm extends DirectionExpressionAsm {
     var known = directionOfVector.known(memory);
     if (known != null) {
       return asm(known.address);
+    }
+
+    if (directionOfVector.isKnownZero(memory) == true) {
+      return directionOfVector.zeroValue.withDirection(
+          // We use normal `memory` here (as opposed to below),
+          // because this is not a conditional jump.
+          // We know to use the zero value,
+          // so we set unbranched memory accordingly.
+          memory: memory,
+          // Preserve the address so callbacks can optimize indirect references.
+          asm: (d) => asm(d),
+          destination: destination,
+          labelSuffix: labelSuffix,
+          load1: load1,
+          load2: load2);
     }
 
     if (directionOfVector.playerIsFacingFrom) {
@@ -1872,6 +1919,7 @@ class Vector2dProjectionExpressionAsm extends Vector2dExpressionAsm {
         asm: (x, y) {
           var keep = labeller!.withContext('keep').nextLocal();
           var xMove = labeller.withContext('xmove').nextLocal();
+          var directionAddress = d2;
           return Asm([
             if (x is! Immediate && x != destinationX) move.l(x, destinationX),
             if (y is! Immediate && y != destinationY) move.l(y, destinationY),
@@ -1881,29 +1929,38 @@ class Vector2dProjectionExpressionAsm extends Vector2dExpressionAsm {
                 labelSuffix: labeller.suffixLocal(),
                 // We don't care about conflicting loads here,
                 // because the facing value is only used for this computation.
-                asm: (d) => Asm([
-                      switch (d) {
-                        Absolute a => btst(3.i, (a.exp + 1.toValue).l),
-                        IndirectAddressRegister a =>
-                          btst(3.i, a.plus(1.toValue)),
-                        _ => btst(3.i, d)
-                      },
-                      bne.s(xMove),
-                      moveq(0.i, destinationX),
-                      if (y is Immediate) move.l(y, destinationY),
-                      cmpi.w(FacingDir_Down.i, d),
-                      beq.s(keep),
-                      neg.l(destinationY),
-                      bra.s(keep),
-                      label(xMove),
-                      if (x is Immediate) move.l(x, destinationX),
-                      moveq(0.i, destinationY),
-                      cmpi.w(FacingDir_Right.i, d),
-                      beq.s(keep),
-                      neg.l(destinationX),
-                      label(keep),
-                      asm(destinationX, destinationY),
-                    ]))
+                asm: (d) {
+                  var prepare = Asm.empty();
+
+                  if (d is Immediate) {
+                    prepare.add(move.w(d, directionAddress));
+                    d = directionAddress;
+                  }
+
+                  return Asm([
+                    prepare,
+                    switch (d) {
+                      Absolute a => btst(3.i, (a.exp + 1.toValue).l),
+                      IndirectAddressRegister a => btst(3.i, a.plus(1.toValue)),
+                      _ => btst(3.i, d),
+                    },
+                    bne.s(xMove),
+                    moveq(0.i, destinationX),
+                    if (y is Immediate) move.l(y, destinationY),
+                    cmpi.w(FacingDir_Down.i, d),
+                    beq.s(keep),
+                    neg.l(destinationY),
+                    bra.s(keep),
+                    label(xMove),
+                    if (x is Immediate) move.l(x, destinationX),
+                    moveq(0.i, destinationY),
+                    cmpi.w(FacingDir_Right.i, d),
+                    beq.s(keep),
+                    neg.l(destinationX),
+                    label(keep),
+                    asm(destinationX, destinationY),
+                  ]);
+                })
           ]);
         });
   }

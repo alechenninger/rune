@@ -361,6 +361,13 @@ sealed class DirectionExpression extends UnaryExpression {
   DirectionExpression get opposite;
   DirectionExpression turn(int times) => OffsetDirection(this, turns: times);
 
+  /// Tests whether or not the direction is known to be the zero vector.
+  ///
+  /// Returns `true` if the direction is known to be the zero vector,
+  /// `false` if it is known to be non-zero,
+  /// and `null` if it is unknown.
+  bool? isKnownZero(EventState state);
+
   Vector2dProjectionExpression multiplyVector(Vector2dExpression vector) =>
       Vector2dProjectionExpression(vector, this);
 }
@@ -388,6 +395,20 @@ class DirectionOfVector extends DirectionExpression {
       to == BySlot.one.position();
 
   @override
+  bool? isKnownZero(EventState state) {
+    // If same, true regardless of whether or not they are known.
+    if (from == to) return true;
+    switch (from.known(state)) {
+      // Can't know this is zero if one side's position is unknown
+      // And we don't want both unknown (==, but null) to mean zero :)
+      case null:
+        return null;
+      case var knownFrom:
+        return knownFrom == to.known(state);
+    }
+  }
+
+  @override
   Direction? known(EventState memory) {
     var knownFrom = from.known(memory);
     var knownTo = to.known(memory);
@@ -402,8 +423,7 @@ class DirectionOfVector extends DirectionExpression {
       return null;
     }
     var vector = knownTo - knownFrom;
-    // TODO(movement): is there a way we can specify "no change to direction"?
-    if (vector.x == 0 && vector.y == 0) return Direction.up;
+    if (vector.x == 0 && vector.y == 0) return zeroValue.known(memory);
     var angle = atan2(vector.y, vector.x) * 180 / pi;
     return switch (angle) {
       >= -45 && < 45 => Direction.right,
@@ -463,6 +483,9 @@ class ObjectFaceDirection extends DirectionExpression {
 
   @override
   int get hashCode => obj.hashCode;
+
+  @override
+  bool? isKnownZero(EventState state) => false;
 }
 
 class OffsetDirection extends DirectionExpression {
@@ -506,6 +529,9 @@ class OffsetDirection extends DirectionExpression {
 
   @override
   int get hashCode => base.hashCode ^ turns.hashCode;
+
+  @override
+  bool? isKnownZero(EventState state) => base.isKnownZero(state);
 }
 
 const up = Direction.up;
@@ -547,6 +573,9 @@ enum Direction implements DirectionExpression {
     var normalized = times.isNegative ? (times + 4) % 4 : times % 4;
     return Direction.values[(index + normalized) % 4];
   }
+
+  @override
+  bool? isKnownZero(EventState state) => false;
 
   @override
   Direction? known(EventState memory) => this;

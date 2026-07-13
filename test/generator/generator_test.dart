@@ -944,6 +944,18 @@ EventFlag_Test001 = $0001'''));
               move.w(curr_y_pos(a4), dest_y_pos(a4)),
             ]));
       });
+
+      test('projection accepts an immediate direction address', () {
+        var expression = Direction.right.multiplyVector(
+            alys.facing().multiplyVector(Vector2dOfXY.constant(0.5, 0.5)));
+        var asm =
+            expression.withVector(memory: Memory(), asm: (x, y) => Asm.empty());
+
+        expect(asm.lines, contains(move.w(FacingDir_Right.i, d2).lines.single));
+        expect(asm.lines, contains(btst(3.i, d2).lines.single));
+        expect(asm.lines,
+            isNot(contains(btst(3.i, FacingDir_Right.i).lines.single)));
+      });
     });
 
     test(
