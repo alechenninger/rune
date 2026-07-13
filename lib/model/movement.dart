@@ -624,7 +624,7 @@ extension ObjectExpressions on FieldObject {
       from: position(), to: other.position(), zeroValue: facing());
 }
 
-abstract class RelativeMovement {
+sealed class RelativeMovement {
   /// Delay in steps before movement starts parallel with other movements.
   Steps get delay;
 
@@ -652,6 +652,9 @@ abstract class RelativeMovement {
 
   /// If all this movement will do is face.
   bool get justFacing => duration == 0.steps && facing != null;
+
+  bool isKnownSelfFacing(EventState state) =>
+      duration == 0.steps && facing?.isKnownZero(state) == true;
 
   /// Attempt to append the movement [m] to this one.
   ///
@@ -828,23 +831,20 @@ class StepPaths extends RelativeMovement {
 
   @override
   StepPaths? append(RelativeMovement m) {
-    // TODO(movement); this is missing Face now
-    // use sealed type?
-    if (m is StepPath) {
-      var answer = StepPaths().._paths.addAll(_paths);
-      answer.step(m);
-      return answer;
+    switch (m) {
+      case StepPath():
+        var answer = StepPaths().._paths.addAll(_paths);
+        answer.step(m);
+        return answer;
+      case StepPaths():
+        var answer = StepPaths().._paths.addAll(_paths);
+        for (var step in m._paths) {
+          answer.step(step);
+        }
+        return answer;
+      default:
+        return null;
     }
-
-    if (m is StepPaths) {
-      var answer = StepPaths().._paths.addAll(_paths);
-      for (var step in m._paths) {
-        answer.step(step);
-      }
-      return answer;
-    }
-
-    return null;
   }
 
   @override
@@ -982,7 +982,10 @@ class StepPaths extends RelativeMovement {
     for (var path in _paths) {
       var canMove = (steps - (totalSubtracted ?? 0.steps)).min(path.duration);
 
-      if (totalSubtracted != steps) {
+      var consumeImmediatePath =
+          steps == 0.steps && path.duration == 0.steps && answer._paths.isEmpty;
+
+      if (totalSubtracted != steps || consumeImmediatePath) {
         lastStep = path.less(canMove);
       } else {
         lastStep = path;

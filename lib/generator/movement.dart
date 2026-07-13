@@ -54,16 +54,19 @@ extension IndividualMovesToAsm on IndividualMoves {
     var remainingMoves = <FieldObject, RelativeMovement>{};
 
     for (var MapEntry(key: moveable, value: movement) in moves.entries) {
+      if (movement.isKnownSelfFacing(ctx)) continue;
+
       remainingMoves.update(
         moveable.resolve(ctx),
-        (existing) =>
-            existing.append(movement) ??
-            // This can occur non-obviously if the object is referred to
-            // in two different ways that resolve to the same object.
-            // E.g. by slot and also by name, when slot is known.
-            (throw ArgumentError(
-              'same object attempted two incompatible moves',
-            )),
+        (existing) {
+          return existing.append(movement) ??
+              // This can occur non-obviously if the object is referred to
+              // in two different ways that resolve to the same object.
+              // E.g. by slot and also by name, when slot is known.
+              (throw ArgumentError(
+                'same object attempted two incompatible moves',
+              ));
+        },
         ifAbsent: () => movement,
       );
     }

@@ -2222,6 +2222,20 @@ void main() {
           ]));
     });
 
+    test('reuses a character address through a slot alias', () {
+      state.setSlot(1, shay);
+      var expectedState = state.branch();
+      var moves = Face(BySlot.one.facing()).move(shay);
+      var asm = moves.toAsm(state);
+
+      expect(
+          asm.withoutComments(),
+          Asm([
+            BySlot.one.toA4(expectedState),
+          ]));
+      expect(state.addressRegisterFor(shay), a4);
+    });
+
     test('skips update when object faces its own direction', () {
       state.setFacing(shay, Direction.down);
       var expectedState = state.branch();
@@ -2235,31 +2249,70 @@ void main() {
       var moves = Face(shay.position().towards(shay.position())).move(shay);
       var asm = moves.toAsm(state);
 
-      expect(asm.withoutComments(), Asm([shay.toA4(testState)]));
+      expect(asm.withoutComments(), Asm.empty());
     });
 
     test('skips update for zero-vector name resolving to known slot', () {
       state.setSlot(1, shay);
       state.positions[shay] = Position(0x100, 0x100);
-      var expectedState = state.branch();
       var moves =
           Face(shay.position().towards(BySlot.one.position())).move(shay);
       var asm = moves.toAsm(state);
 
-      expect(asm.withoutComments(), Asm([shay.toA4(expectedState)]));
+      expect(asm.withoutComments(), Asm.empty());
     });
 
-    test('preserves another object facing for a zero-vector fallback', () {
+    test('preserves another object facing for a runtime zero-vector fallback',
+        () {
       var direction = DirectionOfVector(
-          from: shay.position(), to: shay.position(), zeroValue: alys.facing());
+          from: shay.position(), to: rune.position(), zeroValue: alys.facing());
+      expect(direction.known(state), isNull);
+      expect(direction.isKnownZero(state), isNull);
+
       var moves = Face(direction).move(shay);
       var asm = moves.toAsm(state);
 
       expect(
           asm,
           Asm([
+            rune.toA3(testState),
+            move.w(curr_x_pos(a3), d2),
+            shay.toA4(testState),
+            sub.w(curr_x_pos(a4), d2),
+            move.w(curr_y_pos(a3), d3),
+            sub.w(curr_y_pos(a4), d3),
+            move.w(d2, d4),
+            bpl.s(Label(r'.positive_dx_Shay_0_0')),
+            neg.w(d4),
+            label(Label(r'.positive_dx_Shay_0_0')),
+            move.w(d3, d5),
+            bpl.s(Label(r'.positive_dy_Shay_0_0')),
+            neg.w(d5),
+            label(Label(r'.positive_dy_Shay_0_0')),
+            cmp.w(d4, d5),
+            bgt.s(Label(r'.checky_Shay_0_0')),
+            tst.w(d4),
+            beq.s(Label(r'.zerovector_Shay_0_0')),
+            tst.w(d2),
+            bpl.s(Label(r'.right_Shay_0_0')),
+            move.w(FacingDir_Left.i, d0),
+            bra.s(Label(r'.keep_Shay_0_0')),
+            label(Label(r'.right_Shay_0_0')),
+            move.w(FacingDir_Right.i, d0),
+            bra.s(Label(r'.keep_Shay_0_0')),
+            label(Label(r'.checky_Shay_0_0')),
+            tst.w(d3),
+            bpl.s(Label(r'.down_Shay_0_0')),
+            move.w(FacingDir_Up.i, d0),
+            bra.s(Label(r'.keep_Shay_0_0')),
+            label(Label(r'.down_Shay_0_0')),
+            move.w(FacingDir_Down.i, d0),
+            bra.s(Label(r'.keep_Shay_0_0')),
+            label(Label('.zerovector_Shay_0_0')),
             alys.toA4(testState),
-            move.w(facing_dir(a4), -(sp)),
+            move.w(facing_dir(a4), d0),
+            label(Label(r'.keep_Shay_0_0')),
+            move.w(d0, -(sp)),
             shay.toA4(testState),
             move.w(sp.postIncrement(), d0),
             jsr(Label('Event_UpdateObjFacing').l),

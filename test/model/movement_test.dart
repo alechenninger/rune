@@ -158,6 +158,67 @@ void main() {
       expect(move.facing, null);
       expect(move.still, isTrue);
     });
+
+    test('facing and less 0 agree for consecutive immediate facings', () {
+      var move = StepPaths()
+        ..face(right)
+        ..face(up);
+
+      expect(move.facing, up);
+
+      var remaining = move.less(0.steps);
+
+      expect(remaining.facing, null);
+      expect(remaining.still, isTrue);
+    });
+
+    test('less 0 consumes immediate facings after movement', () {
+      var move = StepPaths()
+        ..step(StepPath()
+          ..distance = 1.step
+          ..facing = right)
+        ..face(up)
+        ..face(left);
+
+      move = move.less(1.step);
+      expect(move.facing, left);
+
+      move = move.less(0.steps);
+
+      expect(move.facing, null);
+      expect(move.still, isTrue);
+    });
+
+    test('less 0 preserves an empty StepPaths', () {
+      expect(StepPaths().less(0.steps), StepPaths());
+    });
+
+    test('less 0 consumes leading immediate facings before a delay', () {
+      var move = StepPaths()
+        ..face(right)
+        ..face(up)
+        ..step(StepPath()
+          ..delay = 1.step
+          ..direction = down
+          ..distance = 1.step
+          ..facing = left);
+
+      var remaining = move.less(0.steps);
+
+      expect(remaining.facing, null);
+      expect(remaining.delay, 1.step);
+      expect(remaining.duration, 2.steps);
+    });
+
+    test('less 0 preserves faces after unfinished movement', () {
+      var move = StepPaths()
+        ..step(StepPath()
+          ..distance = 1.step
+          ..facing = right)
+        ..face(up);
+
+      expect(move.less(0.steps), move);
+    });
   });
 
   group('party move', () {

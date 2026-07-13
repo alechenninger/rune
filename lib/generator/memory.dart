@@ -108,9 +108,13 @@ class Memory implements EventState {
   /// Return the address register the object is referenced in, if any.
   /// Do not wrap in [AddressOf].
   DirectAddressRegister? addressRegisterFor(Object obj) {
-    return _sysState._inAddress.entries
-        .firstWhereOrNull((e) => e.value.obj == obj)
-        ?.key;
+    var knownObjects = _knownAddressObjects(obj);
+    return _sysState._inAddress.entries.firstWhereOrNull((e) {
+      var stored = e.value.obj;
+      if (knownObjects.contains(stored)) return true;
+      return stored is FieldObject &&
+          _knownAddressObjects(stored).any(knownObjects.contains);
+    })?.key;
   }
 
   /// [obj] should not be wrapped in [AddressOf].
@@ -333,6 +337,16 @@ class Memory implements EventState {
   T _apply<T>(StateChange<T> change) {
     _changes.add(change);
     return change.apply(this);
+  }
+
+  Set<Object> _knownAddressObjects(Object obj) {
+    if (obj is! FieldObject) return {obj};
+
+    try {
+      return obj.knownObjects(this).toSet();
+    } on ResolveException {
+      return {obj};
+    }
   }
 
   @override
