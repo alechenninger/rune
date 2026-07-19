@@ -742,6 +742,13 @@ class Scene extends IterableBase<Event> {
           yield* _branches(branch.events,
               current.withBranch((e.operand1, e.operand2), branch.comparison));
         }
+      case YesOrNoChoice e:
+        if (e.id == null) {
+          throw ArgumentError(
+              'YesOrNoChoice must have an id to be used in branches');
+        }
+        yield* _branches(e.ifYes, current.withChoice(e.id!, true));
+        yield* _branches(e.ifNo, current.withChoice(e.id!, false));
       case null:
         return;
     }
@@ -835,19 +842,20 @@ class Scene extends IterableBase<Event> {
     }
   }
 
-  /// Visits the [events] list with the provided [visitor] if
-  /// the [current] condition is satisfied by the [matching] condition.
+  /// Applies [visitor] to the nearest matching event list(s).
   ///
-  /// Recurses through conditional checks within `events`
-  /// to find a matching branch.
-  /// Once a matching branch is found, it is visited with the [visitor], and
-  /// that event list is no longer recursed.
+  /// [current] describes the conditions accumulated along the path to
+  /// [events]. If [matching] is satisfied by [current], [visitor] receives
+  /// [events] and traversal stops below that list. Otherwise, the method
+  /// recurses through [IfEvent] branches whose accumulated condition is
+  /// satisfied by [matching], meaning the branch is compatible with and could
+  /// still reach [matching].
   ///
-  /// The `events` may be mutated by the visitor in order to modify the branch.
-  /// If the branch is not top-level (`events`),
-  /// the corresponding [IfFlag] event will be replaced.
+  /// The visitor may mutate the received list. For a nested list, the
+  /// containing [IfEvent] is rebuilt with the modified branch; unvisited
+  /// sibling branches are preserved.
   ///
-  /// Returns `true` if any branches were visited.
+  /// Returns `true` if [visitor] was called at least once.
   ///
   /// See [Condition.isSatisfiedBy].
   bool _visitBranch(List<Event> events, Function(List<Event> events) visitor,
@@ -868,10 +876,15 @@ class Scene extends IterableBase<Event> {
           var condition = current.withCondition(branch.condition);
           var events = branch.events;
 
-          // Visit this branch if it does not conflict.
-          // In may not satisfy it, but we recurse
-          // in case nested condition(s) eventually do.
-          if (!condition.conflictsWith(matching)) {
+          // Could this branch still reach `matching`?
+          // `condition` is the accumulated condition for this branch.
+          // It must be a subset of `matching`:
+          // every constraint already imposed by this path
+          // must  agree with matching,
+          // while matching may contain additional constraints.
+          // This is only a possibility check;
+          // recursion determines whether the path actually reaches matching.
+          if (condition.isSatisfiedBy(matching)) {
             // May be modified – copy.
             events = [...events];
             // Replace if we modified the branch
@@ -922,12 +935,22 @@ class Scene extends IterableBase<Event> {
           createSequence: createSequence,
           advanceSequenceWhenSet: advanceSequenceWhenSet);
     } else {
-      _visitBranch(_events, (events) {
+      if (!_visitBranch(_events, (events) {
         _addBranch(events, branch,
             whenSet: whenSet,
             createSequence: createSequence,
             advanceSequenceWhenSet: advanceSequenceWhenSet);
-      }, Condition.empty(), asOf);
+      }, Condition.empty(), asOf)) {
+        // No branch matched the given condition,
+        // so we add a new branch at the top level,
+        // using the asOf condition.
+        var withAsOf = asOf.ifSatisfied(branch);
+        // TODO: should attempt to add to the nearest matching branch, ideally?
+        _addBranch(_events, withAsOf,
+            whenSet: whenSet,
+            createSequence: createSequence,
+            advanceSequenceWhenSet: advanceSequenceWhenSet);
+      }
     }
   }
 

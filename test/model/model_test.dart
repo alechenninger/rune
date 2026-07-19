@@ -599,8 +599,10 @@ void main() {
 
       scene.addEventToBranches(
           SetFlag(EventFlag('test')),
-          Condition(
-              {EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'): true}));
+          Condition({
+            EventFlag('HahnJoined'): false,
+            EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1'): true
+          }));
 
       expect(
           scene,
@@ -1111,6 +1113,59 @@ void main() {
                   SetFlag(EventFlag('Talk_Test_obj_Test_0_PrincipalMeeting_1')),
                   Dialog(spans: [DialogSpan('Hi after meeting principal')])
                 ])
+          ]));
+    });
+
+    test(
+        'add branch as of condition creates top level condition event if no existing branch satisfies',
+        () {
+      var scene = Scene([
+        IfFlag(EventFlag('test1'), isUnset: [
+          IfValue(BySlot.one.position().component(Axis.y),
+              comparedTo: PositionComponent(0x100, Axis.y),
+              lessOrEqual: [
+                Dialog(spans: [DialogSpan('first time')]),
+                SetFlag(EventFlag('test1'))
+              ])
+        ], isSet: [
+          Dialog(spans: [DialogSpan('repeat before next flag')])
+        ])
+      ]);
+
+      scene.addBranch([
+        Dialog(spans: [DialogSpan('second time')]),
+        SetFlag(EventFlag('test2'))
+      ],
+          whenSet: EventFlag('storyEvent'),
+          asOf: Condition.of(values: {
+            (
+              BySlot.one.position().component(Axis.y),
+              PositionComponent(0x100, Axis.y)
+            ): Comparison.lte
+          }));
+
+      expect(
+          scene,
+          Scene([
+            IfFlag(EventFlag('storyEvent'), isSet: [
+              IfValue(BySlot.one.position().component(Axis.y),
+                  comparedTo: PositionComponent(0x100, Axis.y),
+                  lessOrEqual: [
+                    Dialog(spans: [DialogSpan('second time')]),
+                    SetFlag(EventFlag('test2'))
+                  ])
+            ], isUnset: [
+              IfFlag(EventFlag('test1'), isUnset: [
+                IfValue(BySlot.one.position().component(Axis.y),
+                    comparedTo: PositionComponent(0x100, Axis.y),
+                    lessOrEqual: [
+                      Dialog(spans: [DialogSpan('first time')]),
+                      SetFlag(EventFlag('test1'))
+                    ])
+              ], isSet: [
+                Dialog(spans: [DialogSpan('repeat before next flag')])
+              ])
+            ])
           ]));
     });
 

@@ -361,6 +361,44 @@ class Condition {
   EventFlagCondition get flags => EventFlagCondition(this);
   ValueCondition get values => ValueCondition(this);
 
+  // Returns [events] that only run if this condition is satisfied.
+  //
+  // An empty Condition just returns the `events`;
+  Iterable<Event> ifSatisfied(Iterable<Event> events) {
+    for (var MapEntry(key: values, value: branch) in _values.entries) {
+      var event = switch (branch) {
+        Comparison.eq =>
+          IfValue(values.$1, comparedTo: values.$2, equal: events),
+        Comparison.neq =>
+          IfValue(values.$1, comparedTo: values.$2, notEqual: events),
+        Comparison.gt =>
+          IfValue(values.$1, comparedTo: values.$2, greater: events),
+        Comparison.gte =>
+          IfValue(values.$1, comparedTo: values.$2, greaterOrEqual: events),
+        Comparison.lt =>
+          IfValue(values.$1, comparedTo: values.$2, less: events),
+        Comparison.lte =>
+          IfValue(values.$1, comparedTo: values.$2, lessOrEqual: events),
+      };
+      events = [event];
+    }
+
+    for (var MapEntry(key: flag, value: isSet) in _flags.entries) {
+      var event =
+          isSet ? IfFlag(flag, isSet: events) : IfFlag(flag, isUnset: events);
+      events = [event];
+    }
+
+    for (var MapEntry(key: choice, value: isSet) in _choices.entries) {
+      var event = isSet
+          ? YesOrNoChoice(id: choice, ifYes: events)
+          : YesOrNoChoice(id: choice, ifNo: events);
+      events = [event];
+    }
+
+    return events;
+  }
+
   Condition withFlag(EventFlag flag, bool isSet) {
     if (this[flag] == isSet) return this;
     return Condition._((_flags.unlock..[flag] = isSet).lock, _values, _choices);
@@ -697,18 +735,18 @@ final class IfValue<T extends ModelExpression> extends IfEvent {
   /// [comparedTo] is subtracted from [operand1] (`op1 - comparedTo`)
   IfValue(
     this.operand1, {
-    List<Event> equal = const [],
-    List<Event> notEqual = const [],
-    List<Event> greater = const [],
-    List<Event> greaterOrEqual = const [],
-    List<Event> less = const [],
-    List<Event> lessOrEqual = const [],
+    Iterable<Event> equal = const [],
+    Iterable<Event> notEqual = const [],
+    Iterable<Event> greater = const [],
+    Iterable<Event> greaterOrEqual = const [],
+    Iterable<Event> less = const [],
+    Iterable<Event> lessOrEqual = const [],
     required T comparedTo,
   }) : operand2 = comparedTo {
     var boolean = true;
     var conditions = <Comparison>{};
 
-    void addBranch(Comparison condition, List<Event> events) {
+    void addBranch(Comparison condition, Iterable<Event> events) {
       if (events.isEmpty) return;
       for (var c in condition.parts) {
         if (!conditions.add(c)) {
@@ -752,12 +790,12 @@ final class IfValue<T extends ModelExpression> extends IfEvent {
 
   @override
   IfValue<T> withBranches(Iterable<Branch> branches) {
-    List<Event> equal = const [];
-    List<Event> notEqual = const [];
-    List<Event> greater = const [];
-    List<Event> greaterOrEqual = const [];
-    List<Event> less = const [];
-    List<Event> lessOrEqual = const [];
+    Iterable<Event> equal = const [];
+    Iterable<Event> notEqual = const [];
+    Iterable<Event> greater = const [];
+    Iterable<Event> greaterOrEqual = const [];
+    Iterable<Event> less = const [];
+    Iterable<Event> lessOrEqual = const [];
 
     // Initialize from existing branches
     for (var existing in _branches) {
@@ -898,7 +936,8 @@ class ComparisonBranch {
   final Comparison comparison;
   final List<Event> events;
 
-  ComparisonBranch(this.comparison, this.events);
+  ComparisonBranch(this.comparison, Iterable<Event> events)
+      : events = List.unmodifiable(events);
   ComparisonBranch.empty(this.comparison) : events = const [];
 
   bool get isEmpty => events.isEmpty;
@@ -909,11 +948,11 @@ class ComparisonBranch {
       other is ComparisonBranch &&
           runtimeType == other.runtimeType &&
           comparison == other.comparison &&
-          const ListEquality<Event>().equals(events, other.events);
+          const IterableEquality<Event>().equals(events, other.events);
 
   @override
   int get hashCode =>
-      comparison.hashCode ^ const ListEquality<Event>().hash(events);
+      comparison.hashCode ^ const IterableEquality<Event>().hash(events);
 
   @override
   String toString() {
@@ -948,16 +987,56 @@ class ChoiceId {
   String toString() => id;
 }
 
-class YesOrNoChoice extends Event {
+class YesOrNoChoice extends IfEvent {
   final ChoiceId? id;
   final List<Event> ifYes;
   final List<Event> ifNo;
 
-  YesOrNoChoice({this.id, this.ifYes = const [], this.ifNo = const []});
+  YesOrNoChoice(
+      {this.id,
+      Iterable<Event> ifYes = const [],
+      Iterable<Event> ifNo = const []})
+      : ifYes = List.unmodifiable(ifYes),
+        ifNo = List.unmodifiable(ifNo);
 
   @override
   void visit(EventVisitor visitor) {
     visitor.yesOrNoChoice(this);
+  }
+
+  @override
+  Set<Branch> branches() {
+    if (id == null) {
+      throw StateError('Cannot get branches for YesOrNoChoice with null id');
+    }
+    return {
+      Branch(Condition.of(choices: {id!: true}), events: ifYes),
+      Branch(Condition.of(choices: {id!: false}), events: ifNo),
+    };
+  }
+
+  @override
+  IfEvent withBranches(Iterable<Branch> branches) {
+    if (id == null) {
+      throw StateError('Cannot set branches for YesOrNoChoice with null id');
+    }
+
+    Iterable<Event> ifYes = this.ifYes;
+    Iterable<Event> ifNo = this.ifNo;
+
+    for (var branch in branches) {
+      var choiceValue = branch.condition.choiceFor(id!);
+      if (choiceValue == true) {
+        ifYes = branch.events;
+      } else if (choiceValue == false) {
+        ifNo = branch.events;
+      } else {
+        throw ArgumentError.value(
+            branch, 'branches', 'expected branch for choice $id only');
+      }
+    }
+
+    return YesOrNoChoice(id: id, ifYes: ifYes, ifNo: ifNo);
   }
 
   @override
@@ -966,14 +1045,14 @@ class YesOrNoChoice extends Event {
       other is YesOrNoChoice &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          const ListEquality().equals(ifYes, other.ifYes) &&
-          const ListEquality().equals(ifNo, other.ifNo);
+          const ListEquality<Event>().equals(ifYes, other.ifYes) &&
+          const ListEquality<Event>().equals(ifNo, other.ifNo);
 
   @override
   int get hashCode =>
       id.hashCode ^
-      const ListEquality().hash(ifYes) ^
-      const ListEquality().hash(ifNo);
+      const ListEquality<Event>().hash(ifYes) ^
+      const ListEquality<Event>().hash(ifNo);
 
   @override
   String toString() {
