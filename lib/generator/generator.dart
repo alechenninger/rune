@@ -705,9 +705,10 @@ class SceneAsmGenerator implements EventVisitor {
   /// mem state which exactly matches current flags; other states may need
   /// updates
   Memory get _memory => _context.memory;
-  // TODO: probably move this to method on context
-  set _memory(Memory value) {
+  Memory _swapMemory(Memory value) {
     _context.memory = value;
+    _dialogTree = value.loadedDialogTree;
+    return value;
   }
 
   /// should also contain root state
@@ -1511,7 +1512,7 @@ class SceneAsmGenerator implements EventVisitor {
       var states = <Memory>[];
 
       void runBranch(List<Event> events) {
-        states.add(_memory = parent.branch());
+        states.add(_swapMemory(parent.branch()));
 
         runEventIfNeeded(events);
 
@@ -1584,7 +1585,7 @@ class SceneAsmGenerator implements EventVisitor {
         _setCurrentStateFinished();
       }
 
-      _memory = parent;
+      _swapMemory(parent);
       _gameMode = startingMode;
 
       // As for now we are not tracking these states in the graph,
@@ -1638,7 +1639,7 @@ class SceneAsmGenerator implements EventVisitor {
     var parent = _memory;
 
     // Run no branch in current dialog tree (offset 0).
-    var noBranch = _memory = parent.branch();
+    var noBranch = _swapMemory(parent.branch());
     var eventAsmLength = _eventAsm.length;
     var yesLbl = Label('.${_eventCounter}_yes_choice');
     var continueLbl = Label('.${_eventCounter}_choice_continue');
@@ -1685,7 +1686,7 @@ class SceneAsmGenerator implements EventVisitor {
     // Both branches act as if the other never happened,
     // since of course only one ever happens in-game.
     _resetCurrentDialog(id: ifYesId, asm: ifYes, lastEventForDialog: yesNo);
-    var yesBranch = _memory = parent.branch();
+    var yesBranch = _swapMemory(parent.branch());
 
     // We're back in dialog, for the next branch.
     _gameMode = startingMode;
@@ -1704,7 +1705,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     // Pop current memory state back to parent.
-    _memory = parent;
+    _swapMemory(parent);
 
     // As for now we are not tracking these states in the graph,
     // consider their events as possibly applied
@@ -2814,34 +2815,34 @@ class SceneAsmGenerator implements EventVisitor {
     }
   }
 
-  _flagIsSet(EventFlag flag, {Memory? parent}) {
+  Memory _flagIsSet(EventFlag flag, {Memory? parent}) {
     parent = parent ?? _memory;
     _currentCondition = _currentCondition.withSet(flag);
     var state = _stateGraph[_currentCondition];
     if (state == null) {
       _stateGraph[_currentCondition] = state = parent.branch();
     }
-    _memory = state;
+    return _swapMemory(state);
   }
 
-  _flagIsNotSet(EventFlag flag, {Memory? parent}) {
+  Memory _flagIsNotSet(EventFlag flag, {Memory? parent}) {
     parent = parent ?? _memory;
     _currentCondition = _currentCondition.withNotSet(flag);
     var state = _stateGraph[_currentCondition];
     if (state == null) {
       _stateGraph[_currentCondition] = state = parent.branch();
     }
-    _memory = state;
+    return _swapMemory(state);
   }
 
-  _flagUnknown(EventFlag flag) {
+  Memory _flagUnknown(EventFlag flag) {
     _currentCondition = _currentCondition.without(flag);
     var state = _stateGraph[_currentCondition];
     if (state == null) {
       // nothing can be known in this case? or is this error case?
       _stateGraph[_currentCondition] = state = Memory();
     }
-    _memory = state;
+    return _swapMemory(state);
   }
 
   /// This takes changes applied to the current state of this branch

@@ -605,6 +605,102 @@ main() {
     expect(program.dialogTrees.withoutComments(), expectedTrees);
   });
 
+  test('resets dialog tree for the next conditional branch after changing map',
+      () {
+    var firstBranchDialog = Dialog(spans: [DialogSpan('first branch')]);
+    var nextBranchDialog = Dialog(spans: [DialogSpan('next branch')]);
+
+    var scene = Scene([
+      IfFlag(EventFlag('Test'), isSet: [
+        LoadMap(
+            map: map2,
+            startingPosition: Position(0x200, 0x200),
+            facing: Direction.down),
+        firstBranchDialog,
+      ], isUnset: [
+        nextBranchDialog,
+      ])
+    ]);
+
+    var program = Program();
+    program.addScene(SceneId('id'), scene, startingMap: map);
+
+    var firstBranchAsm = Asm([dc.b(Bytes.ascii('first branch'))]);
+    var nextBranchAsm = Asm([dc.b(Bytes.ascii('next branch'))]);
+    expect(program.dialogTrees.forMap(map.id).toAsm().withoutComments(),
+        containsAllInOrder(nextBranchAsm));
+    expect(program.dialogTrees.forMap(map2.id).toAsm().withoutComments(),
+        containsAllInOrder(firstBranchAsm));
+    expect(program.dialogTrees.forMap(map2.id).toAsm().withoutComments(),
+        isNot(containsAllInOrder(nextBranchAsm)));
+  });
+
+  test('resets dialog tree for the next if value branch after changing map',
+      () {
+    var firstBranchDialog = Dialog(spans: [DialogSpan('first branch')]);
+    var nextBranchDialog = Dialog(spans: [DialogSpan('next branch')]);
+
+    var scene = Scene([
+      IfValue(PositionComponent(0x200, Axis.y),
+          comparedTo: rune.position().component(Axis.y),
+          less: [
+            LoadMap(
+                map: map2,
+                startingPosition: Position(0x200, 0x200),
+                facing: Direction.down),
+            firstBranchDialog,
+          ],
+          greater: [
+            nextBranchDialog,
+          ])
+    ]);
+
+    var program = Program();
+    program.addScene(SceneId('id'), scene, startingMap: map);
+
+    var firstBranchAsm = Asm([dc.b(Bytes.ascii('first branch'))]);
+    var nextBranchAsm = Asm([dc.b(Bytes.ascii('next branch'))]);
+    expect(program.dialogTrees.forMap(map.id).toAsm().withoutComments(),
+        containsAllInOrder(nextBranchAsm));
+    expect(program.dialogTrees.forMap(map2.id).toAsm().withoutComments(),
+        containsAllInOrder(firstBranchAsm));
+    expect(program.dialogTrees.forMap(map2.id).toAsm().withoutComments(),
+        isNot(containsAllInOrder(nextBranchAsm)));
+  });
+
+  test('resets dialog tree for the next yes-no branch after changing map', () {
+    var firstBranchDialog = Dialog(spans: [DialogSpan('first branch')]);
+    var nextBranchDialog = Dialog(spans: [DialogSpan('next branch')]);
+
+    var scene = Scene([
+      YesOrNoChoice(
+        ifNo: [
+          LoadMap(
+              map: map2,
+              startingPosition: Position(0x200, 0x200),
+              facing: Direction.down),
+          firstBranchDialog,
+        ],
+        ifYes: [
+          Dialog(spans: [DialogSpan('yes branch')]),
+        ],
+      ),
+      nextBranchDialog,
+    ]);
+
+    var program = Program();
+    program.addScene(SceneId('id'), scene, startingMap: map);
+
+    var firstBranchAsm = Asm([dc.b(Bytes.ascii('first branch'))]);
+    var nextBranchAsm = Asm([dc.b(Bytes.ascii('next branch'))]);
+    expect(program.dialogTrees.forMap(map.id).toAsm().withoutComments(),
+        containsAllInOrder(nextBranchAsm));
+    expect(program.dialogTrees.forMap(map2.id).toAsm().withoutComments(),
+        containsAllInOrder(firstBranchAsm));
+    expect(program.dialogTrees.forMap(map2.id).toAsm().withoutComments(),
+        isNot(containsAllInOrder(nextBranchAsm)));
+  });
+
   test('unlocks camera after changing map if not unlocked', () {
     // First lock the camera
     // Change the map
