@@ -707,7 +707,6 @@ class SceneAsmGenerator implements EventVisitor {
   Memory get _memory => _context.memory;
   Memory _swapMemory(Memory value) {
     _context.memory = value;
-    _dialogTree = value.loadedDialogTree;
     return value;
   }
 
@@ -722,7 +721,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   // Current dialog generation state:
 
-  DialogTree? _dialogTree;
+  DialogTree? get _dialogTree => _memory.loadedDialogTree;
   Byte? _currentDialogId;
   DialogAsm? _currentDialog;
   var _lastEventBreak = -1;
@@ -1624,6 +1623,8 @@ class SceneAsmGenerator implements EventVisitor {
     // and determine its offset.
     var ifYes = DialogAsm.empty();
     var currentDialogId = _currentDialogIdOrStart();
+    // This uses the current dialog tree, which is correct.
+    // If the "no" branch changes the map, this is unaffected.
     var ifYesId = _currentDialogTree().add(ifYes);
     var ifYesOffset = ifYesId - currentDialogId as Byte;
 
@@ -2082,8 +2083,7 @@ class SceneAsmGenerator implements EventVisitor {
     // todo: wondering if these should automatically be set by virtue of
     //   setting current map
 
-    _dialogTree = _dialogTrees.forMap(newMap.id);
-    _memory.loadedDialogTree = _dialogTree;
+    _memory.loadedDialogTree = _dialogTrees.forMap(newMap.id);
     _memory.hasSavedDialogPosition = false;
     _memory.isMapInCram = true;
     _memory.isDialogInCram = true;
@@ -3301,15 +3301,17 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   DialogTree _currentDialogTree() {
-    if (_dialogTree == null) {
+    var tree = _dialogTree;
+    if (tree == null) {
       var map = _memory.currentMap;
       if (map == null) {
         throw StateError('cannot load dialog tree; '
             'current map is unknown');
       }
-      _dialogTree = _dialogTrees.forMap(map.id);
+      tree = _dialogTrees.forMap(map.id);
+      _memory.loadedDialogTree = tree;
     }
-    return _dialogTree!;
+    return tree;
   }
 
   /// Immediately add to event code, switching to event from dialog if needed.

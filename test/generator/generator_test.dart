@@ -668,9 +668,10 @@ main() {
         isNot(containsAllInOrder(nextBranchAsm)));
   });
 
-  test('resets dialog tree for the next yes-no branch after changing map', () {
+  test(
+      'yes-no branch dialog uses the starting map after another branch loads a map',
+      () {
     var firstBranchDialog = Dialog(spans: [DialogSpan('first branch')]);
-    var nextBranchDialog = Dialog(spans: [DialogSpan('next branch')]);
 
     var scene = Scene([
       YesOrNoChoice(
@@ -684,21 +685,37 @@ main() {
         ifYes: [
           Dialog(spans: [DialogSpan('yes branch')]),
         ],
-      ),
-      nextBranchDialog,
+      )
     ]);
 
     var program = Program();
     program.addScene(SceneId('id'), scene, startingMap: map);
 
-    var firstBranchAsm = Asm([dc.b(Bytes.ascii('first branch'))]);
-    var nextBranchAsm = Asm([dc.b(Bytes.ascii('next branch'))]);
     expect(program.dialogTrees.forMap(map.id).toAsm().withoutComments(),
-        containsAllInOrder(nextBranchAsm));
-    expect(program.dialogTrees.forMap(map2.id).toAsm().withoutComments(),
-        containsAllInOrder(firstBranchAsm));
-    expect(program.dialogTrees.forMap(map2.id).toAsm().withoutComments(),
-        isNot(containsAllInOrder(nextBranchAsm)));
+        containsAllInOrder(Asm([dc.b(Bytes.ascii('yes branch'))])));
+  });
+
+  test('throws when dialog tree is unknown after yes-no branch changes map',
+      () {
+    var scene = Scene([
+      YesOrNoChoice(
+        ifNo: [
+          LoadMap(
+              map: map2,
+              startingPosition: Position(0x200, 0x200),
+              facing: Direction.down),
+          Dialog(spans: [DialogSpan('first branch')]),
+        ],
+        ifYes: [
+          Dialog(spans: [DialogSpan('yes branch')]),
+        ],
+      ),
+      Dialog(spans: [DialogSpan('next branch')]),
+    ]);
+
+    var program = Program();
+    expect(() => program.addScene(SceneId('id'), scene, startingMap: map),
+        throwsA(isA<StateError>()));
   });
 
   test('unlocks camera after changing map if not unlocked', () {
