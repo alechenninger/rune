@@ -8,6 +8,18 @@ import '../model/model.dart';
 
 Asm stepObjectToAsm(StepObject step,
     {required Memory memory, required Labeller labeller}) {
+  if (step.updateCamera) {
+    return stepObjectsToAsm(
+        StepObjects([step.object],
+            stepPerFrame: step.stepPerFrame,
+            frames: step.frames,
+            onTop: step.onTop,
+            animate: step.animate,
+            updateCamera: true),
+        memory: memory,
+        labeller: labeller);
+  }
+
   /// Current x and y positions in memory are stored
   /// as a longword with fractional component.
   /// The higher order word is the position,
@@ -68,13 +80,14 @@ Asm stepObjectToAsm(StepObject step,
 
 Asm stepObjectsToAsm(StepObjects step,
     {required Memory memory, required Labeller labeller}) {
-  if (step.objects.length == 1) {
+  if (step.objects.length == 1 && !step.updateCamera) {
     return stepObjectToAsm(
         StepObject(step.objects.single,
             stepPerFrame: step.stepPerFrame,
             frames: step.frames,
             onTop: step.onTop,
-            animate: step.animate),
+            animate: step.animate,
+            updateCamera: false),
         memory: memory,
         labeller: labeller);
   }
@@ -144,10 +157,33 @@ Asm stepObjectsToAsm(StepObjects step,
   // update sprites, wait for vint, and loop for the next frame
   asm.add(Asm([
     movem.l(d2 / a4, -(sp)),
+    if (step.updateCamera)
+      Asm([
+        // Move camera based on a4 step constants
+        // See FieldObj_{Char}
+        jsr(Label('FieldObj_CameraXPos_FG').l),
+        jsr(Label('FieldObj_CameraYPos_FG').l),
+        jsr(Label('FieldObj_CameraXPos_BG').l),
+        jsr(Label('FieldObj_CameraYPos_BG').l),
+        // This redundantly runs the characters stepped, but it should be safe
+        // Could consider _only_ calculating sprite positions.
+        // outside of step routine
+        // And then run this unconditionally.
+        jsr(Label('Field_UpdateObjectsSpritePositions').l),
+      ]),
     jsr(Label('Field_LoadSprites').l),
     jsr(Label('Field_BuildSprites').l),
     jsr(Label('AnimateTiles').l),
     jsr(Label('RunMapUpdates').l),
+    if (step.updateCamera)
+      Asm([
+        jsr(Label('UpdateCameraXPosFG').l),
+        jsr(Label('UpdateCameraYPosFG').l),
+        jsr(Label('UpdateCameraXPosBG').l),
+        jsr(Label('UpdateCameraYPosBG').l),
+        jsr(Label('RefreshTilesAsYouMoveFG').l),
+        jsr(Label('RefreshTilesAsYouMoveBG').l),
+      ]),
     jsr(Label('VInt_Prepare').l),
     movem.l(sp.postIncrement(), d2 / a4),
     dbf(d2, loop),

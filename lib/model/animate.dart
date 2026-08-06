@@ -29,23 +29,31 @@ class StepObject extends Event {
   /// How many frames should the movement last. > 0.
   final int frames;
 
+  /// Whether or not to run camera updates during the steps.
+  final bool updateCamera;
+
   StepObject(this.object,
       {this.onTop = false,
       this.animate = true,
+      this.updateCamera = false,
       required this.stepPerFrame,
       required this.frames}) {
     checkArgument(frames > 0, message: 'Frames must be greater than 0.');
   }
 
-  StepObject.constantStep(this.object,
-      {this.onTop = false,
-      this.animate = true,
+  StepObject.constantStep(FieldObject object,
+      {bool onTop = false,
+      bool animate = true,
+      bool updateCamera = false,
       required Point<double> stepPerFrame,
-      required this.frames})
-      : stepPerFrame =
-            Vector2dOfXY(Double(stepPerFrame.x), Double(stepPerFrame.y)) {
-    checkArgument(frames > 0, message: 'Frames must be greater than 0.');
-  }
+      required int frames})
+      : this(object,
+            onTop: onTop,
+            animate: animate,
+            updateCamera: updateCamera,
+            stepPerFrame:
+                Vector2dOfXY(Double(stepPerFrame.x), Double(stepPerFrame.y)),
+            frames: frames);
 
   @override
   void visit(EventVisitor visitor) {
@@ -100,25 +108,33 @@ class StepObjects extends Event {
   /// How many frames should the movement last. > 0.
   final int frames;
 
+  /// Whether or not to run camera updates during the steps.
+  final bool updateCamera;
+
   StepObjects(this.objects,
       {this.onTop = false,
       this.animate = true,
+      this.updateCamera = false,
       required this.stepPerFrame,
       required this.frames}) {
     checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
     checkArgument(frames > 0, message: 'Frames must be greater than 0.');
+    checkArgument(frames < 0x8000, message: 'Frames must be less than 32768.');
   }
 
-  StepObjects.constantStep(this.objects,
-      {this.onTop = false,
-      this.animate = true,
+  StepObjects.constantStep(List<FieldObject> objects,
+      {bool onTop = false,
+      bool animate = true,
+      bool updateCamera = false,
       required Point<double> stepPerFrame,
-      required this.frames})
-      : stepPerFrame =
-            Vector2dOfXY(Double(stepPerFrame.x), Double(stepPerFrame.y)) {
-    checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
-    checkArgument(frames > 0, message: 'Frames must be greater than 0.');
-  }
+      required int frames})
+      : this(objects,
+            onTop: onTop,
+            animate: animate,
+            updateCamera: updateCamera,
+            stepPerFrame:
+                Vector2dOfXY(Double(stepPerFrame.x), Double(stepPerFrame.y)),
+            frames: frames);
 
   @override
   void visit(EventVisitor visitor) {
@@ -131,6 +147,7 @@ class StepObjects extends Event {
         'objects: $objects, '
         'onTop: $onTop, '
         'animate: $animate, '
+        'updateCamera: $updateCamera, '
         'stepPerFrame: $stepPerFrame, '
         'frames: $frames)';
   }
@@ -142,6 +159,7 @@ class StepObjects extends Event {
         const ListEquality<FieldObject>().equals(other.objects, objects) &&
         other.onTop == onTop &&
         other.animate == animate &&
+        other.updateCamera == updateCamera &&
         other.stepPerFrame == stepPerFrame &&
         other.frames == frames;
   }
@@ -151,6 +169,7 @@ class StepObjects extends Event {
       const ListEquality<FieldObject>().hash(objects) ^
       onTop.hashCode ^
       animate.hashCode ^
+      updateCamera.hashCode ^
       stepPerFrame.hashCode ^
       frames;
 }
