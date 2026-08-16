@@ -4074,6 +4074,12 @@ final _defaultBuiltInSprites = {
         art: RomArt(label: Label('loc_19237C')),
         requiredVramTile: Word(0x29b)),
   ],
+  MapId.AngerTower_F2: [
+    SpriteVramMapping(
+        tiles: 0x48, // ? not sure
+        art: RomArt(label: Label('loc_18A158')),
+        requiredVramTile: Word(0x260))
+  ]
 };
 
 Queue<Word> freeEventFlags() {
