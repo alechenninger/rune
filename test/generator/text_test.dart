@@ -147,10 +147,10 @@ void main() {
         dbf     d0, .0_fadeloop_t4000
 
         ; clear previous text in plane A buffer
-        lea     ($FFFF84A4).w, a0
+        lea     ($FFFF8480).w, a0
         move.w  #$001F, d7
         trap    #0
-        lea     ($FFFF8524).w, a0
+        lea     ($FFFF8500).w, a0
         move.w  #$001F, d7
         trap    #0
 
@@ -228,10 +228,10 @@ void main() {
         dbf     d0, .0_fadeloop_t8000
 
         ; clear previous text in plane A buffer
-        lea     ($FFFF84B8).w, a0
+        lea     ($FFFF8480).w, a0
         move.w  #$001F, d7
         trap    #0
-        lea     ($FFFF8538).w, a0
+        lea     ($FFFF8500).w, a0
         move.w  #$001F, d7
         trap    #0
         lea     ($FFFF8600).w, a0
@@ -250,10 +250,10 @@ void main() {
         dbf     d0, .0_fadeloop_t8500
 
         ; clear previous text in plane A buffer
-        lea     ($FFFF863C).w, a0
+        lea     ($FFFF8600).w, a0
         move.w  #$001F, d7
         trap    #0
-        lea     ($FFFF86BC).w, a0
+        lea     ($FFFF8680).w, a0
         move.w  #$001F, d7
         trap    #0
 

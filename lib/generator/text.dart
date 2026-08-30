@@ -205,6 +205,12 @@ int? _loadTextBlock(
           _perPaletteLine * (group.index + 2) + _perCharacter * tile + 0x200);
 
       // each block takes about 0x22 bytes
+      // TODO: I'm not sure this actually works in all cases
+      // RunText2 _wraps_ horizontal lines in the buffer
+      // And it does this for 0x20 characters, always.
+      // So if we start towards the right, we'll wrap over,
+      // and overwrite the plane mappings on the left.
+      // I think this code might assume that doesn't happen.
       eventAsm.add(getDialogueByID(asmRef.dialogId));
       eventAsm.add(runText2(asmRef.position.l, tileMapping.i));
       lastVint = eventAsm.add(vIntPrepare());
@@ -219,7 +225,7 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
     Byte currentDialogId, DisplayText display, List<DialogAsm> newDialogs) {
   var column = display.column;
   var textAsmRefs = <Text, List<TextAsmRef>>{};
-  var layout = _ColumnLayout();
+  var placer = _TextPlacer();
   var quotes = Quotes();
 
   for (var text in column.texts) {
@@ -227,43 +233,42 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
         .map((s) => s.toAscii(quotes))
         .reduceOr((s1, s2) => s1 + s2, ifEmpty: Bytes.empty());
     var lines = dialogLines(ascii,
-        startingColumn: layout.col, dialogIdOffset: currentDialogId);
+        outputWidth: column.width,
+        startingColumn: placer.col,
+        leftMargin: column.left,
+        dialogIdOffset: currentDialogId);
 
-    var startLineNumber = layout.line;
+    var startLineNumber = placer.line;
 
     for (var outputLine
         in lines.groupListsBy((l) => l.outputLineNumber).entries) {
-      layout.line = startLineNumber + outputLine.key;
+      placer.line = startLineNumber + outputLine.key;
       var lines = outputLine.value;
+      var length =
+          lines.map((l) => l.length).reduceOr((l1, l2) => l1 + l2, ifEmpty: 0);
 
-      if (column.hAlign != HorizontalAlignment.left) {
-        var length = lines
-            .map((l) => l.length)
-            .reduceOr((l1, l2) => l1 + l2, ifEmpty: 0);
-        if (column.hAlign == HorizontalAlignment.center) {
-          var leftOffset = (column.width - length) ~/ 2;
-          layout.advanceCharactersWithinLine(leftOffset);
-        } else {
-          var leftOffset = column.width - length;
-          layout.advanceCharactersWithinLine(leftOffset);
-        }
-      }
+      var leftOffset = switch (column.hAlign) {
+        HorizontalAlignment.left => column.left,
+        HorizontalAlignment.center => (column.width - length) ~/ 2,
+        HorizontalAlignment.right => column.width - length,
+      };
+      placer.advanceCharactersWithinLine(leftOffset);
 
       for (var line in lines) {
-        layout.place(line, text);
+        placer.place(line, text);
         currentDialogId = (line.dialogId + 1.toByte) as Byte;
         newDialogs.add(DialogAsm([line.asm]));
       }
     }
 
     if (text.lineBreak) {
-      layout.advanceLine();
+      placer.advanceLine();
     }
   }
 
   var alignedLineOffset = display.lineOffset;
   if (column.vAlign != VerticalAlignment.top) {
-    var totalLines = layout.line + (layout.col == 0 ? 0 : 1);
+    var totalLines = placer.line + (placer.col == 0 ? 0 : 1);
     var heightInOffsets = totalLines * (_perLine ~/ _perLineOffset);
     if (column.vAlign == VerticalAlignment.center) {
       alignedLineOffset += (_maxOffsets - heightInOffsets) ~/ 2;
@@ -272,7 +277,7 @@ Map<Text, List<TextAsmRef>> _generateDialogs(
     }
   }
 
-  for (var placement in layout.placements) {
+  for (var placement in placer.placements) {
     var position = Longword(_planeABuffer +
         alignedLineOffset * _perLineOffset +
         placement.line * _perLine +
@@ -541,7 +546,7 @@ extension _PaletteEventAsm on PaletteEvent {
   }
 }
 
-class _ColumnLayout {
+class _TextPlacer {
   var _position = [0, 0];
   var _advanced = 0;
   int get line => _position[0];
@@ -691,6 +696,8 @@ class Plane {
 
     // do 32 characters unless there is vram mapping to other text which
     // overwrote the buffer there
+    // TODO: See note at where we invoke RunText2
+    // This might be broken.
     for (; end < start + 32 * _perCharacter; end++) {
       if (_cells[end] != text) break;
       _cells[end] = null;
@@ -705,9 +712,26 @@ class Plane {
         lineOffset < _perLine - _perLineOffset;
         lineOffset += _perLineOffset) {
       if (longwords > 0) {
+        // Plane A is a 2-d ring buffer.
+        // If the line would wrap horizontally,
+        // we need to clear _back_ further,
+        // to simulate the same "wrapping"
+        // that RunText2 does when it sets up the plane A mappings.
+
+        // TODO: Note that we probably always want to just clear
+        // at the start of lines
+        // due to wrapping behavior of RunText2
+        // See note above at RunText2 invocation / plane.write
+
+        var startInLine =
+            (text.position.value - _planeABuffer) % _perLineOffset;
+        var end = startInLine + longwords;
+        var wrap = max(0, end - 0x20 /* longs per line */);
+        var offsetStart = text.position.value - wrap;
+
         asm.add(Asm([
-          // why w?
-          lea((text.position + lineOffset.toValue).w, a0),
+          lea((offsetStart + lineOffset).w, a0),
+          // lea((text.position + lineOffset.toValue).w, a0),
           // trap 0 deletes 1 + argument, but we have the number of
           // longs to delete total, so subtract one.
           move.w((longwords - 1).toWord.i, d7),

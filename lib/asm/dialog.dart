@@ -91,12 +91,17 @@ Asm panel(Word panelIndex) {
   ]);
 }
 
+/// TODO
+///
+/// [startingColumn] is an index within the dialog to start.
 List<LineAsm> dialogLines(Bytes dialog,
     {int outputWidth = 40,
     int startingColumn = 0,
+    int leftMargin = 0,
     Byte dialogIdOffset = Byte.zero}) {
   var lines = List<LineAsm>.empty(growable: true);
   var lineNum = 0;
+  // index into dialog for the start of the current line
   var lineStart = 0;
   var breakPoint = -1;
 
@@ -124,7 +129,7 @@ List<LineAsm> dialogLines(Bytes dialog,
       breakPoint = i;
     }
 
-    var lineOffset = lineNum == 0 ? startingColumn : 0;
+    var lineOffset = leftMargin + (lineNum == 0 ? startingColumn : 0);
     if (i - lineStart + lineOffset == outputWidth) {
       if (breakPoint == -1) {
         // No breakpoint before hitting end of line.
