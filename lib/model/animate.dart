@@ -481,13 +481,15 @@ class JumpObject extends Event {
   }
 
   List<StepObjects> toSteps() {
-    var totalFrames = duration.toFrames();
+    var durationFrames = duration.toFrames();
+    // Total frames must be even so we can
+    // split them evenly between the up and down phases of the jump.
+    var totalFrames = durationFrames + durationFrames % 2;
     var xPerFrame = xMovement / totalFrames;
-    var yMagnitude = height * 2 + yMovement.abs();
-    var portionUp = height / yMagnitude;
-    var portionDown = (height + yMovement.abs()) / yMagnitude;
+    var yTraveled = height * 2 + yMovement;
+    var portionUp = height / yTraveled;
     var framesUp = (portionUp * totalFrames).round();
-    var framesDown = (portionDown * totalFrames).round();
+    var framesDown = totalFrames - framesUp;
     var down = Point<double>(xPerFrame, (height + yMovement) / framesDown);
     var up = Point<double>(xPerFrame, -height / framesUp);
     return [
