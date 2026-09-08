@@ -11,9 +11,12 @@ import 'model.dart';
 
 export 'dart:math' show Point;
 
-class StepObject extends Event {
+class StepObject extends Event implements MovesObjects {
   /// The object that is being animated.
   final FieldObject object;
+
+  @override
+  Iterable<FieldObject> movedObjects() => [object];
 
   /// Whether the object should appear on top of other objects
   /// for the duration of the movement.
@@ -90,9 +93,12 @@ class StepObject extends Event {
       frames;
 }
 
-class StepObjects extends Event {
+class StepObjects extends Event implements MovesObjects {
   /// The objects that are being animated.
   final List<FieldObject> objects;
+
+  @override
+  Iterable<FieldObject> movedObjects() => objects;
 
   /// Whether the object should appear on top of other objects
   /// for the duration of the movement.

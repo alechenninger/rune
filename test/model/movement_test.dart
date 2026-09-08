@@ -3,6 +3,62 @@ import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('MovesObjects', () {
+    test('reports affected references without event state', () {
+      var npc = MapObjectById.of('npc');
+      var cases = <(MovesObjects, Set<FieldObject>)>[
+        (FacePlayer(npc), {npc}),
+        (IndividualMoves()..moves[npc] = Face(up), {npc}),
+        (AbsoluteMoves()..destinations[npc] = Position(0, 0), {npc}),
+        (InstantMoves()..put(npc, Position(0, 0)), {npc}),
+        (
+          StepObject.constantStep(npc, stepPerFrame: Point(1, 0), frames: 1),
+          {npc}
+        ),
+        (
+          StepObjects.constantStep([npc, BySlot.two],
+              stepPerFrame: Point(1, 0), frames: 1),
+          {npc, BySlot.two}
+        ),
+        (RelativePartyMove(Face(up)), BySlot.all.toSet()),
+        (OverlapCharacters(), BySlot.all.toSet()),
+      ];
+      for (var (event, expected) in cases) {
+        expect(event.movedObjects().toSet(), expected,
+            reason: event.runtimeType.toString());
+      }
+    });
+
+    test('following character movement includes all slots', () {
+      for (MovesObjects event in [
+        IndividualMoves()
+          ..moves[BySlot.one] = Face(up)
+          ..followLead = true,
+        AbsoluteMoves()
+          ..destinations[BySlot.one] = Position(0, 0)
+          ..followLeader = true,
+      ]) {
+        expect(event.movedObjects().toSet(), BySlot.all.toSet());
+      }
+    });
+
+    test('following NPC-only or empty movement does not include the party', () {
+      var npc = MapObjectById.of('npc');
+      for (MovesObjects event in [
+        IndividualMoves()
+          ..moves[npc] = Face(up)
+          ..followLead = true,
+        AbsoluteMoves()
+          ..destinations[npc] = Position(0, 0)
+          ..followLeader = true,
+      ]) {
+        expect(event.movedObjects(), [npc]);
+      }
+      expect((IndividualMoves()..followLead = true).movedObjects(), isEmpty);
+      expect((AbsoluteMoves()..followLeader = true).movedObjects(), isEmpty);
+    });
+  });
+
   group('step to point', () {
     test('if start axis is x moves along x then y', () {
       var movement = StepToPoint()

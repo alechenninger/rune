@@ -91,7 +91,23 @@ class Memory implements EventState {
   @override
   Memory branch() => Memory.from(_sysState.branch(), _eventState.branch());
 
+  Set<FieldObject> resolveAll(Iterable<FieldObject> objects) =>
+      objects.map((object) => object.resolve(this)).toSet();
+
   List<StateChange> get changes => UnmodifiableListView(_changes);
+
+  @override
+  Set<FieldObject> get pendingMovements => _eventState.pendingMovements;
+
+  @override
+  bool hasPendingMovement(FieldObject object) =>
+      _eventState.hasPendingMovement(object);
+
+  @override
+  void startMovement(FieldObject object) => _apply(StartMovement(object));
+
+  @override
+  void finishMovement(FieldObject object) => _apply(FinishMovement(object));
 
   void clearChanges() {
     _changes.clear();
@@ -456,6 +472,31 @@ class _Slots implements Slots {
 
 // TODO: if prior value is same, then "may apply" can keep same value
 //  in most cases
+
+class StartMovement extends StateChange<void> {
+  final FieldObject object;
+
+  StartMovement(this.object);
+
+  @override
+  void apply(Memory memory) => memory._eventState.startMovement(object);
+
+  @override
+  void mayApply(Memory memory) => apply(memory);
+}
+
+class FinishMovement extends StateChange<void> {
+  final FieldObject object;
+
+  FinishMovement(this.object);
+
+  @override
+  void apply(Memory memory) => memory._eventState.finishMovement(object);
+
+  // A wait in only one possible branch does not establish completion.
+  @override
+  void mayApply(Memory memory) {}
+}
 
 class SetSavedDialogPosition extends StateChange {
   final bool saved;

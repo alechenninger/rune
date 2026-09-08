@@ -76,6 +76,8 @@ sealed class FieldObject extends Moveable {
   /// Does not include objects we know it cannot refer to.
   ///
   /// Does not include the reference object itself if it is not resolved.
+  ///
+  /// This is useful to clear state about objects in doubt.
   Iterable<FieldObject> unknownObjects(EventState state);
 }
 

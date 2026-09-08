@@ -94,6 +94,15 @@ sealed class DialogEvent {
       {required Labeller labeller,
       required FieldRoutineRepository fieldRoutines});
 
+  DialogAndRoutines _waitForPendingMovements(
+      Iterable<FieldObject> objects, Memory state, Labeller labeller) {
+    var pending =
+        state.resolveAll(objects).where(state.hasPendingMovement).toSet();
+    if (pending.isEmpty) return (Asm.empty(), const []);
+    return WaitForMovementsInDialog(WaitForMovements(pending))
+        .toAsm(state, labeller: labeller);
+  }
+
   static DialogEvent? fromEvent(RunnableInDialog event, Memory state) {
     switch (event) {
       case IndividualMoves m:
@@ -260,6 +269,8 @@ class FaceInDialogRoutine extends DialogEvent {
   DialogAndRoutines toAsm(Memory state,
       {required Labeller labeller,
       required FieldRoutineRepository fieldRoutines}) {
+    var (before, post) =
+        _waitForPendingMovements(moves.movedObjects(), state, labeller);
     var routineLbl = labeller.withContext('FaceInDialog').next();
     var routine = Asm([
       label(routineLbl),
@@ -276,7 +287,7 @@ class FaceInDialogRoutine extends DialogEvent {
     // But a0-a4 are also popped from stack.
     state.unknownAddressRegisters();
 
-    return (dialog, [routine]);
+    return (Asm([before, dialog]), [...post, routine]);
   }
 
   @override
@@ -311,8 +322,8 @@ class FaceInDialogByteCode extends DialogEvent {
 
   @override
   DialogAndRoutines toAsm(Memory state,
-      {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
-    var asm = Asm.empty();
+      {required Labeller labeller, FieldRoutineRepository? fieldRoutines}) {
+    var (asm, post) = _waitForPendingMovements(facing.keys, state, labeller);
 
     for (var MapEntry(key: obj, value: dir) in facing.entries) {
       var id = obj.compactId(state);
@@ -348,7 +359,7 @@ class FaceInDialogByteCode extends DialogEvent {
 
     state.unknownAddressRegisters();
 
-    return (asm, const []);
+    return (asm, post);
   }
 
   @override
@@ -363,6 +374,9 @@ class AbsoluteMovesInDialog extends DialogEvent {
   @override
   DialogAndRoutines toAsm(Memory state,
       {required Labeller labeller, FieldRoutineRepository? fieldRoutines}) {
+    var objects = state.resolveAll(moves.movedObjects());
+    var (before, post) = _waitForPendingMovements(objects, state, labeller);
+
     // First generate the positioning routine
     var routineLbl = labeller.withContext('AbsoluteMoves').next();
     var routine = Asm([
@@ -380,7 +394,10 @@ class AbsoluteMovesInDialog extends DialogEvent {
     // But a0-a4 are also popped from stack.
     state.unknownAddressRegisters();
 
-    return (dialog, [routine]);
+    if (!moves.waitForMovements) {
+      objects.forEach(state.startMovement);
+    }
+    return (Asm([before, dialog]), [...post, routine]);
   }
 }
 
@@ -408,6 +425,7 @@ class WaitForMovementsInDialog extends DialogEvent {
     // But a0-a4 are also popped from stack.
     state.unknownAddressRegisters();
 
+    wait.objects.forEach(state.finishMovement);
     return (dialog, [routine]);
   }
 }

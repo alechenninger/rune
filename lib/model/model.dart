@@ -271,6 +271,7 @@ class EventState {
     panelsShown = from.panelsShown;
     _facing.addAll(from._facing);
     _routines.addAll(from._routines);
+    _pendingMovements.addAll(from._pendingMovements);
   }
 
   EventState branch() {
@@ -279,6 +280,23 @@ class EventState {
 
   late final Positions _positions;
   Positions get positions => _positions;
+
+  final _pendingMovements = <FieldObject>{};
+
+  /// Objects whose scripted destinations have not yet been waited for.
+  Set<FieldObject> get pendingMovements =>
+      UnmodifiableSetView(_pendingMovements);
+
+  bool hasPendingMovement(FieldObject object) =>
+      _pendingMovements.contains(object.resolve(this));
+
+  void startMovement(FieldObject object) {
+    object.knownObjects(this).forEach(_pendingMovements.add);
+  }
+
+  void finishMovement(FieldObject object) {
+    object.knownObjects(this).forEach(_pendingMovements.remove);
+  }
 
   /// Character field objects by slot. 1-indexed (zero is invalid).
   final Slots slots;
@@ -399,6 +417,7 @@ class EventState {
         'panelsShown: $panelsShown, '
         'facing: $_facing, '
         'positions: ${positions._positions}, '
+        'pendingMovements: $_pendingMovements, '
         'routines: $_routines'
         '}';
   }

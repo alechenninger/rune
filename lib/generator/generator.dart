@@ -1007,6 +1007,7 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     _addToEvent(face, (i) {
+      _waitForPendingMovements(face.movedObjects());
       var asm = EventAsm.empty();
 
       // TODO: since we try to track withObject now,
@@ -1030,6 +1031,7 @@ class SceneAsmGenerator implements EventVisitor {
   void overlapCharacters(OverlapCharacters overlap) {
     _checkNotFinished();
     _addToEvent(overlap, (_) {
+      _waitForPendingMovements(overlap.movedObjects());
       // Set speed if different from current context
       if (_memory.stepSpeed != overlap.speed) {
         _eventAsm.add(setStepSpeed(overlap.speed.offset.i));
@@ -1046,26 +1048,24 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void individualMoves(IndividualMoves moves) {
+    Asm inEvent(int i) {
+      _waitForPendingMovements(moves.movedObjects());
+      return moves.toAsm(_memory,
+          fieldRoutines: _fieldRoutines, labeller: _labeller.withContext(i));
+    }
+
     var facing = moves.justFacing;
 
     if (facing != null && FaceInDialogByteCode.ok(facing)) {
-      _addToEventOrDialog(moves,
-          inDialog: () {
-            var (dialogAsm, routines) =
-                FaceInDialogByteCode(facing).toAsm(_memory);
+      _addToEventOrDialog(moves, inDialog: () {
+        var (dialogAsm, routines) = FaceInDialogByteCode(facing)
+            .toAsm(_memory, labeller: _labeller.withContext(_eventCounter));
 
-            _addToDialog(dialogAsm);
-            _postAsm.addAll(routines);
-          },
-          inEvent: (i) => moves.toAsm(_memory,
-              fieldRoutines: _fieldRoutines,
-              labeller: _labeller.withContext(i)));
+        _addToDialog(dialogAsm);
+        _postAsm.addAll(routines);
+      }, inEvent: inEvent);
     } else {
-      _addToEvent(
-          moves,
-          (i) => moves.toAsm(_memory,
-              fieldRoutines: _fieldRoutines,
-              labeller: _labeller.withContext(i)));
+      _addToEvent(moves, inEvent);
     }
   }
 
@@ -1073,19 +1073,25 @@ class SceneAsmGenerator implements EventVisitor {
   void absoluteMoves(AbsoluteMoves moves) {
     _checkNotFinished();
 
-    if (moves.canRunInDialog(_memory)) {
-      _addToEventOrDialog(moves,
-          inDialog: () {
-            var (asm, routines) = AbsoluteMovesInDialog(moves)
-                .toAsm(_memory, labeller: _labeller.withContext(_eventCounter));
+    Asm inEvent(int i) {
+      var objects = _memory.resolveAll(moves.movedObjects());
+      _waitForPendingMovements(objects);
+      var asm = absoluteMovesToAsm(moves, _memory, eventIndex: i);
+      if (!moves.waitForMovements) {
+        objects.forEach(_memory.startMovement);
+      }
+      return asm;
+    }
 
-            _postAsm.addAll(routines);
-            _addToDialog(asm);
-          },
-          inEvent: (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
+    if (moves.canRunInDialog(_memory)) {
+      _addToEventOrDialog(moves, inDialog: () {
+        var (asm, routines) = AbsoluteMovesInDialog(moves)
+            .toAsm(_memory, labeller: _labeller.withContext(_eventCounter));
+        _postAsm.addAll(routines);
+        _addToDialog(asm);
+      }, inEvent: inEvent);
     } else {
-      _addToEvent(
-          moves, (i) => absoluteMovesToAsm(moves, _memory, eventIndex: i));
+      _addToEvent(moves, inEvent);
     }
   }
 
@@ -1093,8 +1099,11 @@ class SceneAsmGenerator implements EventVisitor {
   void waitForMovements(WaitForMovements wait) {
     _checkNotFinished();
     var keepDialog = !wait.requireEvent;
-    _addToEvent(wait, (i) => waitForMovementsToAsm(wait, memory: _memory),
-        keepDialog: keepDialog);
+    _addToEvent(wait, (i) {
+      var asm = waitForMovementsToAsm(wait, memory: _memory);
+      wait.objects.forEach(_memory.finishMovement);
+      return asm;
+    }, keepDialog: keepDialog);
   }
 
   @override
@@ -1105,6 +1114,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void stepObject(StepObject step) {
     _addToEvent(step, (i) {
+      _waitForPendingMovements(step.movedObjects());
       return stepObjectToAsm(step,
           memory: _memory, labeller: _labeller.withContext(i));
     });
@@ -1112,10 +1122,11 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void stepObjects(StepObjects step) {
-    _addToEvent(
-        step,
-        (i) => stepObjectsToAsm(step,
-            memory: _memory, labeller: _labeller.withContext(i)));
+    _addToEvent(step, (i) {
+      _waitForPendingMovements(step.movedObjects());
+      return stepObjectsToAsm(step,
+          memory: _memory, labeller: _labeller.withContext(i));
+    });
   }
 
   @override
@@ -1173,6 +1184,7 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void partyMove(RelativePartyMove move) {
     _addToEvent(move, (i) {
+      _waitForPendingMovements(move.movedObjects());
       var moves = IndividualMoves()
         ..moves[BySlot(1)] = move.movement
         ..speed = move.speed
@@ -2666,6 +2678,7 @@ class SceneAsmGenerator implements EventVisitor {
         }
 
         _terminateDialog();
+        _waitForPendingMovements(_memory.pendingMovements);
 
         if (_memory.cameraLock == true) {
           unlockCamera(UnlockCamera());
@@ -2685,6 +2698,7 @@ class SceneAsmGenerator implements EventVisitor {
 
       case EventMode(priorMode: InteractionMode(), type: EventType.event):
         _terminateDialog();
+        _waitForPendingMovements(_memory.pendingMovements);
 
         if (needToShowField) {
           fadeInField(FadeInField());
@@ -2708,6 +2722,7 @@ class SceneAsmGenerator implements EventVisitor {
 
       case EventMode(priorMode: RunEventMode? prior, type: var type):
         _terminateDialog();
+        _waitForPendingMovements(_memory.pendingMovements);
 
         if (needToHidePanels) {
           // unfortunately this will produce unwanted interrupt
@@ -2752,7 +2767,7 @@ class SceneAsmGenerator implements EventVisitor {
         // we need to be able to reset, but there is no event asm to do that
         // need control code
 
-        _terminateDialog();
+        _terminateDialog(waitForPendingMovements: true);
 
         break;
       case RunEventMode():
@@ -2812,6 +2827,24 @@ class SceneAsmGenerator implements EventVisitor {
       return frames == 1 ? vIntPrepare() : vIntPrepareLoop(Word(frames - 1));
     } else {
       return doMapUpdateLoop(Word(frames - 1));
+    }
+  }
+
+  /// Emits in the current generation context without draining the queue.
+  void _waitForPendingMovements(Iterable<FieldObject> objects,
+      {bool inDialog = false}) {
+    var pending = _memory.resolveAll(objects.where(_memory.hasPendingMovement));
+    if (pending.isEmpty) return;
+
+    var wait = WaitForMovements(pending);
+    if (inDialog) {
+      var (asm, routines) = WaitForMovementsInDialog(wait)
+          .toAsm(_memory, labeller: _labeller.withContext(_eventCounter));
+      _addToDialog(asm);
+      _postAsm.addAll(routines);
+    } else {
+      _eventAsm.add(waitForMovementsToAsm(wait, memory: _memory));
+      wait.objects.forEach(_memory.finishMovement);
     }
   }
 
@@ -3161,7 +3194,10 @@ class SceneAsmGenerator implements EventVisitor {
   /// May keep the dialog open if [keepDialog] is true
   /// (and there is currently a dialog window open).
   void _terminateDialog(
-      {bool? hidePanels, bool keepDialog = false, int? forEventBreak}) {
+      {bool? hidePanels,
+      bool keepDialog = false,
+      int? forEventBreak,
+      bool waitForPendingMovements = false}) {
     var wasInDialog = false;
 
     switch (_gameMode) {
@@ -3177,6 +3213,10 @@ class SceneAsmGenerator implements EventVisitor {
             // We can't run in event (because we're not in one),
             // so do in dialog
             _generateQueueInCurrentMode();
+            if (waitForPendingMovements) {
+              _waitForPendingMovements(_memory.pendingMovements,
+                  inDialog: true);
+            }
             break;
         }
 

@@ -6,6 +6,15 @@ import 'package:collection/collection.dart';
 import '../generator/generator.dart';
 import 'model.dart';
 
+/// An event that moves or changes the facing of field objects.
+abstract interface class MovesObjects {
+  /// References affected by this event, including followers when applicable.
+  ///
+  /// Party-wide movement returns all slots. Callers resolve references against
+  /// event state when generating the event.
+  Iterable<FieldObject> movedObjects();
+}
+
 class Steps implements Comparable<Steps> {
   final int toInt;
 
@@ -121,10 +130,13 @@ enum Axis {
   }
 }
 
-class FacePlayer extends Event {
+class FacePlayer extends Event implements MovesObjects {
   final FieldObject object;
 
   FacePlayer(this.object);
+
+  @override
+  Iterable<FieldObject> movedObjects() => [object];
 
   IndividualMoves toMoves() => Face(object.towards(BySlot.one)).move(object);
 
@@ -155,12 +167,16 @@ class FacePlayer extends Event {
 }
 
 /// The party follows the leader
-class RelativePartyMove extends Event implements RunnableInDialog {
+class RelativePartyMove extends Event
+    implements RunnableInDialog, MovesObjects {
   RelativeMovement movement;
   StepSpeed speed = StepSpeed.fast;
   Axis startingAxis = Axis.x;
 
   RelativePartyMove(this.movement);
+
+  @override
+  Iterable<FieldObject> movedObjects() => BySlot.all;
 
   AbsoluteMoves? get asAbsoluteMoves {
     var individual = IndividualMoves()
@@ -277,12 +293,19 @@ class RelativePartyMove extends Event implements RunnableInDialog {
 }
 
 /// A group of parallel, relative movements
-class IndividualMoves extends Event implements RunnableInDialog {
+class IndividualMoves extends Event implements RunnableInDialog, MovesObjects {
   // TODO: what if Slot and Character moveables refer to same Character?
   Map<FieldObject, RelativeMovement> moves = {};
   StepSpeed speed = StepSpeed.fast;
   bool collideLead = false;
   bool followLead = false;
+
+  @override
+  Iterable<FieldObject> movedObjects() => {
+        ...moves.keys,
+        if (followLead && moves.keys.any((object) => object.isCharacter))
+          ...BySlot.all,
+      };
 
   Map<FieldObject, DirectionExpression>? get justFacing {
     var result = <FieldObject, DirectionExpression>{};
@@ -436,7 +459,7 @@ class IndividualMoves extends Event implements RunnableInDialog {
       const MapEquality().hash(moves) ^ speed.hashCode ^ followLead.hashCode;
 }
 
-class AbsoluteMoves extends Event implements RunnableInDialog {
+class AbsoluteMoves extends Event implements RunnableInDialog, MovesObjects {
   // Facing can be controlled with individual movements
   // TODO(movement): we could support delays
   // even though we don't know the duration of movements,
@@ -445,6 +468,14 @@ class AbsoluteMoves extends Event implements RunnableInDialog {
   StepSpeed speed = StepSpeed.fast;
   Axis startingAxis = Axis.x;
   bool followLeader = false;
+
+  @override
+  Iterable<FieldObject> movedObjects() => {
+        ...destinations.keys,
+        if (followLeader &&
+            destinations.keys.any((object) => object.isCharacter))
+          ...BySlot.all,
+      };
 
   /// Whether or not to wait for movements, or allow the characters to move
   /// asynchronously with other events.
@@ -555,9 +586,12 @@ class WaitForMovements extends Event implements RunnableInDialog {
   int get hashCode => const SetEquality().hash(objects) ^ requireEvent.hashCode;
 }
 
-class InstantMoves extends Event {
+class InstantMoves extends Event implements MovesObjects {
   Map<FieldObject, (PositionExpression? position, DirectionExpression? facing)>
       destinations = {};
+
+  @override
+  Iterable<FieldObject> movedObjects() => destinations.keys;
 
   void move(FieldObject obj,
       {PositionExpression? to, DirectionExpression? face}) {
@@ -595,8 +629,11 @@ class InstantMoves extends Event {
   int get hashCode => const MapEquality().hash(destinations);
 }
 
-class OverlapCharacters extends Event {
+class OverlapCharacters extends Event implements MovesObjects {
   StepSpeed speed = StepSpeed.normal();
+
+  @override
+  Iterable<FieldObject> movedObjects() => BySlot.all;
 
   @override
   void visit(EventVisitor visitor) {
