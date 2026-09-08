@@ -454,6 +454,8 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
 }
 
 Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
+  if (wait.objects.isEmpty) return Asm.empty();
+
   var chars = wait.objects.where((o) => o.isCharacter).toList();
   var secondary = wait.objects.where((o) => o.isNotCharacter).toList();
 

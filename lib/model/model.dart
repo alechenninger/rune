@@ -291,11 +291,14 @@ class EventState {
       _pendingMovements.contains(object.resolve(this));
 
   void startMovement(FieldObject object) {
-    object.knownObjects(this).forEach(_pendingMovements.add);
+    // If it's known, only need to add that one
+    // TODO: what if state changes, and what was once known is no longer?
+    _pendingMovements.add(object.resolve(this));
   }
 
   void finishMovement(FieldObject object) {
-    object.knownObjects(this).forEach(_pendingMovements.remove);
+    // Be more conservative here; no reason to keep either around
+    _pendingMovements.removeAll(object.knownObjects(this));
   }
 
   /// Character field objects by slot. 1-indexed (zero is invalid).

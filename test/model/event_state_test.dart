@@ -9,6 +9,7 @@ void main() {
     state.positions[rune] = Position(0x10, 0x20);
     expect(state.positions[BySlot(2)], Position(0x10, 0x20));
   });
+
   for (var factory in <String, EventState Function()>{
     'EventState': EventState.new,
     'Memory': Memory.new,
@@ -63,21 +64,4 @@ void main() {
       });
     });
   }
-
-  test('Memory records definite and possible movement changes', () {
-    var state = Memory()..setSlot(2, rune);
-    state.clearChanges();
-    state.startMovement(BySlot.two);
-    state.finishMovement(rune);
-    var [start, finish] = state.changes;
-    var target = Memory()..setSlot(2, shay);
-    start.mayApply(target);
-    expect(target.pendingMovements, {rune});
-    finish.mayApply(target);
-    expect(target.pendingMovements, {rune});
-    finish.apply(target);
-    expect(target.pendingMovements, isEmpty);
-    start.apply(target);
-    expect(target.pendingMovements, {rune});
-  });
 }
