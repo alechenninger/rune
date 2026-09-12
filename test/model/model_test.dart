@@ -5,6 +5,22 @@ import 'package:test/test.dart';
 import '../fixtures.dart';
 
 void main() {
+  test('event interactions retain their supplied scene', () {
+    var scene = Scene([Pause(Duration(seconds: 1))]);
+    var interaction = EventInteraction(scene, id: const TalkInteractionId());
+
+    expect(interaction.onInteract, same(scene));
+  });
+
+  test('Talk interaction is a singleton within each game', () {
+    var game = Game();
+
+    expect(game.interaction(const TalkInteractionId()),
+        same(game.talkInteraction));
+    expect(game.talk, same(game.talkInteraction.onInteract));
+    expect(Game().talk, isNot(same(game.talk)));
+  });
+
   group('SceneId', () {
     test('IDs require word characters', () {
       expect(() => SceneId('not-valid'), throwsArgumentError);

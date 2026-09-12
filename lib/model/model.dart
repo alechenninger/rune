@@ -56,7 +56,10 @@ class Game {
   List<GameMap> get maps => _maps.values.toList(growable: false);
 
   /// The single, map-independent Talk menu scene.
-  final Scene talk = Scene([]);
+  final EventInteraction talkInteraction =
+      EventInteraction(Scene([]), id: const TalkInteractionId());
+
+  Scene get talk => talkInteraction.onInteract;
 
   final HuntersGuildInteractions huntersGuild = HuntersGuildInteractions();
 
@@ -103,10 +106,7 @@ class Game {
   // TODO(interaction elements): may want to move this to be per-map
   //  rather thangame-level
   MapElement? interaction(InteractionId id) {
-    // Right now, the only event interactions
-    // are modeled by the HuntersGuild.
-    // If there are others in the future,
-    // handle in this method.
+    if (id is TalkInteractionId) return talkInteraction;
     return huntersGuild.interactionById(id);
   }
 

@@ -1832,6 +1832,18 @@ abstract class InteractionId extends MapElementId {
   int get hashCode => value.hashCode;
 }
 
+/// Identifies the single Talk menu interaction.
+class TalkInteractionId extends InteractionId {
+  const TalkInteractionId();
+
+  @override
+  String get value => 'Talk';
+
+  @override
+  // ignore: hash_and_equals
+  bool operator ==(Object other) => other is TalkInteractionId;
+}
+
 /// Models custom, event-based interactions.
 class EventInteraction
     with Interactive<InteractiveMapElement>
@@ -1839,7 +1851,7 @@ class EventInteraction
   final InteractionId id;
 
   EventInteraction(Scene onInteract, {required this.id}) {
-    onInteract = onInteract;
+    this.onInteract = onInteract;
   }
 
   @override
