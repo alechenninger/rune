@@ -5,6 +5,24 @@ import 'package:test/test.dart';
 import '../fixtures.dart';
 
 void main() {
+  test('long story dialogue trees reuse unchanged conditional subtrees', () {
+    var scene = Scene([Dialog.parse('Before')]);
+    for (var i = 0; i < 64; i++) {
+      scene.addBranch([Dialog.parse('Update $i')],
+          whenSet: EventFlag('Story$i'));
+    }
+
+    var unchanged = scene.asOf(Condition({EventFlag('Unrelated'): true}));
+    expect(unchanged.single, same(scene.single));
+    expect(scene.asOf(Condition({EventFlag('Story63'): true})),
+        Scene([Dialog.parse('Update 63')]));
+    expect(
+        scene.asOf(Condition({
+          for (var i = 0; i < 64; i++) EventFlag('Story$i'): false,
+        })),
+        Scene([Dialog.parse('Before')]));
+  }, timeout: Timeout(Duration(seconds: 5)));
+
   test('event interactions retain their supplied scene', () {
     var scene = Scene([Pause(Duration(seconds: 1))]);
     var interaction = EventInteraction(scene, id: const TalkInteractionId());

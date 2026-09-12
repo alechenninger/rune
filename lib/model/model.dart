@@ -673,10 +673,21 @@ class Scene extends IterableBase<Event> {
         } else {
           // We don't know if this is set or not,
           // so go through each branch
-          yield IfFlag(event.flag,
-              isSet: _asOf(event.isSet, asOf, current.withSet(event.flag)),
-              isUnset:
-                  _asOf(event.isUnset, asOf, current.withNotSet(event.flag)));
+          var isSet =
+              _asOf(event.isSet, asOf, current.withSet(event.flag)).toList();
+          var isUnset =
+              _asOf(event.isUnset, asOf, current.withNotSet(event.flag))
+                  .toList();
+          // IfFlag normalizes its branches in its constructor. Rebuilding an
+          // unchanged subtree repeats that work recursively, growing
+          // exponentially with the depth of a dialogue's story branches.
+          const sameEvents = ListEquality<Event>(IdentityEquality<Event>());
+          if (sameEvents.equals(isSet, event.isSet) &&
+              sameEvents.equals(isUnset, event.isUnset)) {
+            yield event;
+          } else {
+            yield IfFlag(event.flag, isSet: isSet, isUnset: isUnset);
+          }
         }
       } else {
         yield event;
