@@ -431,7 +431,7 @@ class WaitForMovementsInDialog extends DialogEvent {
 }
 
 extension DialogToAsm on Dialog {
-  DialogAndRoutines toGeneratedAsm(Memory memory,
+  DialogAndRoutines toGeneratedAsm(Memory memory, DialogCapableMode mode,
       {required Labeller labeller,
       required FieldRoutineRepository fieldRoutines}) {
     var asm = DialogAsm.empty();
@@ -440,9 +440,11 @@ extension DialogToAsm on Dialog {
 
     // i think byte zero removes portrait if already present.
     // todo: could optimize if we know there is no portrait
-    if (memory.dialogPortrait != speaker.portrait) {
-      asm.add(portrait(toPortraitCode(speaker.portrait)));
+    if (memory.dialogPortrait != speaker.portrait ||
+        memory.portraitAlignment != portraitAlignment) {
+      asm.add(mode.execution.portraitCode(speaker.portrait, portraitAlignment));
       memory.dialogPortrait = speaker.portrait;
+      memory.portraitAlignment = portraitAlignment;
     }
 
     var ascii = BytesAndAscii([]);
@@ -479,7 +481,7 @@ extension DialogToAsm on Dialog {
   DialogAsm toAsm([EventState? eventState]) {
     var memory =
         eventState == null ? Memory() : Memory.from(SystemState(), eventState);
-    var (asm, _) = toGeneratedAsm(memory,
+    var (asm, _) = toGeneratedAsm(memory, InteractionMode.noObject(),
         labeller: Labeller(), fieldRoutines: defaultFieldRoutines);
     return DialogAsm([asm]);
   }

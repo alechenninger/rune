@@ -1058,8 +1058,8 @@ class SceneAsmGenerator implements EventVisitor {
   void dialog(Dialog dialog) {
     _checkNotFinished();
     _generateQueueInCurrentMode();
-    _runOrContinueDialog(dialog);
-    var (asm, post) = dialog.toGeneratedAsm(_memory,
+    var mode = _runOrContinueDialog(dialog);
+    var (asm, post) = dialog.toGeneratedAsm(_memory, mode,
         labeller: _labeller.withContext(_eventCounter),
         fieldRoutines: _fieldRoutines);
     _addToDialog(asm);
@@ -2222,18 +2222,21 @@ class SceneAsmGenerator implements EventVisitor {
       // because it HAS to run in dialog in this case.
       // It is like a Dialog event in that way.
       _generateQueueInCurrentMode();
-      _runOrContinueDialog(showPanel);
+      var mode = _runOrContinueDialog(showPanel);
       _memory.addPanel();
 
       var p = showPanel.portrait;
       _addToDialog(Asm([
         // TODO: Use PanelCode
-        if (_memory.dialogPortrait != p) portrait(toPortraitCode(p)),
+        if (_memory.dialogPortrait != p ||
+            _memory.portraitAlignment != HorizontalAlignment.left)
+          mode.execution.portraitCode(p, HorizontalAlignment.left),
         dc.b([ControlCodes.action, Byte.zero]),
         dc.w([Word(index)]),
       ]));
 
       _memory.dialogPortrait = p;
+      _memory.portraitAlignment = HorizontalAlignment.left;
     } else {
       _addToEvent(showPanel, (_) {
         _memory.addPanel();
@@ -3116,7 +3119,8 @@ class SceneAsmGenerator implements EventVisitor {
   /// Assumes consecutive events in dialog should wait for player input,
   /// called an "interrupt." If this is not the case, set
   /// [interruptDialog] to false.
-  void _runOrContinueDialog(Event event, {bool interruptDialog = true}) {
+  DialogCapableMode _runOrContinueDialog(Event event,
+      {bool interruptDialog = true}) {
     // TODO: call generatequeueincurrentmode here instead of before calling this method
 
     _context.getAndIncrementEventCount();
@@ -3128,13 +3132,17 @@ class SceneAsmGenerator implements EventVisitor {
       _addToDialog(dc.b(Bytes.of(0xf3)));
     }
 
+    DialogCapableMode nextMode;
+
     switch (_gameMode) {
-      case InteractionMode() || EventMode(isInDialogLoop: true):
+      case DialogCapableMode mode &&
+            (InteractionMode() || EventMode(isInDialogLoop: true)):
         if (_lastEventInCurrentDialog is Dialog && interruptDialog) {
           // Add cursor for previous dialog
           // This is delayed because this interrupt may be a termination
           _addToDialog(interrupt());
         }
+        nextMode = mode;
         break;
       case EventMode m:
         // TODO(dialog): consider if this should trigger regardless of prior mode
@@ -3151,7 +3159,7 @@ class SceneAsmGenerator implements EventVisitor {
               move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l));
           _memory.dialogTriggered = true;
         }
-        _runDialog(m);
+        nextMode = _runDialog(m);
         break;
       case RunEventMode():
         // We need to switch to event mode,
@@ -3163,14 +3171,16 @@ class SceneAsmGenerator implements EventVisitor {
         // an exception will be thrown later in generation,
         // so in practice it's probably not an issue.
         var m = runEvent(type: EventType.event);
-        _runDialog(m);
+        nextMode = _runDialog(m);
         break;
     }
 
     _lastEventInCurrentDialog = event;
+
+    return nextMode;
   }
 
-  void _runDialog(EventMode mode) {
+  DialogCapableMode _runDialog(EventMode mode) {
     _eventAsm.add(
         Asm([comment('${_context.getAndIncrementEventCount()}: $Dialog')]));
 
@@ -3236,7 +3246,7 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.unknownAddressRegisters();
     _memory.keepDialog = false;
 
-    _gameMode = mode.enterDialogLoop();
+    return _gameMode = mode.enterDialogLoop();
   }
 
   /// Terminates the current dialog, if there is any,
@@ -3605,9 +3615,29 @@ abstract class EventExecution {
   });
 }
 
+/// Assembly emitted within dialogue.
+abstract class DialogExecution {
+  const DialogExecution();
+
+  Asm portraitCode(Portrait? portrait, HorizontalAlignment alignment);
+}
+
+/// Execution supporting both event routines and dialogue bytecode.
+abstract class EventAndDialogExecution extends EventExecution
+    implements DialogExecution {
+  const EventAndDialogExecution();
+}
+
 /// Dialog helpers shared by ordinary script and interaction events.
-abstract class FieldEventExecution extends EventExecution {
+abstract class FieldEventExecution extends EventAndDialogExecution {
   const FieldEventExecution();
+
+  @override
+  Asm portraitCode(Portrait? thePortrait, HorizontalAlignment alignment) {
+    checkArgument(alignment == HorizontalAlignment.left,
+        message: 'Only left alignment is supported.');
+    return portrait(toPortraitCode(thePortrait));
+  }
 
   @override
   Asm runDialog({required bool resume, required DialogOnClose onClose}) {
@@ -3655,8 +3685,19 @@ class InteractionEventExecution extends FieldEventExecution {
 }
 
 /// Talk events execute synchronously inside the menu's window loop.
-class TalkEventExecution extends EventExecution {
+class TalkEventExecution extends EventAndDialogExecution {
   const TalkEventExecution();
+
+  @override
+  Asm portraitCode(Portrait? thePortrait, HorizontalAlignment alignment) {
+    var positionCode = switch (alignment) {
+      HorizontalAlignment.left => 0,
+      HorizontalAlignment.right => 2,
+      HorizontalAlignment.center => 1,
+    };
+    return portraitWithPosition(
+        toPortraitCode(thePortrait), Byte(positionCode));
+  }
 
   @override
   bool get startsWithDialogWindow => true;
@@ -3690,11 +3731,12 @@ sealed class GameMode {}
 
 sealed class DialogCapableMode extends GameMode {
   RunEventCapableMode? get priorMode;
+  DialogExecution get execution;
   bool get isInDialogLoop;
 }
 
 sealed class RunEventCapableMode extends GameMode {
-  EventExecution get eventExecution;
+  EventExecution get execution;
   EventMode toEventMode(EventType type);
 }
 
@@ -3704,7 +3746,8 @@ class EventMode implements DialogCapableMode {
   final EventType type;
   final bool _inDialog;
 
-  final EventExecution execution;
+  @override
+  final EventAndDialogExecution execution;
 
   EventMode({
     this.priorMode,
@@ -3725,11 +3768,11 @@ class EventMode implements DialogCapableMode {
 
 class RunEventMode implements RunEventCapableMode {
   @override
-  EventExecution get eventExecution => const ScriptEventExecution();
+  EventAndDialogExecution get execution => const ScriptEventExecution();
 
   @override
   EventMode toEventMode(EventType type) =>
-      EventMode(priorMode: this, type: type, execution: eventExecution);
+      EventMode(priorMode: this, type: type, execution: execution);
 }
 
 class InteractionMode implements RunEventCapableMode, DialogCapableMode {
@@ -3747,11 +3790,11 @@ class InteractionMode implements RunEventCapableMode, DialogCapableMode {
   InteractionMode.noObject() : this(withObject: null);
 
   @override
-  EventExecution get eventExecution => const InteractionEventExecution();
+  EventAndDialogExecution get execution => const InteractionEventExecution();
 
   @override
   EventMode toEventMode(EventType type) =>
-      EventMode(priorMode: this, type: type, execution: eventExecution);
+      EventMode(priorMode: this, type: type, execution: execution);
 }
 
 /// An objectless interaction whose events retain the menu's window context.
@@ -3759,7 +3802,7 @@ class TalkMode extends InteractionMode {
   TalkMode() : super.noObject();
 
   @override
-  TalkEventExecution get eventExecution => const TalkEventExecution();
+  TalkEventExecution get execution => const TalkEventExecution();
 
   @override
   EventMode toEventMode(EventType type) {

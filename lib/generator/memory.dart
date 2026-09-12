@@ -253,6 +253,16 @@ class Memory implements EventState {
       (s, m) => m._eventState.dialogPortrait = s));
 
   @override
+  HorizontalAlignment? get portraitAlignment => _eventState.portraitAlignment;
+
+  @override
+  set portraitAlignment(HorizontalAlignment? alignment) =>
+      _apply(SetValue<HorizontalAlignment>(
+          alignment,
+          (m) => m._eventState.portraitAlignment,
+          (a, m) => m._eventState.portraitAlignment = a));
+
+  @override
   bool? get keepDialog => _eventState.keepDialog;
 
   @override

@@ -1602,7 +1602,7 @@ void main() {
         var dialog = Dialog(spans: DialogSpan.parse('hello', events: [event]));
 
         var (asm, postRoutines) = dialog.toGeneratedAsm(
-            state..cameraLock = true,
+            state..cameraLock = true, InteractionMode.noObject(),
             labeller: Labeller.localTo('TestScene').withContext(0),
             fieldRoutines: defaultFieldRoutines);
 
@@ -1634,7 +1634,7 @@ void main() {
         var dialog = Dialog(spans: DialogSpan.parse('hello', events: [event]));
 
         var (asm, postRoutines) = dialog.toGeneratedAsm(
-            state..cameraLock = true,
+            state..cameraLock = true, InteractionMode.noObject(),
             labeller: Labeller.localTo('TestScene').withContext(0),
             fieldRoutines: defaultFieldRoutines);
 
@@ -1675,7 +1675,7 @@ void main() {
         ]);
 
         var (asm, postRoutines) = dialog.toGeneratedAsm(
-            state..cameraLock = true,
+            state..cameraLock = true, InteractionMode.noObject(),
             labeller: Labeller.localTo('TestScene').withContext(0),
             fieldRoutines: defaultFieldRoutines);
 
@@ -1723,6 +1723,7 @@ void main() {
             state
               ..cameraLock = true
               ..followLead = false,
+            InteractionMode.noObject(),
             labeller: Labeller.localTo('TestScene').withContext(0),
             fieldRoutines: defaultFieldRoutines);
 
@@ -1768,7 +1769,7 @@ void main() {
         ]));
 
         var (asm, postRoutines) = dialog.toGeneratedAsm(
-            state..cameraLock = true,
+            state..cameraLock = true, InteractionMode.noObject(),
             labeller: Labeller.localTo('TestScene').withContext(0),
             fieldRoutines: defaultFieldRoutines);
 

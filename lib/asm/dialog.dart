@@ -65,6 +65,10 @@ Asm portrait(Byte portrait) {
   return dc.b([...ControlCodes.portrait, portrait]);
 }
 
+Asm portraitWithPosition(Byte portrait, Byte position) {
+  return dc.b([...ControlCodes.portrait, portrait, position]);
+}
+
 Asm extendableEventCheck(KnownConstantValue flag, Byte dialogOffset) {
   if (flag.value > Byte.max) {
     return Asm([

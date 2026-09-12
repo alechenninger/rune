@@ -5,6 +5,8 @@ import '../generator/generator.dart';
 import "../src/iterables.dart";
 import 'model.dart';
 
+export 'alignment.dart';
+
 class DisplayText extends Event {
   /// Columns by starting line offset. Note that lines of text take up 3 offsets
   /// so consecutive columns should be spaced 3 apart. That said, the simpler
@@ -145,8 +147,6 @@ class Text {
       const ListEquality<Span>().hash(spans) ^
       lineBreak.hashCode;
 }
-
-enum HorizontalAlignment { left, center, right }
 
 enum VerticalAlignment { top, center, bottom }
 

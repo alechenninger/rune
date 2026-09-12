@@ -42,6 +42,7 @@ export 'movement.dart';
 export 'objects.dart';
 export 'party.dart';
 export 'sound.dart';
+export 'alignment.dart';
 export 'text.dart';
 export 'guild.dart';
 export 'item.dart';
@@ -267,6 +268,7 @@ class EventState {
     isFieldShown = from.isFieldShown;
     onExitRunBattle = from.onExitRunBattle;
     dialogPortrait = from.dialogPortrait;
+    portraitAlignment = from.portraitAlignment;
     keepDialog = from.keepDialog;
     currentMap = from.currentMap;
     stepSpeed = from.stepSpeed;
@@ -319,6 +321,7 @@ class EventState {
   bool? onExitRunBattle = false;
 
   Portrait? dialogPortrait = Portrait.none;
+  HorizontalAlignment? portraitAlignment = HorizontalAlignment.left;
 
   /// Whether or not dialog windows are kept during event loop.
   bool? keepDialog = false;
@@ -820,6 +823,7 @@ class Scene extends IterableBase<Event> {
 
             events.replaceRange(i, j, [
               Dialog(
+                portraitAlignment: d.portraitAlignment,
                 spans: [
                   DialogSpan.fromSpan(dialogTo,
                       events: spans.firstOrNull?.events ?? []),
@@ -1082,6 +1086,7 @@ extension CollapseDialog on List<Event> {
 
       if (e is! Dialog) continue;
 
+      var alignment = e.portraitAlignment;
       var spans = <DialogSpan>[..._justEvents(e)];
       var j = i + 1;
 
@@ -1093,6 +1098,7 @@ extension CollapseDialog on List<Event> {
 
       replaceRange(i, j, [
         Dialog(
+          portraitAlignment: alignment,
           spans: [
             DialogSpan.fromSpan(to, panel: spans.firstOrNull?.panel),
             ...spans.skip(1)

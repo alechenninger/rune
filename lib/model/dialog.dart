@@ -7,16 +7,25 @@ import 'model.dart';
 class Dialog extends Event {
   Speaker speaker;
   Portrait get portrait => speaker.portrait;
-  bool hidePanelsOnClose = false;
+  final HorizontalAlignment portraitAlignment;
+  final bool hidePanelsOnClose = false;
   final List<DialogSpan> _spans = [];
   List<DialogSpan> get spans => UnmodifiableListView(_spans);
 
-  factory Dialog.parse(String markup, {Speaker? speaker}) {
-    return Dialog(spans: DialogSpan.parse(markup), speaker: speaker);
+  factory Dialog.parse(String markup,
+      {Speaker? speaker,
+      HorizontalAlignment portraitAlignment = HorizontalAlignment.left}) {
+    return Dialog(
+        spans: DialogSpan.parse(markup),
+        speaker: speaker,
+        portraitAlignment: portraitAlignment);
   }
 
-  Dialog({Speaker? speaker, List<DialogSpan> spans = const []})
-      : speaker = speaker ?? const UnnamedSpeaker() {
+  Dialog({
+    Speaker? speaker,
+    List<DialogSpan> spans = const [],
+    this.portraitAlignment = HorizontalAlignment.left,
+  }) : speaker = speaker ?? const UnnamedSpeaker() {
     var lastSpanSkipped = false;
 
     for (var i = 0; i < spans.length; i++) {
@@ -103,11 +112,13 @@ class Dialog extends Event {
       other is Dialog &&
           runtimeType == other.runtimeType &&
           speaker == other.speaker &&
+          portraitAlignment == other.portraitAlignment &&
           hidePanelsOnClose == other.hidePanelsOnClose &&
           const ListEquality().equals(_spans, other._spans);
 
   @override
-  int get hashCode => speaker.hashCode ^ const ListEquality().hash(_spans);
+  int get hashCode => Object.hash(speaker, portraitAlignment, hidePanelsOnClose,
+      const ListEquality().hash(_spans));
 }
 
 class DialogSpan {
