@@ -55,6 +55,9 @@ class Game {
 
   List<GameMap> get maps => _maps.values.toList(growable: false);
 
+  /// The single, map-independent Talk menu scene.
+  final Scene talk = Scene([]);
+
   final HuntersGuildInteractions huntersGuild = HuntersGuildInteractions();
 
   /// Returns the [Game] split into subsets based on what objects in the game

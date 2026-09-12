@@ -1,5 +1,7 @@
 import '../asm/data.dart';
 
+const talkSceneLabel = Constant('Talk');
+
 class Labeller {
   /// A context which can be ommitted if using a local label.
   ///

@@ -103,9 +103,9 @@ void _compileReceptionistScene(
   var dialogId = tree.nextDialogId!;
   var eventAsm = EventAsm.empty();
 
-  SceneAsmGenerator.forInteraction(
-      map, SceneId(constant.constant), dialogTrees, eventAsm, eventRoutines,
-      eventFlags: eventFlags, withObject: null)
+  SceneAsmGenerator.forGuild(
+      map, constant, dialogTrees, eventAsm, eventRoutines,
+      eventFlags: eventFlags)
     ..scene(scene)
     ..finish();
 

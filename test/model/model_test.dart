@@ -5,6 +5,18 @@ import 'package:test/test.dart';
 import '../fixtures.dart';
 
 void main() {
+  group('SceneId', () {
+    test('IDs require word characters', () {
+      expect(() => SceneId('not-valid'), throwsArgumentError);
+    });
+
+    test('ordinary IDs do not reserve Talk or GrandCross_', () {
+      expect(SceneId('Talk').id, 'Talk');
+      expect(SceneId('GrandCross_').id, 'GrandCross_');
+      expect(SceneId('GrandCross_Talk').id, 'GrandCross_Talk');
+    });
+  });
+
   group('==', () {
     test('IndividualMoves', () {
       var moves = IndividualMoves();

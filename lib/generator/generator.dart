@@ -165,6 +165,22 @@ class Program {
     return _scenes[id] = SceneAsm(event: eventAsm);
   }
 
+  /// Compiles Talk using the same flags and routine tables as the rest of the game.
+  EventAsm addTalk(Scene scene) {
+    try {
+      var eventAsm = EventAsm.empty();
+      SceneAsmGenerator.forTalk(
+          dialogTrees, eventAsm, _ProgramEventRoutines(this),
+          eventFlags: _eventFlags, fieldRoutines: _fieldRoutines)
+        ..runEventIfNeeded(scene.events)
+        ..scene(scene)
+        ..finish();
+      return eventAsm;
+    } catch (err, stack) {
+      throw GeneratorException('Failed to compile Talk scene', err, stack);
+    }
+  }
+
   MapAsm addMap(GameMap map) {
     // trees are already written to, and we don't know which ones, and which
     // branches
@@ -192,11 +208,13 @@ class Program {
         eventRoutines: _ProgramEventRoutines(this));
   }
 
-  /// DialogTrees for maps which are not added to the game.
-  Map<MapId?, DialogTree> extraDialogTrees() {
-    var extras = dialogTrees.toMap();
-    extras.removeWhere((key, _) => _maps.containsKey(key));
-    return extras;
+  /// Dialog trees for maps which are not included in the compiled maps.
+  Map<MapId, DialogTree> extraDialogTrees() {
+    return {
+      for (var entry in dialogTrees.toMap().entries)
+        if (entry.key case MapDialogTreeKey(:final mapId))
+          if (!_maps.containsKey(mapId)) mapId: entry.value,
+    };
   }
 
   Asm extraConstants() {
@@ -750,10 +768,34 @@ class SceneAsmGenerator implements EventVisitor {
   final _queuedGeneration = Queue<_QueuedGeneration>();
   Event? _lastEventInCurrentDialog;
 
-  Function([int? dialogRoutine])? _replaceDialogRoutine;
+  /// Routine to change the current dialog's onClose behavior.
+  ///
+  /// null if there is no dialog generated.
+  void Function(DialogOnClose)? _setDialogOnClose;
 
-  // todo: This might be a subclass really
-  SceneAsmGenerator.forInteraction(GameMap map, this.id,
+  SceneAsmGenerator.forInteraction(GameMap map, SceneId id,
+      DialogTrees dialogTrees, EventAsm eventAsm, EventRoutines eventRoutines,
+      {EventFlags? eventFlags,
+      FieldObject? withObject = const InteractionObject(),
+      FieldRoutineRepository? fieldRoutines})
+      : this._forInteraction(
+            map, _validateSceneId(id), dialogTrees, eventAsm, eventRoutines,
+            eventFlags: eventFlags,
+            withObject: withObject,
+            fieldRoutines: fieldRoutines);
+
+  /// Uses the guild's existing assembly constant as the scene's identity.
+  /// Reserved generator prefixes are allowed for these built-in names.
+  SceneAsmGenerator.forGuild(GameMap map, Constant constant,
+      DialogTrees dialogTrees, EventAsm eventAsm, EventRoutines eventRoutines,
+      {EventFlags? eventFlags, FieldRoutineRepository? fieldRoutines})
+      : this._forInteraction(map, SceneId(constant.constant), dialogTrees,
+            eventAsm, eventRoutines,
+            eventFlags: eventFlags,
+            withObject: null,
+            fieldRoutines: fieldRoutines);
+
+  SceneAsmGenerator._forInteraction(GameMap map, this.id,
       DialogTrees dialogTrees, EventAsm eventAsm, EventRoutines eventRoutines,
       {EventFlags? eventFlags,
       FieldObject? withObject = const InteractionObject(),
@@ -782,6 +824,33 @@ class SceneAsmGenerator implements EventVisitor {
     _currentDialogIdOrStart();
   }
 
+  /// Generates the single Talk scene, with an unknown map and no object.
+  /// The caller must load the Talk tree and start at dialog ID zero.
+  SceneAsmGenerator.forTalk(
+      DialogTrees dialogTrees, EventAsm eventAsm, EventRoutines eventRoutines,
+      {EventFlags? eventFlags, FieldRoutineRepository? fieldRoutines})
+      : id = SceneId(talkSceneLabel.constant),
+        _labeller = Labeller.localTo(talkSceneLabel),
+        _gameMode = TalkMode(),
+        _context = GenerationContext(
+            _EventRoutinesWrappingConfiguration(
+                eventRoutines: eventRoutines,
+                constants: Constants.wrap({}),
+                dialogTrees: dialogTrees,
+                eventFlags: eventFlags ?? EventFlags(),
+                fieldRoutines: fieldRoutines ?? defaultFieldRoutines),
+            eventAsm: eventAsm,
+            runEventAsm: Asm.empty()) {
+    var tree = _dialogTrees.forTalk();
+    if (tree.isNotEmpty) {
+      throw StateError('the Talk scene has already been generated');
+    }
+    _memory.hasSavedDialogPosition = false;
+    _memory.loadedDialogTree = tree;
+    _stateGraph[Condition.empty()] = _memory;
+    _currentDialogIdOrStart();
+  }
+
   SceneAsmGenerator.forEvent(
       this.id, DialogTrees dialogTrees, EventAsm eventAsm,
       {GameMap? startingMap,
@@ -790,7 +859,9 @@ class SceneAsmGenerator implements EventVisitor {
       FieldRoutineRepository? fieldRoutines})
       : //_dialogIdOffset = _dialogTree.nextDialogId!,
         _labeller = Labeller.localTo(id),
-        _gameMode = EventMode(type: eventType ?? EventType.event),
+        _gameMode = EventMode(
+            type: eventType ?? EventType.event,
+            execution: const ScriptEventExecution()),
         _context = GenerationContext(
             _AsmProgramConfiguration(
                 events: eventPtrs(),
@@ -804,6 +875,7 @@ class SceneAsmGenerator implements EventVisitor {
                 builtInSprites: _defaultBuiltInSprites),
             eventAsm: eventAsm,
             runEventAsm: Asm.empty()) {
+    _validateSceneId(id);
     _memory.currentMap = startingMap;
     if (startingMap != null) {
       _memory.loadedDialogTree = _dialogTrees.forMap(startingMap.id);
@@ -820,9 +892,18 @@ class SceneAsmGenerator implements EventVisitor {
         _gameMode = RunEventMode(),
         _context = GenerationContext(config,
             eventAsm: eventAsm, runEventAsm: runEventAsm) {
+    _validateSceneId(id);
     _memory.currentMap = inMap;
     _memory.loadedDialogTree = _dialogTrees.forMap(inMap.id);
     _stateGraph[Condition.empty()] = _memory;
+  }
+
+  static SceneId _validateSceneId(SceneId id) {
+    checkArgument(id.id != talkSceneLabel.constant,
+        message: 'Talk is reserved by the generator');
+    checkArgument(!id.id.startsWith('GrandCross_'),
+        message: 'IDs starting with GrandCross_ are reserved by the generator');
+    return id;
   }
 
   void scene(Scene scene) {
@@ -924,6 +1005,8 @@ class SceneAsmGenerator implements EventVisitor {
         _addToDialog(dialog_asm.runEvent(eventIndex));
         _terminateDialog();
         _gameMode = newMode = m.toEventMode(type);
+        // Depending on the mode, there may already be a dialog window.
+        _memory.keepDialog = newMode.execution.startsWithDialogWindow;
 
         break;
       case RunEventMode m:
@@ -2669,13 +2752,14 @@ class SceneAsmGenerator implements EventVisitor {
         _memory.onExitRunBattle == false && (_memory.panelsShown ?? 0) > 0;
 
     switch (_gameMode) {
-      case EventMode(priorMode: InteractionMode(), type: EventType.cutscene):
+      case EventMode(priorMode: InteractionMode(), type: EventType.cutscene) &&
+            EventMode mode:
         if (needToShowField) {
-          if (_replaceDialogRoutine case var replaceDialog?) {
+          if (_setDialogOnClose case var setOnClose?) {
             // dialog 5 will fade out the whole screen
             // before map reload happens
             // (destroy window -> fade out -> destroy panels)
-            replaceDialog(5);
+            setOnClose(DialogOnClose.fadeOutAndDestroyPanels);
           } else {
             // todo: but what if there isn't dialog?
             //  do we need to do palfadout?
@@ -2700,12 +2784,13 @@ class SceneAsmGenerator implements EventVisitor {
 
         // clears z bit so we don't reload the map from cutscene
         _eventAsm.add(comment('Finish'));
-        _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
-        _eventAsm.add(rts);
+        _eventAsm.add(mode.execution.returnFromEvent(
+            type: mode.type, reloadField: needToShowField, forceReturn: true));
 
         break;
 
-      case EventMode(priorMode: InteractionMode(), type: EventType.event):
+      case EventMode(priorMode: InteractionMode(), type: EventType.event) &&
+            EventMode mode:
         _terminateDialog();
         _eventAsm.add(_waitForPendingMovements(_memory.pendingMovements));
 
@@ -2725,11 +2810,13 @@ class SceneAsmGenerator implements EventVisitor {
         }
 
         _eventAsm.add(comment('Finish'));
-        _eventAsm.add(returnFromInteractionEvent());
+        _eventAsm.add(mode.execution.returnFromEvent(
+            type: mode.type, reloadField: needToShowField, forceReturn: true));
 
         break;
 
-      case EventMode(priorMode: RunEventMode? prior, type: var type):
+      case EventMode(priorMode: RunEventMode? prior, type: var type) &&
+            EventMode mode:
         _terminateDialog();
         _eventAsm.add(_waitForPendingMovements(_memory.pendingMovements));
 
@@ -2750,7 +2837,6 @@ class SceneAsmGenerator implements EventVisitor {
         if (type == EventType.cutscene) {
           // clears z bit so we don't reload the map from cutscene
           _eventAsm.add(comment('Finish'));
-          _eventAsm.add(moveq(needToShowField ? 0.i : 1.i, d0));
         } else if (needToShowField) {
           fadeInField(FadeInField());
         }
@@ -2758,9 +2844,10 @@ class SceneAsmGenerator implements EventVisitor {
         // NOTE: It is somewhat legacy behavior that we don't always add rts
         // There are some scenes where we add manual assembly after the event
         // code. We could move these to manual ASM blocks inside the script.
-        if (prior != null || _postAsm.isNotEmpty || force) {
-          _eventAsm.add(rts);
-        }
+        _eventAsm.add(mode.execution.returnFromEvent(
+            type: type,
+            reloadField: needToShowField,
+            forceReturn: prior != null || _postAsm.isNotEmpty || force));
 
         break;
 
@@ -3035,7 +3122,7 @@ class SceneAsmGenerator implements EventVisitor {
     _context.getAndIncrementEventCount();
 
     if (_gameMode case InteractionMode m
-        when _lastEventInCurrentDialog == null && m.isWithObject) {
+        when _lastEventInCurrentDialog == null && m.knownWithObject) {
       // This is an interaction and we're not starting with face player,
       // so signal not to.
       _addToDialog(dc.b(Bytes.of(0xf3)));
@@ -3129,46 +3216,9 @@ class SceneAsmGenerator implements EventVisitor {
       _eventAsm.add(move.b(1.i, Constant('Render_Sprites_In_Cutscenes').w));
     }
 
-    /*
-    differences in panel handling after button press:
-
-    rundialog - destory panels, then destroy window
-    rundialog2 - leave everything up, but reset counts - used before battles
-    rundialog3 - destroy window, don't touch panels
-    rundialog4 - destroy window, don't touch panels
-      (but uses runtext3 instead - used in ending for non-interactive dialog)
-    rundialog5 - destroy window, then fade screen (then destroy panels silently)
-
-    problem is we have to know how we want to handle panels in the future
-    before we run dialog.
-
-    we could lookahead and see what's about to happen:
-
-    - if no more events
-      - if there are panels
-        - if field is faded
-          - run5
-        - run regular
-      - run regular
-    - run3
-
-    we could also look back? remember where the last rundialog routine was
-    and change it accordingly?
-
-    the behavior of destroying a panel before the window is more like a dialog
-    behavior. so we'd set a flag on the dialog to say whether it should close
-    panels with it, and then look ahead in dialog for that.
-
-    fade out can just be done explicitly, but might check if we have already
-    faded the field, in which case only call the palfadeout routine. that is,
-    default to rundialog3.
-     */
-
-    if (_memory.hasSavedDialogPosition) {
+    var resume = _memory.hasSavedDialogPosition;
+    if (resume) {
       _eventAsm.add(popdlg);
-      var line = _eventAsm.add(jsr(Label('Event_RunDialogue3').l));
-      _replaceDialogRoutine = ([i]) =>
-          _eventAsm.replace(line, jsr(Label('Event_RunDialogue${i ?? ""}').l));
     } else {
       var id = _currentDialogIdOrStart();
       if (id < Byte(128)) {
@@ -3176,10 +3226,12 @@ class SceneAsmGenerator implements EventVisitor {
       } else {
         _eventAsm.add(move.b(id.i, d0));
       }
-      var line = _eventAsm.add(jsr(Label('Event_GetAndRunDialogue3').l));
-      _replaceDialogRoutine = ([i]) => _eventAsm.replace(
-          line, jsr(Label('Event_GetAndRunDialogue${i ?? ""}').l));
     }
+
+    var line = _eventAsm.add(mode.execution
+        .runDialog(resume: resume, onClose: DialogOnClose.leavePanels));
+    _setDialogOnClose = (cleanup) => _eventAsm.replace(
+        line, mode.execution.runDialog(resume: resume, onClose: cleanup));
 
     _memory.unknownAddressRegisters();
     _memory.keepDialog = false;
@@ -3266,8 +3318,8 @@ class SceneAsmGenerator implements EventVisitor {
     // if replace routine is null,
     // this should mean that we are processing interaction and not in event
     // so panels will be hidden as interaction ends normally
-    if (hidePanels == true && _replaceDialogRoutine != null) {
-      _replaceDialogRoutine!();
+    if (_setDialogOnClose case var setOnClose? when hidePanels == true) {
+      setOnClose(DialogOnClose.destroyPanels);
     }
 
     if (hidePanels == false && _gameMode is InteractionMode) {
@@ -3279,7 +3331,7 @@ class SceneAsmGenerator implements EventVisitor {
       _resetCurrentDialog();
     }
 
-    if (_gameMode case EventMode()) {
+    if (_gameMode case EventMode mode) {
       // If we meant not to keep dialog,
       // ensure it's closed now as it may have been left open.
       if (!keepDialog && _memory.keepDialog != false) {
@@ -3287,7 +3339,7 @@ class SceneAsmGenerator implements EventVisitor {
         _memory.dialogPortrait = Portrait.none;
 
         // This is a no-op if dialog not actually kept.
-        _eventAsm.add(jsr('Event_CloseDialog'.l));
+        _eventAsm.add(mode.execution.closeDialog());
 
         // Close window, map chunk loads both mess with registers
         _memory.unknownAddressRegisters();
@@ -3324,7 +3376,7 @@ class SceneAsmGenerator implements EventVisitor {
     // see it used that way. just an optimization so come back to this.
     _memory.hasSavedDialogPosition = false;
     _lastEventBreak = -1;
-    _replaceDialogRoutine = null;
+    _setDialogOnClose = null;
   }
 
   Byte _currentDialogIdOrStart() {
@@ -3527,6 +3579,113 @@ class _QueuedGeneration {
   _QueuedGeneration(this.generateDialog, this.generateEvent);
 }
 
+/// What should happen to panels when a dialog window finishes.
+enum DialogOnClose {
+  leavePanels,
+  destroyPanels,
+  fadeOutAndDestroyPanels,
+}
+
+/// Assembly conventions of the context which invoked an event.
+///
+/// The generator owns memory tracking and decides when these operations occur.
+/// Implementations must not mutate generation state.
+abstract class EventExecution {
+  const EventExecution();
+
+  /// Whether the caller hands an already-open dialog window to the event.
+  bool get startsWithDialogWindow => false;
+
+  Asm runDialog({required bool resume, required DialogOnClose onClose});
+  Asm closeDialog();
+  Asm returnFromEvent({
+    required EventType type,
+    required bool reloadField,
+    required bool forceReturn,
+  });
+}
+
+/// Dialog helpers shared by ordinary script and interaction events.
+abstract class FieldEventExecution extends EventExecution {
+  const FieldEventExecution();
+
+  @override
+  Asm runDialog({required bool resume, required DialogOnClose onClose}) {
+    var suffix = switch (onClose) {
+      DialogOnClose.leavePanels => '3',
+      DialogOnClose.destroyPanels => '',
+      DialogOnClose.fadeOutAndDestroyPanels => '5',
+    };
+    var routine = resume ? 'Event_RunDialogue' : 'Event_GetAndRunDialogue';
+    return jsr(Label('$routine$suffix').l);
+  }
+
+  @override
+  Asm closeDialog() => jsr('Event_CloseDialog'.l);
+}
+
+class ScriptEventExecution extends FieldEventExecution {
+  const ScriptEventExecution();
+
+  @override
+  Asm returnFromEvent({
+    required EventType type,
+    required bool reloadField,
+    required bool forceReturn,
+  }) =>
+      Asm([
+        if (type == EventType.cutscene) moveq(reloadField ? 0.i : 1.i, d0),
+        if (forceReturn) rts,
+      ]);
+}
+
+class InteractionEventExecution extends FieldEventExecution {
+  const InteractionEventExecution();
+
+  @override
+  Asm returnFromEvent({
+    required EventType type,
+    required bool reloadField,
+    required bool forceReturn,
+  }) =>
+      switch (type) {
+        EventType.event => returnFromInteractionEvent(),
+        EventType.cutscene => Asm([moveq(reloadField ? 0.i : 1.i, d0), rts]),
+      };
+}
+
+/// Talk events execute synchronously inside the menu's window loop.
+class TalkEventExecution extends EventExecution {
+  const TalkEventExecution();
+
+  @override
+  bool get startsWithDialogWindow => true;
+
+  @override
+  Asm runDialog({required bool resume, required DialogOnClose onClose}) {
+    var suffix = switch (onClose) {
+      DialogOnClose.leavePanels => '3',
+      DialogOnClose.destroyPanels => '',
+      DialogOnClose.fadeOutAndDestroyPanels =>
+        throw UnsupportedError('Talk does not support fading out dialog'),
+    };
+    var routine =
+        resume ? 'Talk_Event_RunDialogue' : 'Talk_Event_GetAndRunDialogue';
+    return jsr(Label('$routine$suffix').l);
+  }
+
+  @override
+  Asm closeDialog() => jsr('Talk_Event_CloseDialog'.l);
+
+  @override
+  Asm returnFromEvent({
+    required EventType type,
+    required bool reloadField,
+    required bool forceReturn,
+  }) =>
+      rts;
+}
+
 sealed class GameMode {}
 
 sealed class DialogCapableMode extends GameMode {
@@ -3535,6 +3694,7 @@ sealed class DialogCapableMode extends GameMode {
 }
 
 sealed class RunEventCapableMode extends GameMode {
+  EventExecution get eventExecution;
   EventMode toEventMode(EventType type);
 }
 
@@ -3544,23 +3704,32 @@ class EventMode implements DialogCapableMode {
   final EventType type;
   final bool _inDialog;
 
-  EventMode({this.priorMode, required this.type, bool inDialog = false})
-      : _inDialog = inDialog;
+  final EventExecution execution;
+
+  EventMode({
+    this.priorMode,
+    required this.type,
+    required this.execution,
+    bool inDialog = false,
+  }) : _inDialog = inDialog;
 
   @override
   bool get isInDialogLoop => _inDialog;
 
-  EventMode enterDialogLoop() =>
-      EventMode(priorMode: priorMode, type: type, inDialog: true);
+  EventMode enterDialogLoop() => EventMode(
+      priorMode: priorMode, type: type, execution: execution, inDialog: true);
 
-  EventMode exitDialogLoop() =>
-      EventMode(priorMode: priorMode, type: type, inDialog: false);
+  EventMode exitDialogLoop() => EventMode(
+      priorMode: priorMode, type: type, execution: execution, inDialog: false);
 }
 
 class RunEventMode implements RunEventCapableMode {
   @override
+  EventExecution get eventExecution => const ScriptEventExecution();
+
+  @override
   EventMode toEventMode(EventType type) =>
-      EventMode(priorMode: this, type: type);
+      EventMode(priorMode: this, type: type, execution: eventExecution);
 }
 
 class InteractionMode implements RunEventCapableMode, DialogCapableMode {
@@ -3570,14 +3739,35 @@ class InteractionMode implements RunEventCapableMode, DialogCapableMode {
   final isInDialogLoop = true;
   final FieldObject? withObject;
 
-  bool get isWithObject => withObject != null;
-  bool get isWithArea => !isWithObject;
+  /// Whether or not this interaction involves a specific object,
+  /// and we know what that object is.
+  bool get knownWithObject => withObject != null;
 
   InteractionMode({required this.withObject});
+  InteractionMode.noObject() : this(withObject: null);
+
+  @override
+  EventExecution get eventExecution => const InteractionEventExecution();
 
   @override
   EventMode toEventMode(EventType type) =>
-      EventMode(priorMode: this, type: type);
+      EventMode(priorMode: this, type: type, execution: eventExecution);
+}
+
+/// An objectless interaction whose events retain the menu's window context.
+class TalkMode extends InteractionMode {
+  TalkMode() : super.noObject();
+
+  @override
+  TalkEventExecution get eventExecution => const TalkEventExecution();
+
+  @override
+  EventMode toEventMode(EventType type) {
+    if (type == EventType.cutscene) {
+      throw UnsupportedError('Talk does not support cutscene events');
+    }
+    return super.toEventMode(type);
+  }
 }
 
 Word _addEventRoutine(EventRoutines r, Label name) {
@@ -3784,14 +3974,48 @@ abstract class DialogTreeLookup {
   Future<DialogTree> byLabel(Label lbl);
 }
 
+sealed class DialogTreeKey {
+  const DialogTreeKey();
+
+  const factory DialogTreeKey.forMap(MapId mapId) = MapDialogTreeKey;
+  static const talk = TalkDialogTreeKey();
+}
+
+final class MapDialogTreeKey extends DialogTreeKey {
+  final MapId mapId;
+
+  const MapDialogTreeKey(this.mapId);
+
+  @override
+  bool operator ==(Object other) =>
+      other is MapDialogTreeKey && mapId == other.mapId;
+
+  @override
+  int get hashCode => mapId.hashCode;
+}
+
+final class TalkDialogTreeKey extends DialogTreeKey {
+  const TalkDialogTreeKey();
+
+  @override
+  bool operator ==(Object other) => other is TalkDialogTreeKey;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+}
+
 class DialogTrees {
-  final _trees = <MapId?, DialogTree>{};
+  final _trees = <DialogTreeKey, DialogTree>{};
 
   // note, in the original a tree is usually shared for multiple maps
   // but i don't think it will really be a problem to separate more
-  DialogTree forMap(MapId map) => _trees.putIfAbsent(map, () => DialogTree());
+  DialogTree forMap(MapId map) =>
+      _trees.putIfAbsent(DialogTreeKey.forMap(map), () => DialogTree());
 
-  Map<MapId?, DialogTree> toMap() => Map.of(_trees);
+  DialogTree forTalk() =>
+      _trees.putIfAbsent(DialogTreeKey.talk, () => DialogTree());
+
+  Map<DialogTreeKey, DialogTree> toMap() => Map.of(_trees);
 
   DialogTrees withoutComments() {
     return DialogTrees()

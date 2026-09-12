@@ -28,6 +28,103 @@ void main() {
     return fixtures.generateEventAsm(events, context: ctx, inMap: map);
   }
 
+  group('scene ID validation', () {
+    var constructors = <String, SceneAsmGenerator Function(SceneId)>{
+      'interaction': (id) => SceneAsmGenerator.forInteraction(
+          GameMap(MapId.Test),
+          id,
+          DialogTrees(),
+          EventAsm.empty(),
+          TestEventRoutines()),
+      'event': (id) =>
+          SceneAsmGenerator.forEvent(id, DialogTrees(), EventAsm.empty()),
+      'run event': (id) => SceneAsmGenerator.forRunEvent(id,
+          inMap: GameMap(MapId.Test),
+          eventAsm: EventAsm.empty(),
+          runEventAsm: Asm.empty(),
+          config: ProgramConfiguration.empty()),
+    };
+
+    for (var entry in constructors.entries) {
+      test('${entry.key} rejects reserved ordinary IDs', () {
+        for (var name in ['Talk', 'GrandCross_', 'GrandCross_Test']) {
+          expect(() => entry.value(SceneId(name)), throwsArgumentError);
+        }
+      });
+    }
+  });
+
+  test('guild constructor preserves the constant and has no interaction object',
+      () {
+    const constant = Constant('GrandCross_HuntersGuild_DialogID_Welcome');
+    var trees = DialogTrees();
+    var asm = EventAsm.empty();
+    var dialog = Dialog(spans: [DialogSpan('Welcome')]);
+    var generator = SceneAsmGenerator.forGuild(
+        map, constant, trees, asm, TestEventRoutines())
+      ..dialog(dialog)
+      ..finish();
+
+    expect(generator.id.id, constant.constant);
+    expect(asm, isEmpty);
+    expect(trees.forMap(map.id).toAsm().withoutComments().trim(),
+        Asm([dialog.toAsm(), terminateDialog()]));
+  });
+
+  group('Talk', () {
+    test('generates conditional dialog without a map or interaction object',
+        () {
+      var trees = DialogTrees();
+      var asm = EventAsm.empty();
+      SceneAsmGenerator.forTalk(trees, asm, TestEventRoutines())
+        ..ifFlag(IfFlag(EventFlag('flag1'), isSet: [
+          Dialog(spans: DialogSpan.parse('Set')),
+        ], isUnset: [
+          Dialog(spans: DialogSpan.parse('Unset')),
+        ]))
+        ..finish();
+
+      expect(asm, isEmpty);
+      expect(trees.toMap().keys, [DialogTreeKey.talk]);
+      expect(
+          trees.forTalk().toAsm().withoutComments().trim(),
+          Asm([
+            dc.b([Byte(0xFA)]),
+            dc.b([Constant('EventFlag_flag1'), Byte(1)]),
+            dc.b(DialogSpan('Unset').toAscii()),
+            terminateDialog(),
+            newLine(),
+            dc.b(DialogSpan('Set').toAscii()),
+            terminateDialog(),
+          ]));
+    });
+
+    test('reserves dialog zero even for an empty scene', () {
+      var trees = DialogTrees();
+      SceneAsmGenerator.forTalk(trees, EventAsm.empty(), TestEventRoutines())
+          .finish();
+      expect(trees.forTalk(), hasLength(1));
+      expect(trees.forTalk()[0].withoutComments(), terminateDialog());
+      expect(
+          () => SceneAsmGenerator.forTalk(
+              trees, EventAsm.empty(), TestEventRoutines()),
+          throwsStateError);
+    });
+
+    test('keeps Talk separate from maps and excludes it from extra trees', () {
+      var trees = program.dialogTrees;
+      var talk = trees.forTalk();
+      var mapTree = trees.forMap(map.id);
+      expect(identical(talk, mapTree), isFalse);
+      expect(identical(trees.forTalk(), talk), isTrue);
+      expect(trees.toMap()[DialogTreeKey.forMap(map.id)], same(mapTree));
+      expect(trees.withoutComments(), trees);
+      expect(program.extraDialogTrees(), {map.id: mapTree});
+      program.addMap(map);
+      expect(program.extraDialogTrees(), isEmpty);
+    });
+  });
+
   group('a cursor separates', () {
     test('between dialogs', () {
       var dialog1 = Dialog(speaker: Alys(), spans: DialogSpan.parse('Hi'));

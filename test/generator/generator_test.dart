@@ -11,6 +11,21 @@ import 'package:test/test.dart';
 import '../fixtures.dart';
 
 main() {
+  test('addScene rejects IDs reserved by the generator', () {
+    for (var name in ['Talk', 'GrandCross_', 'GrandCross_Talk']) {
+      expect(() => Program().addScene(SceneId(name), Scene()),
+          throwsArgumentError);
+    }
+  });
+
+  test('addScene permits names containing the reserved text elsewhere', () {
+    var program = Program();
+    for (var name in ['Talking', 'Another_GrandCross_Scene']) {
+      program.addScene(SceneId(name), Scene());
+      expect(program.scenes, contains(SceneId(name)));
+    }
+  });
+
   late GameMap map;
   late GameMap map2;
   late Memory testMemory;
