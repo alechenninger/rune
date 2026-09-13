@@ -50,8 +50,8 @@ const storyEvents = [
   EventFlag('Igglanova'),
   EventFlag('AfterIgglanova'),
   EventFlag('PrincipalConfession'),
-  // Grand Cross custom – avoid these because makes sram incompatible?
-  // EventFlag('ZemaFirstTime'),
+  // Grand Cross custom – keep otherwise timeline based events can be off
+  EventFlag('ZemaFirstTime'),
   EventFlag('HoltPetrified'),
   EventFlag('RuneJoined'),
   //EventFlag('Saya'), // May occur in different order
@@ -90,12 +90,16 @@ const storyEvents = [
   EventFlag('ZemaPetrified'),
   EventFlag('IgglanovaZema'),
   EventFlag('AfterIgglanovaZema'),
+  // New to GC
+  EventFlag('BioPlantFirstTime'),
   EventFlag('BioPlantEscape'),
   EventFlag('RikaJoined'),
   //EventFlag('AfterCrevice'),
   //EventFlag('FissureOfFearFee'),
   //EventFlag('TallasSaved'),
   //EventFlag('WreckageSystem'), - optional dungeon
+  // New to GC
+  EventFlag('ZioFortBarrierFirst'),
   EventFlag('JuzaFirstEncounter'),
   EventFlag('Juza'),
   EventFlag('JuzaDefeated'),
@@ -133,8 +137,8 @@ const storyEvents = [
   EventFlag('RajaTemple'),
   EventFlag('RajaJoined'),
   EventFlag('Snowstorm'),
-  // New to Grand Cross. – but maybe leave out for SRAM compatibility?
-  // EventFlag('RyuonFirstTime'),
+  // New to Grand Cross
+  EventFlag('RyuonFirstTime'),
   EventFlag('LandaleWhereabouts'),
   EventFlag('TylerGrave'),
   EventFlag('DezoSpaceport'),
