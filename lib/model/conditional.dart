@@ -141,6 +141,8 @@ const storyEvents = [
   EventFlag('RyuonFirstTime'),
   EventFlag('LandaleWhereabouts'),
   EventFlag('TylerGrave'),
+  // New to Grand Cross
+  EventFlag('HyperionDefender'),
   EventFlag('DezoSpaceport'),
   EventFlag('Kuran'),
   EventFlag('NearDarkForce1'),

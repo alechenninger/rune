@@ -155,6 +155,8 @@ const EnemyID_KingRappy = Constant('EnemyID_KingRappy');
 const EnemyID_InfantWorm2 = Constant('EnemyID_InfantWorm2');
 const EnemyID_Prophallus = Constant('EnemyID_Prophallus');
 const EnemyID_Zio3 = Constant('EnemyID_Zio3');
+const EnemyID_DarkLogoi = Constant('EnemyID_DarkLogoi');
+const EnemyID_HyperionDefender = Constant('EnemyID_HyperionDefender');
 
 const enemyIds = Array.wrap(byte, [
   EnemyID_Helex,
@@ -309,5 +311,8 @@ const enemyIds = Array.wrap(byte, [
   EnemyID_KingRappy,
   EnemyID_InfantWorm2,
   EnemyID_Prophallus,
-  EnemyID_Zio3
+  EnemyID_Zio3,
+  // Unique to GC
+  EnemyID_DarkLogoi,
+  EnemyID_HyperionDefender
 ]);
