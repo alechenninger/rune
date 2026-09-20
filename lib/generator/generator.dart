@@ -1769,7 +1769,8 @@ class SceneAsmGenerator implements EventVisitor {
 
       // Must terminate dialog first,
       // since it may trigger some event code is written lazily.
-      _terminateDialog();
+      // Keep dialog in case next event is dialog, just like other conditionals.
+      _terminateDialog(keepDialog: true);
 
       // Prempt event code for "yes" branch
       if (_eventAsm.length == eventAsmLength) {
@@ -1782,6 +1783,8 @@ class SceneAsmGenerator implements EventVisitor {
       }
     } else {
       runBranch(yesNo.ifNo);
+      // In this case, do not keep dialog; there cannot be a follow up event.
+      // After the yes branch, we finish().
       _terminateDialog();
     }
 
@@ -1799,7 +1802,7 @@ class SceneAsmGenerator implements EventVisitor {
     if (_inEvent) {
       _eventAsm.add(setLabel(yesLbl.name));
       runBranch(yesNo.ifYes);
-      _terminateDialog();
+      _terminateDialog(keepDialog: true);
       _eventAsm.add(setLabel(continueLbl.name));
       // Add continue label for earlier jump
     } else {
@@ -2866,6 +2869,9 @@ class SceneAsmGenerator implements EventVisitor {
         // we need to be able to reset, but there is no event asm to do that
         // need control code
 
+        // TODO: We might have left keep dialog = true
+        // and because we're still in dialog this will not clear it.
+
         _terminateDialog(waitForPendingMovements: true);
 
         break;
@@ -3274,6 +3280,7 @@ class SceneAsmGenerator implements EventVisitor {
             // We can't run in event (because we're not in one),
             // so do in dialog
             _generateQueueInCurrentMode();
+
             if (waitForPendingMovements) {
               var pending = _memory.resolveAll(
                   _memory.pendingMovements.where(_memory.hasPendingMovement));
@@ -3286,6 +3293,7 @@ class SceneAsmGenerator implements EventVisitor {
                 _postAsm.addAll(routines);
               }
             }
+
             break;
         }
 
@@ -3296,6 +3304,15 @@ class SceneAsmGenerator implements EventVisitor {
           } else {
             _memory.keepDialog = false;
             _memory.dialogPortrait = Portrait.none;
+          }
+
+          if (_lastEventInCurrentDialog is YesOrNoChoice) {
+            // The choice is already a selection,
+            // and if there were no other events,
+            // skip the terminate arrow prompt.
+            // Otherwise we get an empty window with a second required prompt.
+            _addToDialog(dc.b(ControlCodes.skipArrowPrompt));
+            // TODO: not sure if we need to track this in memory?
           }
 
           if (forEventBreak != null) {
@@ -3344,6 +3361,10 @@ class SceneAsmGenerator implements EventVisitor {
     if (_gameMode case EventMode mode) {
       // If we meant not to keep dialog,
       // ensure it's closed now as it may have been left open.
+      // This branch is hit when:
+      // - we weren't in dialog already (if so, above code already handled it)
+      // - we previously kept dialog (or might have)
+      // - this terminate does not want to keep dialog
       if (!keepDialog && _memory.keepDialog != false) {
         _memory.keepDialog = false;
         _memory.dialogPortrait = Portrait.none;

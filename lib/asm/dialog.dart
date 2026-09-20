@@ -5,6 +5,7 @@ import 'package:charcode/ascii.dart';
 import 'asm.dart';
 
 final class ControlCodes {
+  static final skipArrowPrompt = Bytes.list(const [0xF0]);
   static const action = Byte.constant(0xf2);
   static final keepNpcFacingDirection = Bytes.list(const [0xF3]);
   static final portrait = Bytes.list(const [0xF4]);

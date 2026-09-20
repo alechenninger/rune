@@ -162,6 +162,7 @@ main() {
               generateEventAsm([Pause(1.seconds)]),
               popAndRunDialog3,
               setLabel('.3_choice_continue'),
+              jsr('Event_CloseDialog'.l),
               returnFromInteractionEvent(),
             ]));
       });
@@ -176,16 +177,20 @@ main() {
             DialogAsm([
               dc.b([Byte(0xf5)]),
               dc.b([Byte(0x1), Byte(0)]),
+              dc.b([Byte(0xf0)]),
               dc.b([Byte(0xf7)]),
               dc.b(Bytes.ascii('Too bad.')),
+              dc.b([Byte(0xf8)]),
               dc.b([Byte(0xff)])
             ]));
 
         expect(
             dialogTree[2].withoutComments(),
             DialogAsm([
+              dc.b([Byte(0xf0)]),
               dc.b([Byte(0xf7)]),
               dc.b(Bytes.ascii('Great!')),
+              dc.b([Byte(0xf8)]),
               dc.b([Byte(0xff)])
             ]));
       });
@@ -290,6 +295,194 @@ main() {
               ]));
         });
       });
+    });
+
+    group('with empty branches', () {
+      test('empty branch with no following events skips arrow and terminates',
+          () {
+        mapObject.onInteract = Scene([
+          InteractionObject.facePlayer(),
+          YesOrNoChoice(ifYes: [Dialog.parse('Yes')]),
+        ]);
+
+        var asm = program.addMap(map);
+        expect(asm.events, isEmpty);
+
+        var dialogTree = program.dialogTrees.forMap(map.id);
+        expect(dialogTree, hasLength(2));
+        expect(
+            dialogTree[0].withoutComments(),
+            DialogAsm([
+              dc.b([Byte(0xf5)]),
+              dc.b([Byte(0x1), Byte(0)]),
+              dc.b([Byte(0xf0)]),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            dialogTree[1].withoutComments(),
+            DialogAsm([
+              dc.b(Bytes.ascii('Yes')),
+              dc.b([Byte(0xff)]),
+            ]));
+      });
+
+      test('empty branch followed by dialog skips arrow and keeps window', () {
+        mapObject.onInteract = Scene([
+          InteractionObject.facePlayer(),
+          YesOrNoChoice(ifYes: [Dialog.parse('Yes')]),
+          Dialog.parse('After'),
+        ]);
+
+        var asm = program.addMap(map);
+        var dialogTree = program.dialogTrees.forMap(map.id);
+
+        expect(dialogTree, hasLength(4));
+        expect(
+            dialogTree[0],
+            DialogAsm([
+              runEvent(0.toWord),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            dialogTree[1].withoutComments(),
+            DialogAsm([
+              dc.b([Byte(0xf5)]),
+              dc.b([Byte(0x1), Byte(0)]),
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xf0)]),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            dialogTree[2].withoutComments(),
+            DialogAsm([
+              dc.b(Bytes.ascii('Yes')),
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            dialogTree[3].withoutComments(),
+            DialogAsm([
+              dc.b(Bytes.ascii('After')),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            asm.events.withoutComments().trim().skip(2),
+            Asm([
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
+              getAndRunDialog3LowDialogId(Byte(1).i),
+              tst.b(Constant('Yes_No_Option').w),
+              bne.w(Label('.4_choice_continue')),
+              setLabel('.4_yes_choice'),
+              setLabel('.4_choice_continue'),
+              getAndRunDialog3LowDialogId(Byte(3).i),
+              returnFromInteractionEvent(),
+            ]));
+      });
+
+      test('empty branch followed by event skips arrow and closes window', () {
+        mapObject.onInteract = Scene([
+          InteractionObject.facePlayer(),
+          YesOrNoChoice(ifYes: [Dialog.parse('Yes')]),
+          Pause(1.second),
+        ]);
+
+        var asm = program.addMap(map);
+        var dialogTree = program.dialogTrees.forMap(map.id);
+
+        expect(dialogTree, hasLength(3));
+        expect(
+            dialogTree[0],
+            DialogAsm([
+              runEvent(0.toWord),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            dialogTree[1].withoutComments(),
+            DialogAsm([
+              dc.b([Byte(0xf5)]),
+              dc.b([Byte(0x1), Byte(0)]),
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xf0)]),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            dialogTree[2].withoutComments(),
+            DialogAsm([
+              dc.b(Bytes.ascii('Yes')),
+              dc.b([Byte(0xf8)]),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            asm.events.withoutComments().trim().skip(2),
+            Asm([
+              move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
+              getAndRunDialog3LowDialogId(Byte(1).i),
+              tst.b(Constant('Yes_No_Option').w),
+              bne.w(Label('.4_choice_continue')),
+              setLabel('.4_yes_choice'),
+              setLabel('.4_choice_continue'),
+              jsr('Event_CloseDialog'.l),
+              generateEventAsm([Pause(1.second)]),
+              returnFromInteractionEvent(),
+            ]));
+      });
+
+      test('both empty branches skip arrow and terminate', () {
+        mapObject.onInteract = Scene([
+          InteractionObject.facePlayer(),
+          YesOrNoChoice(),
+        ]);
+
+        var asm = program.addMap(map);
+        expect(asm.events, isEmpty);
+
+        var dialogTree = program.dialogTrees.forMap(map.id);
+        expect(dialogTree, hasLength(2));
+        expect(
+            dialogTree[0].withoutComments(),
+            DialogAsm([
+              dc.b([Byte(0xf5)]),
+              dc.b([Byte(0x1), Byte(0)]),
+              dc.b([Byte(0xf0)]),
+              dc.b([Byte(0xff)]),
+            ]));
+        expect(
+            dialogTree[1].withoutComments(),
+            DialogAsm([
+              dc.b([Byte(0xf0)]),
+              dc.b([Byte(0xff)]),
+            ]));
+      });
+    });
+
+    test('non-empty branches do not skip the arrow', () {
+      mapObject.onInteract = Scene([
+        InteractionObject.facePlayer(),
+        YesOrNoChoice(
+          ifYes: [Dialog.parse('Yes')],
+          ifNo: [Dialog.parse('No')],
+        )
+      ]);
+
+      var asm = program.addMap(map);
+      expect(asm.events, isEmpty);
+
+      var dialogTree = program.dialogTrees.forMap(map.id);
+      expect(dialogTree, hasLength(2));
+      expect(
+          dialogTree[0].withoutComments(),
+          DialogAsm([
+            dc.b([Byte(0xf5)]),
+            dc.b([Byte(0x1), Byte(0)]),
+            dc.b(Bytes.ascii('No')),
+            dc.b([Byte(0xff)]),
+          ]));
+      expect(
+          dialogTree[1].withoutComments(),
+          DialogAsm([
+            dc.b(Bytes.ascii('Yes')),
+            dc.b([Byte(0xff)]),
+          ]));
     });
   });
 }
