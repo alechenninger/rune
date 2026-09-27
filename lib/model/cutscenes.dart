@@ -265,6 +265,58 @@ class FadeInField extends FadeEvent {
   int get hashCode => speed.hashCode ^ runtimeType.hashCode;
 }
 
+class FadeToRed extends FadeEvent {
+  final VariableSpeed speed;
+
+  FadeToRed() : speed = VariableSpeed(3);
+
+  FadeToRed.withSpeed(int speed) : speed = VariableSpeed(speed);
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.fadeToRed(this);
+  }
+
+  @override
+  String toString() => 'FadeToRed{$speed}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FadeToRed &&
+          runtimeType == other.runtimeType &&
+          speed == other.speed;
+
+  @override
+  int get hashCode => speed.hashCode ^ runtimeType.hashCode;
+}
+
+class FadeFromRed extends FadeEvent {
+  final VariableSpeed speed;
+
+  FadeFromRed() : speed = VariableSpeed(3);
+
+  FadeFromRed.withSpeed(int speed) : speed = VariableSpeed(speed);
+
+  @override
+  void visit(EventVisitor visitor) {
+    visitor.fadeFromRed(this);
+  }
+
+  @override
+  String toString() => 'FadeFromRed{$speed}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FadeFromRed &&
+          runtimeType == other.runtimeType &&
+          speed == other.speed;
+
+  @override
+  int get hashCode => speed.hashCode ^ runtimeType.hashCode;
+}
+
 sealed class Panel {}
 
 // See _panelData for generation

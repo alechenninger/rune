@@ -1955,6 +1955,30 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void fadeToRed(FadeToRed fadeToRed) {
+    _checkNotFinished();
+
+    _addToEvent(
+        fadeToRed,
+        (_) => Asm([
+              move.b(fadeToRed.speed.value.i, 0xffffed52.w),
+              jsr(Label('Pal_VariableFadeToRed').l),
+            ]));
+  }
+
+  @override
+  void fadeFromRed(FadeFromRed fadeFromRed) {
+    _checkNotFinished();
+
+    _addToEvent(
+        fadeFromRed,
+        (_) => Asm([
+              move.b(fadeFromRed.speed.value.i, 0xffffed52.w),
+              jsr(Label('Pal_VariableFadeFromRed').l),
+            ]));
+  }
+
+  @override
   void increaseTone(IncreaseTone increase) {
     _checkNotFinished();
 

@@ -236,6 +236,8 @@ abstract class EventVisitor {
   void hideAllPanels(HideAllPanels hidePanels);
   void fadeOut(FadeOut fadeOut);
   void fadeInField(FadeInField fadeIn);
+  void fadeToRed(FadeToRed fadeToRed);
+  void fadeFromRed(FadeFromRed fadeFromRed);
   void increaseTone(IncreaseTone increase);
   void restoreTone(RestoreTone restore);
   void flashScreen(FlashScreen flash);

@@ -127,7 +127,6 @@ main() {
     var scene = Scene([
       ShowPanel(PanelByIndex(0x2b), queueForDisplay: true),
     ]);
-
     var program = Program();
     var asm = program.addScene(SceneId('id'), scene, startingMap: map);
 
@@ -137,6 +136,26 @@ main() {
           move.w(0x2b.toWord.i, d0),
           jsr(Label('Panel_Create').l),
           jsr(Label('Panel_Destroy').l),
+        ]));
+  });
+
+  test('variable red fades set speed before calling their palette routines',
+      () {
+    var scene = Scene([
+      FadeToRed.withSpeed(5),
+      FadeFromRed(),
+    ]);
+
+    var program = Program();
+    var asm = program.addScene(SceneId('id'), scene, startingMap: map);
+
+    expect(
+        asm.event.withoutComments().withoutEmptyLines().head(4),
+        Asm([
+          move.b(5.i, 0xffffed52.w),
+          jsr(Label('Pal_VariableFadeToRed').l),
+          move.b(3.i, 0xffffed52.w),
+          jsr(Label('Pal_VariableFadeFromRed').l),
         ]));
   });
 
