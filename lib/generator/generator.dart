@@ -766,6 +766,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   /// Events processed in current dialog, last event first.
   final _queuedGeneration = Queue<_QueuedGeneration>();
+  // TODO: would be beneficial to just keep the whole event history I think.
   Event? _lastEventInCurrentDialog;
 
   /// Routine to change the current dialog's onClose behavior.
@@ -1130,17 +1131,25 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void individualMoves(IndividualMoves moves) {
+    var facing = moves.justFacing;
+    var isJustFacing = facing != null;
+
     Asm inEvent(int i) {
+      var justPlayedSound = _lastEventInCurrentDialog is PlaySound ||
+          _lastEventInCurrentDialog is PlayMusic;
+
       return Asm([
         _waitForPendingMovements(moves.movedObjects()),
+        // If just facing, vint isn't run
+        // Which means a sound could get overwritten
+        // by another follow-up sound event.
+        if (isJustFacing && justPlayedSound) _waitFrames(1),
         moves.toAsm(_memory,
             fieldRoutines: _fieldRoutines, labeller: _labeller.withContext(i)),
       ]);
     }
 
-    var facing = moves.justFacing;
-
-    if (facing != null && FaceInDialogByteCode.ok(facing)) {
+    if (isJustFacing && FaceInDialogByteCode.ok(facing)) {
       _addToEventOrDialog(moves, inDialog: () {
         var (dialogAsm, routines) = FaceInDialogByteCode(facing)
             .toAsm(_memory, labeller: _labeller.withContext(_eventCounter));

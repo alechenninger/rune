@@ -177,6 +177,29 @@ ${dialog2.toAsm()}
       expect(asm.event.withoutComments(),
           move.b(Constant('SFXID_Selection').i, Constant('Sound_Index').l));
     });
+
+    test('waits before just facing after playing a sound', () {
+      var scene = Scene([
+        SetContext((ctx) => ctx.isFieldShown = true),
+        PlaySound(SoundEffect.selection),
+        IndividualMoves()..moves[alys] = (StepPath()..facing = Direction.down),
+        PlaySound(SoundEffect.lightning),
+      ]);
+      var program = Program();
+      var asm = program.addScene(SceneId('test'), scene);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
+            doMapUpdateLoop(Word(0)),
+            moveq(alys.charIdAddress, d0),
+            jsr(Label('Event_GetCharacter').l),
+            moveq(FacingDir_Down.i, d0),
+            jsr(Label('Event_UpdateObjFacing').l),
+            move.b(SoundEffect.lightning.sfxId.i, Constant('Sound_Index').l),
+          ]));
+    });
   });
 
   group('dialog with event', () {
