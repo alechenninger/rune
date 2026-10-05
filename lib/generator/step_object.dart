@@ -42,7 +42,7 @@ Asm stepObjectToAsm(StepObject step,
   // Step will always execute at least once.
   var additionalFrames = step.frames - 1;
 
-  return step.stepPerFrame.withVector(
+  var asm = step.stepPerFrame.withVector(
       memory: memory,
       labeller: labeller,
       destinationX: d0,
@@ -76,6 +76,8 @@ Asm stepObjectToAsm(StepObject step,
             move.w(curr_x_pos(a4), dest_x_pos(a4)),
             move.w(curr_y_pos(a4), dest_y_pos(a4)),
           ]));
+  memory.putInAddress(a3, null);
+  return asm;
 }
 
 Asm stepObjectsToAsm(StepObjects step,
@@ -219,5 +221,6 @@ Asm stepObjectsToAsm(StepObjects step,
     }
   }
 
+  memory.putInAddress(a3, null);
   return asm;
 }
