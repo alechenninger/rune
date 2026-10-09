@@ -714,6 +714,14 @@ class Scene extends IterableBase<Event> {
     events.forEach(addEvent);
   }
 
+  /// Prepends events in place, preserving references to this scene.
+  ///
+  /// Events are inserted in the supplied order. Subsequent scene operations
+  /// apply the usual normalization rules; no prefix boundary is retained.
+  void prependEvents(Iterable<Event> events) {
+    _events.insertAll(0, events);
+  }
+
   void addEventToBranches(Event event, Condition condition) {
     _visitBranch(_events, (branch) => _addEvent(branch, event),
         Condition.empty(), condition);

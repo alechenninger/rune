@@ -584,6 +584,73 @@ void main() {
   });
 
   group('scene', () {
+    group('prependEvents', () {
+      test('mutates the shared scene and runs newer prefixes first', () {
+        var original = Dialog.parse('Original');
+        var first = Dialog.parse('First prefix');
+        var second = Dialog.parse('Second prefix');
+        var scene = Scene([original]);
+        var interaction =
+            EventInteraction(scene, id: const TalkInteractionId());
+
+        scene.prependEvents([first]);
+        scene.prependEvents([second]);
+
+        expect(interaction.onInteract, same(scene));
+        expect(scene.events, [second, first, original]);
+      });
+
+      test('rebuilt scenes apply ordinary flag normalization after prepending',
+          () {
+        var flag = SetFlag(EventFlag('OriginalPlayed'));
+        var original = Dialog.parse('Original');
+        var scene = Scene([flag, original]);
+        var prefix = IfFlag(EventFlag('Alternate'), isSet: [
+          Dialog.parse('Alternate'),
+          ReturnControl(),
+        ]);
+
+        scene.prependEvents([prefix]);
+
+        expect(scene.events, [prefix, flag, original]);
+        expect(scene.copy().events, [flag, prefix, original]);
+        expect(IfFlag(EventFlag('Outer'), isSet: scene).isSet,
+            [flag, prefix, original]);
+      });
+
+      test('preserves the supplied event order without normalizing the prefix',
+          () {
+        var prefixFlag = SetFlag(EventFlag('PrefixPlayed'));
+        var originalFlag = SetFlag(EventFlag('OriginalPlayed'));
+        var prefixDialog = Dialog.parse('Prefix');
+        var originalDialog = Dialog.parse('Original');
+        var scene = Scene([originalFlag, originalDialog]);
+
+        scene.prependEvents([prefixDialog, prefixFlag]);
+
+        expect(scene.events,
+            [prefixDialog, prefixFlag, originalFlag, originalDialog]);
+      });
+
+      test('ordered flags retain their position through copies and filtering',
+          () {
+        var flag = SetFlag(EventFlag('OriginalPlayed'), anyTime: false);
+        var original = Dialog.parse('Original');
+        var alternate = Dialog.parse('Alternate');
+        var condition = EventFlag('Alternate');
+        var prefix = IfFlag(condition, isSet: [alternate, ReturnControl()]);
+        var scene = Scene([flag, original])..prependEvents([prefix]);
+
+        expect(scene.copy().events, [prefix, flag, original]);
+        expect(IfFlag(EventFlag('Outer'), isSet: scene).isSet,
+            [prefix, flag, original]);
+        expect(
+            scene.asOf(Condition({condition: false})).events, [flag, original]);
+        expect(scene.asOf(Condition({condition: true})).events,
+            [alternate, ReturnControl(), flag, original]);
+      });
+    });
+
     test('toString', () {
       var scene = Scene([
         Dialog(spans: [DialogSpan('Hi after Hahn joined')]),
