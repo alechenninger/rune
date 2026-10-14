@@ -54,7 +54,7 @@ extension IndividualMovesToAsm on IndividualMoves {
     var remainingMoves = <FieldObject, RelativeMovement>{};
 
     for (var MapEntry(key: moveable, value: movement) in moves.entries) {
-      if (movement.isKnownSelfFacing(ctx)) continue;
+      if (movement.isKnownSelfFacing(ctx, moveable)) continue;
 
       remainingMoves.update(
         moveable.resolve(ctx),
@@ -440,15 +440,22 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
       }
     }
 
-    // TODO(correctness): if not wait for movement?
-    // i think we'd have to set destinations in memory, which could also serve
-    // as an indicator that we need to wait for movement to finish /
-    // animate during dialog.
-    state.positions[obj] = pos.known(state);
+    // An asynchronous destination does not establish the current position.
+    // Later waits leave it unknown rather than restoring a saved destination.
+    state.positions[obj] = moves.waitForMovements ? pos.known(state) : null;
     // If we don't know which direction the object was coming from,
     // we don't know which direction it will be facing.
     state.clearFacing(obj);
   });
+
+  if (!moves.waitForMovements && moves.followLeader) {
+    // Followers move too, even without explicit destinations.
+    // Position writes also invalidate possible character aliases for unknown
+    // slots, so this does not require knowing the party order.
+    for (var obj in moves.movedObjects()) {
+      state.positions[obj] = null;
+    }
+  }
 
   return asm;
 }

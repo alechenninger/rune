@@ -270,7 +270,7 @@ class FaceInDialogRoutine extends DialogEvent {
       {required Labeller labeller,
       required FieldRoutineRepository fieldRoutines}) {
     var (before, post) =
-        _waitForPendingMovements(moves.movedObjects(), state, labeller);
+        _waitForPendingMovements(moves.movedObjects(state), state, labeller);
     var routineLbl = labeller.withContext('FaceInDialog').next();
     var routine = Asm([
       label(routineLbl),
@@ -323,9 +323,15 @@ class FaceInDialogByteCode extends DialogEvent {
   @override
   DialogAndRoutines toAsm(Memory state,
       {required Labeller labeller, FieldRoutineRepository? fieldRoutines}) {
-    var (asm, post) = _waitForPendingMovements(facing.keys, state, labeller);
+    var activeFacing = {
+      for (var entry in facing.entries)
+        if (!Face(entry.value).isKnownSelfFacing(state, entry.key))
+          entry.key: entry.value,
+    };
+    var (asm, post) =
+        _waitForPendingMovements(activeFacing.keys, state, labeller);
 
-    for (var MapEntry(key: obj, value: dir) in facing.entries) {
+    for (var MapEntry(key: obj, value: dir) in activeFacing.entries) {
       var id = obj.compactId(state);
       var face = switch (dir) {
         Direction d => d.constant,

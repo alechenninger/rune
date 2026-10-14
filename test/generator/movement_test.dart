@@ -1292,6 +1292,89 @@ void main() {
       expect(state.positions[alys], Position(0x1b0, 0x200));
     });
 
+    test('asynchronous moves invalidate character and object positions', () {
+      state.setSlot(2, shay);
+      state.positions[shay] = Position(0x100, 0x100);
+      state.positions[npc] = Position(0x200, 0x200);
+      var event = AbsoluteMoves()
+        ..destinations[BySlot.two] = Position(0x1a0, 0x1f0)
+        ..destinations[MapObjectById.of('testnpc')] = Position(0x1b0, 0x200)
+        ..waitForMovements = false;
+
+      absoluteMovesToAsm(event, state);
+
+      expect(state.positions[shay], isNull);
+      expect(state.positions[BySlot.two], isNull);
+      expect(state.positions[npc], isNull);
+    });
+
+    test('asynchronous party moves invalidate followers too', () {
+      state.setSlot(1, shay);
+      state.setSlot(2, alys);
+      state.positions[shay] = Position(0x100, 0x100);
+      state.positions[alys] = Position(0x100, 0x110);
+      var event = AbsoluteMoves()
+        ..destinations[BySlot.one] = Position(0x1a0, 0x1f0)
+        ..followLeader = true
+        ..waitForMovements = false;
+
+      absoluteMovesToAsm(event, state);
+
+      expect(state.positions[shay], isNull);
+      expect(state.positions[alys], isNull);
+      expect(state.positions[BySlot.two], isNull);
+    });
+
+    for (var partialPartyOrder in [false, true]) {
+      test(
+          'asynchronous party moves invalidate named characters with '
+          'partialPartyOrder=$partialPartyOrder', () {
+        if (partialPartyOrder) {
+          state.setSlot(1, shay);
+          state.setSlot(3, rune);
+        }
+        for (var character in Character.allCharacters) {
+          state.positions[character] = Position(0x100, 0x100);
+        }
+        var npcPosition = Position(0x200, 0x200);
+        state.positions[npc] = npcPosition;
+        var event = AbsoluteMoves()
+          ..destinations[BySlot.one] = Position(0x1a0, 0x1f0)
+          ..followLeader = true
+          ..waitForMovements = false;
+
+        absoluteMovesToAsm(event, state);
+
+        for (var character in Character.allCharacters) {
+          expect(state.positions[character], isNull, reason: '$character');
+        }
+        for (var slot in BySlot.all) {
+          expect(state.positions[slot], isNull, reason: '$slot');
+        }
+        expect(state.positions[npc], npcPosition);
+      });
+    }
+
+    test('dialog waits do not restore asynchronous destinations', () {
+      state.positions[shay] = Position(0x100, 0x100);
+      var event = AbsoluteMoves()
+        ..destinations[shay] = Position(0x1a0, 0x1f0)
+        ..waitForMovements = false;
+      var dialog = Dialog(
+          spans: DialogSpan.parse('hello', events: [
+        event,
+        WaitForMovements([shay]),
+      ]));
+
+      dialog.toGeneratedAsm(
+          state..cameraLock = true, InteractionMode.noObject(),
+          labeller: Labeller.localTo('TestScene'),
+          fieldRoutines: defaultFieldRoutines);
+
+      expect(state.positions[shay], isNull);
+      expect(state.hasPendingMovement(shay), isFalse);
+    });
+
     test('clears context facing', () {
       state.setFacing(shay, up);
       state.setFacing(alys, down);
@@ -2428,7 +2511,7 @@ void main() {
       state.setSlot(1, shay);
       var moves = IndividualMoves()
         ..moves[shay] = Face(down)
-        ..moves[BySlot.one] = Face(BySlot.one.towards(shay));
+        ..moves[BySlot.one] = Face(up);
 
       expect(() => moves.toAsm(state), throwsArgumentError);
     });
@@ -2451,7 +2534,7 @@ void main() {
 
     test('facing-only paths include batch and list index in labels', () {
       state.setSlot(1, shay);
-      var direction = BySlot.one.towards(shay);
+      var direction = BySlot.one.towards(rune);
       var moves = IndividualMoves()
         ..moves[shay] = (StepPaths()
           ..face(direction)

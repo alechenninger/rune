@@ -300,12 +300,20 @@ class IndividualMoves extends Event implements RunnableInDialog, MovesObjects {
   bool collideLead = false;
   bool followLead = false;
 
+  /// With [state], excludes facing operations that preserve their own facing.
   @override
-  Iterable<FieldObject> movedObjects() => {
-        ...moves.keys,
-        if (followLead && moves.keys.any((object) => object.isCharacter))
-          ...BySlot.all,
-      };
+  Iterable<FieldObject> movedObjects([EventState? state]) {
+    var objects = moves.entries
+        .where((entry) =>
+            state == null || !entry.value.isKnownSelfFacing(state, entry.key))
+        .map((entry) => entry.key)
+        .toSet();
+    return {
+      ...objects,
+      if (followLead && objects.any((object) => object.isCharacter))
+        ...BySlot.all,
+    };
+  }
 
   Map<FieldObject, DirectionExpression>? get justFacing {
     var result = <FieldObject, DirectionExpression>{};
@@ -690,8 +698,22 @@ sealed class RelativeMovement {
   /// If all this movement will do is face.
   bool get justFacing => duration == 0.steps && facing != null;
 
-  bool isKnownSelfFacing(EventState state) =>
-      duration == 0.steps && facing?.isKnownZero(state) == true;
+  /// A zero-vector facing operation is a no-op only if its fallback preserves
+  /// [object]'s own facing, and it includes no movement or delay.
+  bool isKnownSelfFacing(EventState state, FieldObject object) {
+    if (duration != 0.steps) return false;
+    try {
+      return switch (facing) {
+        DirectionOfVector(zeroValue: ObjectFaceDirection(obj: var fallback)) &&
+                var direction
+            when direction.isKnownZero(state) == true =>
+          fallback.resolve(state) == object.resolve(state),
+        _ => false,
+      };
+    } on ResolveException {
+      return false;
+    }
+  }
 
   /// Attempt to append the movement [m] to this one.
   ///

@@ -1,7 +1,9 @@
 import 'package:rune/asm/dialog.dart';
 import 'package:rune/asm/events.dart';
+import 'package:rune/generator/dialog.dart';
 import 'package:rune/generator/event.dart';
 import 'package:rune/generator/generator.dart';
+import 'package:rune/generator/labels.dart';
 import 'package:rune/generator/memory.dart';
 import 'package:rune/generator/movement.dart';
 import 'package:rune/model/model.dart';
@@ -91,6 +93,52 @@ Asm faceSlot(int slot, {bool load = true}) => Asm([
       updateObjFacing(FacingDir_Up.i),
     ]);
 
+// Expected direction calculation after loading the X/Y deltas into d2/d3.
+// Callers spell out coordinate reads, zero-vector fallback, and facing update.
+Asm vectorDirection(String suffix) => Asm([
+      move.w(d2, d4),
+      bpl.s(Label('.positive_dx$suffix')),
+      neg.w(d4),
+      label(Label('.positive_dx$suffix')),
+      move.w(d3, d5),
+      bpl.s(Label('.positive_dy$suffix')),
+      neg.w(d5),
+      label(Label('.positive_dy$suffix')),
+      cmp.w(d4, d5),
+      bgt.s(Label('.checky$suffix')),
+      tst.w(d4),
+      beq.s(Label('.zerovector$suffix')),
+      tst.w(d2),
+      bpl.s(Label('.right$suffix')),
+      move.w(FacingDir_Left.i, d0),
+      bra.s(Label('.keep$suffix')),
+      label(Label('.right$suffix')),
+      move.w(FacingDir_Right.i, d0),
+      bra.s(Label('.keep$suffix')),
+      label(Label('.checky$suffix')),
+      tst.w(d3),
+      bpl.s(Label('.down$suffix')),
+      move.w(FacingDir_Up.i, d0),
+      bra.s(Label('.keep$suffix')),
+      label(Label('.down$suffix')),
+      move.w(FacingDir_Down.i, d0),
+      bra.s(Label('.keep$suffix')),
+      label(Label('.zerovector$suffix')),
+    ]);
+
+Asm faceSlotTowardShay(int slot, String suffix) => Asm([
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_x_pos(a3), d2),
+      slotA4(slot),
+      sub.w(curr_x_pos(a4), d2),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection(suffix),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep$suffix')),
+      jsr(Label('Event_UpdateObjFacing').l),
+    ]);
+
 Asm finishMovement() => bclr(Byte(2).i, Char_Move_Flags.w);
 
 Asm synchronousMove() => Asm([
@@ -138,6 +186,182 @@ Asm dialogData() => Asm([
     ]);
 
 void main() {
+  test('self-facing through a slot alias does not wait for movement', () {
+    var generated = generateScene([
+      moving(),
+      Face(BySlot.two.towards(shay)).move(BySlot.two),
+      facing(alys),
+      WaitForMovements([shay]),
+    ]);
+
+    expectGenerated(
+        generated, [moveShay(), faceSlot(1), waitForSlot(2), finishMovement()]);
+  });
+
+  test('party facing a moving member waits only after facing', () {
+    var generated = generateScene([
+      moving(),
+      IndividualMoves()
+        ..moves.addEntries(
+            BySlot.all.map((slot) => MapEntry(slot, Face(slot.towards(shay))))),
+      WaitForMovements([shay]),
+    ]);
+    expectGenerated(generated, [
+      moveShay(),
+      move.w(curr_x_pos(a4), d2),
+      slotA4(1),
+      sub.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_2_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_2_Alys_0_0')),
+      slotA4(1),
+      jsr(Label('Event_UpdateObjFacing').l),
+      for (var slot in [3, 4, 5])
+        faceSlotTowardShay(slot, '_2_Slot${slot}_0_${slot - 2}'),
+      waitForSlot(2),
+      finishMovement(),
+    ]);
+  });
+
+  test('party self-facing in dialog bytecode leaves movement pending', () {
+    var state = Memory()
+      ..setSlot(1, alys)
+      ..setSlot(2, shay)
+      ..startMovement(shay);
+    var (asm, routines) = FaceInDialogByteCode({
+      for (var slot in BySlot.all) slot: slot.towards(shay),
+    }).toAsm(state, labeller: Labeller.localTo('pending'));
+
+    expect(routines, isEmpty);
+    expect(state.hasPendingMovement(shay), isTrue);
+    expect(
+        asm,
+        Asm([
+          for (var slot in BySlot.all.where((slot) => slot != BySlot.two)) ...[
+            dc.b(
+                [ControlCodes.action, Byte(0xE), Byte(slot.compactId(state)!)]),
+            dc.w([Word(shay.compactId(state)! | 0x100)]),
+          ],
+        ]));
+  });
+
+  test('self-facing in a dialog routine leaves movement pending', () {
+    var state = Memory()
+      ..setSlot(1, alys)
+      ..setSlot(2, shay)
+      ..startMovement(shay);
+    var moves = IndividualMoves()
+      ..moves[BySlot.two] = Face(BySlot.two.towards(shay))
+      ..moves[alys] = Face(alys.towards(shay));
+    var (asm, routines) = FaceInDialogRoutine(moves).toAsm(state,
+        labeller: Labeller.localTo('pending'),
+        fieldRoutines: defaultFieldRoutines);
+
+    expect(state.hasPendingMovement(shay), isTrue);
+    expect(
+        asm,
+        Asm([
+          dc.b([ControlCodes.action, Byte(0xF)]),
+          dc.l([Label('pending_FaceInDialog')]),
+        ]));
+    expect(routines, [
+      Asm([
+        label(Label('pending_FaceInDialog')),
+        faceSlotTowardShay(1, '_Alys_0_0'),
+        rts,
+      ]),
+    ]);
+  });
+
+  test('actual movement with self-facing still waits for pending movement', () {
+    var generated = generateScene([
+      moving(),
+      IndividualMoves()
+        ..moves[BySlot.two] = (StepPaths()
+          ..step(StepPath()
+            ..direction = right
+            ..distance = 1.step)
+          ..face(BySlot.two.towards(shay))),
+    ]);
+    expectGenerated(generated, [
+      moveShay(),
+      waitForSlot(2, load: false),
+      move.w(curr_x_pos(a4), d0),
+      move.w(curr_y_pos(a4), d1),
+      addi.w(0x10.toWord.i, d0),
+      jsr(Label('Event_MoveCharacter').l),
+      finishMovement(),
+    ]);
+  });
+
+  test('zero-vector facing with a different fallback still waits', () {
+    var generated = generateScene([
+      SetContext((state) => state.setFacing(alys, up)),
+      moving(),
+      Face(DirectionOfVector(
+        from: BySlot.two.position(),
+        to: shay.position(),
+        zeroValue: alys.facing(),
+      )).move(BySlot.two),
+    ]);
+
+    expectGenerated(generated, [
+      moveShay(),
+      waitForSlot(2, load: false),
+      slotA4(1),
+      move.w(facing_dir(a4), -(sp)),
+      slotA4(2),
+      move.w(sp.postIncrement(), d0),
+      jsr(Label('Event_UpdateObjFacing').l),
+      finishMovement(),
+    ]);
+  });
+
+  for (var waitFirst in [false, true]) {
+    test('reads a moving target position at runtime with waitFirst=$waitFirst',
+        () {
+      var generated = generateScene([
+        SetContext((state) {
+          state.positions[alys] = Position(0x80, 0x100);
+          state.positions[shay] = Position(0x100, 0x80);
+        }),
+        moving(),
+        if (waitFirst) WaitForMovements([shay]),
+        IndividualMoves()..moves[alys] = Face(alys.towards(shay)),
+      ]);
+      var suffix = waitFirst ? '_3_Alys_0_0' : '_2_Alys_0_0';
+      expectGenerated(generated, [
+        moveShay(),
+        if (waitFirst) waitForSlot(2, load: false),
+        move.w(curr_x_pos(a4), d2),
+        subi.w(0x80.toWord.i, d2),
+        move.w(curr_y_pos(a4), d3),
+        subi.w(0x100.toWord.i, d3),
+        vectorDirection(suffix),
+        slotA4(1),
+        move.w(facing_dir(a4), d0),
+        label(Label('.keep$suffix')),
+        slotA4(1),
+        jsr(Label('Event_UpdateObjFacing').l),
+        if (!waitFirst) waitForSlot(2),
+        finishMovement(),
+      ]);
+    });
+  }
+
+  test('a wait does not overwrite a newer position', () {
+    var position = Position(0x80, 0x80);
+    generateScene([
+      moving(),
+      InstantMoves()..move(shay, to: position),
+      WaitForMovements([shay]),
+      SetContext((state) => expect(state.positions[shay], position)),
+    ]);
+  });
+
   test('waits before operating on the same object through a slot reference',
       () {
     var generated = generateScene([moving(), facing(BySlot.two)]);

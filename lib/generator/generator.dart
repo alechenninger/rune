@@ -1139,7 +1139,7 @@ class SceneAsmGenerator implements EventVisitor {
           _lastEventInCurrentDialog is PlayMusic;
 
       return Asm([
-        _waitForPendingMovements(moves.movedObjects()),
+        _waitForPendingMovements(moves.movedObjects(_memory)),
         // If just facing, vint isn't run
         // Which means a sound could get overwritten
         // by another follow-up sound event.

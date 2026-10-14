@@ -398,6 +398,17 @@ class DirectionOfVector extends DirectionExpression {
   bool? isKnownZero(EventState state) {
     // If same, true regardless of whether or not they are known.
     if (from == to) return true;
+    try {
+      if ((from, to)
+          case (
+            PositionOfObject(obj: var fromObj),
+            PositionOfObject(obj: var toObj)
+          ) when fromObj.resolve(state) == toObj.resolve(state)) {
+        return true;
+      }
+    } on ResolveException {
+      // Without a resolved alias, fall back to known coordinates.
+    }
     switch (from.known(state)) {
       // Can't know this is zero if one side's position is unknown
       // And we don't want both unknown (==, but null) to mean zero :)
