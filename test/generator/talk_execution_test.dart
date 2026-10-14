@@ -27,7 +27,7 @@ void main() {
           moveq(Byte.one.i, d0),
           jsr(Label('Talk_Event_GetAndRunDialogue3').l),
           move.w(Word(29).i, d0),
-          jsr(Label('DoMapUpdateLoop').l),
+          jsr(Label('VInt_PrepareLoop').l),
           popdlg,
           jsr(Label('Talk_Event_RunDialogue3').l),
           rts,
@@ -51,7 +51,7 @@ void main() {
         ]);
   });
 
-  test('a leading pause closes the inherited window before waiting', () {
+  test('a leading pause waits before opening the first dialog window', () {
     var program = Program(eventPointers: EventPointers.empty());
     var after = Dialog(spans: [DialogSpan('After')]);
     var asm = program.addTalk(Scene([
@@ -63,9 +63,8 @@ void main() {
         asm.withoutComments().trim(),
         Asm([
           setLabel('Event_GrandCross_Talk'),
-          jsr(Label('Talk_Event_CloseDialog').l),
           move.w(Word(29).i, d0),
-          jsr(Label('DoMapUpdateLoop').l),
+          jsr(Label('VInt_PrepareLoop').l),
           move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
           moveq(Byte.one.i, d0),
           jsr(Label('Talk_Event_GetAndRunDialogue3').l),
@@ -88,6 +87,46 @@ void main() {
         ]);
   });
 
+  test('Talk with only a pause returns without closing the label window', () {
+    var program = Program(eventPointers: EventPointers.empty());
+    var asm = program.addTalk(Scene([
+      Pause(Duration(milliseconds: 500)),
+    ]));
+
+    expect(
+        asm.withoutComments().trim(),
+        Asm([
+          setLabel('Event_GrandCross_Talk'),
+          move.w(Word(29).i, d0),
+          jsr(Label('VInt_PrepareLoop').l),
+          rts,
+        ]));
+  });
+
+  test('a one-frame Talk pause waits for VBlank without updating the map', () {
+    var program = Program(eventPointers: EventPointers.empty());
+    var asm = program.addTalk(Scene([
+      Pause(Duration(milliseconds: 17)),
+    ]));
+
+    expect(
+        asm.withoutComments().trim(),
+        Asm([
+          setLabel('Event_GrandCross_Talk'),
+          jsr(Label('VInt_Prepare').l),
+          rts,
+        ]));
+  });
+
+  test('Talk rejects a pause that requests object updates', () {
+    expect(
+        () => Program().addTalk(Scene([
+              Pause(Duration(milliseconds: 500), runObjects: true),
+            ])),
+        throwsA(isA<GeneratorException>()
+            .having((e) => e.cause, 'cause', isA<StateError>())));
+  });
+
   test('panel disposition remains Talk-specific for new dialog', () {
     var mode = TalkMode().toEventMode(EventType.event).enterDialogLoop();
     expect(
@@ -106,6 +145,8 @@ void main() {
         .enterDialogLoop()
         .exitDialogLoop();
     expect(mode.priorMode, isA<TalkMode>());
+    expect(mode.canRunMapUpdates, isFalse);
+    expect(mode.canRunObjects, isFalse);
     expect(
         mode.execution
             .runDialog(resume: true, onClose: DialogOnClose.leavePanels),

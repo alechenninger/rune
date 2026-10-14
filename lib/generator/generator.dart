@@ -1006,8 +1006,8 @@ class SceneAsmGenerator implements EventVisitor {
         _addToDialog(dialog_asm.runEvent(eventIndex));
         _terminateDialog();
         _gameMode = newMode = m.toEventMode(type);
-        // Depending on the mode, there may already be a dialog window.
-        _memory.keepDialog = newMode.execution.startsWithDialogWindow;
+        // Events start without an inherited dialog window.
+        _memory.keepDialog = false;
 
         break;
       case RunEventMode m:
@@ -2956,12 +2956,24 @@ class SceneAsmGenerator implements EventVisitor {
 
   Asm _waitFrames(int frames, {bool runObjects = false}) {
     checkArgument(frames >= 0, message: 'frames must be non-negative');
+
     if (frames == 0) return Asm.empty();
 
+    final mode = _gameMode;
+    if (mode is! EventMode) {
+      throw StateError('frame waits require EventMode');
+    }
+
     if (runObjects) {
+      if (!mode.canRunObjects) {
+        throw StateError(
+            'cannot wait frames with runObjects=true in the current game mode');
+      }
+
       return doMainUpdatesLoop(Word(frames - 1));
     } else if (_memory.isFieldShown == false ||
-        (_memory.panelsShown ?? 0) > 0) {
+        (_memory.panelsShown ?? 0) > 0 ||
+        !mode.canRunMapUpdates) {
       return frames == 1 ? vIntPrepare() : vIntPrepareLoop(Word(frames - 1));
     } else {
       return doMapUpdateLoop(Word(frames - 1));
@@ -3657,8 +3669,11 @@ enum DialogOnClose {
 abstract class EventExecution {
   const EventExecution();
 
-  /// Whether the caller hands an already-open dialog window to the event.
-  bool get startsWithDialogWindow => false;
+  /// Whether synchronous waits may advance the map.
+  bool get canRunMapUpdates => true;
+
+  /// Whether synchronous waits may run the full object update loop.
+  bool get canRunObjects => true;
 
   Asm runDialog({required bool resume, required DialogOnClose onClose});
   Asm closeDialog();
@@ -3743,6 +3758,11 @@ class TalkEventExecution extends EventAndDialogExecution {
   const TalkEventExecution();
 
   @override
+  bool get canRunMapUpdates => false;
+  @override
+  bool get canRunObjects => false;
+
+  @override
   Asm portraitCode(Portrait? thePortrait, HorizontalAlignment alignment) {
     var positionCode = switch (alignment) {
       HorizontalAlignment.left => 0,
@@ -3752,9 +3772,6 @@ class TalkEventExecution extends EventAndDialogExecution {
     return portraitWithPosition(
         toPortraitCode(thePortrait), Byte(positionCode));
   }
-
-  @override
-  bool get startsWithDialogWindow => true;
 
   @override
   Asm runDialog({required bool resume, required DialogOnClose onClose}) {
@@ -3800,6 +3817,9 @@ class EventMode implements DialogCapableMode {
   final EventType type;
   final bool _inDialog;
 
+  bool get canRunMapUpdates => execution.canRunMapUpdates;
+  bool get canRunObjects => execution.canRunObjects;
+
   @override
   final EventAndDialogExecution execution;
 
@@ -3824,6 +3844,7 @@ class RunEventMode implements RunEventCapableMode {
   @override
   EventAndDialogExecution get execution => const ScriptEventExecution();
 
+  // Map and object updates become available once the RunEvent has dispatched.
   @override
   EventMode toEventMode(EventType type) =>
       EventMode(priorMode: this, type: type, execution: execution);
