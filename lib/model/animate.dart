@@ -372,11 +372,13 @@ class ShutterObjects extends Event {
   final Duration duration;
   final int times;
   final ShutterStart start;
+  final bool animate;
 
   ShutterObjects(this.objects,
       {required this.duration,
       required this.times,
-      this.start = ShutterStart.down}) {
+      this.start = ShutterStart.down,
+      this.animate = true}) {
     checkArgument(objects.isNotEmpty, message: 'Objects must not be empty.');
     checkArgument(duration > Duration.zero,
         message: 'Duration must be greater than 0.');
@@ -405,27 +407,12 @@ class ShutterObjects extends Event {
     return events;
   }
 
-  _addEventsWithPause(List events, Duration pause) {
-    events.add(
-        StepObjects.constantStep(objects, stepPerFrame: start.step, frames: 1));
-    events.add(Pause(pause));
-    events.add(StepObjects.constantStep(objects,
-        stepPerFrame: start.step * -1, frames: 1));
-    events.add(Pause(pause));
-  }
-
-  _addEventsWithoutPause(List events) {
-    events.add(
-        StepObjects.constantStep(objects, stepPerFrame: start.step, frames: 1));
-    events.add(StepObjects.constantStep(objects,
-        stepPerFrame: start.step * -1, frames: 1));
-  }
-
   @override
   String toString() {
     return 'ShutterObjects(objects: $objects, '
         'duration: $duration, '
-        'times: $times)';
+        'times: $times, '
+        'animate: $animate)';
   }
 
   @override
@@ -434,14 +421,32 @@ class ShutterObjects extends Event {
     return other is ShutterObjects &&
         const ListEquality<FieldObject>().equals(other.objects, objects) &&
         other.duration == duration &&
-        other.times == times;
+        other.times == times &&
+        other.animate == animate;
   }
 
   @override
   int get hashCode =>
       const ListEquality<FieldObject>().hash(objects) ^
       duration.hashCode ^
-      times.hashCode;
+      times.hashCode ^
+      animate.hashCode;
+
+  _addEventsWithPause(List events, Duration pause) {
+    events.add(StepObjects.constantStep(objects,
+        animate: animate, stepPerFrame: start.step, frames: 1));
+    events.add(Pause(pause));
+    events.add(StepObjects.constantStep(objects,
+        animate: animate, stepPerFrame: start.step * -1, frames: 1));
+    events.add(Pause(pause));
+  }
+
+  _addEventsWithoutPause(List events) {
+    events.add(StepObjects.constantStep(objects,
+        animate: animate, stepPerFrame: start.step, frames: 1));
+    events.add(StepObjects.constantStep(objects,
+        animate: animate, stepPerFrame: start.step * -1, frames: 1));
+  }
 }
 
 class JumpObject extends Event {

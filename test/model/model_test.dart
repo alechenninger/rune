@@ -2132,6 +2132,35 @@ void main() {
   });
 
   group('shutter objects', () {
+    for (final duration in [1.second, 2.framesToDuration()]) {
+      test('can disable animation for duration $duration', () {
+        var shutter = ShutterObjects([alys],
+            duration: duration, times: 2, animate: false);
+        var pauseFrames = (duration.toFrames() - 2) ~/ 2;
+
+        expect(shutter.toEvents(), [
+          for (var i = 0; i < 2; i++) ...[
+            StepObjects.constantStep([alys],
+                animate: false, frames: 1, stepPerFrame: Point(0, 1)),
+            if (pauseFrames > 0) Pause(pauseFrames.framesToDuration()),
+            StepObjects.constantStep([alys],
+                animate: false, frames: 1, stepPerFrame: Point(0, -1)),
+            if (pauseFrames > 0) Pause(pauseFrames.framesToDuration()),
+          ],
+        ]);
+      });
+    }
+
+    test('animation setting participates in equality', () {
+      var animated = ShutterObjects([alys], duration: 1.second, times: 2);
+      var unanimated =
+          ShutterObjects([alys], duration: 1.second, times: 2, animate: false);
+
+      expect(unanimated, isNot(animated));
+      expect(unanimated,
+          ShutterObjects([alys], duration: 1.second, times: 2, animate: false));
+    });
+
     test('starts down by default', () {
       var shutter = ShutterObjects([MapObjectById.of('test')],
           duration: 1.second, times: 2);
