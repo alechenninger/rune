@@ -248,6 +248,7 @@ abstract class EventVisitor {
   void playSound(PlaySound playSound);
   void playMusic(PlayMusic playMusic);
   void stopMusic(StopMusic stopMusic);
+  void waitForMusicFade(WaitForMusicFade wait);
   void addMoney(AddMoney addMoney);
   void clearMapObject(ClearMapObject clear);
   void resetObjectRoutine(ResetObjectRoutine resetRoutine);

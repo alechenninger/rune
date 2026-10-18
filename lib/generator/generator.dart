@@ -2560,22 +2560,54 @@ class SceneAsmGenerator implements EventVisitor {
      */
     var musicId = SoundEffect.stopMusic.sfxId;
 
-    _addToRoutineOrDialog(stopMusic, inDialog: () {
-      var (asm, routines) = SoundCode(musicId).toAsm(_memory);
-      _addToDialog(asm);
-      _postAsm.addAll(routines);
-      // TODO: note in this case, saved sound index is not set
-    }, inRoutine: (_, asm) {
+    Asm inRoutine(int _, Asm asm) {
       return Asm([
         // Necessary to ensure previous sound change occurs
         // TODO: as last event in current dialog is relevant to current dialog
         // depending on how dialog generation is managed this may miss cases
         // TODO(frame perfect): may need to run tiles/map updates
         if (_lastEventInCurrentDialog is PlaySound ||
-            _lastEventInCurrentDialog is PlayMusic)
+            _lastEventInCurrentDialog is PlayMusic ||
+            stopMusic.fadeSpeed != null &&
+                _lastEventInCurrentDialog is StopMusic)
           _waitFrames(1),
-        move.b(musicId.i, Constant('Sound_Index').l),
+        if (stopMusic.fadeSpeed case var speed?)
+          move.b(speed.i, Constant('Sound_SlowFade').l)
+        else
+          move.b(musicId.i, Constant('Sound_Index').l),
         move.b(musicId.i, Constant('Saved_Sound_Index').w)
+      ]);
+    }
+
+    if (stopMusic.fadeSpeed != null) {
+      _addToRoutine(stopMusic, inRoutine);
+    } else {
+      _addToRoutineOrDialog(stopMusic, inDialog: () {
+        var (asm, routines) = SoundCode(musicId).toAsm(_memory);
+        _addToDialog(asm);
+        _postAsm.addAll(routines);
+        // TODO: note in this case, saved sound index is not set
+      }, inRoutine: inRoutine);
+    }
+  }
+
+  @override
+  void waitForMusicFade(WaitForMusicFade wait) {
+    _addToRoutine(wait, (i, asm) {
+      var loop = Label('.wait_music_fade$i');
+      var check = Label('.check_music_fade$i');
+      return Asm([
+        bra.s(check),
+        label(loop),
+        _waitFrames(1),
+        label(check),
+        // A stop can remain queued across intervening non-waiting events.
+        cmpi.b(SoundEffect.stopMusic.sfxId.i, Constant('Sound_Index').l),
+        beq.s(loop),
+        tst.b(Constant('Sound_SlowFade').l),
+        bne.s(loop),
+        tst.b(Longword(0xFF5004).l), // original and slow fade step counter
+        bne.s(loop),
       ]);
     });
   }

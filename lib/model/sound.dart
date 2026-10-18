@@ -1,3 +1,4 @@
+import 'package:quiver/check.dart';
 import 'package:quiver/iterables.dart';
 
 import 'model.dart';
@@ -61,8 +62,20 @@ class PlayMusic extends Event implements RunnableInDialog {
 }
 
 class StopMusic extends Event implements RunnableInDialog {
+  /// Slow-fade interval, in sound updates minus one. Higher is slower.
+  ///
+  /// Null uses the original short fade. Values 1..127 request the deeper
+  /// Grand Cross fade: 2 is about 4.05 seconds at 60 Hz, 3 is 5.4 seconds.
+  /// Custom fades currently require event routine generation.
+  final int? fadeSpeed;
+
+  StopMusic({this.fadeSpeed}) {
+    checkArgument(fadeSpeed == null || fadeSpeed! >= 1 && fadeSpeed! <= 127,
+        message: 'fadeSpeed must be between 1 and 127');
+  }
+
   @override
-  bool canRunInDialog([EventState? state]) => true;
+  bool canRunInDialog([EventState? state]) => fadeSpeed == null;
 
   @override
   void visit(EventVisitor visitor) {
@@ -72,15 +85,39 @@ class StopMusic extends Event implements RunnableInDialog {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is StopMusic && runtimeType == other.runtimeType;
+      other is StopMusic &&
+          runtimeType == other.runtimeType &&
+          fadeSpeed == other.fadeSpeed;
 
   @override
-  int get hashCode => toString().hashCode;
+  int get hashCode => Object.hash(runtimeType, fadeSpeed);
 
   @override
   String toString() {
-    return 'StopMusic{}';
+    return 'StopMusic{fadeSpeed: $fadeSpeed}';
   }
+}
+
+/// Waits for a queued or running music fade to finish (or be canceled).
+///
+/// Supports both [StopMusic]'s original short fade and its custom slow fade.
+/// Currently requires event routine generation.
+class WaitForMusicFade extends Event {
+  const WaitForMusicFade();
+
+  @override
+  void visit(EventVisitor visitor) => visitor.waitForMusicFade(this);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WaitForMusicFade && runtimeType == other.runtimeType;
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  String toString() => 'WaitForMusicFade{}';
 }
 
 sealed class Sound implements Enum {

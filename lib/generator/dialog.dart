@@ -130,7 +130,7 @@ sealed class DialogEvent {
         return DialogCodesEvent(c.codes);
       case AbsoluteMoves m when m.canRunInDialog(state):
         return AbsoluteMovesInDialog(m);
-      case StopMusic():
+      case StopMusic(fadeSpeed: null):
         // TODO: pause or stop?
         return SoundCode(SoundEffect.stopMusic.sfxId);
       case WaitForMovements wait:
