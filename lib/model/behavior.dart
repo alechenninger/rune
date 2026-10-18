@@ -3,6 +3,21 @@ import 'package:collection/collection.dart';
 import '../asm/data.dart';
 import 'model.dart';
 
+/// Clears a fixed map object's routine until the slot is initialized again.
+class ClearMapObject extends Event {
+  final MapObjectId object;
+  ClearMapObject(this.object);
+  @override
+  void visit(EventVisitor visitor) => visitor.clearMapObject(this);
+  @override
+  bool operator ==(Object other) =>
+      other is ClearMapObject && object == other.object;
+  @override
+  int get hashCode => object.hashCode;
+  @override
+  String toString() => 'ClearMapObject{$object}';
+}
+
 class ResetObjectRoutine extends Event {
   final FieldObject object;
 
@@ -72,6 +87,14 @@ class ChangeObjectRoutine extends Event {
 }
 
 sealed class SpecModel {}
+
+/// A known cleared routine word, distinct from unknown routine state.
+class ClearedObjectRoutine extends SpecModel {
+  @override
+  bool operator ==(Object other) => other is ClearedObjectRoutine;
+  @override
+  int get hashCode => runtimeType.hashCode;
+}
 
 class NpcRoutineModel extends SpecModel {
   final Type behaviorType;

@@ -21,6 +21,8 @@ class MapAsm {
   final Asm events;
   final Asm runEventRoutines;
   final Asm runEventIndices;
+  final Asm mapDataManagerRoutines;
+  final Asm mapDataManagerIndices;
   // might also need dialogTrees ASM
   // if these labels need to be programmatically referred to
 
@@ -31,7 +33,9 @@ class MapAsm {
       required this.dialog,
       required this.events,
       this.runEventRoutines = const Asm.none(),
-      this.runEventIndices = const Asm.none()});
+      this.runEventIndices = const Asm.none(),
+      this.mapDataManagerRoutines = const Asm.none(),
+      this.mapDataManagerIndices = const Asm.none()});
 
   MapAsm.empty()
       : sprites = Asm.empty(),
@@ -40,7 +44,9 @@ class MapAsm {
         dialog = Asm.empty(),
         events = Asm.empty(),
         runEventRoutines = Asm.empty(),
-        runEventIndices = Asm.empty();
+        runEventIndices = Asm.empty(),
+        mapDataManagerRoutines = Asm.empty(),
+        mapDataManagerIndices = Asm.empty();
 
   @override
   String toString() {
@@ -133,8 +139,9 @@ MapAsm compileMap(GameMap map, ProgramConfiguration config) {
 
   var objects = map.orderedObjects;
 
-  if (objects.length > 64) {
-    throw 'too many objects';
+  if (objects.length > 52) {
+    throw StateError(
+        'map=${map.id}: ${objects.length} object slots exceed the engine secondary-object capacity of 52 (also shared with chests)');
   }
 
   var objectsTileNumbers = _compileMapSpriteData(
@@ -225,7 +232,32 @@ MapAsm compileMap(GameMap map, ProgramConfiguration config) {
     runEventIndices.add(Byte(0));
   }
 
+  final managerAsm = Asm.empty();
+  final managerIndices = <Word>[];
+
+  for (final (id, scene) in map.dataManagers) {
+    final name = Label('MapDataMan_GrandCross_$id');
+    managerIndices.add(config.addMapDataManager(name));
+    managerAsm.add(label(name));
+
+    final generator = SceneAsmGenerator.forMapDataManager(id,
+        inMap: map, managerAsm: managerAsm, config: config);
+
+    generator.scene(scene);
+    generator.finish();
+
+    managerAsm.addNewline();
+  }
+
+  managerIndices.addAll(map.asmDataManagers);
+  if (managerIndices.isEmpty) {
+    managerIndices.addAll(config.originalDataManagersForMap(map.id));
+  }
+
   return MapAsm(
+      mapDataManagerRoutines: managerAsm,
+      mapDataManagerIndices:
+          managerIndices.isEmpty ? Asm.empty() : dc.w(managerIndices),
       sprites: spritesAsm,
       objects: objectsAsm,
       areas: areasAsm,
@@ -1068,15 +1100,55 @@ List<(MapId, Position, Direction, PartyArrangement)> mapTransitions(Asm asm) {
   return transitions;
 }
 
+/// Select the supported Grand Cross build's map-data alternatives before
+/// reading constants. Reading both revision branches misaligns the manager tail.
+Asm _grandCrossMapData(Asm source) {
+  // TODO: consider adding broader conditional assembly support
+  // this was partially started once or twice
+  const values = {'revision': 1, 'grand_cross': 1, 'bugfixes': 1};
+  final frames = <(bool parent, bool condition)>[];
+  var active = true;
+  final selected = <Instruction>[];
+  for (final line in source) {
+    switch (line.cmd) {
+      case 'if':
+        final expression = line.operands.join(' ');
+        final match =
+            RegExp(r'^(\w+)\s*([=<>])\s*(\d+)$').firstMatch(expression);
+        if (match == null || !values.containsKey(match[1])) {
+          throw UnsupportedError(
+              'unsupported map-data build condition: $expression');
+        }
+        final left = values[match[1]]!;
+        final right = int.parse(match[3]!);
+        final condition = switch (match[2]) {
+          '=' => left == right,
+          '>' => left > right,
+          _ => left < right,
+        };
+        frames.add((active, condition));
+        active = active && condition;
+      case 'else':
+        if (frames.isNotEmpty) active = frames.last.$1 && !frames.last.$2;
+      case 'endif':
+        if (frames.isNotEmpty) active = frames.removeLast().$1;
+      default:
+        if (active) selected.add(line);
+    }
+  }
+  return Asm.fromInstructions(selected);
+}
+
 List<String> preprocessMapToRaw(Asm original,
     {required String sprites,
     required String objects,
     String? areas,
     required Label dialog,
     String? events,
+    String? dataManagers,
     FieldRoutineRepository? fieldRoutines}) {
   fieldRoutines ??= defaultFieldRoutines;
-  final reader = ConstantReader.asm(original);
+  final reader = ConstantReader.asm(_grandCrossMapData(original));
   final processed = <String>[];
 
   final trimmed = original.trim();
@@ -1143,20 +1215,29 @@ List<String> preprocessMapToRaw(Asm original,
   // defineConstants([Label('Map_${mapId.name}_Dialog')]);
   defineConstants([dialog]);
 
-  // ignore & replace real area data, if there is any area data
-  if (areas != null) {
-    _readAreas(reader).forEach((_) {});
-    addComment('Areas');
-    processed.add(areas);
-    defineConstants([Word(0xffff)]);
-  }
+  final originalAreas = _readAreas(reader).toList();
+  addComment('Areas');
+  processed.add(areas ??
+      Asm([for (final area in originalAreas) area.toAsm()]).toString());
+  defineConstants([Word(0xffff)]);
 
-  if (events != null) {
-    _readEvents(reader).forEach((_) {});
-    addComment('Events');
-    processed.add(events);
-    defineConstants([Byte(0xff)]);
+  final originalEvents = _readEvents(reader);
+  addComment('Events');
+  processed.add(events ?? _defineConstants(originalEvents).toString());
+  defineConstants([Byte(0xff)]);
+
+  defineConstants([reader.readLabel()]); // palette pointer
+  defineConstants([for (var i = 0; i < 4; i++) reader.readByte()]);
+
+  final originalManagers = <Word>[];
+  while (true) {
+    final index = reader.readWord();
+    if (index == Word(0xffff)) break;
+    originalManagers.add(index);
   }
+  addComment('Map data managers');
+  processed.add(dataManagers ?? _defineConstants(originalManagers).toString());
+  defineConstants([Word(0xffff)]);
 
   processed.addAll(reader.remaining.lines.map((l) => l.toString()));
 
@@ -1190,7 +1271,7 @@ Future<GameMap> asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup,
   final mapId = labelToMapId(mapLabel);
   final map = GameMap(mapId);
 
-  final reader = ConstantReader.asm(asm);
+  final reader = ConstantReader.asm(_grandCrossMapData(asm));
 
   _skipToSprites(reader);
 
@@ -1215,7 +1296,6 @@ Future<GameMap> asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup,
     dialogLabel = reader.readLabel();
   }
 
-  var lookup = dialogLookup.byLabel(dialogLabel);
   var scenes = <_DialogAndLabel, Scene>{};
 
   // todo: pass map instead of returning lists to add to map?
@@ -1231,8 +1311,24 @@ Future<GameMap> asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup,
     map.addAsmEvent(asm);
   }
 
-  for (var obj in _buildObjects(mapId, sprites, asmObjects, await lookup)) {
-    map.addObject(obj);
+  if (asmObjects.isEmpty && map.areas.isEmpty) return map;
+
+  reader.readLabel(); // palette pointer
+  for (var i = 0; i < 4; i++) {
+    reader.readByte();
+  }
+
+  while (true) {
+    final index = reader.readWord();
+    if (index == Word(0xffff)) break;
+    map.addAsmDataManager(index);
+  }
+
+  if (asmObjects.isNotEmpty) {
+    final lookup = await dialogLookup.byLabel(dialogLabel);
+    for (var obj in _buildObjects(mapId, sprites, asmObjects, lookup)) {
+      map.addObject(obj);
+    }
   }
 
   return map;
@@ -1528,6 +1624,11 @@ class _AsmArea {
       required this.flag,
       required this.routine,
       required this.param});
+
+  Asm toAsm() => Asm([
+        dc.w([Word(at.x ~/ 8), Word(at.y ~/ 8), _rangeTypeId(range)]),
+        dc.b([flagType, flag, routine, param]),
+      ]);
 }
 
 class _DialogAndLabel {

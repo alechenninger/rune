@@ -21,9 +21,68 @@ void main() {
         eventPointers: EventPointers.empty(),
         cutscenePointers: EventPointers.empty(),
         runEvents: JumpTable(
-            jump: bra.w, newIndex: Byte.new, labels: [RunEvent_NoEvent]));
+            jump: bra.w,
+            newIndex: Byte.new,
+            capacity: 0xff,
+            labels: [RunEvent_NoEvent]));
     testEventRoutines = TestEventRoutines();
   });
+
+  test('maps inherit configured original managers without changing the model',
+      () {
+    final map = GameMap(MapId.PiataAcademyF1);
+    final compiled = Program().addMap(map);
+    final original = [Word(0), Word(0), Word(0), Word(1)];
+
+    expect(compiled.mapDataManagerIndices.withoutComments(), dc.w(original));
+    expect(compiled.mapDataManagerRoutines, isEmpty);
+    expect(map.dataManagers, isEmpty);
+    expect(map.asmDataManagers, isEmpty);
+    expect(ProgramConfiguration.grandCross().originalDataManagersForMap(map.id),
+        original);
+    expect(ProgramConfiguration.empty().originalDataManagersForMap(map.id),
+        isEmpty);
+    expect(
+        Program().addMap(GameMap(MapId.Test)).mapDataManagerIndices, isEmpty);
+  });
+
+  test('original managers can be replaced or disabled through configuration',
+      () {
+    final original = [Word(0x1e), Word(0x1d), Word(0x1e)];
+    final defaults = {MapId.Test: original};
+    final program = Program(originalDataManagers: defaults);
+    final config = ProgramConfiguration.empty(originalDataManagers: defaults);
+    original.clear();
+    defaults.clear();
+    final expected = dc.w([Word(0x1e), Word(0x1d), Word(0x1e)]);
+
+    expect(program.addMap(GameMap(MapId.Test)).mapDataManagerIndices, expected);
+    expect(compileMap(GameMap(MapId.Test), config).mapDataManagerIndices,
+        expected);
+    expect(
+        Program(originalDataManagers: {})
+            .addMap(GameMap(MapId.PiataAcademyF1))
+            .mapDataManagerIndices,
+        isEmpty);
+  });
+
+  for (final (generated, indexed) in [
+    (true, false),
+    (false, true),
+    (true, true)
+  ]) {
+    test(
+        'authored managers replace originals: generated=$generated indexed=$indexed',
+        () {
+      final map = GameMap(MapId.PiataAcademyF1);
+      if (generated) map.addDataManager(SceneId('Replacement'), Scene.empty());
+      if (indexed) map.addAsmDataManager(Word(0x1d));
+
+      final compiled = Program().addMap(map);
+      expect(compiled.mapDataManagerIndices.withoutComments(),
+          dc.w([if (generated) Word(0x8c), if (indexed) Word(0x1d)]));
+    });
+  }
 
   test('map model generates asm', () {
     var obj = MapObject(

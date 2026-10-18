@@ -93,6 +93,7 @@ class Program {
   EventFlags get _eventFlags => _config.eventFlags;
   Constants get _constants => _config.constants;
   Asm get runEventsJumpTable => _config.runEvents.toAsm();
+  Asm get mapDataManagersJumpTable => _config.mapDataManagers.toAsm();
 
   FieldRoutineRepository get _fieldRoutines => _config.fieldRoutines;
 
@@ -100,6 +101,8 @@ class Program {
     EventPointers? eventPointers,
     EventPointers? cutscenePointers,
     JumpTable<Byte>? runEvents,
+    JumpTable<Word>? mapDataManagers,
+    Map<MapId, List<Word>>? originalDataManagers,
     Map<MapId, Word>? vramTileOffsets,
     Map<MapId, List<SpriteVramMapping>>? builtInSprites,
     FieldRoutineRepository? fieldRoutines,
@@ -108,6 +111,9 @@ class Program {
             cutscenes:
                 cutscenePointers?.withOffset(Word(0x8000)) ?? cutscenePtrs(),
             runEvents: runEvents ?? runEventsJmpTbl(),
+            mapDataManagers: mapDataManagers ?? mapDataManagersJmpTbl(),
+            originalDataManagers:
+                originalDataManagers ?? _defaultOriginalDataManagers,
             fieldRoutines: fieldRoutines ?? defaultFieldRoutines,
             eventFlags: EventFlags(),
             constants: Constants.wrap({}),
@@ -239,20 +245,12 @@ abstract class EventRoutines {
 }
 
 abstract class ProgramConfiguration implements EventRoutines {
-  Byte addRunEvent(Label name);
-  FieldRoutineRepository get fieldRoutines;
-  EventFlags get eventFlags;
-  Constants get constants;
-  DialogTrees get dialogTrees;
-  Word? spriteVramOffsetForMap(MapId map);
-  List<SpriteVramMapping> builtInSpritesForMap(MapId map);
-
-  ProgramConfiguration._();
-
   factory ProgramConfiguration.empty(
       {EventPointers? events,
       EventPointers? cutscenes,
       JumpTable<Byte>? runEvents,
+      JumpTable<Word>? mapDataManagers,
+      Map<MapId, List<Word>> originalDataManagers = const {},
       FieldRoutineRepository? fieldRoutines,
       EventFlags? eventFlags,
       Constants? constants,
@@ -267,7 +265,15 @@ abstract class ProgramConfiguration implements EventRoutines {
             JumpTable.sparse(
               jump: withNoop(Label.known('RunEvent_NoEvent'), bra.w),
               newIndex: (i) => Byte(i),
+              capacity: 0xff,
             ),
+        mapDataManagers: mapDataManagers ??
+            JumpTable.sparse(
+              jump: withNoop(Label.known('GetMapLayoutOffset'), bra.w),
+              newIndex: Word.new,
+              capacity: 0x2000,
+            ),
+        originalDataManagers: originalDataManagers,
         fieldRoutines: fieldRoutines ?? defaultFieldRoutines,
         eventFlags: eventFlags ?? EventFlags(),
         constants: constants ?? Constants.wrap({}),
@@ -281,6 +287,8 @@ abstract class ProgramConfiguration implements EventRoutines {
         events: eventPtrs(),
         cutscenes: cutscenePtrs(),
         runEvents: runEventsJmpTbl(),
+        mapDataManagers: mapDataManagersJmpTbl(),
+        originalDataManagers: _defaultOriginalDataManagers,
         fieldRoutines: defaultFieldRoutines,
         eventFlags: EventFlags(),
         constants: Constants.wrap({}),
@@ -288,14 +296,27 @@ abstract class ProgramConfiguration implements EventRoutines {
         spriteVramOffsets: _defaultSpriteVramOffsets,
         builtInSprites: _defaultBuiltInSprites);
   }
+
+  ProgramConfiguration._();
+
+  FieldRoutineRepository get fieldRoutines;
+  EventFlags get eventFlags;
+  Constants get constants;
+  DialogTrees get dialogTrees;
+  Byte addRunEvent(Label name);
+  Word addMapDataManager(Label name);
+
+  /// Original manager IDs used only when the map has no authored managers.
+  List<Word> originalDataManagersForMap(MapId map);
+  Word? spriteVramOffsetForMap(MapId map);
+  List<SpriteVramMapping> builtInSpritesForMap(MapId map);
 }
 
 class _AsmProgramConfiguration extends ProgramConfiguration {
-  final int _startEventCount;
   final EventPointers events;
-  EventPointers get additionalEvents => events.skip(_startEventCount);
   final EventPointers cutscenes;
   final JumpTable<Byte> runEvents;
+  final JumpTable<Word> mapDataManagers;
 
   @override
   final FieldRoutineRepository fieldRoutines;
@@ -306,13 +327,17 @@ class _AsmProgramConfiguration extends ProgramConfiguration {
   @override
   final DialogTrees dialogTrees;
 
+  final int _startEventCount;
   final Map<MapId, Word> _spriteVramOffsets;
   final Map<MapId, List<SpriteVramMapping>> _builtInSprites;
+  final Map<MapId, List<Word>> _originalDataManagers;
 
   _AsmProgramConfiguration(
       {required this.events,
       required this.cutscenes,
       required this.runEvents,
+      required this.mapDataManagers,
+      required Map<MapId, List<Word>> originalDataManagers,
       required this.fieldRoutines,
       required this.eventFlags,
       required this.constants,
@@ -320,9 +345,13 @@ class _AsmProgramConfiguration extends ProgramConfiguration {
       required Map<MapId, Word> spriteVramOffsets,
       required Map<MapId, List<SpriteVramMapping>> builtInSprites})
       : _spriteVramOffsets = Map.of(spriteVramOffsets),
+        _originalDataManagers = originalDataManagers
+            .map((map, indices) => MapEntry(map, List.unmodifiable(indices))),
         _builtInSprites = Map.of(builtInSprites),
         _startEventCount = events.length,
         super._();
+
+  EventPointers get additionalEvents => events.skip(_startEventCount);
 
   @override
   Word addCutscene(Label name) {
@@ -340,6 +369,15 @@ class _AsmProgramConfiguration extends ProgramConfiguration {
   }
 
   @override
+  Word addMapDataManager(Label name) {
+    return mapDataManagers.add(name);
+  }
+
+  @override
+  List<Word> originalDataManagersForMap(MapId map) =>
+      _originalDataManagers[map] ?? const [];
+
+  @override
   Word? spriteVramOffsetForMap(MapId map) => _spriteVramOffsets[map];
 
   @override
@@ -354,6 +392,9 @@ class _AsmProgramConfiguration extends ProgramConfiguration {
           events == other.events &&
           cutscenes == other.cutscenes &&
           runEvents == other.runEvents &&
+          mapDataManagers == other.mapDataManagers &&
+          const DeepCollectionEquality()
+              .equals(_originalDataManagers, other._originalDataManagers) &&
           fieldRoutines == other.fieldRoutines &&
           eventFlags == other.eventFlags &&
           constants == other.constants &&
@@ -367,6 +408,8 @@ class _AsmProgramConfiguration extends ProgramConfiguration {
       events.hashCode ^
       cutscenes.hashCode ^
       runEvents.hashCode ^
+      mapDataManagers.hashCode ^
+      const DeepCollectionEquality().hash(_originalDataManagers) ^
       fieldRoutines.hashCode ^
       eventFlags.hashCode ^
       constants.hashCode ^
@@ -379,6 +422,8 @@ class _AsmProgramConfiguration extends ProgramConfiguration {
     return '_ProgramConfiguration{events: $events, '
         'cutscenes: $cutscenes, '
         'runEvents: $runEvents, '
+        'mapDataManagers: $mapDataManagers, '
+        '_originalDataManagers: $_originalDataManagers, '
         'fieldRoutines: $fieldRoutines, '
         'eventFlags: $eventFlags, '
         'constants: $constants, '
@@ -389,9 +434,6 @@ class _AsmProgramConfiguration extends ProgramConfiguration {
 }
 
 class _EventRoutinesWrappingConfiguration extends ProgramConfiguration {
-  final EventRoutines _eventRoutines;
-  final JumpTable<Byte> _runEvents;
-
   @override
   final Constants constants;
 
@@ -404,12 +446,18 @@ class _EventRoutinesWrappingConfiguration extends ProgramConfiguration {
   @override
   final FieldRoutineRepository fieldRoutines;
 
+  final EventRoutines _eventRoutines;
+  final JumpTable<Byte> _runEvents;
+  final JumpTable<Word> _mapDataManagers;
   final Map<MapId, Word> _spriteVramOffsets;
   final Map<MapId, List<SpriteVramMapping>> _builtInSprites;
+  final Map<MapId, List<Word>> _originalDataManagers;
 
   _EventRoutinesWrappingConfiguration(
       {required EventRoutines eventRoutines,
       JumpTable<Byte>? runEvents,
+      JumpTable<Word>? mapDataManagers,
+      Map<MapId, List<Word>> originalDataManagers = const {},
       required this.constants,
       required this.dialogTrees,
       required this.eventFlags,
@@ -417,9 +465,12 @@ class _EventRoutinesWrappingConfiguration extends ProgramConfiguration {
       Map<MapId, Word> spriteVramOffsets = const {},
       Map<MapId, List<SpriteVramMapping>> builtInSprites = const {}})
       : _spriteVramOffsets = Map.of(spriteVramOffsets),
+        _originalDataManagers = originalDataManagers
+            .map((map, indices) => MapEntry(map, List.unmodifiable(indices))),
         _builtInSprites = Map.of(builtInSprites),
         _eventRoutines = eventRoutines,
         _runEvents = runEvents ?? runEventsJmpTbl(),
+        _mapDataManagers = mapDataManagers ?? mapDataManagersJmpTbl(),
         super._();
 
   @override
@@ -430,6 +481,13 @@ class _EventRoutinesWrappingConfiguration extends ProgramConfiguration {
 
   @override
   Byte addRunEvent(Label name) => _runEvents.add(name);
+
+  @override
+  Word addMapDataManager(Label name) => _mapDataManagers.add(name);
+
+  @override
+  List<Word> originalDataManagersForMap(MapId map) =>
+      _originalDataManagers[map] ?? const [];
 
   @override
   Word? spriteVramOffsetForMap(MapId map) => _spriteVramOffsets[map];
@@ -644,7 +702,9 @@ EventType? sceneEventType(List<Event> events,
 
 class GenerationContext {
   GenerationContext(this.config,
-      {required this.eventAsm, required this.runEventAsm});
+      {required this.eventAsm,
+      required this.runEventAsm,
+      required this.mapDataManagerAsm});
 
   // Non-volatile state (state of the code being generated)
   final ProgramConfiguration config;
@@ -652,6 +712,7 @@ class GenerationContext {
   EventFlags get eventFlags => config.eventFlags;
   final EventAsm eventAsm;
   final Asm runEventAsm;
+  final Asm mapDataManagerAsm;
 
   /// Additional assembly segments, labelled, which are added after generation.
   ///
@@ -680,8 +741,6 @@ class GenerationContext {
   Memory memory = Memory(); // todo: ctor initialization
   /// should also contain root state
   final stateGraph = <Condition, Memory>{};
-
-  //AsmGeneratingEventVisitor mode;
 }
 
 class SceneAsmGenerator implements EventVisitor {
@@ -812,7 +871,8 @@ class SceneAsmGenerator implements EventVisitor {
                 eventFlags: eventFlags ?? EventFlags(),
                 fieldRoutines: fieldRoutines ?? defaultFieldRoutines),
             eventAsm: eventAsm,
-            runEventAsm: Asm.empty()) {
+            runEventAsm: Asm.empty(),
+            mapDataManagerAsm: Asm.empty()) {
     if (withObject != null) {
       _memory.putInAddress(a3, const InteractionObject());
     }
@@ -841,7 +901,8 @@ class SceneAsmGenerator implements EventVisitor {
                 eventFlags: eventFlags ?? EventFlags(),
                 fieldRoutines: fieldRoutines ?? defaultFieldRoutines),
             eventAsm: eventAsm,
-            runEventAsm: Asm.empty()) {
+            runEventAsm: Asm.empty(),
+            mapDataManagerAsm: Asm.empty()) {
     var tree = _dialogTrees.forTalk();
     if (tree.isNotEmpty) {
       throw StateError('the Talk scene has already been generated');
@@ -868,6 +929,8 @@ class SceneAsmGenerator implements EventVisitor {
                 events: eventPtrs(),
                 cutscenes: cutscenePtrs(),
                 runEvents: runEventsJmpTbl(),
+                mapDataManagers: mapDataManagersJmpTbl(),
+                originalDataManagers: _defaultOriginalDataManagers,
                 fieldRoutines: fieldRoutines ?? defaultFieldRoutines,
                 eventFlags: eventFlags ?? EventFlags(),
                 constants: Constants.wrap({}),
@@ -875,7 +938,8 @@ class SceneAsmGenerator implements EventVisitor {
                 spriteVramOffsets: _defaultSpriteVramOffsets,
                 builtInSprites: _defaultBuiltInSprites),
             eventAsm: eventAsm,
-            runEventAsm: Asm.empty()) {
+            runEventAsm: Asm.empty(),
+            mapDataManagerAsm: Asm.empty()) {
     _validateSceneId(id);
     _memory.currentMap = startingMap;
     if (startingMap != null) {
@@ -892,11 +956,33 @@ class SceneAsmGenerator implements EventVisitor {
       : _labeller = Labeller.localTo(id),
         _gameMode = RunEventMode(),
         _context = GenerationContext(config,
-            eventAsm: eventAsm, runEventAsm: runEventAsm) {
+            eventAsm: eventAsm,
+            runEventAsm: runEventAsm,
+            mapDataManagerAsm: Asm.empty()) {
     _validateSceneId(id);
     _memory.currentMap = inMap;
     _memory.loadedDialogTree = _dialogTrees.forMap(inMap.id);
     _stateGraph[Condition.empty()] = _memory;
+  }
+
+  SceneAsmGenerator.forMapDataManager(this.id,
+      {required GameMap inMap,
+      required Asm managerAsm,
+      required ProgramConfiguration config})
+      : _labeller = Labeller.localTo(id),
+        _gameMode = MapDataManagerMode(),
+        _context = GenerationContext(config,
+            eventAsm: EventAsm.empty(),
+            runEventAsm: Asm.empty(),
+            mapDataManagerAsm: managerAsm) {
+    _validateSceneId(id);
+    _memory.currentMap = inMap;
+    _memory.isFieldShown = null;
+    _memory.isDisplayEnabled = null;
+    _memory.panelsShown = null;
+    _stateGraph[Condition.empty()] = _memory;
+    // Data managers should maintain all registers
+    _context.mapDataManagerAsm.add(movem.l(d0 - a6, -(sp)));
   }
 
   static SceneId _validateSceneId(SceneId id) {
@@ -920,8 +1006,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   void runEventIfNeeded(List<Event> events,
       {Word? eventIndex, String? nameSuffix}) {
-    // Check if we're already in an event
-    if (_gameMode is EventMode) return;
+    // Check if we're already in an event / do not support promotion
+    if (_gameMode is EventMode || _gameMode is MapDataManagerMode) return;
 
     // We're not so see if the events require one.
     var type = needsEventMode(events);
@@ -1032,14 +1118,18 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void asm(AsmEvent asm) {
     if (asm.requireEvent) {
-      _addToEvent(asm, (i) {
+      _addToRoutine(asm, (i, destination) {
         _memory.unknownAddressRegisters();
         return asm.asm;
       });
     } else {
-      _addToEventOrRunEvent(asm, (i, _) {
+      _addToRoutine(asm, (i, _) {
         _memory.unknownAddressRegisters();
         return asm.asm;
+      }, allowedModes: const {
+        ModeType<EventMode>(),
+        ModeType<RunEventMode>(),
+        ModeType<MapDataManagerMode>(),
       });
     }
   }
@@ -1070,7 +1160,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void displayText(DisplayText display) {
-    _addToEvent(display, (i) {
+    _addToRoutine(display, (i, _) {
       var asm = text_model.displayTextToAsm(display, _currentDialogTree(),
           labeller: _labeller.withContext(i));
       return asm.event;
@@ -1083,14 +1173,15 @@ class SceneAsmGenerator implements EventVisitor {
 
     if (!_inEvent &&
         _isInteractingWithObject &&
-        _lastEventInCurrentDialog == null &&
+        (_lastEventInCurrentDialog == null ||
+            _lastEventInCurrentDialog == face) &&
         face.object == const InteractionObject()) {
       // this already will happen by default if the first event
       _lastEventInCurrentDialog = face;
       return;
     }
 
-    _addToEvent(face, (i) {
+    _addToRoutine(face, (i, _) {
       var asm = EventAsm.of(_waitForPendingMovements(face.movedObjects()));
 
       // TODO: since we try to track withObject now,
@@ -1113,17 +1204,17 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void overlapCharacters(OverlapCharacters overlap) {
     _checkNotFinished();
-    _addToEvent(overlap, (_) {
-      _eventAsm.add(_waitForPendingMovements(overlap.movedObjects()));
+    _addToRoutine(overlap, (_, asm) {
+      asm.add(_waitForPendingMovements(overlap.movedObjects()));
       // Set speed if different from current context
       if (_memory.stepSpeed != overlap.speed) {
-        _eventAsm.add(setStepSpeed(overlap.speed.offset.i));
+        asm.add(setStepSpeed(overlap.speed.offset.i));
         _memory.stepSpeed = overlap.speed;
       }
-      _eventAsm.add(jsr(Label('Event_OverlapCharacters').l));
+      asm.add(jsr(Label('Event_OverlapCharacters').l));
       // Reset to normal speed after overlap
       if (_memory.stepSpeed != StepSpeed.normal()) {
-        _eventAsm.add(setStepSpeed(StepSpeed.normal().offset.i));
+        asm.add(setStepSpeed(StepSpeed.normal().offset.i));
         _memory.stepSpeed = StepSpeed.normal();
       }
     });
@@ -1134,7 +1225,7 @@ class SceneAsmGenerator implements EventVisitor {
     var facing = moves.justFacing;
     var isJustFacing = facing != null;
 
-    Asm inEvent(int i) {
+    Asm inRoutine(int i, Asm _) {
       var justPlayedSound = _lastEventInCurrentDialog is PlaySound ||
           _lastEventInCurrentDialog is PlayMusic;
 
@@ -1150,15 +1241,15 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     if (isJustFacing && FaceInDialogByteCode.ok(facing)) {
-      _addToEventOrDialog(moves, inDialog: () {
+      _addToRoutineOrDialog(moves, inDialog: () {
         var (dialogAsm, routines) = FaceInDialogByteCode(facing)
             .toAsm(_memory, labeller: _labeller.withContext(_eventCounter));
 
         _addToDialog(dialogAsm);
         _postAsm.addAll(routines);
-      }, inEvent: inEvent);
+      }, inRoutine: inRoutine);
     } else {
-      _addToEvent(moves, inEvent);
+      _addToRoutine(moves, inRoutine);
     }
   }
 
@@ -1166,7 +1257,7 @@ class SceneAsmGenerator implements EventVisitor {
   void absoluteMoves(AbsoluteMoves moves) {
     _checkNotFinished();
 
-    Asm inEvent(int i) {
+    Asm inRoutine(int i, Asm _) {
       var objects = _memory.resolveAll(moves.movedObjects());
       var asm = Asm([
         _waitForPendingMovements(objects),
@@ -1179,14 +1270,14 @@ class SceneAsmGenerator implements EventVisitor {
     }
 
     if (moves.canRunInDialog(_memory)) {
-      _addToEventOrDialog(moves, inDialog: () {
+      _addToRoutineOrDialog(moves, inDialog: () {
         var (asm, routines) = AbsoluteMovesInDialog(moves)
             .toAsm(_memory, labeller: _labeller.withContext(_eventCounter));
         _postAsm.addAll(routines);
         _addToDialog(asm);
-      }, inEvent: inEvent);
+      }, inRoutine: inRoutine);
     } else {
-      _addToEvent(moves, inEvent);
+      _addToRoutine(moves, inRoutine);
     }
   }
 
@@ -1194,7 +1285,7 @@ class SceneAsmGenerator implements EventVisitor {
   void waitForMovements(WaitForMovements wait) {
     _checkNotFinished();
     var keepDialog = !wait.requireEvent;
-    _addToEvent(wait, (i) {
+    _addToRoutine(wait, (i, asm) {
       var asm = waitForMovementsToAsm(wait, memory: _memory);
       wait.objects.forEach(_memory.finishMovement);
       return asm;
@@ -1203,12 +1294,13 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void instantMoves(InstantMoves moves) {
-    _addToEvent(moves, (i) => instantMovesToAsm(moves, _memory, eventIndex: i));
+    _addToRoutine(
+        moves, (i, asm) => instantMovesToAsm(moves, _memory, eventIndex: i));
   }
 
   @override
   void stepObject(StepObject step) {
-    _addToEvent(step, (i) {
+    _addToRoutine(step, (i, asm) {
       return Asm([
         _waitForPendingMovements(step.movedObjects()),
         stepObjectToAsm(step,
@@ -1219,7 +1311,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void stepObjects(StepObjects step) {
-    _addToEvent(step, (i) {
+    _addToRoutine(step, (i, asm) {
       return Asm([
         _waitForPendingMovements(step.movedObjects()),
         stepObjectsToAsm(step,
@@ -1230,7 +1322,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void lockCamera(LockCamera lock) {
-    _addToEvent(lock, (i) {
+    _addToRoutine(lock, (i, asm) {
       if (_memory.cameraLock == true) {
         return EventAsm.empty();
       }
@@ -1240,7 +1332,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void unlockCamera(UnlockCamera unlock) {
-    _addToEvent(unlock, (i) {
+    _addToRoutine(unlock, (i, asm) {
       if (_memory.cameraLock == false) {
         return EventAsm.empty();
       }
@@ -1250,7 +1342,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void moveCamera(MoveCamera move) {
-    _addToEvent(move, (i) {
+    _addToRoutine(move, (i, asm) {
       var panels = _memory.panelsShown;
       if (panels != null && panels > 0) {
         throw StateError('moving camera while panels are shown '
@@ -1282,7 +1374,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void partyMove(RelativePartyMove move) {
-    _addToEvent(move, (i) {
+    _addToRoutine(move, (i, asm) {
       var moves = IndividualMoves()
         ..moves[BySlot(1)] = move.movement
         ..speed = move.speed
@@ -1307,7 +1399,7 @@ class SceneAsmGenerator implements EventVisitor {
       return;
     }
 
-    Asm generateEvent(i) {
+    Asm generateRoutine(int i, Asm _) {
       // if (_isProcessingInteraction) {
       //   return EventAsm.of(doInteractionUpdatesLoop(Word(frames)));
       // } else {
@@ -1316,15 +1408,15 @@ class SceneAsmGenerator implements EventVisitor {
 
     switch (pause.duringDialog) {
       case false:
-        _addToEvent(pause, generateEvent);
+        _addToRoutine(pause, generateRoutine);
         break;
       case null when !pause.runObjects:
         // Not running objects so can do either
-        _addToEventOrDialog(pause, inDialog: () {
+        _addToRoutineOrDialog(pause, inDialog: () {
           var (asm, routines) = PauseCode(frames.toByte).toAsm(_memory);
           _addToDialog(asm);
           _postAsm.addAll(routines);
-        }, inEvent: generateEvent);
+        }, inRoutine: generateRoutine);
         break;
       case _: // true or null with runObjects
         _generateQueueInCurrentMode();
@@ -1413,7 +1505,7 @@ class SceneAsmGenerator implements EventVisitor {
         }
 
         // Wrap up this branch
-        finish(appendNewline: true, allowIncompleteDialogTrees: true);
+        _finishBranch(appendNewline: true);
 
         if (_inEvent) {
           // we may be in event now, but we have to go back to dialog generation
@@ -1431,7 +1523,7 @@ class SceneAsmGenerator implements EventVisitor {
         }
 
         // Wrap up this branch
-        finish(appendNewline: true, allowIncompleteDialogTrees: true);
+        _finishBranch(appendNewline: true);
 
         _flagUnknown(flag);
 
@@ -1448,8 +1540,8 @@ class SceneAsmGenerator implements EventVisitor {
         // TODO(ifflag): should we update state graph here?
 
         break;
-      case EventMode() || RunEventMode():
-        _addToEventOrRunEvent(ifFlag, (i, asm) {
+      case EventMode() || RunEventMode() || MapDataManagerMode():
+        _addToRoutine(ifFlag, (i, asm) {
           // note that if we need to move further than beq.w
           // we will need to branch to subroutine
           // which then jsr/jmp to another
@@ -1516,7 +1608,7 @@ class SceneAsmGenerator implements EventVisitor {
             if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
               // We're done with the event code; finish it.
               // If we need an event at this point it will be a new event.
-              finish(appendNewline: true, allowIncompleteDialogTrees: true);
+              _finishBranch(appendNewline: true);
             } else {
               // Keep dialog in case event after IfFlag is still dialog
               _terminateDialog(keepDialog: true);
@@ -1548,7 +1640,7 @@ class SceneAsmGenerator implements EventVisitor {
             if (startingMode is RunEventMode && _gameMode is! RunEventMode) {
               // We're done with the event code; finish it.
               // If we need an event at this point it will be a new event.
-              finish(appendNewline: true, allowIncompleteDialogTrees: true);
+              _finishBranch(appendNewline: true);
             } else {
               // Keep dialog in case event after IfFlag is still dialog
               _terminateDialog(keepDialog: true);
@@ -1574,6 +1666,10 @@ class SceneAsmGenerator implements EventVisitor {
           } else {
             asm.add(setLabel(continueScene.name));
           }
+        }, allowedModes: const {
+          ModeType<EventMode>(),
+          ModeType<RunEventMode>(),
+          ModeType<MapDataManagerMode>(),
         }, keepDialog: true);
 
         break;
@@ -1582,7 +1678,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void setFlag(SetFlag setFlag) {
-    _addToEventOrDialog(setFlag, inDialog: () {
+    _addToRoutineOrDialog(setFlag, inDialog: () {
       var flag = _eventFlags.toConstantValue(setFlag.flag);
       if (flag.value > Byte.max) {
         _addToDialog(dc.b([ControlCodes.action, Byte(0xd)]));
@@ -1591,15 +1687,23 @@ class SceneAsmGenerator implements EventVisitor {
         _addToDialog(dc.b([ControlCodes.action, Byte(0xb)]));
         _addToDialog(dc.b([flag.constant]));
       }
-    }, inEvent: (_) {
+    }, inRoutine: (_, asm) {
       var flag = _eventFlags.toConstantValue(setFlag.flag);
       return setEventFlag(flag);
+    }, allowedModes: const {
+      ModeType<EventMode>(),
+      ModeType<MapDataManagerMode>(),
     });
   }
 
   @override
   void ifValue(IfValue ifValue) {
-    _addToEventOrRunEvent(ifValue, (i, asm) {
+    if (_gameMode is MapDataManagerMode) {
+      _validateManagerValue(ifValue.operand1);
+      _validateManagerValue(ifValue.operand2);
+    }
+
+    _addToRoutine(ifValue, (i, asm) {
       // This event will apply changes to reachable states in the graph.
       // Because of this, we need to be sure any queued changes
       // are applied first,
@@ -1716,8 +1820,10 @@ class SceneAsmGenerator implements EventVisitor {
           }
         }
       }
-
-      return null;
+    }, allowedModes: const {
+      ModeType<EventMode>(),
+      ModeType<RunEventMode>(),
+      ModeType<MapDataManagerMode>(),
     }, keepDialog: true);
   }
 
@@ -1793,7 +1899,7 @@ class SceneAsmGenerator implements EventVisitor {
     } else {
       runBranch(yesNo.ifNo);
       // In this case, do not keep dialog; there cannot be a follow up event.
-      // After the yes branch, we finish().
+      // After the yes branch, we finish that branch.
       _terminateDialog();
     }
 
@@ -1818,7 +1924,7 @@ class SceneAsmGenerator implements EventVisitor {
       runBranch(yesNo.ifYes);
       // If we're in dialog loop, we cannot do anything else after this.
       // Terminating both branches means we're done.
-      finish();
+      _finishBranch();
     }
 
     // Pop current memory state back to parent.
@@ -1849,7 +1955,7 @@ class SceneAsmGenerator implements EventVisitor {
     // Sometimes we might not know its not shown (e.g. at the start of a scene)
     // if (_memory.isFieldShown == true) return;
 
-    _addToEvent(fadeIn, (eventIndex) {
+    _addToRoutine(fadeIn, (eventIndex, asm) {
       var wasFieldShown = _memory.isFieldShown;
       // TODO(optimization): if reload palette only needed,
       // might be able to do:
@@ -1912,7 +2018,7 @@ class SceneAsmGenerator implements EventVisitor {
   void fadeOut(FadeOut fadeOut) {
     _checkNotFinished();
 
-    _addToEvent(fadeOut, (eventIndex) {
+    _addToRoutine(fadeOut, (eventIndex, asm) {
       _memory.isFieldShown = false;
       _memory.isMapInCram = false;
       _memory.isDialogInCram = false;
@@ -1937,14 +2043,14 @@ class SceneAsmGenerator implements EventVisitor {
 
       switch (fadeOut.speed) {
         case VariableSpeed s:
-          _eventAsm.add(Asm([
+          asm.add(Asm([
             move.b(s.value.i, 0xffffed52.w),
             jsr(Label('Pal_VariableFadeOut').l),
           ]));
         case Normal():
-          _eventAsm.add(events_asm.fadeOut(initVramAndCram: false));
+          asm.add(events_asm.fadeOut(initVramAndCram: false));
         case Instantly():
-          _eventAsm.add(Asm([
+          asm.add(Asm([
             lea((Palette_Table_Buffer).w, a0),
             move.w(0x1F.i, d7),
             trap(0.i),
@@ -1955,11 +2061,9 @@ class SceneAsmGenerator implements EventVisitor {
       }
 
       if ((_memory.panelsShown ?? 0) > 0) {
-        _eventAsm.add(jsr(Label('Panel_DestroyAll').l));
+        asm.add(jsr(Label('Panel_DestroyAll').l));
         _memory.panelsShown = 0;
       }
-
-      return null;
     });
   }
 
@@ -1967,9 +2071,9 @@ class SceneAsmGenerator implements EventVisitor {
   void fadeToRed(FadeToRed fadeToRed) {
     _checkNotFinished();
 
-    _addToEvent(
+    _addToRoutine(
         fadeToRed,
-        (_) => Asm([
+        (_, asm) => Asm([
               move.b(fadeToRed.speed.value.i, 0xffffed52.w),
               jsr(Label('Pal_VariableFadeToRed').l),
             ]));
@@ -1979,9 +2083,9 @@ class SceneAsmGenerator implements EventVisitor {
   void fadeFromRed(FadeFromRed fadeFromRed) {
     _checkNotFinished();
 
-    _addToEvent(
+    _addToRoutine(
         fadeFromRed,
-        (_) => Asm([
+        (_, asm) => Asm([
               move.b(fadeFromRed.speed.value.i, 0xffffed52.w),
               jsr(Label('Pal_VariableFadeFromRed').l),
             ]));
@@ -1992,7 +2096,7 @@ class SceneAsmGenerator implements EventVisitor {
     _checkNotFinished();
 
     if (increase.savePalette) {
-      _addToEvent(increase, (_) {
+      _addToRoutine(increase, (_, asm) {
         return Asm([
           lea(Palette_Table_Buffer.w, a0),
           lea(Palette_Table_Buffer_2.w, a1),
@@ -2006,7 +2110,7 @@ class SceneAsmGenerator implements EventVisitor {
     var frames = (increase.percent * 28).ceil();
 
     if (frames > 0) {
-      _addToEvent(increase, (eventIndex) {
+      _addToRoutine(increase, (eventIndex, asm) {
         var extraFrames = frames - 1;
         return Asm([
           if (extraFrames <= 128)
@@ -2032,7 +2136,7 @@ class SceneAsmGenerator implements EventVisitor {
     var frames = (restore.percent * 28).ceil();
 
     if (frames > 0) {
-      _addToEvent(restore, (eventIndex) {
+      _addToRoutine(restore, (eventIndex, asm) {
         var extraFrames = frames - 1;
         return Asm([
           if (extraFrames <= 128)
@@ -2054,8 +2158,8 @@ class SceneAsmGenerator implements EventVisitor {
   void flashScreen(FlashScreen flash) {
     _checkNotFinished();
 
-    _addToEvent(flash, (i) {
-      _eventAsm.add(Asm([
+    _addToRoutine(flash, (i, asm) {
+      asm.add(Asm([
         // Copy current palette to buffer 2
         lea(Palette_Table_Buffer.w, a0),
         lea(Palette_Table_Buffer_2.w, a1),
@@ -2074,7 +2178,7 @@ class SceneAsmGenerator implements EventVisitor {
           playSound(PlaySound(s));
         }
 
-        _eventAsm.add(Asm([
+        asm.add(Asm([
           lea(Palette_Table_Buffer.w, a0),
           // Rewrite the palette white
           moveq(0x1F.i, d7),
@@ -2091,7 +2195,7 @@ class SceneAsmGenerator implements EventVisitor {
         var additionalRestoreFrames = max(0, (percent * 28 - 1).ceil());
         var loop = Label('.restore_palette${i}_$sequence');
 
-        _eventAsm.add(Asm([
+        asm.add(Asm([
           _waitFrames(flashedFrames),
           move.w(additionalRestoreFrames.i, d7),
           label(loop),
@@ -2116,8 +2220,10 @@ class SceneAsmGenerator implements EventVisitor {
   void prepareMap(PrepareMap prepareMap) {
     _checkNotFinished();
 
-    _addToEvent(prepareMap,
-        (eventIndex) => refreshMap(refreshObjects: prepareMap.refreshObjects));
+    _addToRoutine(
+        prepareMap,
+        (eventIndex, asm) =>
+            refreshMap(refreshObjects: prepareMap.refreshObjects));
 
     _memory.isMapInCram = true;
     _memory.isMapInVram = true;
@@ -2145,11 +2251,11 @@ class SceneAsmGenerator implements EventVisitor {
     var y = startPos.y ~/ 8;
     var alignByte = arrangement.toAsm;
 
-    _addToEvent(loadMap, (eventIndex) {
+    _addToRoutine(loadMap, (eventIndex, asm) {
       switch (loadMap.updateParty) {
         case ChangePartyOrder changeParty:
           if (changeParty.saveCurrentParty) {
-            _eventAsm.add(saveCurrentPartySlots());
+            asm.add(saveCurrentPartySlots());
           }
 
           var newParty = changeParty.party;
@@ -2161,7 +2267,7 @@ class SceneAsmGenerator implements EventVisitor {
             return c.charId;
           }).toList(growable: false);
 
-          _eventAsm.add(loadPartySlots(
+          asm.add(loadPartySlots(
               partyIds, Current_Party_Slots.w, Current_Party_Slot_5.w));
 
           _memory.slots.setPartyOrder(newParty,
@@ -2169,7 +2275,7 @@ class SceneAsmGenerator implements EventVisitor {
           break;
         case RestoreSavedPartyOrder():
           _memory.slots.restorePreviousParty();
-          _eventAsm.add(restoreSavedPartySlots());
+          asm.add(restoreSavedPartySlots());
           break;
         case null:
           break;
@@ -2178,18 +2284,18 @@ class SceneAsmGenerator implements EventVisitor {
       if (loadMap.showField) {
         if (_memory.isDisplayEnabled == false) {
           if (_memory.isMapInCram != false) {
-            _eventAsm.add(events_asm.fadeOut());
+            asm.add(events_asm.fadeOut());
             _memory.isMapInCram = false;
             _memory.isDialogInCram = false;
 
             // Remove panels while in fade out if present.
             if ((_memory.panelsShown ?? 0) > 0) {
-              _eventAsm.add(jsr(Label('Panel_DestroyAll').l));
+              asm.add(jsr(Label('Panel_DestroyAll').l));
               _memory.panelsShown = 0;
             }
           }
-          _eventAsm.add(jsr(Label('Pal_FadeIn').l));
-          _eventAsm.add(jsr(Label('VInt_Prepare').l));
+          asm.add(jsr(Label('Pal_FadeIn').l));
+          asm.add(jsr(Label('VInt_Prepare').l));
           _memory.isDisplayEnabled = true;
         }
       }
@@ -2197,12 +2303,12 @@ class SceneAsmGenerator implements EventVisitor {
       // If by this point, there are still panels, remove them.
       // Otherwise map change will corrupt them.
       if ((_memory.panelsShown ?? 0) > 0) {
-        _eventAsm.add(jsr(Label('Panel_DestroyAll').l));
+        asm.add(jsr(Label('Panel_DestroyAll').l));
         _memory.panelsShown = 0;
       }
 
-      _eventAsm.add(move.b(newMap.id.world.toAsm.i, World_Index.w));
-      _eventAsm.add(events_asm.changeMap(
+      asm.add(move.b(newMap.id.world.toAsm.i, World_Index.w));
+      asm.add(events_asm.changeMap(
           to: newId.i,
           from: currentId?.i,
           startX: Word(x).i,
@@ -2212,7 +2318,7 @@ class SceneAsmGenerator implements EventVisitor {
           refreshObjects: loadMap.refreshObjects));
 
       if (_memory.cameraLock != false) {
-        _eventAsm.add(events_asm.lockCamera(false));
+        asm.add(events_asm.lockCamera(false));
         _memory.cameraLock = false;
       }
     });
@@ -2251,6 +2357,8 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void showPanel(ShowPanel showPanel) {
+    _checkNotFinished();
+
     var index = showPanel.panel.panelIndex;
 
     if (showPanel.showDialogBox) {
@@ -2274,7 +2382,7 @@ class SceneAsmGenerator implements EventVisitor {
       _memory.dialogPortrait = p;
       _memory.portraitAlignment = HorizontalAlignment.left;
     } else {
-      _addToEvent(showPanel, (_) {
+      _addToRoutine(showPanel, (_, asm) {
         _memory.addPanel();
 
         if (_memory.isDisplayEnabled == false) {
@@ -2283,7 +2391,7 @@ class SceneAsmGenerator implements EventVisitor {
             // Confirmed this with emulator.
             _initVramAndCram();
           }
-          _eventAsm.add(jsr(Label('Pal_FadeIn').l));
+          asm.add(jsr(Label('Pal_FadeIn').l));
           _memory.isDisplayEnabled = true;
         }
 
@@ -2301,15 +2409,14 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void hideAllPanels(HideAllPanels hidePanels) {
-    _checkNotFinished();
-    _addToEventOrDialog(hidePanels, inDialog: () {
+    _addToRoutineOrDialog(hidePanels, inDialog: () {
       var panelsShown = _memory.panelsShown;
       if (panelsShown == 0) return;
       var (asm, routines) =
           HideAllPanelsCode(instantly: hidePanels.instantly).toAsm(_memory);
       _addToDialog(asm);
       _postAsm.addAll(routines);
-    }, inEvent: (i) {
+    }, inRoutine: (i, _) {
       var panelsShown = _memory.panelsShown;
       if (panelsShown == 0) return Asm.empty();
       if (hidePanels.instantly) {
@@ -2351,12 +2458,12 @@ class SceneAsmGenerator implements EventVisitor {
       throw UnimplementedError('HideTopPanels.instantly');
     }
 
-    _addToEventOrDialog(hidePanels, inDialog: () {
+    _addToRoutineOrDialog(hidePanels, inDialog: () {
       var (asm, routines) =
           HideTopPanelsCode(hidePanels.panelsToHide).toAsm(_memory);
       _addToDialog(asm);
       _postAsm.addAll(routines);
-    }, inEvent: (eventIndex) {
+    }, inRoutine: (eventIndex, _) {
       var panels = hidePanels.panelsToHide;
       var panelsShown = _memory.panelsShown;
 
@@ -2389,11 +2496,11 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void playSound(PlaySound playSound) {
-    _addToEventOrDialog(playSound, inDialog: () {
+    _addToRoutineOrDialog(playSound, inDialog: () {
       var (asm, routines) = SoundCode(playSound.sound.soundId).toAsm(_memory);
       _addToDialog(asm);
       _postAsm.addAll(routines);
-    }, inEvent: (_) {
+    }, inRoutine: (_, asm) {
       return Asm([
         // Necessary to ensure previous sound change occurs
         // TODO: as last event in current dialog is relevant to current dialog
@@ -2417,12 +2524,12 @@ class SceneAsmGenerator implements EventVisitor {
      */
     var musicId = playMusic.music.musicId;
 
-    _addToEventOrDialog(playMusic, inDialog: () {
+    _addToRoutineOrDialog(playMusic, inDialog: () {
       var (asm, routines) = SoundCode(musicId).toAsm(_memory);
       _addToDialog(asm);
       _postAsm.addAll(routines);
       // TODO: note in this case, saved sound index is not set
-    }, inEvent: (_) {
+    }, inRoutine: (_, asm) {
       return Asm([
         // Necessary to ensure previous sound change occurs
         // TODO: as last event in current dialog is relevant to current dialog
@@ -2453,12 +2560,12 @@ class SceneAsmGenerator implements EventVisitor {
      */
     var musicId = SoundEffect.stopMusic.sfxId;
 
-    _addToEventOrDialog(stopMusic, inDialog: () {
+    _addToRoutineOrDialog(stopMusic, inDialog: () {
       var (asm, routines) = SoundCode(musicId).toAsm(_memory);
       _addToDialog(asm);
       _postAsm.addAll(routines);
       // TODO: note in this case, saved sound index is not set
-    }, inEvent: (_) {
+    }, inRoutine: (_, asm) {
       return Asm([
         // Necessary to ensure previous sound change occurs
         // TODO: as last event in current dialog is relevant to current dialog
@@ -2483,11 +2590,37 @@ class SceneAsmGenerator implements EventVisitor {
 
     var diff = addMoney.meseta;
 
-    _addToEvent(
+    _addToRoutine(
         addMoney,
-        (_) => diff > 0
+        (_, asm) => diff > 0
             ? addi.l(diff.i, const Constant('Current_Money').w)
             : subi.l(diff.i, const Constant('Current_Money').w));
+  }
+
+  @override
+  void clearMapObject(ClearMapObject clear) {
+    _addToRoutine(clear, (_, asm) {
+      final map = _memory.currentMap;
+      final obj = map?.object(clear.object);
+      if (map == null || obj == null) {
+        throw StateError(
+            'scene=$id map=${map?.id} clear_map_object: missing object ${clear.object}');
+      }
+      final index = map.indexOf(clear.object)!;
+      _memory.finishMovement(obj);
+      _memory.positions[obj] = null;
+      _memory.clearFacing(obj);
+      _memory.setRoutine(obj, ClearedObjectRoutine());
+      _memory.putInAddress(a0, null);
+      return Asm([
+        lea(Constant('Field_Obj_Secondary+\$40*$index').w, a0),
+        clr.w(a0.indirect),
+      ]);
+    }, allowedModes: const {
+      ModeType<EventMode>(),
+      ModeType<RunEventMode>(),
+      ModeType<MapDataManagerMode>(),
+    });
   }
 
   @override
@@ -2515,7 +2648,7 @@ class SceneAsmGenerator implements EventVisitor {
 
   @override
   void changeObjectRoutine(ChangeObjectRoutine change) {
-    _addToEvent(change, (eventIndex) {
+    _addToRoutine(change, (eventIndex, asm) {
       var obj = change.object.resolve(_memory);
 
       if (obj is! MapObject) {
@@ -2557,9 +2690,9 @@ class SceneAsmGenerator implements EventVisitor {
   void changeParty(ChangePartyOrder changeParty) {
     _checkNotFinished();
 
-    _addToEvent(changeParty, (_) {
+    _addToRoutine(changeParty, (_, asm) {
       if (changeParty.saveCurrentParty) {
-        _eventAsm.add(saveCurrentPartySlots());
+        asm.add(saveCurrentPartySlots());
       }
 
       var newParty = changeParty.party;
@@ -2570,7 +2703,7 @@ class SceneAsmGenerator implements EventVisitor {
       var prior = _memory.branch();
 
       if (changeParty.maintainOrder) {
-        _eventAsm.add(Asm([
+        asm.add(Asm([
           loadPartySlots(
               newParty
                   .map((c) => c?.charId ?? Byte.max)
@@ -2599,7 +2732,7 @@ class SceneAsmGenerator implements EventVisitor {
             //  we can make this a little smarter.
             continue;
           }
-          _eventAsm.add(Asm([
+          asm.add(Asm([
             moveq(member.charId.i, d0),
             moveq(i.i, d1),
             jsr(Label('Event_SwapCharacter').l),
@@ -2625,8 +2758,6 @@ class SceneAsmGenerator implements EventVisitor {
           _memory.positions[BySlot(slot)] = null;
         }
       }
-
-      return null;
     });
   }
 
@@ -2634,7 +2765,7 @@ class SceneAsmGenerator implements EventVisitor {
   void restoreSavedParty(RestoreSavedPartyOrder restoreParty) {
     _checkNotFinished();
 
-    _addToEvent(restoreParty, (_) {
+    _addToRoutine(restoreParty, (_, asm) {
       // Capture positions by character before the swap.
       // Characters don't physically move when swapping slots - they stay at their
       // x/y positions. Only slot assignments change.
@@ -2651,7 +2782,7 @@ class SceneAsmGenerator implements EventVisitor {
         if (prior == current && current != null) {
           return;
         }
-        _eventAsm.add(Asm([
+        asm.add(Asm([
           move.b((Constant('Saved_Char_ID_Mem_$i').w), d0),
           moveq((i - 1).i, d1),
           jsr(Label('Event_SwapCharacter').l),
@@ -2683,31 +2814,29 @@ class SceneAsmGenerator implements EventVisitor {
 
     // TODO(onexit): this event has to be at the end of a scene to work,
     //  we could be smarter than that.
-    _addToEvent(onExit, (_) {
+    _addToRoutine(onExit, (_, asm) {
       // See RunDialogue2, which is normally used before boss battles.
-      _eventAsm.add(Asm([
+      asm.add(Asm([
         moveq(0.i, d0),
         move.b(d0, (Panel_Num).w),
       ]));
 
       if (onExit.postBattleSound case Sound s) {
-        _eventAsm.add(move.b(s.soundId.i, Constant('Saved_Sound_Index').w));
+        asm.add(move.b(s.soundId.i, Constant('Saved_Sound_Index').w));
       }
 
       var controlFadeInBit = onExit.postBattleFadeInMap ? bclr : bset;
-      _eventAsm.add(controlFadeInBit(7.i, Map_Load_Flags.w));
+      asm.add(controlFadeInBit(7.i, Map_Load_Flags.w));
 
       var controlObjectsBit = onExit.postBattleReloadObjects ? bclr : bset;
-      _eventAsm.add(controlObjectsBit(3.i, Map_Load_Flags.w));
+      asm.add(controlObjectsBit(3.i, Map_Load_Flags.w));
 
-      _eventAsm.add(Asm([
+      asm.add(Asm([
         move.b(onExit.battleIndex.toByte.i, Constant('Event_Battle_Index').w),
         bset(3.i, Constant('Routine_Exit_Flags').w),
       ]));
 
       _memory.onExitRunBattle = true;
-
-      return null;
     });
   }
 
@@ -2715,7 +2844,7 @@ class SceneAsmGenerator implements EventVisitor {
   void onNextInteraction(OnNextInteraction onNext) {
     _checkNotFinished();
 
-    _addToEvent(onNext, (_) {
+    _addToRoutine(onNext, (_, asm) {
       // Generate the new interaction,
       // which may introduce its own subroutine its own event or cutscene.
       var tree = _currentDialogTree();
@@ -2752,7 +2881,7 @@ class SceneAsmGenerator implements EventVisitor {
               'object_id=$objId current_map=${map.id}');
         }
 
-        _eventAsm.add(Asm([
+        asm.add(Asm([
           obj.toA4(_memory),
           move.b(nextDialogId.i, dialogue_id(a4)),
         ]));
@@ -2766,16 +2895,22 @@ class SceneAsmGenerator implements EventVisitor {
     _finish(force: true);
   }
 
+  /// Complete the scene and validate its dialogue tree once all branches exist.
   void finish(
       {bool appendNewline = false, bool allowIncompleteDialogTrees = false}) {
     // todo: also apply all changes for current mem across graph
     // not sure if still need to do this
     // seems useless because memory won't ever be consulted again after
     // finishing
+    _finishBranch(appendNewline: appendNewline);
+    if (!allowIncompleteDialogTrees) _dialogTree?.validate();
+  }
 
+  /// Complete the current path without validating other, unfinished branches.
+  /// The root condition becomes finished when all paths are complete.
+  void _finishBranch({bool appendNewline = false}) {
     if (!_isFinished) {
       _finish(appendNewline: appendNewline);
-      if (!allowIncompleteDialogTrees) _dialogTree?.validate();
       _setCurrentStateFinished();
     }
   }
@@ -2791,6 +2926,13 @@ class SceneAsmGenerator implements EventVisitor {
         _memory.onExitRunBattle == false && (_memory.panelsShown ?? 0) > 0;
 
     switch (_gameMode) {
+      case MapDataManagerMode():
+        _context.mapDataManagerAsm.add(Asm([
+          movem.l(sp.postIncrement(), d0 - a6),
+          moveq(0.i, d7),
+          rts,
+        ]));
+        break;
       case EventMode(priorMode: InteractionMode(), type: EventType.cutscene) &&
             EventMode mode:
         if (needToShowField) {
@@ -2935,6 +3077,12 @@ class SceneAsmGenerator implements EventVisitor {
             _eventAsm.addNewline();
           }
           break;
+        case MapDataManagerMode():
+          if (_context.mapDataManagerAsm.isNotEmpty &&
+              _context.mapDataManagerAsm.last.isNotEmpty) {
+            _context.mapDataManagerAsm.addNewline();
+          }
+          break;
         case RunEventMode():
           if (_context.runEventAsm.isNotEmpty &&
               _context.runEventAsm.last.isNotEmpty) {
@@ -2945,6 +3093,37 @@ class SceneAsmGenerator implements EventVisitor {
           // empty
           break;
       }
+    }
+  }
+
+  // TODO(refactor): this should probably be in the model instead?
+  void _validateManagerValue(ModelExpression value) {
+    switch (value) {
+      case PositionComponent() ||
+            Position() ||
+            BooleanConstant() ||
+            Slot() ||
+            NullSlot() ||
+            SlotOfCharacter() ||
+            RoutineIdOfSlot() ||
+            NullObjectRoutineId():
+        return;
+      case PositionComponentOfObject(:final obj) ||
+            PositionOfObject(:final obj):
+        if (obj.resolve(_memory) is! MapObject) {
+          throw UnsupportedError(
+              'scene=$id mode=MapDataManagerMode offending tech=IfValue: requires a fixed map object, got $obj');
+        }
+      case PositionOfXY(:final x, :final y):
+        _validateManagerValue(x);
+        _validateManagerValue(y);
+      case OffsetPosition(:final base):
+        _validateManagerValue(base);
+      case OffsetPositionComponent(:final base):
+        _validateManagerValue(base);
+      default:
+        throw UnsupportedError(
+            'scene=$id mode=MapDataManagerMode offending tech=IfValue: unsupported operand $value');
     }
   }
 
@@ -3186,6 +3365,9 @@ class SceneAsmGenerator implements EventVisitor {
     DialogCapableMode nextMode;
 
     switch (_gameMode) {
+      case MapDataManagerMode():
+        throw UnsupportedError(
+            "scene=$id mode=MapDataManagerMode offending tech=${event.runtimeType}");
       case DialogCapableMode mode &&
             (InteractionMode() || EventMode(isInDialogLoop: true)):
         if (_lastEventInCurrentDialog is Dialog && interruptDialog) {
@@ -3489,111 +3671,91 @@ class SceneAsmGenerator implements EventVisitor {
     return tree;
   }
 
-  /// Immediately add to event code, switching to event from dialog if needed.
+  /// Emit routine code in an accepted mode, promoting to event execution when
+  /// permitted by the current mode and [allowedModes].
   ///
-  /// [generate] may update [_eventAsm] directly, and/or it may return
-  /// [Asm] to be added to `_eventAsm`.
+  /// [generate] may append to its supplied destination and/or return additional
+  /// [Asm] for that same destination.
+  /// Any non-null return value must be [Asm].
   ///
   /// Any [_memory] interactions MUST happen either within [generate]
   /// or AFTER this method has returned.
   /// This is because there may be queued events
   /// that have not run yet (but will run when this is called).
   ///
-  /// See: [_addToEventOrDialog].
-  void _addToEvent(Event event, dynamic Function(int eventIndex) generate,
-      {bool keepDialog = false}) {
+  /// See: [_addToRoutineOrDialog].
+  void _addToRoutine(Event event, dynamic Function(int, Asm) generate,
+      {Set<ModeType<GameMode>> allowedModes = const {ModeType<EventMode>()},
+      bool keepDialog = false}) {
     _checkNotFinished();
 
-    var eventIndex = _context.getAndIncrementEventCount();
+    // Preserve event/label numbering across lazy promotion.
+    final eventIndex = _context.getAndIncrementEventCount();
 
-    switch (_gameMode) {
-      case RunEventMode():
-        // We need to switch to event mode,
-        // though we don't know what the type is.
-        // We assume event, but it may not be.
-        // This can be dangerous, but currently this is done because
-        // we rely on lazily entering event mode from a run event.
-        // If it's actually a problem,
-        // an exception will be thrown later in generation,
-        // so in practice it's probably not an issue.
+    if (allowedModes.none((allowed) => allowed.matches(_gameMode))) {
+      if (allowedModes.any((allowed) => allowed.type == EventMode) &&
+          _gameMode is RunEventCapableMode) {
         runEvent(type: EventType.event);
-        break;
-      case EventMode():
-        _terminateDialog(
-            hidePanels: false,
-            keepDialog: keepDialog,
-            forEventBreak: eventIndex);
-        break;
-      case InteractionMode():
-        throw StateError("can't add event from interaction "
-            "unless it's the first event");
+      } else {
+        throw UnsupportedError('scene=$id map=${_memory.currentMap?.id} '
+            'mode=${_gameMode.runtimeType} offending tech=${event.runtimeType}');
+      }
+    } else if (_gameMode is EventMode) {
+      _terminateDialog(
+          hidePanels: false, keepDialog: keepDialog, forEventBreak: eventIndex);
     }
 
-    var length = _eventAsm.length;
+    final asm = switch (_gameMode) {
+      EventMode() => _eventAsm,
+      RunEventMode() => _context.runEventAsm,
+      MapDataManagerMode() => _context.mapDataManagerAsm,
+      _ =>
+        throw StateError('no routine destination for ${_gameMode.runtimeType}')
+    };
 
-    if (generate(eventIndex) case Asm asm) {
-      _eventAsm.add(asm);
-    }
+    final length = asm.length;
 
-    // TODO(asm comments): modifications don't necessarily add new lines...
-    if (_eventAsm.length > length) {
-      _eventAsm.insert(length, comment('$eventIndex: ${event.runtimeType}'));
+    final extra = generate(eventIndex, asm) as Asm?;
+    if (extra != null) asm.add(extra);
+
+    if (asm.length > length) {
+      asm.insert(length, comment('$eventIndex: ${event.runtimeType}'));
     }
 
     _lastEventInCurrentDialog = event;
   }
 
-  /// Adds generated assembly to either run event assembly or event assembly,
-  /// depending on the current mode.
+  /// Emits routine assembly immediately outside dialogue; otherwise queues both
+  /// alternatives until the execution context is known.
+  /// [allowedModes] applies only when the routine alternative executes.
   ///
-  /// The [generate] callback accepts an [asm] argument which can be used
-  /// to modify the correct assembly inline if needed.
-  /// Regardless, any returned assembly will be added
-  /// to the appropriate assembly.
-  void _addToEventOrRunEvent(
-      Event event, dynamic Function(int eventIndex, Asm asm) generate,
-      {bool keepDialog = false}) {
-    switch (_gameMode) {
-      case RunEventMode():
-        _checkNotFinished();
-        var eventIndex = _context.getAndIncrementEventCount();
-        _context.runEventAsm.add(comment('$eventIndex: ${event.runtimeType}'));
-        if (generate(eventIndex, _context.runEventAsm) case Asm asm) {
-          _context.runEventAsm.add(asm);
-        }
-      default:
-        _addToEvent(event, (i) => generate(i, _eventAsm),
-            keepDialog: keepDialog);
-    }
-  }
-
-  /// Adds to event if can, otherwise queues up for later.
   /// We don't want to add to dialog
   /// unless there is an eventual intended interrupt,
   /// like a Dialog or ShowPanel (with speaker) event.
-  void _addToEventOrDialog(Event event,
+  void _addToRoutineOrDialog(Event event,
       {required void Function() inDialog,
-      required Asm? Function(int eventIndex) inEvent,
+      required dynamic Function(int eventIndex, Asm asm) inRoutine,
+      Set<ModeType<GameMode>> allowedModes = const {ModeType<EventMode>()},
       void Function()? after,
       bool interuptDialog = true}) {
     _checkNotFinished();
 
-    generateEvent() {
+    generateRoutine() {
       // Keep dialog if open since this event could've been in dialog
-      _addToEvent(event, inEvent, keepDialog: true);
+      _addToRoutine(event, inRoutine,
+          allowedModes: allowedModes, keepDialog: true);
       after?.call();
     }
 
     if (!inDialogLoop) {
-      // just always run in event in this case
-      generateEvent();
+      generateRoutine();
     } else {
       // may go either way
       _queuedGeneration.add(_QueuedGeneration(() {
         _runOrContinueDialog(event, interruptDialog: interuptDialog);
         inDialog();
         after?.call();
-      }, generateEvent));
+      }, generateRoutine));
     }
   }
 
@@ -3603,7 +3765,7 @@ class SceneAsmGenerator implements EventVisitor {
       if (inDialogLoop) {
         queued.generateDialog();
       } else {
-        queued.generateEvent();
+        queued.generateRoutine();
       }
     }
   }
@@ -3650,9 +3812,9 @@ int? _lastLineIfFadeOut(Asm asm) {
 
 class _QueuedGeneration {
   final void Function() generateDialog;
-  final void Function() generateEvent;
+  final void Function() generateRoutine;
 
-  _QueuedGeneration(this.generateDialog, this.generateEvent);
+  _QueuedGeneration(this.generateDialog, this.generateRoutine);
 }
 
 /// What should happen to panels when a dialog window finishes.
@@ -3800,6 +3962,15 @@ class TalkEventExecution extends EventAndDialogExecution {
 
 sealed class GameMode {}
 
+/// Selects an exact [GameMode] type, without including its subclasses.
+class ModeType<T extends GameMode> {
+  const ModeType();
+
+  Type get type => T;
+
+  bool matches(GameMode mode) => mode.runtimeType == type;
+}
+
 sealed class DialogCapableMode extends GameMode {
   RunEventCapableMode? get priorMode;
   DialogExecution get execution;
@@ -3887,6 +4058,9 @@ class TalkMode extends InteractionMode {
     return super.toEventMode(type);
   }
 }
+
+/// Synchronous map setup has no dialogue or event-loop transition.
+class MapDataManagerMode extends GameMode {}
 
 Word _addEventRoutine(EventRoutines r, Label name) {
   return r.addEvent(name);
@@ -4209,6 +4383,192 @@ enum _Reachability { child, reachable, unreachable, current }
 //  itself rather than hard coding here.
 //  Program API would be the right place now that we have that.
 // todo: see generator/map.dart for more of stuff like this
+
+// Grand Cross revision 1 manager lists from ps4disasm/ps4.asm.
+// Verified against the disassembly in map_data_managers_test.dart.
+const _defaultOriginalDataManagers = <MapId, List<Word>>{
+  MapId.Motavia: [Word.constant(0x14)],
+  MapId.Dezolis: [Word.constant(0x26), Word.constant(0x14)],
+  MapId.PiataAcademyNearBasement: [Word.constant(0x2), Word.constant(0x18)],
+  MapId.PiataAcademyF1: [
+    Word.constant(0x0),
+    Word.constant(0x0),
+    Word.constant(0x0),
+    Word.constant(0x1)
+  ],
+  MapId.PiataAcademyPrincipalOffice: [Word.constant(0x1d), Word.constant(0x1e)],
+  MapId.PiataAcademyBasement: [Word.constant(0x3), Word.constant(0x8b)],
+  MapId.PiataAcademyBasementB1: [Word.constant(0x8b)],
+  MapId.PiataAcademyBasementB2: [
+    Word.constant(0x4),
+    Word.constant(0x19),
+    Word.constant(0x34),
+    Word.constant(0x8b)
+  ],
+  MapId.PiataDorm: [Word.constant(0xc)],
+  MapId.Mile: [Word.constant(0x70), Word.constant(0x71)],
+  MapId.MileDead: [Word.constant(0x81)],
+  MapId.MileWeaponShop: [Word.constant(0x6f)],
+  MapId.MileHouse1: [Word.constant(0x6f)],
+  MapId.MileHouse2: [Word.constant(0x6f)],
+  MapId.MileInn: [Word.constant(0x6f)],
+  MapId.Zema: [
+    Word.constant(0x5),
+    Word.constant(0x1a),
+    Word.constant(0x66),
+    Word.constant(0x6d)
+  ],
+  MapId.ZemaHouse2: [
+    Word.constant(0xd),
+    Word.constant(0x12),
+    Word.constant(0x1a)
+  ],
+  MapId.ZemaHouse2_B1: [Word.constant(0xe)],
+  MapId.BirthValley_B1: [
+    Word.constant(0xb),
+    Word.constant(0xf),
+    Word.constant(0x10),
+    Word.constant(0x11),
+    Word.constant(0x84)
+  ],
+  MapId.Krup: [Word.constant(0x39), Word.constant(0x72)],
+  MapId.KrupKindergarten: [Word.constant(0x1f)],
+  MapId.KrupInn_F1: [Word.constant(0x20)],
+  MapId.Molcum: [Word.constant(0x6), Word.constant(0x7)],
+  MapId.TonoeStorageRoom: [Word.constant(0x6b)],
+  MapId.TonoeGryzHouse: [Word.constant(0x21), Word.constant(0x22)],
+  MapId.NalyaHouse3: [Word.constant(0x86)],
+  MapId.Aiedo: [Word.constant(0x83)],
+  MapId.AiedoPrison: [Word.constant(0x32)],
+  MapId.ShayHouse: [Word.constant(0x82)],
+  MapId.AiedoSupermarket: [Word.constant(0x31)],
+  MapId.RockyHouse: [Word.constant(0x75)],
+  MapId.Kadary: [Word.constant(0x3a)],
+  MapId.KadaryChurch: [Word.constant(0x23), Word.constant(0x7f)],
+  MapId.KadaryPub: [Word.constant(0x25)],
+  MapId.KadaryPub_F1: [Word.constant(0x24)],
+  MapId.KadaryInn: [Word.constant(0x76)],
+  MapId.KadaryInn_F1: [Word.constant(0x24)],
+  MapId.Monsen: [Word.constant(0x73), Word.constant(0x78)],
+  MapId.MonsenHouse4: [Word.constant(0x77)],
+  MapId.Termi: [Word.constant(0x74)],
+  MapId.ZioFort: [Word.constant(0x42), Word.constant(0x46)],
+  MapId.ZioFort_F1: [
+    Word.constant(0x8),
+    Word.constant(0x9),
+    Word.constant(0x46)
+  ],
+  MapId.ZioFortWestTunnel: [Word.constant(0xa)],
+  MapId.ZioFortJuzaRoom: [Word.constant(0x38)],
+  MapId.ZioFortEastTunnel: [Word.constant(0xa)],
+  MapId.ZioFort_F3: [Word.constant(0x46)],
+  MapId.ZioFort_F4: [Word.constant(0x6a)],
+  MapId.LadeaTower_F2: [Word.constant(0x35)],
+  MapId.LadeaTower_F5: [Word.constant(0x45)],
+  MapId.IslandCave: [
+    Word.constant(0x8),
+    Word.constant(0x9),
+    Word.constant(0x1b)
+  ],
+  MapId.SoldiersTempleOutside: [Word.constant(0x89)],
+  MapId.SoldiersTemple: [Word.constant(0x8a)],
+  MapId.BioPlant: [Word.constant(0x13)],
+  MapId.BioPlant_B4_Part2: [Word.constant(0x36)],
+  MapId.Wreckage: [Word.constant(0x27)],
+  MapId.Wreckage_F1: [Word.constant(0x28)],
+  MapId.Wreckage_F2_Part2: [Word.constant(0x28)],
+  MapId.Wreckage_F2_Part4: [Word.constant(0x8), Word.constant(0x29)],
+  MapId.MachineCenter: [Word.constant(0x2a)],
+  MapId.MachineCenter_B1_Part2: [Word.constant(0x2b)],
+  MapId.PlateSystem: [Word.constant(0x40), Word.constant(0x5e)],
+  MapId.PlateSystem_F1: [Word.constant(0x8)],
+  MapId.PlateSystem_F2: [Word.constant(0x8)],
+  MapId.PlateSystem_F3: [Word.constant(0x8)],
+  MapId.PlateSystem_F4: [Word.constant(0x8)],
+  MapId.MotaSpaceport: [Word.constant(0x67)],
+  MapId.ClimCenter_F1: [Word.constant(0x8)],
+  MapId.ClimCenter_F3: [Word.constant(0x5c)],
+  MapId.WeaponPlant_F1: [Word.constant(0x16), Word.constant(0x2c)],
+  MapId.WeaponPlant_F2: [Word.constant(0x17)],
+  MapId.WeaponPlant_F3: [Word.constant(0x2c)],
+  MapId.VahalFort: [Word.constant(0x7b)],
+  MapId.VahalFort_F1: [Word.constant(0x2d), Word.constant(0x17)],
+  MapId.VahalFort_F2: [Word.constant(0x15), Word.constant(0x2e)],
+  MapId.VahalFort_F3: [Word.constant(0x17), Word.constant(0x7c)],
+  MapId.Nurvus_B1: [Word.constant(0x8)],
+  MapId.Nurvus_B1Tunnel: [Word.constant(0x30)],
+  MapId.DezoSpaceport: [Word.constant(0x68)],
+  MapId.Nurvus_B3Tunnel: [Word.constant(0x30)],
+  MapId.ValleyMazeOutside: [Word.constant(0x48)],
+  MapId.UzoHouse3: [Word.constant(0x79)],
+  MapId.CulversHouse: [Word.constant(0x7d)],
+  MapId.MonsenCave: [Word.constant(0x5b), Word.constant(0x5d)],
+  MapId.RappyCave: [Word.constant(0x80)],
+  MapId.LeRoofRoom: [Word.constant(0x47)],
+  MapId.StrengthTower_F4: [Word.constant(0x46), Word.constant(0x64)],
+  MapId.CourageTower_F4: [Word.constant(0x46), Word.constant(0x65)],
+  MapId.AngerTower_F2: [Word.constant(0x46), Word.constant(0x69)],
+  MapId.TheEdge: [Word.constant(0x58)],
+  MapId.TheEdge_Part2: [Word.constant(0x58)],
+  MapId.TheEdge_Part3: [Word.constant(0x58)],
+  MapId.TheEdge_Part4: [Word.constant(0x58)],
+  MapId.TheEdge_Part5: [Word.constant(0x58)],
+  MapId.TheEdge_Part6: [Word.constant(0x58)],
+  MapId.TheEdge_Part7: [Word.constant(0x58)],
+  MapId.TheEdge_Part8: [Word.constant(0x58)],
+  MapId.Tyler: [Word.constant(0x46), Word.constant(0x6c)],
+  MapId.Zosa: [Word.constant(0x6c)],
+  MapId.Meese: [Word.constant(0x4b), Word.constant(0x6c), Word.constant(0x6e)],
+  MapId.MeeseHouse1: [Word.constant(0x4c)],
+  MapId.MeeseInn: [Word.constant(0x4d)],
+  MapId.MeeseClinic: [Word.constant(0x88)],
+  MapId.MeeseClinic_F1: [
+    Word.constant(0x87),
+    Word.constant(0x4e),
+    Word.constant(0x7e)
+  ],
+  MapId.Jut: [Word.constant(0x4f), Word.constant(0x5a), Word.constant(0x6c)],
+  MapId.JutHouse2: [Word.constant(0x50)],
+  MapId.JutHouse5: [Word.constant(0x50)],
+  MapId.JutHouse7: [Word.constant(0x52)],
+  MapId.JutHouse8: [Word.constant(0x50)],
+  MapId.JutChurch: [Word.constant(0x53)],
+  MapId.Ryuon: [Word.constant(0x6c), Word.constant(0x85)],
+  MapId.RajaTemple: [Word.constant(0x44)],
+  MapId.Reshel1: [Word.constant(0x6c)],
+  MapId.Reshel2: [Word.constant(0x6c)],
+  MapId.Reshel3: [Word.constant(0x6c)],
+  MapId.MystVale_Part2: [Word.constant(0x4a)],
+  MapId.Gumbious_F1: [Word.constant(0x62)],
+  MapId.EspMansionNorth: [Word.constant(0x54)],
+  MapId.InnerSanctuary: [Word.constant(0x56)],
+  MapId.InnerSanctuary_B1: [Word.constant(0x55), Word.constant(0x57)],
+  MapId.AirCastle_Part3: [Word.constant(0x63)],
+  MapId.AirCastle_F1_Part10: [Word.constant(0x63)],
+  MapId.AirCastleXeAThoulRoom: [Word.constant(0x63)],
+  MapId.AirCastleInner_B1: [Word.constant(0x8)],
+  MapId.AirCastleInner_B2: [Word.constant(0x8)],
+  MapId.AirCastleInner_B3: [Word.constant(0x8)],
+  MapId.AirCastleInner_B4: [Word.constant(0x8)],
+  MapId.AirCastleInner_B5: [Word.constant(0x8)],
+  MapId.Zelan: [Word.constant(0x33)],
+  MapId.Zelan_F1: [Word.constant(0x41), Word.constant(0x43)],
+  MapId.Kuran: [Word.constant(0x33)],
+  MapId.Kuran_F1: [Word.constant(0x37)],
+  MapId.Kuran_F2: [Word.constant(0x8)],
+  MapId.Kuran_F1_Part2: [Word.constant(0x33)],
+  MapId.Kuran_F1_Part3: [Word.constant(0x33)],
+  MapId.Kuran_F1_Part5: [Word.constant(0x33)],
+  MapId.Kuran_F2_Part2: [Word.constant(0x33)],
+  MapId.Kuran_F1_Part4: [Word.constant(0x33)],
+  MapId.Kuran_F3: [Word.constant(0x37), Word.constant(0x49)],
+  MapId.GaruberkTower: [Word.constant(0x3f)],
+  MapId.GaruberkTower_Part2: [Word.constant(0x3b)],
+  MapId.GaruberkTower_Part4: [Word.constant(0x3d)],
+  MapId.GaruberkTower_Part5: [Word.constant(0x3e)],
+  MapId.GaruberkTower_Part6: [Word.constant(0x3c), Word.constant(0x59)],
+  MapId.GaruberkTower_Part7: [Word.constant(0x59), Word.constant(0x61)],
+};
 
 // generated via dart bin/macro.dart vram-tile-offsets | gsed -E 's/([^,]+),(.*)/Label('"'"'\1'"'"'): Word(\2),/'
 final Map<MapId, Word> _defaultSpriteVramOffsets = {

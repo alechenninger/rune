@@ -27,6 +27,7 @@ JumpTable<Byte> runEventsJmpTbl() {
     jump: withNoop(Label.known('RunEvent_NoEvent'), bra.w),
     labels: _runEventsTable,
     newIndex: (i) => Byte(i),
+    capacity: 0xff, // $FF terminates the map's run-event list.
   );
 }
 
@@ -362,4 +363,174 @@ const _runEventsTable = [
   Label.known('RunEvent_NoEvent'),
   Label.known('RunEvent_NoEvent'),
   Label.known('RunEvent_NoEvent'),
+];
+
+/// Grand Cross (revision 1) baseline with reusable, unreferenced padding slots.
+JumpTable<Word> mapDataManagersJmpTbl() => JumpTable<Word>.sparse(
+    jump: withNoop(Label.known('GetMapLayoutOffset'), bra.w),
+    newIndex: Word.new,
+    capacity: 0x2000, // Four-byte offsets must fit a signed word.
+    labels: _mapDataManagersTable);
+
+const _mapDataManagersTable = [
+  Label.known('MapDataMan_Null'), // $00
+  Label.known('MapDataMan_PiataAcademy_F1'), // $01
+  Label.known('MapDataMan_PiataNearBasement'), // $02
+  Label.known('MapDataMan_PiataBasement'), // $03
+  Label.known('MapDataMan_PiataBasementB2_Igglanova'), // $04
+  Label.known('MapDataMan_ChkZemaNormal'), // $05
+  Label.known('MapDataMan_MolcumCitizens'), // $06
+  Label.known('MapDataMan_MolcumRune'), // $07
+  Label.known('MapDataMan_UseAlternateColors'), // $08
+  Label.known('MapDataMan_ScrollValues'), // $09
+  Label.known('MapDataMan_ZioFortTunnels'), // $0A
+  Label.known('MapDataMan_BioPlantDoor'), // $0B
+  Label.known('MapDataMan_PiataDorm'), // $0C
+  Label.known('MapDataMan_ZemaHouse2'), // $0D
+  Label.known('MapDataMan_ZemaHouse2_B1'), // $0E
+  Label.known('MapDataMan_BrthVllyPetrified'), // $0F
+  Label.known('MapDataMan_BrthVllyBackToNormal'), // $10
+  Label.known('MapDataMan_BrthVllyAfterExplosion'), // $11
+  Label.known('MapDataMan_ZemaHouse2_WomanArt'), // $12
+  Label.known('MapDataMan_BioPlantPal'), // $13
+  Label.known('MapDataMan_MovingPlatforms'), // $14
+  Label.known('MapDataMan_VahFortMovPlatforms'), // $15
+  Label.known('MapDataMan_WpnPlntMovPlatforms'), // $16
+  Label.known('MapDataMan_Terminals'), // $17
+  Label.known('MapDataMan_NearPiataBasement'), // $18
+  Label.known('MapDataMan_PiataBasementB2_CharPositions'), // $19
+  Label.known('MapDataMan_ZemaPetrifiedFlag'), // $1A
+  Label.known('loc_52380'), // $1B
+  Label.known('loc_52384'), // $1C
+  Label.known('MapDataMan_PrincipalOffice'), // $1D
+  Label.known('MapDataMan_PrincipalOffice_Hahn'), // $1E
+  Label.known('MapDataMan_KrupKindergarten'), // $1F
+  Label.known('MapDataMan_KrupInn_F1'), // $20
+  Label.known('MapDataMan_TonoeDorin'), // $21
+  Label.known('MapDataMan_TonoeGryz'), // $22
+  Label.known('MapDataMan_KadaryChurchPeople'), // $23
+  Label.known('MapDataMan_KadaryPubAndInn_F1'), // $24
+  Label.known('MapDataMan_KadaryPub'), // $25
+  Label.known('MapDataMan_Dezolis'), // $26
+  Label.known('MapDataMan_WreckagePalettes'), // $27
+  Label.known('MapDataMan_WreckageF1Palettes'), // $28
+  Label.known('MapDataMan_WreckageEnginePal'), // $29
+  Label.known('MapDataMan_MachCenterPal'), // $2A
+  Label.known('MapDataMan_MachCenterB1Pal'), // $2B
+  Label.known('MapDataMan_WpnPlntPal'), // $2C
+  Label.known('MapDataMan_VahFortPal'), // $2D
+  Label.known('MapDataMan_VahFortF2Pal'), // $2E
+  Label.known('loc_5277E'), // $2F
+  Label.known('MapDataMan_NurvusTunnelsPal'), // $30
+  Label.known('MapDataMan_AiedoSupermarket'), // $31
+  Label.known('MapDataMan_AiedoPrison'), // $32
+  Label.known('MapDataMan_ZelanKuranScrollValues'), // $33
+  Label.known('MapDataMan_PiataBasementB2_Palettes'), // $34
+  Label.known('MapDataMan_LadeaTowerRune'), // $35
+  Label.known('MapDataMan_BioPlantRika'), // $36
+  Label.known('MapDataMan_KuranPal'), // $37
+  Label.known('MapDataMan_JuzaRoom'), // $38
+  Label.known('MapDataMan_AlysGravestone'), // $39
+  Label.known('MapDataMan_Kadary'), // $3A
+  Label.known('MapDataMan_GaruberkTowerPart2'), // $3B
+  Label.known('MapDataMan_GaruberkTowerPart6'), // $3C
+  Label.known('MapDataMan_GaruberkTowerPart4'), // $3D
+  Label.known('MapDataMan_GaruberkTowerPart5'), // $3E
+  Label.known('MapDataMan_GaruberkTower'), // $3F
+  Label.known('MapDataMan_PlateSystemPal'), // $40
+  Label.known('MapDataMan_ZelanPal'), // $41
+  Label.known('MapDataMan_ZioFortBarrier'), // $42
+  Label.known('MapDataMan_ZelanWren'), // $43
+  Label.known('MapDataMan_RajaTemple'), // $44
+  Label.known('MapDataMan_LadeaTower_F5'), // $45
+  Label.known('MapDataMan_ZioFort'), // $46
+  Label.known('MapDataMan_LeRoofRoom'), // $47
+  Label.known('MapDataMan_ValleyMazeOutside'), // $48
+  Label.known('MapDataMan_KuranDarkForce'), // $49
+  Label.known('MapDataMan_MystValePart2'), // $4A
+  Label.known('MapDataMan_MeeseObj'), // $4B
+  Label.known('MapDataMan_MeeseHouse1'), // $4C
+  Label.known('MapDataMan_MeeseInn'), // $4D
+  Label.known('MapDataMan_MeeseClinicKyra'), // $4E
+  Label.known('MapDataMan_JutObjs'), // $4F
+  Label.known('MapDataMan_JutHouses'), // $50
+  Label.known('loc_52C64'), // $51
+  Label.known('MapDataMan_JutHouse7'), // $52
+  Label.known('MapDataMan_JutChurch'), // $53
+  Label.known('MapDataMan_EspMansionNorth'), // $54
+  Label.known('MapDataMan_InnerSanctuaryB1Chars'), // $55
+  Label.known('MapDataMan_InnerSanctuary'), // $56
+  Label.known('MapDataMan_InnerSanctuaryB1Priest'), // $57
+  Label.known('MapDataMan_TheEdge'), // $58
+  Label.known('MapDataMan_GaruberkTwPart6Tiles'), // $59
+  Label.known('MapDataMan_JutObjID'), // $5A
+  Label.known('MapDataMan_MonsenCavePal'), // $5B
+  Label.known('MapDataMan_ClimCntrDElmLars'), // $5C
+  Label.known('MapDataMan_MonsenCaveObjs'), // $5D
+  Label.known('MapDataMan_PlateSysBarrier'), // $5E
+  Label.known('loc_52E62'), // $5F
+  Label.known('MapDataMan_MeeseClinicDialogueID'), // $60
+  Label.known('MapDataMan_GrbrkTwDarkForce2'), // $61
+  Label.known('MapDataMan_GumbiousF1'), // $62
+  Label.known('MapDataMan_AirCastleXeAThoul'), // $63
+  Label.known('MapDataMan_StrengthTwTop'), // $64
+  Label.known('MapDataMan_CourageTwTop'), // $65
+  Label.known('MapDataMan_ZemaRocks'), // $66
+  Label.known('MapDataMan_MotaSpaceport'), // $67
+  Label.known('MapDataMan_DezoSpaceport'), // $68
+  Label.known('MapDataMan_AngerTwTop'), // $69
+  Label.known('MapDataMan_ZioFort_F4'), // $6A
+  Label.known('MapDataMan_TonoeStorageRoom'), // $6B
+  Label.known('MapDataMan_DezoTownsPal'), // $6C
+  Label.known('MapDataMan_ZemaWaterfallBase'), // $6D
+  Label.known('MapDataMan_ItemShopDoor'), // $6E
+  Label.known('MapDataMan_MileBuildings'), // $6F
+  Label.known('MapDataMan_RanchOwner'), // $70
+  Label.known('MapDataMan_MileSandWorm'), // $71
+  Label.known('MapDataMan_KrupRocky'), // $72
+  Label.known('MapDataMan_MonsenRocky'), // $73
+  Label.known('MapDataMan_Termi'), // $74
+  Label.known('MapDataMan_RockyHouse'), // $75
+  Label.known('MapDataMan_KadaryInn'), // $76
+  Label.known('MapDataMan_MonsenHouse4'), // $77
+  Label.known('MapDataMan_MonsenSign'), // $78
+  Label.known('MapDataMan_UzoHouse3'), // $79
+  Label.known('loc_53356'), // $7A
+  Label.known('MapDataMan_VahFortBarrier'), // $7B
+  Label.known('MapDataMan_VahFortF3'), // $7C
+  Label.known('MapDataMan_CulversHouse'), // $7D
+  Label.known('MapDataMan_MeeseClinicRaja'), // $7E
+  Label.known('MapDataMan_KadaryChurchStudent'), // $7F
+  Label.known('MapDataMan_RappyCave'), // $80
+  Label.known('MapDataMan_MileDead'), // $81
+  Label.known('MapDataMan_ChazHouse'), // $82
+  Label.known('MapDataMan_Aiedo'), // $83
+  Label.known('MapDataMan_ClrBioPlantAlarm'), // $84
+  Label.known('MapDataMan_RyuonFirstTime'), // $85
+  Label.known('MapDataMan_NalyaHouse3'), // $86
+  Label.known('MapDataMan_MeeseClinicF1Konrad'), // $87
+  Label.known('MapDataMan_MeeseClinicKonrad'), // $88
+  Label.known('MapDataMan_SoldiersTempleOutside'), // $89
+  Label.known('MapDataMan_SoldiersTemple'), // $8A
+  Label.known('MapDataMan_AcademyBasementEncounters'), // $8B
+  null, // $8C — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $8D — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $8E — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $8F — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $90 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $91 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $92 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $93 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $94 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $95 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $96 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $97 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $98 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $99 — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $9A — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $9B — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $9C — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $9D — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $9E — Unused; emits GetMapLayoutOffset until assigned.
+  null, // $9F — Unused; emits GetMapLayoutOffset until assigned.
 ];

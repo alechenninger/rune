@@ -88,6 +88,7 @@ class Game {
         // keep original index in new maps
         mapSubset.addObject(obj, at: i);
         map.asmEvents.forEach(mapSubset.addAsmEvent);
+        map.asmDataManagers.forEach(mapSubset.addAsmDataManager);
       });
 
       for (var area in map.areas) {
@@ -98,6 +99,7 @@ class Game {
         // to start at least we won't support objects sharing scenes with areas
         mapSubset.addArea(area);
         map.asmEvents.forEach(mapSubset.addAsmEvent);
+        map.asmDataManagers.forEach(mapSubset.addAsmDataManager);
       }
     }
 
@@ -247,6 +249,7 @@ abstract class EventVisitor {
   void playMusic(PlayMusic playMusic);
   void stopMusic(StopMusic stopMusic);
   void addMoney(AddMoney addMoney);
+  void clearMapObject(ClearMapObject clear);
   void resetObjectRoutine(ResetObjectRoutine resetRoutine);
   void changeObjectRoutine(ChangeObjectRoutine change);
   void changeParty(ChangePartyOrder changeParty);

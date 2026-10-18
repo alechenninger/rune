@@ -93,6 +93,9 @@ final defaultFieldRoutines = FieldRoutineRepository([
       spriteMappingTiles: 6,
       ramArt: RamArt(address: Word(0)),
       vramAnimated: true),
+  // The sick person upstairs at Nalya's inn uses one static 2x3 mapping.
+  FieldRoutine.asm(Word(0xFC), Label('FieldObj_NPCType29'),
+      spriteMappingTiles: 6),
   FieldRoutine.asm(Word(0x174), Label('FieldObj_BigDuck'),
       spriteMappingTiles: 0x20),
   FieldRoutine.asm(Word(0x178), Label('FieldObj_SmallWhiteDuck'),
@@ -197,6 +200,7 @@ class FieldRoutineRepository {
 
   FieldRoutine? bySpecModel(SpecModel spec) {
     return switch (spec) {
+      ClearedObjectRoutine() => byIndex(Word(0)),
       AsmRoutineModel() => byIndex(spec.index),
       NpcRoutineModel() => _byModel[spec],
       SpecRoutineModel() => _byModel[spec],

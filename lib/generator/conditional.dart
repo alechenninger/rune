@@ -239,12 +239,20 @@ Asm Function(Address src, [Address? src2]) _compare(
   };
 }
 
-Asm _cmp(Address src, Address dst, Size size, {DirectDataRegister dR = d0}) {
+// Comparison operands use d0-d3 for temporary values. Reserve d4 as scratch
+// here so materializing an immediate cannot overwrite either operand.
+Asm _cmp(Address src, Address dst, Size size, {DirectDataRegister dR = d4}) {
   var width = switch (size) {
     byte => (c) => c.b,
     word => (c) => c.w,
     long => (c) => c.l
   };
+
+  // TODO(optimization): Select IfValue branches at compile time when both
+  // operands are known numeric constants; immediate symbols may be unresolved.
+  if (dst is Immediate) {
+    return Asm([width(move)(dst, dR), _cmp(src, dR, size, dR: dR)]);
+  }
 
   if (src is Immediate) {
     return width(cmpi)(src, dst);

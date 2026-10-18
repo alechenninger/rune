@@ -1716,8 +1716,8 @@ EventFlag_Test001 = $0001'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d0),
-            cmp.w(curr_y_pos(a4), d0),
+            move.w(0x200.toWord.i, d4),
+            cmp.w(curr_y_pos(a4), d4),
             bls(Label('.1_continue')),
 
             // gt branch
@@ -1744,8 +1744,8 @@ EventFlag_Test001 = $0001'''));
             characterByIdToA4(rune.charIdAddress),
             lea(a4.indirect, a3),
             characterByIdToA4(alys.charIdAddress),
-            move.w(curr_y_pos(a4), d0),
-            cmp.w(curr_y_pos(a3), d0),
+            move.w(curr_y_pos(a4), d4),
+            cmp.w(curr_y_pos(a3), d4),
             bls(Label('.1_continue')),
 
             // gt branch
@@ -1772,8 +1772,8 @@ EventFlag_Test001 = $0001'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d0),
-            cmp.w(curr_y_pos(a4), d0),
+            move.w(0x200.toWord.i, d4),
+            cmp.w(curr_y_pos(a4), d4),
             beq(Label('.1_continue')),
             bhi(Label('.1_gt')),
 
@@ -1825,8 +1825,8 @@ EventFlag_Test001 = $0001'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d0),
-            cmp.w(curr_y_pos(a4), d0),
+            move.w(0x200.toWord.i, d4),
+            cmp.w(curr_y_pos(a4), d4),
             beq(Label('.1_continue')),
             bhi(Label('.1_gt')),
 
@@ -1881,8 +1881,8 @@ EventFlag_Test001 = $0001'''));
           asm.event.withoutComments(),
           Asm([
             characterByIdToA4(rune.charIdAddress),
-            move.w(0x200.toWord.i, d0),
-            cmp.w(curr_y_pos(a4), d0),
+            move.w(0x200.toWord.i, d4),
+            cmp.w(curr_y_pos(a4), d4),
             beq(Label('.1_continue')),
             bhi(Label('.1_gt')),
 
@@ -2433,12 +2433,12 @@ EventFlag_Test001 = $0001'''));
           Asm([
             alys.toA(a5, Memory()),
             characterByIdToA4(rune.charIdAddress),
-            move.w(curr_x_pos(a4), d0),
-            cmp.w(curr_x_pos(a5), d0),
+            move.w(curr_x_pos(a4), d4),
+            cmp.w(curr_x_pos(a5), d4),
             bhi(Label('.1_gt')),
             bcs(Label('.1_lt')),
-            move.w(curr_y_pos(a4), d0),
-            cmp.w(curr_y_pos(a5), d0),
+            move.w(curr_y_pos(a4), d4),
+            cmp.w(curr_y_pos(a5), d4),
             beq(Label('.1_eq')),
             bhi(Label('.1_gt')),
 
@@ -2487,6 +2487,33 @@ EventFlag_Test001 = $0001'''));
             updateObjFacing(down.address),
 
             // continue
+            label(Label('.1_continue')),
+          ]));
+    });
+
+    test('scalar compared to offset preserves the computed source', () {
+      var scene = Scene([
+        IfValue<PositionComponentExpression>(
+          PositionComponent(0x200, Axis.y),
+          comparedTo: OffsetPositionComponent(rune.position().component(Axis.y),
+              offset: 0x40),
+          greater: [Face(down).move(rune)],
+        )
+      ]);
+
+      var asm =
+          Program().addScene(SceneId('testscene'), scene, startingMap: map);
+
+      expect(
+          asm.event.withoutComments(),
+          Asm([
+            characterByIdToA4(rune.charIdAddress),
+            move.w(curr_y_pos(a4), d0),
+            addi.w(0x40.toWord.i, d0),
+            move.w(0x200.toWord.i, d4),
+            cmp.w(d0, d4),
+            bls(Label('.1_continue')),
+            updateObjFacing(down.address),
             label(Label('.1_continue')),
           ]));
     });

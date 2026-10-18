@@ -3,18 +3,25 @@ import 'package:collection/collection.dart';
 import 'asm.dart';
 
 abstract class JumpTable<S extends SizedValue> {
+  /// [capacity] is the maximum number of slots, including seeded entries.
   factory JumpTable(
           {required Jump<Label> jump,
           required S Function(int index) newIndex,
+          required int capacity,
           List<Label> labels = const []}) =>
-      _JumpTable<S>(jump: jump, newIndex: newIndex, labels: labels);
+      _JumpTable<S>(
+          jump: jump, newIndex: newIndex, capacity: capacity, labels: labels);
 
+  /// Seeded unused slots count toward [capacity] and remain reusable when full.
   factory JumpTable.sparse(
           {required Jump<Label?> jump,
           required S Function(int index) newIndex,
+          required int capacity,
           List<Label?> labels = const []}) =>
-      _SparseJumpTable<S>(jump: jump, newIndex: newIndex, labels: labels);
+      _SparseJumpTable<S>(
+          jump: jump, newIndex: newIndex, capacity: capacity, labels: labels);
 
+  /// Returns null for an unused slot or an index beyond the table.
   Label? labelAtIndex(int index);
   Label? labelAt(S index);
   S? operator [](Label name);
@@ -26,22 +33,38 @@ abstract class _AbstractJumpTable<T extends Label?, S extends SizedValue>
     implements JumpTable<S> {
   final Jump<T> _jump;
   final S Function(int) _newIndex;
+  final int _capacity;
   final _labels = <T>[];
 
   _AbstractJumpTable(
       {required Jump<T> jump,
       required S Function(int index) newIndex,
+      required int capacity,
       List<T> labels = const []})
       : _jump = jump,
-        _newIndex = newIndex {
+        _newIndex = newIndex,
+        _capacity = RangeError.checkNotNegative(capacity, 'capacity') {
+    if (labels.length > _capacity) {
+      throw ArgumentError.value(labels.length, 'labels.length',
+          'exceeds jump table capacity of $_capacity');
+    }
     _labels.addAll(labels);
   }
 
-  @override
-  T labelAtIndex(int index) => _labels[index];
+  S _append(T name) {
+    if (_labels.length >= _capacity) {
+      throw StateError('jump table capacity of $_capacity exceeded');
+    }
+    final index = _newIndex(_labels.length);
+    _labels.add(name);
+    return index;
+  }
 
   @override
-  T labelAt(S index) => labelAtIndex(index.value);
+  T? labelAtIndex(int index) => _labels.elementAtOrNull(index);
+
+  @override
+  T? labelAt(S index) => labelAtIndex(index.value);
 
   @override
   S? operator [](Label name) {
@@ -61,7 +84,10 @@ abstract class _AbstractJumpTable<T extends Label?, S extends SizedValue>
 class _SparseJumpTable<S extends SizedValue>
     extends _AbstractJumpTable<Label?, S> {
   _SparseJumpTable(
-      {required super.jump, required super.newIndex, super.labels = const []});
+      {required super.jump,
+      required super.newIndex,
+      required super.capacity,
+      super.labels = const []});
 
   @override
   S? operator [](Label? name) {
@@ -81,21 +107,20 @@ class _SparseJumpTable<S extends SizedValue>
         _labels[s.value] = name;
         return s;
       default:
-        _labels.add(name);
-        return _newIndex(_labels.length - 1);
+        return _append(name);
     }
   }
 }
 
 class _JumpTable<S extends SizedValue> extends _AbstractJumpTable<Label, S> {
   _JumpTable(
-      {required super.jump, required super.newIndex, super.labels = const []});
+      {required super.jump,
+      required super.newIndex,
+      required super.capacity,
+      super.labels = const []});
 
   @override
-  S add(Label name) {
-    _labels.add(name);
-    return _newIndex(_labels.length - 1);
-  }
+  S add(Label name) => _append(name);
 }
 
 typedef Jump<T extends Label?> = Asm Function(T, {String? comment});

@@ -75,6 +75,10 @@ void main() {
   });
 
   group('RegisterList', () {
+    test('toString for a range across data and address registers', () {
+      expect((d0 - a6).toString(), equals('d0-d7/a0-a6'));
+    });
+
     test('toString for range', () {
       expect(RegisterList.of([d0, d1, d2]).toString(), equals('d0-d2'));
     });

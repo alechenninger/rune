@@ -13,7 +13,7 @@ import 'model.dart';
 class GameMap {
   final MapId id;
 
-  // limited to 64 objects in ram currently
+  // The engine allocator scans 52 secondary slots, also shared with chests.
   final _objects = <MapObjectId, _MapObjectAt>{};
   final _indexedObjects = <MapObject?>[];
 
@@ -23,6 +23,9 @@ class GameMap {
   // TODO: order is significant between these.
   final _events = <SceneId, Scene>{};
   final _asmEvents = <Byte>{};
+
+  final _dataManagers = <SceneId, Scene>{};
+  final _asmDataManagers = <Word>{};
 
   GameMap(this.id);
 
@@ -46,7 +49,7 @@ class GameMap {
       }).toList(growable: false);
 
   Iterable<IndexedMapObject> get indexedObjects =>
-      _iterateIndexedObjects().whereNotNull();
+      _iterateIndexedObjects().nonNulls;
 
   bool get isNotEmpty => _objects.isNotEmpty || _areas.isNotEmpty;
   bool get isEmpty => _objects.isEmpty && _areas.isEmpty;
@@ -148,6 +151,29 @@ class GameMap {
     _asmEvents.add(runEventIndex);
   }
 
+  Iterable<(SceneId, Scene)> get dataManagers =>
+      _dataManagers.entries.map((e) => (e.key, e.value));
+
+  void addDataManager(SceneId id, Scene scene) {
+    if (_dataManagers.containsKey(id)) {
+      throw ArgumentError('map already contains manager with id: $id');
+    }
+    _dataManagers[id] = scene;
+  }
+
+  Scene? managerById(SceneId id) => _dataManagers[id];
+
+  Iterable<Word> get asmDataManagers => UnmodifiableSetView(_asmDataManagers);
+
+  void addAsmDataManager(Word index) {
+    if (index.value > 0x1fff) {
+      throw ArgumentError.value(index, 'manager index',
+          'four-byte dispatch offset must fit signed word');
+    }
+
+    _asmDataManagers.add(index);
+  }
+
   @override
   String toString() {
     return 'GameMap{id: $id, '
@@ -163,6 +189,9 @@ class GameMap {
       other is GameMap &&
           runtimeType == other.runtimeType &&
           id == other.id &&
+          const MapEquality().equals(_dataManagers, other._dataManagers) &&
+          const SetEquality()
+              .equals(_asmDataManagers, other._asmDataManagers) &&
           const MapEquality().equals(_objects, other._objects) &&
           const MapEquality().equals(_areas, other._areas) &&
           const MapEquality().equals(_events, other._events) &&
@@ -172,6 +201,8 @@ class GameMap {
   @override
   int get hashCode =>
       id.hashCode ^
+      const MapEquality().hash(_dataManagers) ^
+      const SetEquality().hash(_asmDataManagers) ^
       const MapEquality().hash(_objects) ^
       const MapEquality().hash(_areas) ^
       const MapEquality().hash(_events) ^

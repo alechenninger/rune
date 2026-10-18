@@ -28,6 +28,97 @@ void main() {
     return fixtures.generateEventAsm(events, context: ctx, inMap: map);
   }
 
+  test('mode selectors match exact game mode types', () {
+    const ModeType<GameMode> event = ModeType<EventMode>();
+    const ModeType<GameMode> runEvent = ModeType<RunEventMode>();
+    const ModeType<GameMode> manager = ModeType<MapDataManagerMode>();
+    final eventMode = RunEventMode().toEventMode(EventType.event);
+
+    expect(event.matches(eventMode), isTrue);
+    expect(event.matches(RunEventMode()), isFalse);
+    expect(runEvent.matches(RunEventMode()), isTrue);
+    expect(runEvent.matches(eventMode), isFalse);
+    expect(manager.matches(MapDataManagerMode()), isTrue);
+    expect(manager.matches(eventMode), isFalse);
+    expect(const ModeType<GameMode>().matches(eventMode), isFalse);
+    expect(const ModeType<InteractionMode>().matches(TalkMode()), isFalse);
+  });
+
+  group('map manager ASM events', () {
+    test('emit supplied assembly between manager entry and completion', () {
+      final asm = Asm.empty();
+      final supplied = Asm([
+        moveq(42.i, d0),
+        jsr(Label('CustomMapSetup').l),
+      ]);
+      SceneAsmGenerator.forMapDataManager(SceneId('CustomManager'),
+          inMap: map, managerAsm: asm, config: ProgramConfiguration.empty())
+        ..asm(AsmEvent(supplied))
+        ..finish();
+
+      expect(
+          asm.withoutComments().withoutEmptyLines(),
+          Asm([
+            movem.l(d0 - a6, -(sp)),
+            supplied,
+            movem.l(sp.postIncrement(), d0 - a6),
+            moveq(0.i, d7),
+            rts,
+          ]));
+    });
+
+    test('reject assembly that requires event execution', () {
+      final asm = Asm.empty();
+      final generator = SceneAsmGenerator.forMapDataManager(
+          SceneId('EventRequired'),
+          inMap: map,
+          managerAsm: asm,
+          config: ProgramConfiguration.empty());
+
+      expect(() => generator.asm(AsmEvent(moveq(42.i, d0), requireEvent: true)),
+          throwsUnsupportedError);
+      expect(asm, movem.l(d0 - a6, -(sp)));
+    });
+  });
+
+  group('routine or dialogue generation', () {
+    test('queued flags use dialogue without requiring a routine mode', () {
+      final config = ProgramConfiguration.empty();
+      final asm = EventAsm.empty();
+      final flag = EventFlag('QueuedFlag');
+      SceneAsmGenerator.forInteraction(
+          map, SceneId('QueuedFlag'), config.dialogTrees, asm, config,
+          eventFlags: config.eventFlags)
+        ..setFlag(SetFlag(flag))
+        ..dialog(Dialog(spans: DialogSpan.parse('Hello')))
+        ..finish();
+
+      expect(asm, isEmpty);
+      expect(config.dialogTrees.forMap(map.id).toAsm().toString(),
+          contains(config.eventFlags.toConstant(flag).toString()));
+    });
+
+    test('flags retain event promotion from run-event mode', () {
+      final config = ProgramConfiguration.empty();
+      final eventAsm = EventAsm.empty();
+      final runEventAsm = Asm.empty();
+      final flag = EventFlag('RoutineFlag');
+      SceneAsmGenerator.forRunEvent(SceneId('RoutineFlag'),
+          inMap: map,
+          eventAsm: eventAsm,
+          runEventAsm: runEventAsm,
+          config: config)
+        ..setFlag(SetFlag(flag))
+        ..finish();
+
+      expect(runEventAsm.toString(), contains('Event_Index'));
+      expect(eventAsm.toString(),
+          contains(config.eventFlags.toConstant(flag).toString()));
+      expect(runEventAsm.toString(),
+          isNot(contains(config.eventFlags.toConstant(flag).toString())));
+    });
+  });
+
   group('scene ID validation', () {
     var constructors = <String, SceneAsmGenerator Function(SceneId)>{
       'interaction': (id) => SceneAsmGenerator.forInteraction(
@@ -2264,8 +2355,8 @@ ${dialog2.toAsm()}
               lea(a4.indirect, a3),
               moveq(alys.charIdAddress, d0),
               jsr(Label('Event_GetCharacter').l),
-              move.w(curr_y_pos(a4), d0),
-              cmp.w(curr_y_pos(a3), d0),
+              move.w(curr_y_pos(a4), d4),
+              cmp.w(curr_y_pos(a3), d4),
               bcc(Label('.2_continue')),
               // y(alys) < y(rune): check StoryFlag
               moveq(Constant('EventFlag_StoryFlag').i, d0),
@@ -2277,8 +2368,8 @@ ${dialog2.toAsm()}
               lea(a4.indirect, a3),
               moveq(alys.charIdAddress, d0),
               jsr(Label('Event_GetCharacter').l),
-              move.w(curr_x_pos(a4), d0),
-              cmp.w(curr_x_pos(a3), d0),
+              move.w(curr_x_pos(a4), d4),
+              cmp.w(curr_x_pos(a3), d4),
               bne(Label('.4_continue')),
               // x(alys) = x(rune): compare y(shay) > y(hahn)
               moveq(hahn.charIdAddress, d0),
@@ -2286,8 +2377,8 @@ ${dialog2.toAsm()}
               lea(a4.indirect, a3),
               moveq(shay.charIdAddress, d0),
               jsr(Label('Event_GetCharacter').l),
-              move.w(curr_y_pos(a4), d0),
-              cmp.w(curr_y_pos(a3), d0),
+              move.w(curr_y_pos(a4), d4),
+              cmp.w(curr_y_pos(a3), d4),
               bls(Label('.5_continue')),
               // y(shay) > y(hahn): ReturnControl
               bra.w(Label('RunEvent_NoEvent')),
@@ -2304,8 +2395,8 @@ ${dialog2.toAsm()}
               lea(a4.indirect, a3),
               moveq(alys.charIdAddress, d0),
               jsr(Label('Event_GetCharacter').l),
-              move.w(curr_x_pos(a4), d0),
-              cmp.w(curr_x_pos(a3), d0),
+              move.w(curr_x_pos(a4), d4),
+              cmp.w(curr_x_pos(a3), d4),
               bne(Label('.7_continue')),
               // x(alys) = x(rune): compare y(shay) > y(hahn)
               moveq(hahn.charIdAddress, d0),
@@ -2313,8 +2404,8 @@ ${dialog2.toAsm()}
               lea(a4.indirect, a3),
               moveq(shay.charIdAddress, d0),
               jsr(Label('Event_GetCharacter').l),
-              move.w(curr_y_pos(a4), d0),
-              cmp.w(curr_y_pos(a3), d0),
+              move.w(curr_y_pos(a4), d4),
+              cmp.w(curr_y_pos(a3), d4),
               bls(Label('.8_continue')),
               // y(shay) > y(hahn): ReturnControl
               bra.w(Label('RunEvent_NoEvent')),

@@ -227,6 +227,7 @@ class DirectDataRegister extends _Address
 
   @override
   RegisterList operator -(DirectRegister other) {
+    // TODO: we should probably not make this span register types?
     var (maxDataRegister, maxAddressRegister) = switch (other) {
       DirectDataRegister() => (other.register, -1),
       DirectAddressRegister() => (7, other.register),
@@ -244,7 +245,7 @@ class DirectDataRegister extends _Address
 
   @override
   DirectDataRegister? get next =>
-      register <= 7 ? DirectDataRegister(register + 1) : null;
+      register < 7 ? DirectDataRegister(register + 1) : null;
 }
 
 class DataRegisterWithSize {
