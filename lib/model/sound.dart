@@ -225,4 +225,6 @@ enum Music implements Sound {
   thePromisingFuture2,
   dezorisDeDon,
   ooze,
+  krupNight,
+  krupNightAmbience,
 }
