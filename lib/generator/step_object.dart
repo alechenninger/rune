@@ -7,7 +7,9 @@ import '../asm/events.dart';
 import '../model/model.dart';
 
 Asm stepObjectToAsm(StepObject step,
-    {required Memory memory, required Labeller labeller}) {
+    {required Memory memory,
+    required Labeller labeller,
+    bool updateDestinationY = true}) {
   if (step.updateCamera) {
     return stepObjectsToAsm(
         StepObjects([step.object],
@@ -17,7 +19,8 @@ Asm stepObjectToAsm(StepObject step,
             animate: step.animate,
             updateCamera: true),
         memory: memory,
-        labeller: labeller);
+        labeller: labeller,
+        updateDestinationY: updateDestinationY);
   }
 
   /// Current x and y positions in memory are stored
@@ -74,14 +77,16 @@ Asm stepObjectToAsm(StepObject step,
               jsr(Label('Event_StepObjectNoAnimate').l),
             if (step.onTop) bclr(0.i, priority_flag(a4)),
             move.w(curr_x_pos(a4), dest_x_pos(a4)),
-            move.w(curr_y_pos(a4), dest_y_pos(a4)),
+            if (updateDestinationY) move.w(curr_y_pos(a4), dest_y_pos(a4)),
           ]));
   memory.putInAddress(a3, null);
   return asm;
 }
 
 Asm stepObjectsToAsm(StepObjects step,
-    {required Memory memory, required Labeller labeller}) {
+    {required Memory memory,
+    required Labeller labeller,
+    bool updateDestinationY = true}) {
   if (step.objects.length == 1 && !step.updateCamera) {
     return stepObjectToAsm(
         StepObject(step.objects.single,
@@ -91,7 +96,8 @@ Asm stepObjectsToAsm(StepObjects step,
             animate: step.animate,
             updateCamera: false),
         memory: memory,
-        labeller: labeller);
+        labeller: labeller,
+        updateDestinationY: updateDestinationY);
   }
 
   // Step will always execute at least once.
@@ -207,7 +213,8 @@ Asm stepObjectsToAsm(StepObjects step,
       // This is needed if routine will move to destination.
       // If not set in that case, the object will move the next time
       // the field object routine is run.
-      setDestination(x: curr_x_pos(a4), y: curr_y_pos(a4)),
+      move.w(curr_x_pos(a4), dest_x_pos(a4)),
+      if (updateDestinationY) move.w(curr_y_pos(a4), dest_y_pos(a4)),
     ]));
 
     if ((memory.positions[obj]) case var current?) {

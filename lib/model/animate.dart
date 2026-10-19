@@ -449,19 +449,17 @@ class ShutterObjects extends Event {
   }
 }
 
-class JumpObject extends Event {
+class JumpObject extends Event implements MovesObjects {
   final List<FieldObject> objects;
   final Duration duration;
-  // todo: this could be Point movement like above
-  // to allow jumping up/down as well.
-  // However there is some complexity as actually moving up would potentially
-  // mean z ordering would need to change during the jump.
   final int xMovement;
   // todo: make a point type?
   /// Offsets y-movement after the peak of the jump.
   ///
   /// The [height] of the jump is the only factor in the first "phase" of the
   /// jump (going up). But going down, the amount is `height + yMovement`.
+  /// Sprite ordering stays at takeoff Y until landing, including when this
+  /// changes the landing Y.
   final int yMovement;
   final int height;
   final bool animate;
@@ -505,18 +503,19 @@ class JumpObject extends Event {
     var up = Point<double>(xPerFrame, -height / framesUp);
     return [
       StepObjects.constantStep(objects,
-          stepPerFrame: up, frames: framesUp, onTop: true, animate: animate),
+          stepPerFrame: up, frames: framesUp, animate: animate),
       StepObjects.constantStep(objects,
-          stepPerFrame: down, frames: framesDown, onTop: true, animate: animate)
+          stepPerFrame: down, frames: framesDown, animate: animate)
     ];
   }
 
   @override
   void visit(EventVisitor visitor) {
-    for (var step in toSteps()) {
-      visitor.stepObjects(step);
-    }
+    visitor.jumpObject(this);
   }
+
+  @override
+  Iterable<FieldObject> movedObjects() => objects;
 
   @override
   String toString() {

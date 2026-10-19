@@ -170,12 +170,10 @@ void main() {
 
       expect(jump.toSteps(), [
         StepObjects.constantStep([alys],
-            onTop: true,
             animate: false,
             frames: 0.5.seconds.toFrames(),
             stepPerFrame: Point(0, -10 / 0.5.seconds.toFrames())),
         StepObjects.constantStep([alys],
-            onTop: true,
             animate: false,
             frames: 0.5.second.toFrames(),
             stepPerFrame: Point(0, 10 / 0.5.seconds.toFrames())),
@@ -188,12 +186,10 @@ void main() {
 
       expect(jump.toSteps(), [
         StepObjects.constantStep([alys],
-            onTop: true,
             animate: false,
             frames: 0.5.seconds.toFrames(),
             stepPerFrame: Point(-8 / 30, -10 / 30)),
         StepObjects.constantStep([alys],
-            onTop: true,
             animate: false,
             frames: 0.5.second.toFrames(),
             stepPerFrame: Point(-8 / 30, 10 / 30)),

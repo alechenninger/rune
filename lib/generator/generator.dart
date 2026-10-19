@@ -1321,6 +1321,37 @@ class SceneAsmGenerator implements EventVisitor {
   }
 
   @override
+  void jumpObject(JumpObject jump) {
+    _addToRoutine(jump, (i, _) {
+      var result = Asm([
+        _waitForPendingMovements(jump.movedObjects()),
+      ]);
+      for (var object in jump.objects) {
+        result.add(Asm([
+          object.toA4(_memory),
+          // Hold the ground position across BOTH halves of the jump.
+          move.w(curr_y_pos(a4), dest_y_pos(a4)),
+          bset(priority_ground_y_bit.i, priority_flag(a4)),
+        ]));
+      }
+      for (var (phase, step) in jump.toSteps().indexed) {
+        result.add(stepObjectsToAsm(step,
+            memory: _memory,
+            labeller: _labeller.withContext(i).withContext(phase),
+            updateDestinationY: false));
+      }
+      for (var object in jump.objects) {
+        result.add(Asm([
+          object.toA4(_memory),
+          bclr(priority_ground_y_bit.i, priority_flag(a4)),
+          move.w(curr_y_pos(a4), dest_y_pos(a4)),
+        ]));
+      }
+      return result;
+    });
+  }
+
+  @override
   void lockCamera(LockCamera lock) {
     _addToRoutine(lock, (i, asm) {
       if (_memory.cameraLock == true) {
