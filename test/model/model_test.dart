@@ -596,7 +596,8 @@ void main() {
         expect(scene.events, [second, first, original]);
       });
 
-      test('rebuilt scenes apply ordinary flag normalization after prepending',
+      test(
+          'copies preserve prepended order while rebuilt scenes normalize flags',
           () {
         var flag = SetFlag(EventFlag('OriginalPlayed'));
         var original = Dialog.parse('Original');
@@ -609,7 +610,7 @@ void main() {
         scene.prependEvents([prefix]);
 
         expect(scene.events, [prefix, flag, original]);
-        expect(scene.copy().events, [flag, prefix, original]);
+        expect(scene.copy().events, [prefix, flag, original]);
         expect(IfFlag(EventFlag('Outer'), isSet: scene).isSet,
             [flag, prefix, original]);
       });
@@ -843,14 +844,14 @@ void main() {
           ]));
     });
 
-    test('adds branch with createSequence sets the flag', () {
+    test('addSequence sets the progression flag', () {
       var scene = Scene([
         Dialog(spans: [DialogSpan('Hello world')])
       ]);
 
-      scene.addBranch([
+      scene.addSequence([
         Dialog(spans: [DialogSpan('This is after the quest')])
-      ], whenSet: EventFlag('Quest1'), createSequence: true);
+      ], whenSet: EventFlag('Quest1'));
 
       expect(
           scene,
@@ -864,28 +865,36 @@ void main() {
           ]));
     });
 
-    test('adds branch with createSequence and advanceSequenceWhenSet', () {
+    test('addSequence extends the selected condition', () {
       var scene = Scene([
-        Dialog(spans: [DialogSpan('Hello world')])
+        IfFlag(EventFlag('AdvanceCondition'), isSet: [
+          Dialog(spans: [DialogSpan('Hello world')]),
+        ], isUnset: [
+          Dialog.parse('Before')
+        ]),
+        Dialog.parse('After'),
       ]);
 
-      scene.addBranch([
+      scene.addSequence([
         Dialog(spans: [DialogSpan('This is after the quest')])
       ],
           whenSet: EventFlag('Quest1'),
-          createSequence: true,
-          advanceSequenceWhenSet: EventFlag('AdvanceCondition'));
+          asOf: Condition({EventFlag('AdvanceCondition'): true}));
 
       expect(
           scene,
           Scene([
-            IfFlag(EventFlag('Quest1'), isSet: [
-              Dialog(spans: [DialogSpan('This is after the quest')])
+            IfFlag(EventFlag('AdvanceCondition'), isSet: [
+              IfFlag(EventFlag('Quest1'), isSet: [
+                Dialog(spans: [DialogSpan('This is after the quest')])
+              ], isUnset: [
+                SetFlag(EventFlag('Quest1')),
+                Dialog(spans: [DialogSpan('Hello world')]),
+              ]),
             ], isUnset: [
-              Dialog(spans: [DialogSpan('Hello world')]),
-              IfFlag(EventFlag('AdvanceCondition'),
-                  isSet: [SetFlag(EventFlag('Quest1'))]),
-            ])
+              Dialog.parse('Before')
+            ]),
+            Dialog.parse('After'),
           ]));
     });
 

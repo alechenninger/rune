@@ -652,7 +652,8 @@ class Scene extends IterableBase<Event> {
   }
 
   Scene copy() {
-    return Scene([..._events]);
+    // Preserve the boundary between a conditional and the events following it.
+    return Scene.empty().._events.addAll(_events);
   }
 
   /// Advances the scene in place by assuming the given [condition].
@@ -729,7 +730,8 @@ class Scene extends IterableBase<Event> {
 
   void addEventToBranches(Event event, Condition condition) {
     _visitBranch(_events, (branch) => _addEvent(branch, event),
-        Condition.empty(), condition);
+        Condition.empty(), condition,
+        allowAdditionalConditions: true);
   }
 
   void addEventsToBranches(Iterable<Event> events, Condition condition) {
@@ -908,13 +910,16 @@ class Scene extends IterableBase<Event> {
   ///
   /// The visitor may mutate the received list. For a nested list, the
   /// containing [IfEvent] is rebuilt with the modified branch; unvisited
-  /// sibling branches are preserved.
+  /// sibling branches are preserved. [allowAdditionalConditions] permits
+  /// bookkeeping to reach a sequence beneath other compatible story gates.
+  /// [firstMatchOnly] leaves later matching conditionals untouched.
   ///
   /// Returns `true` if [visitor] was called at least once.
   ///
   /// See [Condition.isSatisfiedBy].
   bool _visitBranch(List<Event> events, Function(List<Event> events) visitor,
-      Condition current, Condition matching) {
+      Condition current, Condition matching,
+      {bool allowAdditionalConditions = false, bool firstMatchOnly = false}) {
     if (matching.isSatisfiedBy(current)) {
       visitor(events);
       return true;
@@ -933,19 +938,25 @@ class Scene extends IterableBase<Event> {
 
           // Could this branch still reach `matching`?
           // `condition` is the accumulated condition for this branch.
-          // It must be a subset of `matching`:
+          // Unless additional conditions are allowed, it must be a subset
+          // of `matching`:
           // every constraint already imposed by this path
           // must  agree with matching,
           // while matching may contain additional constraints.
           // This is only a possibility check;
           // recursion determines whether the path actually reaches matching.
-          if (condition.isSatisfiedBy(matching)) {
+          if (allowAdditionalConditions
+              ? !condition.conflictsWith(matching)
+              : condition.isSatisfiedBy(matching)) {
             // May be modified – copy.
             events = [...events];
             // Replace if we modified the branch
             // or any prior branches needed replacement
-            if (_visitBranch(events, visitor, condition, matching)) {
+            if (_visitBranch(events, visitor, condition, matching,
+                allowAdditionalConditions: allowAdditionalConditions,
+                firstMatchOnly: firstMatchOnly)) {
               replacements.add(Branch(branch.condition, events: events));
+              if (firstMatchOnly) break;
             }
           }
         }
@@ -954,6 +965,7 @@ class Scene extends IterableBase<Event> {
           added = true;
           // Rebuild the conditional event with the replaced branches
           events[i] = e.withBranches(replacements);
+          if (firstMatchOnly) return true;
         }
       }
     }
@@ -965,18 +977,8 @@ class Scene extends IterableBase<Event> {
   ///
   /// The `branch` is played instead of the current scene if the [whenSet] flag
   /// is set. If the flag is not set, the current scene is played.
-  ///
-  /// If [createSequence] is `true`, `whenSet` will be set with the current
-  /// scene, thus creating a sequence if the scene is played again.
-  ///
-  /// Advancing to the next branch in sequence can be conditional, however,
-  /// by setting the [advanceSequenceWhenSet] flag. If provided, advancing the
-  /// sequence will only happen when the `advanceSequenceWhenSet` flag is set.
   void addBranch(Iterable<Event> branch,
-      {required EventFlag whenSet,
-      bool createSequence = false,
-      EventFlag? advanceSequenceWhenSet,
-      Condition? asOf}) {
+      {required EventFlag whenSet, Condition? asOf}) {
     /*
     is asOf is set
     we need to find the corresponding branch
@@ -985,43 +987,50 @@ class Scene extends IterableBase<Event> {
     where the branch becomes the isUnset of a new IfFlag at that point
      */
     if (asOf == null) {
-      _addBranch(_events, branch,
-          whenSet: whenSet,
-          createSequence: createSequence,
-          advanceSequenceWhenSet: advanceSequenceWhenSet);
+      _addBranch(_events, branch, whenSet: whenSet);
     } else {
       if (!_visitBranch(_events, (events) {
-        _addBranch(events, branch,
-            whenSet: whenSet,
-            createSequence: createSequence,
-            advanceSequenceWhenSet: advanceSequenceWhenSet);
+        _addBranch(events, branch, whenSet: whenSet);
       }, Condition.empty(), asOf)) {
         // No branch matched the given condition,
         // so we add a new branch at the top level,
         // using the asOf condition.
         var withAsOf = asOf.ifSatisfied(branch);
         // TODO: should attempt to add to the nearest matching branch, ideally?
-        _addBranch(_events, withAsOf,
-            whenSet: whenSet,
-            createSequence: createSequence,
-            advanceSequenceWhenSet: advanceSequenceWhenSet);
+        _addBranch(_events, withAsOf, whenSet: whenSet);
       }
     }
   }
 
-  void _addBranch(List<Event> events, Iterable<Event> branch,
-      {required EventFlag whenSet,
-      bool createSequence = false,
-      EventFlag? advanceSequenceWhenSet}) {
-    if (createSequence) {
-      if (advanceSequenceWhenSet == null) {
-        _addEvent(events, SetFlag(whenSet));
-      } else {
-        _addEvent(
-            events, IfFlag(advanceSequenceWhenSet, isSet: [SetFlag(whenSet)]));
-      }
+  /// Extends the events selected by [asOf] with another step in a sequence.
+  ///
+  /// An empty condition selects the whole scene. Otherwise the first matching
+  /// branch is forked. The previous step sets [whenSet] on entry, and the
+  /// new step runs on subsequent interactions.
+  void addSequence(Iterable<Event> next,
+      {required EventFlag whenSet, Condition asOf = const Condition.empty()}) {
+    if (!_visitBranch(_events, (events) {
+      _addEvent(events, SetFlag(whenSet));
+      _addBranch(events, next, whenSet: whenSet);
+    }, Condition.empty(), asOf,
+        allowAdditionalConditions: true, firstMatchOnly: true)) {
+      throw ArgumentError.value(
+          asOf, 'asOf', 'no existing branch matches the sequence condition');
     }
+  }
 
+  /// Runs a story-controlled prefix before the prior scene.
+  void addPrefix(Iterable<Event> prefix,
+      {required EventFlag storyEvent, EventFlag? priorInteractionFlag}) {
+    _events.insert(
+        0,
+        IfFlag(storyEvent, isSet: prefix, isUnset: [
+          if (priorInteractionFlag case var flag?) SetFlag(flag),
+        ]));
+  }
+
+  void _addBranch(List<Event> events, Iterable<Event> branch,
+      {required EventFlag whenSet}) {
     var withBranch = <Event>[];
     _addEvent(withBranch, IfFlag(whenSet, isSet: branch, isUnset: events));
     events.replaceRange(0, events.length, withBranch);
