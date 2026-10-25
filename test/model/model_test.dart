@@ -378,6 +378,60 @@ void main() {
       game = Game();
     });
 
+    group('interactive elements in a map', () {
+      test('includes interactive objects and areas only from the requested map',
+          () {
+        var map = game.getOrStartMap(MapId.Test);
+        var npc = MapObject(
+            id: 'npc',
+            startPosition: Position(0, 0),
+            spec: Npc(Sprite.PalmanWoman1, FaceDown()));
+        var scenery = MapObject(
+            id: 'scenery',
+            startPosition: Position(0, 0),
+            spec: Npc(Sprite.PalmanWoman1, FaceDownLegsHiddenNonInteractive()));
+        var area = MapArea(
+            id: MapAreaId('area'),
+            at: Position(0, 0),
+            range: AreaRange.xyExact,
+            spec: InteractiveAreaSpec());
+        map.addObject(npc);
+        map.addObject(scenery);
+        map.addArea(area);
+        game.getOrStartMap(MapId.Aiedo).addObject(MapObject(
+            id: 'other',
+            startPosition: Position(0, 0),
+            spec: Npc(Sprite.PalmanWoman1, FaceDown())));
+
+        expect(game.interactiveElementsIn(MapId.Test), [npc, area]);
+      });
+
+      test('includes all guild interactions alongside its map elements', () {
+        var map = game.getOrStartMap(MapId.HuntersGuild);
+        var npc = MapObject(
+            id: 'clerk',
+            startPosition: Position(0, 0),
+            spec: Npc(Sprite.PalmanWoman1, FaceDown()));
+        map.addObject(npc);
+
+        expect(game.interactiveElementsIn(map.id),
+            [npc, ...game.huntersGuild.interactions]);
+      });
+
+      test('can find guild interactions without creating a map', () {
+        expect(game.interactiveElementsIn(MapId.HuntersGuild),
+            orderedEquals(game.huntersGuild.interactions));
+        expect(game.maps, isEmpty);
+      });
+
+      test('excludes guild interactions and Talk from unrelated maps', () {
+        expect(game.interactiveElementsIn(MapId.Test), isEmpty);
+        expect(game.interactiveElementsIn(MapId.HuntersGuild),
+            isNot(contains(game.talkInteraction)));
+        expect(game.maps, isEmpty);
+      });
+    });
+
     group('scenes by interaction', () {
       late GameMap map;
 

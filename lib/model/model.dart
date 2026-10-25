@@ -113,6 +113,21 @@ class Game {
     return huntersGuild.interactionById(id);
   }
 
+  /// Returns all interactive elements associated with [mapId].
+  ///
+  /// Includes the guild's clerk and job interactions for [MapId.HuntersGuild],
+  /// although they are stored outside [GameMap.elements]. The map-independent
+  /// Talk interaction is excluded. This query does not create a missing map.
+  Iterable<InteractiveMapElement> interactiveElementsIn(MapId mapId) sync* {
+    var map = getMap(mapId);
+    if (map != null) {
+      yield* map.elements.whereType<InteractiveMapElement>();
+    }
+    if (mapId == MapId.HuntersGuild) {
+      yield* huntersGuild.interactions;
+    }
+  }
+
   bool containsMap(MapId id) {
     return _maps.containsKey(id);
   }
