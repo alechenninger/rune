@@ -111,14 +111,21 @@ class Dialog extends Event {
       identical(this, other) ||
       other is Dialog &&
           runtimeType == other.runtimeType &&
-          speaker == other.speaker &&
+          _speakerKey == other._speakerKey &&
           portraitAlignment == other.portraitAlignment &&
           hidePanelsOnClose == other.hidePanelsOnClose &&
           const ListEquality().equals(_spans, other._spans);
 
   @override
-  int get hashCode => Object.hash(speaker, portraitAlignment, hidePanelsOnClose,
-      const ListEquality().hash(_spans));
+  int get hashCode => Object.hash(_speakerKey, portraitAlignment,
+      hidePanelsOnClose, const ListEquality().hash(_spans));
+
+  // An object speaker is a reference: its interaction can contain this dialogue.
+  // Comparing or hashing its full spec would recurse through that cycle.
+  Object get _speakerKey => switch (speaker) {
+        MapObject object => object.id,
+        var speaker => speaker,
+      };
 }
 
 class DialogSpan {

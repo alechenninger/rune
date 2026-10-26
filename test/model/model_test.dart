@@ -5,6 +5,26 @@ import 'package:test/test.dart';
 import '../fixtures.dart';
 
 void main() {
+  test('dialogue compares object speakers without traversing their scenes', () {
+    MapObject speaker(String id) {
+      final object = MapObject(
+          id: id,
+          startPosition: Position(64, 80),
+          spec: InteractiveAsmSpec(
+              routine: Word(0xFC), startFacing: Direction.down));
+      object.onInteract = Scene([Dialog.parse('Hello', speaker: object)]);
+      return object;
+    }
+
+    final first = speaker('patient');
+    final equivalent = speaker('patient');
+    final different = speaker('guest');
+
+    expect(first.onInteract.hashCode, equivalent.onInteract.hashCode);
+    expect(first.onInteract, equivalent.onInteract);
+    expect(first.onInteract, isNot(different.onInteract));
+  });
+
   test('long story dialogue trees reuse unchanged conditional subtrees', () {
     var scene = Scene([Dialog.parse('Before')]);
     for (var i = 0; i < 64; i++) {
