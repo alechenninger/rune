@@ -3,6 +3,9 @@ import 'package:collection/collection.dart';
 import '../asm/data.dart';
 import 'model.dart';
 
+/// The NPC routine whose position and facing are controlled by scripted moves.
+final scriptableObjectRoutine = AsmRoutineModel(Word(0x194));
+
 /// Clears a fixed map object's routine until the slot is initialized again.
 class ClearMapObject extends Event {
   final MapObjectId object;

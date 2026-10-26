@@ -97,6 +97,10 @@ class Memory implements EventState {
   List<StateChange> get changes => UnmodifiableListView(_changes);
 
   @override
+  bool get playerFacesInteractionObject =>
+      _eventState.playerFacesInteractionObject;
+
+  @override
   Set<FieldObject> get pendingMovements => _eventState.pendingMovements;
 
   @override
@@ -108,6 +112,15 @@ class Memory implements EventState {
 
   @override
   void finishMovement(FieldObject object) => _apply(FinishMovement(object));
+
+  @override
+  void clearPendingMovementState() {
+    // Record the invalidations so they also apply when branch states merge.
+    for (final object in pendingMovements) {
+      positions[object] = null;
+      clearFacing(object);
+    }
+  }
 
   void clearChanges() {
     _changes.clear();
@@ -273,7 +286,7 @@ class Memory implements EventState {
   DirectionExpression? getFacing(FieldObject obj) => _eventState.getFacing(obj);
 
   @override
-  void setFacing(FieldObject obj, Direction dir) {
+  void setFacing(FieldObject obj, DirectionExpression dir) {
     _apply(SetFacing(obj, dir));
   }
 
@@ -281,6 +294,10 @@ class Memory implements EventState {
   void clearFacing(FieldObject obj) {
     _apply(ClearFacing(obj));
   }
+
+  @override
+  void clearObjectState({bool preserveScripted = false}) =>
+      _apply(ClearObjectState(preserveScripted: preserveScripted));
 
   @override
   int? slotFor(Character c) => _eventState.slotFor(c);
@@ -395,18 +412,13 @@ class _Positions implements Positions {
   }
 
   @override
-  void addAll(Positions p) {
-    _memory._apply(AddAllPositions(p));
-  }
-
-  @override
   void forEach(Function(FieldObject obj, Position pos) func) {
     _memory._eventState.positions.forEach(func);
   }
 
   @override
   void clear() {
-    _memory._eventState.positions.clear();
+    _memory._apply(ClearPositions());
   }
 }
 
@@ -416,9 +428,6 @@ class _Slots implements Slots {
   _Slots(this._memory);
 
   @override
-  Slots branch() => _Slots(_memory.branch());
-
-  @override
   bool get partyOrderMaintained =>
       _memory._eventState.slots.partyOrderMaintained;
 
@@ -426,24 +435,13 @@ class _Slots implements Slots {
   Character? operator [](int slot) => _memory._eventState.slots[slot];
 
   @override
-  void operator []=(int slot, Character? c) =>
-      _memory._eventState.slots[slot] = c;
+  void operator []=(int slot, Character? c) => _memory._apply(SetSlot(slot, c));
 
   @override
   int? slotFor(Character c) => _memory._eventState.slots.slotFor(c);
 
   @override
   int get numCharacters => _memory._eventState.numCharacters;
-
-  @override
-  void addAll(Slots slots) {
-    _memory._apply(AddAllSlots(slots));
-  }
-
-  @override
-  void forEach(Function(int slot, Character c) func) {
-    _memory._eventState.slots.forEach(func);
-  }
 
   @override
   Character? party(int slot) => _memory._eventState.slots.party(slot);
@@ -503,9 +501,27 @@ class FinishMovement extends StateChange<void> {
   @override
   void apply(Memory memory) => memory._eventState.finishMovement(object);
 
-  // A wait in only one possible branch does not establish completion.
   @override
-  void mayApply(Memory memory) {}
+  void mayApply(Memory memory) {
+    // A wait in only one possible branch does not establish completion.
+    // It can still update objects without establishing completion on this path.
+    //
+    // e.g.
+    //
+    // Start Shay moving asynchronously
+    // Alys faces toward Shay
+    // If flag:
+    //     Wait for Shay
+    //
+    // With finish unknown, we can neither assume Alys still faces Shay,
+    // nor that the movement as finished.
+    try {
+      memory._eventState.positions[object] = null;
+      memory._eventState.clearFacing(object);
+    } on ResolveException {
+      // The object may belong to a different map in this state.
+    }
+  }
 }
 
 class SetSavedDialogPosition extends StateChange {
@@ -558,7 +574,7 @@ class UnknownAddressRegisters extends StateChange {
 
 class SetFacing extends StateChange {
   final FieldObject obj;
-  final Direction dir;
+  final DirectionExpression dir;
 
   SetFacing(this.obj, this.dir);
 
@@ -597,6 +613,19 @@ class ClearFacing extends StateChange {
   }
 }
 
+class ClearObjectState extends StateChange {
+  final bool preserveScripted;
+
+  ClearObjectState({required this.preserveScripted});
+
+  @override
+  void apply(Memory memory) =>
+      memory._eventState.clearObjectState(preserveScripted: preserveScripted);
+
+  @override
+  void mayApply(Memory memory) => apply(memory);
+}
+
 class SetSlot extends StateChange {
   final int slot;
   final Character? char;
@@ -616,22 +645,6 @@ class SetSlot extends StateChange {
   @override
   mayApply(Memory memory) {
     memory._eventState.clearSlot(slot);
-  }
-}
-
-class AddAllSlots extends StateChange {
-  final Slots slots;
-
-  AddAllSlots(this.slots);
-
-  @override
-  apply(Memory memory) {
-    memory._eventState.slots.addAll(slots);
-  }
-
-  @override
-  mayApply(Memory memory) {
-    slots.forEach((slot, c) => memory._eventState.slots[slot] = null);
   }
 }
 
@@ -733,26 +746,12 @@ class SetPosition extends StateChange {
   }
 }
 
-class AddAllPositions extends StateChange {
-  final Positions positions;
-
-  AddAllPositions(this.positions);
+class ClearPositions extends StateChange {
+  @override
+  apply(Memory memory) => memory._eventState.positions.clear();
 
   @override
-  apply(Memory memory) {
-    memory._eventState.positions.addAll(positions);
-  }
-
-  @override
-  mayApply(Memory memory) {
-    positions.forEach((obj, pos) {
-      try {
-        memory._eventState.positions[obj] = null;
-      } on ResolveException catch (_) {
-        // Fall through; object may not be relevant in this state
-      }
-    });
-  }
+  mayApply(Memory memory) => apply(memory);
 }
 
 class SetStartingAxis extends StateChange {

@@ -11,6 +11,7 @@ import 'package:rune/numbers.dart';
 import 'package:test/test.dart';
 
 import '../fixtures.dart';
+import 'assembly_fixtures.dart';
 
 void main() {
   late GameMap testMap;
@@ -885,8 +886,11 @@ void main() {
               characterBySlotToA4(1),
               doMapUpdateLoop(Word(7 /*8 frames per step?*/)),
               lea(0xFFFFC300.w, a4),
-              move.w(Word(0x90).i, d0),
-              move.w(Word(0x50).i, d1),
+              // Arbitrary assembly can change both routine and coordinates.
+              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(curr_x_pos(a4), d0),
+              move.w(curr_y_pos(a4), d1),
+              addi.w(0x20.toWord.i, d0),
               jsr(Label('Event_MoveCharacter').l),
             ]));
       });
@@ -2329,6 +2333,36 @@ void main() {
       expect(asm.withoutComments(), Asm([shay.toA4(expectedState)]));
     });
 
+    for (final direction in <String, DirectionExpression>{
+      'own opposite': BySlot.one.facing().opposite,
+      'rotated vector fallback': DirectionOfVector(
+          from: Position(0, 0),
+          to: Position(0, 0),
+          zeroValue: BySlot.one.facing().opposite),
+    }.entries) {
+      test('repeated facing updates both execute for ${direction.key}', () {
+        final moves = Face(direction.value).move(BySlot.one);
+        final first = moves.toAsm(state);
+        final second = moves.toAsm(state);
+
+        expect(
+            first.withoutComments(),
+            Asm([
+              lea(Constant('Character_1').w, a4),
+              move.w(facing_dir(a4), d0),
+              bchg(2.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+            ]));
+        expect(
+            second.withoutComments(),
+            Asm([
+              move.w(facing_dir(a4), d0),
+              bchg(2.i, d0),
+              jsr(Label('Event_UpdateObjFacing').l),
+            ]));
+      });
+    }
+
     test('skips update for zero-vector identical expressions', () {
       var moves = Face(shay.position().towards(shay.position())).move(shay);
       var asm = moves.toAsm(state);
@@ -2429,15 +2463,28 @@ void main() {
       var moves =
           Face(BySlot.one.towards(InteractionObject())).move(BySlot.one);
       var asm = EventAsm.empty();
+      final dialogs = DialogTrees();
       SceneAsmGenerator.forInteraction(
-          map, SceneId('test'), DialogTrees(), asm, TestEventRoutines(),
+          map, SceneId('test'), dialogs, asm, TestEventRoutines(),
           withObject: const InteractionObject())
         ..runEvent()
         ..individualMoves(moves)
         ..finish();
 
-      expect(asm.withoutComments().head(-3).skip(1), Asm.empty());
-    }, skip: 'not done but not very useful');
+      expectGenerated((
+        event: asm,
+        dialog: dialogs.forMap(map.id).toAsm()
+      ), [
+        label(Label('Event_GrandCross_test')),
+        move.w(Word(0).i, Constant('Game_Mode_Routine').w),
+        movea.l(Constant('Map_Chunk_Addr').w, a0),
+        jmp(Label('Map_LoadChunks').l),
+      ], dialog: [
+        dc.b([Byte(0xf6)]),
+        dc.w([Word(0)]),
+        dc.b([Byte(0xff)]),
+      ]);
+    });
 
     test('character 1 by name facing interaction object is noop', () {},
         skip: "i don't think this is possible "
@@ -2540,17 +2587,75 @@ void main() {
           ..face(direction)
           ..step(StepPath()
             ..delay = 1.step
-            ..facing = direction));
+            // A repeated relationship can now omit the second facing update.
+            ..facing = direction.opposite));
 
-      var labels = moves
-          .toAsm(state)
-          .map((line) => line.label)
-          .whereType<String>()
-          .toList();
+      final generated = moves.toAsm(state);
+      expect(
+          generated.withoutComments(),
+          Asm([
+            moveq(Constant('CharID_Rune').i, d0),
+            cmd('getcharacter', [a3]),
+            move.w(curr_x_pos(a3), d2),
+            lea(Constant('Character_1').w, a4),
+            sub.w(curr_x_pos(a4), d2),
+            move.w(curr_y_pos(a3), d3),
+            sub.w(curr_y_pos(a4), d3),
+            vectorDirection('_Shay_0_0'),
+            move.w(facing_dir(a4), d0),
+            label(Label('.keep_Shay_0_0')),
+            lea(Constant('Character_1').w, a4),
+            jsr(Label('Event_UpdateObjFacing').l),
+            move.w(Word(0x0007).i, d0),
+            jsr(Label('DoMapUpdateLoop').l),
+            move.w(curr_x_pos(a4), d2),
+            moveq(Constant('CharID_Rune').i, d0),
+            jsr(Label('Event_GetCharacter').l),
+            sub.w(curr_x_pos(a4), d2),
+            lea(Constant('Character_1').w, a3),
+            move.w(curr_y_pos(a3), d3),
+            sub.w(curr_y_pos(a4), d3),
+            vectorDirection('_Shay_2_0'),
+            move.w(facing_dir(a4), d0),
+            label(Label('.keep_Shay_2_0')),
+            lea(Constant('Character_1').w, a4),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
+      var labels =
+          generated.map((line) => line.label).whereType<String>().toList();
 
       expect(labels.toSet(), hasLength(labels.length));
-      expect(labels, contains('.positive_dx_Shay_0_0'));
-      expect(labels, contains('.positive_dx_Shay_2_0'));
+    });
+
+    test('different zero-vector fallbacks require another facing update', () {
+      state.setFacing(
+          shay,
+          DirectionOfVector(
+              from: shay.position(),
+              to: rune.position(),
+              zeroValue: Direction.left));
+      final direction = DirectionOfVector(
+          from: shay.position(),
+          to: rune.position(),
+          zeroValue: Direction.right);
+
+      final asm = Face(direction).move(shay).toAsm(state);
+      expect(
+          asm.withoutComments(),
+          Asm([
+            moveq(Constant('CharID_Rune').i, d0),
+            cmd('getcharacter', [a3]),
+            move.w(curr_x_pos(a3), d2),
+            moveq(Constant('CharID_Chaz').i, d0),
+            jsr(Label('Event_GetCharacter').l),
+            sub.w(curr_x_pos(a4), d2),
+            move.w(curr_y_pos(a3), d3),
+            sub.w(curr_y_pos(a4), d3),
+            vectorDirection('_Shay_0_0'),
+            move.w(Constant('FacingDir_Right').i, d0),
+            label(Label('.keep_Shay_0_0')),
+            jsr(Label('Event_UpdateObjFacing').l),
+          ]));
     });
   });
 

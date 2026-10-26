@@ -357,7 +357,8 @@ class PositionComponent extends PositionComponentExpression {
 }
 
 sealed class DirectionExpression extends UnaryExpression {
-  Direction? known(EventState memory);
+  Direction? known(EventState memory) =>
+      _knownDirection(this, memory, const {});
   DirectionExpression get opposite;
   DirectionExpression turn(int times) => OffsetDirection(this, turns: times);
 
@@ -389,8 +390,8 @@ class DirectionOfVector extends DirectionExpression {
     };
   }
 
-  @Deprecated("It's wrong if the player or object has moved")
-  bool get playerIsFacingFrom =>
+  bool playerIsFacingFrom(EventState state) =>
+      state.playerFacesInteractionObject &&
       from == const InteractionObject().position() &&
       to == BySlot.one.position();
 
@@ -420,31 +421,6 @@ class DirectionOfVector extends DirectionExpression {
   }
 
   @override
-  Direction? known(EventState memory) {
-    var knownFrom = from.known(memory);
-    var knownTo = to.known(memory);
-    if (knownFrom == null || knownTo == null) {
-      // If we know the player is facing this object,
-      // try using the opposite direction of the player facing.
-      if (playerIsFacingFrom) {
-        var dir = memory.getFacing(BySlot.one)?.opposite;
-        if (dir is Direction) return dir;
-      }
-
-      return null;
-    }
-    var vector = knownTo - knownFrom;
-    if (vector.x == 0 && vector.y == 0) return zeroValue.known(memory);
-    var angle = atan2(vector.y, vector.x) * 180 / pi;
-    return switch (angle) {
-      >= -45 && < 45 => Direction.right,
-      >= 45 && < 135 => Direction.down,
-      >= -135 && < -45 => Direction.up,
-      _ => Direction.left
-    };
-  }
-
-  @override
   DirectionExpression get opposite => DirectionOfVector(from: to, to: from);
 
   @override
@@ -457,10 +433,11 @@ class DirectionOfVector extends DirectionExpression {
       other is DirectionOfVector &&
       runtimeType == other.runtimeType &&
       from == other.from &&
-      to == other.to;
+      to == other.to &&
+      zeroValue == other.zeroValue;
 
   @override
-  int get hashCode => from.hashCode ^ to.hashCode;
+  int get hashCode => Object.hash(from, to, zeroValue);
 }
 
 class ObjectFaceDirection extends DirectionExpression {
@@ -470,15 +447,6 @@ class ObjectFaceDirection extends DirectionExpression {
 
   @override
   DirectionExpression get opposite => OffsetDirection(this, turns: 2);
-
-  @override
-  Direction? known(EventState memory) {
-    return switch (memory.getFacing(obj)) {
-      Direction d => d,
-      DirectionExpression d when d != this => d.known(memory),
-      _ => null,
-    };
-  }
 
   @override
   String toString() {
@@ -518,14 +486,6 @@ class OffsetDirection extends DirectionExpression {
       OffsetDirection(base.opposite, turns: turns);
 
   @override
-  Direction? known(EventState memory) {
-    return switch (base.known(memory)) {
-      Direction d => d.turn(turns),
-      _ => null,
-    };
-  }
-
-  @override
   String toString() {
     return 'OffsetDirection{base: $base, turns: $turns}';
   }
@@ -543,6 +503,51 @@ class OffsetDirection extends DirectionExpression {
 
   @override
   bool? isKnownZero(EventState state) => base.isKnownZero(state);
+}
+
+/// Evaluates facing knowledge without following circular relationships.
+///
+/// The recursion path belongs to this query and follows resolved objects so
+/// aliases share the same cycle check, including inside zero-vector fallbacks.
+Direction? _knownDirection(DirectionExpression direction, EventState memory,
+    Set<FieldObject> evaluatingFacing) {
+  switch (direction) {
+    case Direction d:
+      return d;
+    case ObjectFaceDirection(:final obj):
+      final resolved = obj.resolve(memory);
+      if (evaluatingFacing.contains(resolved)) return null;
+      final facing = memory.getFacing(resolved);
+      return facing == null
+          ? null
+          : _knownDirection(facing, memory, {...evaluatingFacing, resolved});
+    case OffsetDirection(:final base, :final turns):
+      return _knownDirection(base, memory, evaluatingFacing)?.turn(turns);
+    case DirectionOfVector(:final from, :final to, :final zeroValue):
+      var knownFrom = from.known(memory);
+      var knownTo = to.known(memory);
+      if (knownFrom == null || knownTo == null) {
+        // If we know the player is facing this object,
+        // try using the opposite direction of the player facing.
+        if (direction.playerIsFacingFrom(memory)) {
+          var dir = memory.getFacing(BySlot.one)?.opposite;
+          if (dir is Direction) return dir;
+        }
+
+        return null;
+      }
+      var vector = knownTo - knownFrom;
+      if (vector.x == 0 && vector.y == 0) {
+        return _knownDirection(zeroValue, memory, evaluatingFacing);
+      }
+      var angle = atan2(vector.y, vector.x) * 180 / pi;
+      return switch (angle) {
+        >= -45 && < 45 => Direction.right,
+        >= 45 && < 135 => Direction.down,
+        >= -135 && < -45 => Direction.up,
+        _ => Direction.left
+      };
+  }
 }
 
 const up = Direction.up;

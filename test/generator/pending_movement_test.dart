@@ -10,6 +10,7 @@ import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
 import '../fixtures.dart';
+import 'assembly_fixtures.dart';
 
 AbsoluteMoves moving([FieldObject object = shay]) => AbsoluteMoves()
   ..destinations[object] = Position(0x100, 0x100)
@@ -17,8 +18,6 @@ AbsoluteMoves moving([FieldObject object = shay]) => AbsoluteMoves()
 
 IndividualMoves facing([FieldObject object = shay]) =>
     IndividualMoves()..moves[object] = Face(up);
-
-typedef GeneratedAssembly = ({Asm event, Asm dialog});
 
 GeneratedAssembly generateScene(List<Event> events,
     {GameMap? map, bool interaction = false}) {
@@ -44,14 +43,6 @@ GeneratedAssembly generateScene(List<Event> events,
     event: event.withoutComments().trim(),
     dialog: dialogs.forMap(map.id).toAsm().withoutComments().trim(),
   );
-}
-
-Asm expectedAssembly(Iterable<Asm> fragments) => Asm(fragments.toList()).trim();
-
-void expectGenerated(GeneratedAssembly generated, List<Asm> event,
-    {List<Asm> dialog = const []}) {
-  expect(generated.event, expectedAssembly(event), reason: 'event assembly');
-  expect(generated.dialog, expectedAssembly(dialog), reason: 'dialog assembly');
 }
 
 Asm slotA4(int slot) => lea(Constant('Character_$slot').w, a4);
@@ -91,39 +82,6 @@ Asm waitForSlot(int slot, {bool load = true}) => Asm([
 Asm faceSlot(int slot, {bool load = true}) => Asm([
       if (load) slotA4(slot),
       updateObjFacing(FacingDir_Up.i),
-    ]);
-
-// Expected direction calculation after loading the X/Y deltas into d2/d3.
-// Callers spell out coordinate reads, zero-vector fallback, and facing update.
-Asm vectorDirection(String suffix) => Asm([
-      move.w(d2, d4),
-      bpl.s(Label('.positive_dx$suffix')),
-      neg.w(d4),
-      label(Label('.positive_dx$suffix')),
-      move.w(d3, d5),
-      bpl.s(Label('.positive_dy$suffix')),
-      neg.w(d5),
-      label(Label('.positive_dy$suffix')),
-      cmp.w(d4, d5),
-      bgt.s(Label('.checky$suffix')),
-      tst.w(d4),
-      beq.s(Label('.zerovector$suffix')),
-      tst.w(d2),
-      bpl.s(Label('.right$suffix')),
-      move.w(FacingDir_Left.i, d0),
-      bra.s(Label('.keep$suffix')),
-      label(Label('.right$suffix')),
-      move.w(FacingDir_Right.i, d0),
-      bra.s(Label('.keep$suffix')),
-      label(Label('.checky$suffix')),
-      tst.w(d3),
-      bpl.s(Label('.down$suffix')),
-      move.w(FacingDir_Up.i, d0),
-      bra.s(Label('.keep$suffix')),
-      label(Label('.down$suffix')),
-      move.w(FacingDir_Down.i, d0),
-      bra.s(Label('.keep$suffix')),
-      label(Label('.zerovector$suffix')),
     ]);
 
 Asm faceSlotTowardShay(int slot, String suffix) => Asm([
@@ -186,6 +144,265 @@ Asm dialogData() => Asm([
     ]);
 
 void main() {
+  test('ordinary pause invalidates facing toward a pending movement', () {
+    final generated = generateScene([
+      moving(),
+      Face(alys.towards(shay)).move(alys),
+      Pause(const Duration(seconds: 1)),
+      SetContext((state) {
+        expect(state.getFacing(alys), isNull);
+        expect(state.hasPendingMovement(shay), isTrue);
+      }),
+      Face(alys.towards(shay)).move(alys),
+    ]);
+
+    expectGenerated(generated, [
+      moveShay(),
+      move.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_1').w, a4),
+      sub.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_2_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_2_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      move.w(Word(0x003b).i, d0),
+      jsr(Label('DoMapUpdateLoop').l),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_x_pos(a3), d2),
+      sub.w(curr_x_pos(a4), d2),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_4_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_4_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      waitForSlot(2),
+      finishMovement(),
+    ]);
+  });
+
+  test('movement delay invalidates facing toward a pending movement', () {
+    final generated = generateScene([
+      moving(),
+      Face(alys.towards(shay)).move(alys),
+      (StepPath()..delay = 1.step).move(rune),
+      SetContext((state) {
+        expect(state.getFacing(alys), isNull);
+        expect(state.hasPendingMovement(shay), isTrue);
+      }),
+      Face(alys.towards(shay)).move(alys),
+    ]);
+
+    expectGenerated(generated, [
+      moveShay(),
+      move.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_1').w, a4),
+      sub.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_2_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_2_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      move.w(Word(0x0007).i, d0),
+      jsr(Label('DoMapUpdateLoop').l),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_x_pos(a3), d2),
+      sub.w(curr_x_pos(a4), d2),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_4_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_4_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      waitForSlot(2),
+      finishMovement(),
+    ]);
+  });
+
+  test('single-object step invalidates facing toward a pending movement', () {
+    final generated = generateScene([
+      moving(),
+      Face(alys.towards(shay)).move(alys),
+      StepObject.constantStep(rune, stepPerFrame: const Point(1, 0), frames: 2),
+      SetContext((state) {
+        expect(state.getFacing(alys), isNull);
+        expect(state.hasPendingMovement(shay), isTrue);
+      }),
+      Face(alys.towards(shay)).move(alys),
+    ]);
+
+    expectGenerated(generated, [
+      moveShay(),
+      move.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_1').w, a4),
+      sub.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_2_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_2_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      moveq(Constant('CharID_Rune').i, d0),
+      jsr(Label('Event_GetCharacter').l),
+      move.l(Longword(0x00010000).i, d0),
+      moveq(0.i, d1),
+      moveq(Byte(0x01).i, d2),
+      jsr(Label('Event_StepObject').l),
+      move.w(curr_x_pos(a4), dest_x_pos(a4)),
+      move.w(curr_y_pos(a4), dest_y_pos(a4)),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_x_pos(a3), d2),
+      lea(Constant('Character_1').w, a4),
+      sub.w(curr_x_pos(a4), d2),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_4_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_4_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      waitForSlot(2),
+      finishMovement(),
+    ]);
+  });
+
+  test('a conditional pause invalidates facing after branches merge', () {
+    final generated = generateScene([
+      moving(),
+      Face(alys.towards(shay)).move(alys),
+      IfValue(SlotOfCharacter(rune), comparedTo: NullSlot(), notEqual: [
+        Pause(const Duration(seconds: 1)),
+      ]),
+      Face(alys.towards(shay)).move(alys),
+    ]);
+
+    expectGenerated(generated, [
+      moveShay(),
+      move.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_1').w, a4),
+      sub.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_2_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_2_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      moveq(Constant('CharID_Rune').i, d0),
+      jsr(Label('FindCharacterSlot').l),
+      cmpi.b(Byte(0xff).i, d1),
+      beq(Label('.3_continue')),
+      move.w(Word(0x003b).i, d0),
+      jsr(Label('DoMapUpdateLoop').l),
+      label(Label('.3_continue')),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_x_pos(a3), d2),
+      sub.w(curr_x_pos(a4), d2),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_5_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_5_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      waitForSlot(2),
+      finishMovement(),
+    ]);
+  });
+
+  test('ordinary pauses preserve facts unrelated to pending movements', () {
+    final npc = MapObject(
+        id: 'npc', startPosition: Position(0, 0), spec: AlysWaiting());
+    final map = GameMap(MapId.Test)..addObject(npc);
+    final position = Position(0x80, 0x100);
+    generateScene([
+      moving(),
+      SetContext((state) {
+        state.positions[npc] = position;
+        state.setFacing(npc, up);
+        state.setRoutine(npc, NpcRoutineModel(FaceUp));
+        state.positions[alys] = position;
+        state.setFacing(alys, alys.towards(rune));
+        state.setFacing(rika, rika.towards(shay));
+        state.setFacing(wren, rika.facing());
+      }),
+      Pause(const Duration(seconds: 1)),
+      SetContext((state) {
+        expect(state.positions[npc], position);
+        expect(state.getFacing(npc), up);
+        expect(state.getRoutine(npc), NpcRoutineModel(FaceUp));
+        expect(state.positions[alys], position);
+        expect(state.getFacing(alys), alys.towards(rune));
+        expect(state.getFacing(rika), isNull);
+        expect(state.getFacing(wren), isNull);
+        expect(state.hasPendingMovement(shay), isTrue);
+      }),
+    ], map: map);
+  });
+
+  test('a zero-length pause preserves facing toward a pending movement', () {
+    final generated = generateScene([
+      moving(),
+      Face(alys.towards(shay)).move(alys),
+      Pause(Duration.zero),
+      Face(alys.towards(shay)).move(alys),
+    ]);
+
+    expectGenerated(generated, [
+      moveShay(),
+      move.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_1').w, a4),
+      sub.w(curr_x_pos(a4), d2),
+      lea(Constant('Character_2').w, a3),
+      move.w(curr_y_pos(a3), d3),
+      sub.w(curr_y_pos(a4), d3),
+      vectorDirection('_2_Alys_0_0'),
+      move.w(facing_dir(a4), d0),
+      label(Label('.keep_2_Alys_0_0')),
+      jsr(Label('Event_UpdateObjFacing').l),
+      waitForSlot(2),
+      finishMovement(),
+    ]);
+  });
+
+  for (final dialog in <String, Dialog>{
+    'text': Dialog(spans: [DialogSpan('Hello')]),
+    'inline pause': Dialog(spans: [
+      DialogSpan('', events: [
+        Pause(const Duration(seconds: 1), duringDialog: true),
+      ]),
+    ]),
+    'text after inline facing': Dialog(spans: [
+      DialogSpan('', events: [Face(alys.towards(shay)).move(alys)]),
+      DialogSpan('Hello'),
+    ]),
+  }.entries) {
+    test('dialog ${dialog.key} invalidates pending movement dependencies', () {
+      final memory = Memory()
+        ..setSlot(1, alys)
+        ..setSlot(2, shay)
+        ..startMovement(shay)
+        ..setFacing(shay, left)
+        ..setFacing(alys, alys.towards(shay))
+        ..setFacing(rika, alys.facing())
+        ..setFacing(rune, up);
+
+      dialog.value.toGeneratedAsm(memory, InteractionMode.noObject(),
+          labeller: Labeller.localTo('pending'),
+          fieldRoutines: defaultFieldRoutines);
+
+      expect(memory.getFacing(shay), isNull);
+      expect(memory.getFacing(alys), isNull);
+      expect(memory.getFacing(rika), isNull);
+      expect(memory.getFacing(rune), up);
+      expect(memory.hasPendingMovement(shay), isTrue);
+    });
+  }
+
   test('self-facing through a slot alias does not wait for movement', () {
     var generated = generateScene([
       moving(),
@@ -359,6 +576,32 @@ void main() {
       InstantMoves()..move(shay, to: position),
       WaitForMovements([shay]),
       SetContext((state) => expect(state.positions[shay], position)),
+    ]);
+  });
+
+  test('instant reposition cancels both runtime and tracked pending movement',
+      () {
+    final generated = generateScene([
+      moving(),
+      InstantMoves()..move(shay, to: Position(0x80, 0x80)),
+      SetContext((state) => expect(state.hasPendingMovement(shay), isFalse)),
+    ]);
+    expectGenerated(generated, [
+      moveShay(),
+      move.l(0.i, x_step_constant(a4)),
+      move.l(0.i, y_step_constant(a4)),
+      move.w(0.i, x_step_duration(a4)),
+      move.w(0.i, y_step_duration(a4)),
+      move.w(Word(0x0080).i, curr_x_pos(a4)),
+      move.w(Word(0x0000).i, (curr_x_pos + 2.toValue)(a4)),
+      move.w(Word(0x0080).i, curr_y_pos(a4)),
+      move.w(Word(0x0000).i, (curr_y_pos + 2.toValue)(a4)),
+      move.w(Word(0x0080).i, dest_x_pos(a4)),
+      move.w(Word(0x0080).i, dest_y_pos(a4)),
+      move.l(a4, -sp),
+      jsr(Label('Field_UpdateObjects').l),
+      move.l(sp.postIncrement(), a4),
+      finishMovement(),
     ]);
   });
 

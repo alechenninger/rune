@@ -875,6 +875,8 @@ class SceneAsmGenerator implements EventVisitor {
             mapDataManagerAsm: Asm.empty()) {
     if (withObject != null) {
       _memory.putInAddress(a3, const InteractionObject());
+      _memory.setFacing(
+          BySlot.one, BySlot.one.towards(const InteractionObject()));
     }
     _memory.hasSavedDialogPosition = false;
     _memory.currentMap = map;
@@ -1120,11 +1122,13 @@ class SceneAsmGenerator implements EventVisitor {
     if (asm.requireEvent) {
       _addToRoutine(asm, (i, destination) {
         _memory.unknownAddressRegisters();
+        _memory.clearObjectState();
         return asm.asm;
       });
     } else {
       _addToRoutine(asm, (i, _) {
         _memory.unknownAddressRegisters();
+        _memory.clearObjectState();
         return asm.asm;
       }, allowedModes: const {
         ModeType<EventMode>(),
@@ -1178,6 +1182,7 @@ class SceneAsmGenerator implements EventVisitor {
         face.object == const InteractionObject()) {
       // this already will happen by default if the first event
       _lastEventInCurrentDialog = face;
+      _memory.setFacing(face.object, BySlot.one.facing().opposite);
       return;
     }
 
@@ -1189,9 +1194,11 @@ class SceneAsmGenerator implements EventVisitor {
       // It's not exactly the same in case there are multiple objects
       // which share the same interaction scene.
 
-      if (_memory.inAddress(a3) == AddressOf(face.object) &&
+      if (_memory.playerFacesInteractionObject &&
+          _memory.inAddress(a3) == AddressOf(face.object) &&
           face.object == const InteractionObject()) {
         asm.add(jsr(Label('Interaction_UpdateObj').l));
+        _memory.setFacing(face.object, BySlot.one.facing().opposite);
       } else {
         asm.add(face.toMoves().toAsm(_memory,
             fieldRoutines: _fieldRoutines, labeller: _labeller.withContext(i)));
@@ -1212,6 +1219,18 @@ class SceneAsmGenerator implements EventVisitor {
         _memory.stepSpeed = overlap.speed;
       }
       asm.add(jsr(Label('Event_OverlapCharacters').l));
+
+      _memory.clearObjectState(preserveScripted: true);
+
+      // Every follower finishes at the leader's position. Snapshot it before
+      // updating possible aliases; their final facing depends on their paths.
+      final position = _memory.positions[BySlot.one];
+      for (var object in overlap.movedObjects()) {
+        if (object == BySlot.one) continue;
+        _memory.positions[object] = position;
+        _memory.clearFacing(object);
+      }
+
       // Reset to normal speed after overlap
       if (_memory.stepSpeed != StepSpeed.normal()) {
         asm.add(setStepSpeed(StepSpeed.normal().offset.i));
@@ -1379,6 +1398,9 @@ class SceneAsmGenerator implements EventVisitor {
         throw StateError('moving camera while panels are shown '
             'creates artifacts.');
       }
+
+      // Event_MoveCamera runs field objects while the camera travels.
+      _memory.clearObjectState(preserveScripted: true);
 
       var speed = switch (move.speed) {
         CameraSpeed.one => 1,
@@ -2262,7 +2284,8 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.stepSpeed = StepSpeed.normal();
 
     if (prepareMap.refreshObjects) {
-      _memory.resetRoutines();
+      // RefreshMap reinitializes object positions, facing, and routines.
+      _memory.clearObjectState();
     }
   }
 
@@ -2367,22 +2390,21 @@ class SceneAsmGenerator implements EventVisitor {
     _memory.isMapInVram = true;
     _memory.stepSpeed = StepSpeed.normal();
 
-    // Due to new map, clear known positions.
-    //TODO: _memory.clearAllFacing();
-    _memory.positions.clear();
-
-    // TODO(optimization): if we tracked party in memory, we could set positions
-    //  regardless of slot
-    //if (arrangement == PartyArrangement.overlapping) {}
-
-    for (var i = 1; i <= 5; i++) {
-      // Reposition party in memory using the new position and arrangement.
-      // TODO(loadmap): take into account num characters
-      _memory.positions[BySlot(i)] = arrangement.offsets[i - 1] + startPos;
-    }
-
+    // Only an object refresh applies the requested party position and facing.
     if (loadMap.refreshObjects) {
-      _memory.resetRoutines();
+      // Discard old object facts before recording the new map's party layout.
+      _memory.clearObjectState();
+
+      // TODO(optimization): if we tracked party in memory, we could set positions
+      //  regardless of slot
+      //if (arrangement == PartyArrangement.overlapping) {}
+
+      for (var i = 1; i <= 5; i++) {
+        // Reposition party in memory using the new position and arrangement.
+        // TODO(loadmap): take into account num characters
+        _memory.positions[BySlot(i)] = arrangement.offsets[i - 1] + startPos;
+        _memory.setFacing(BySlot(i), facing);
+      }
     }
   }
 
@@ -2735,6 +2757,14 @@ class SceneAsmGenerator implements EventVisitor {
       }
 
       _memory.setRoutine(obj, change.routine);
+      if (change.initialize) {
+        // The initializer executes immediately and can change either property.
+        // Technically, an object routine can do almost anything.
+        // This is just typical.
+        // Add special cases based on the routine if/when necessary.
+        _memory.positions[obj] = null;
+        _memory.clearFacing(obj);
+      }
 
       var index = switch (change.initialize) {
         true => routine.index,
@@ -3212,12 +3242,16 @@ class SceneAsmGenerator implements EventVisitor {
             'cannot wait frames with runObjects=true in the current game mode');
       }
 
+      // Objects may move
+      _memory.clearObjectState(preserveScripted: true);
       return doMainUpdatesLoop(Word(frames - 1));
     } else if (_memory.isFieldShown == false ||
         (_memory.panelsShown ?? 0) > 0 ||
         !mode.canRunMapUpdates) {
       return frames == 1 ? vIntPrepare() : vIntPrepareLoop(Word(frames - 1));
     } else {
+      // Async movements run during any pause where objects are shown
+      _memory.clearPendingMovementState();
       return doMapUpdateLoop(Word(frames - 1));
     }
   }
@@ -3437,6 +3471,7 @@ class SceneAsmGenerator implements EventVisitor {
           // Add cursor for previous dialog
           // This is delayed because this interrupt may be a termination
           _addToDialog(interrupt());
+          _memory.clearPendingMovementState();
         }
         nextMode = mode;
         break;
@@ -3603,6 +3638,9 @@ class SceneAsmGenerator implements EventVisitor {
             // Otherwise we get an empty window with a second required prompt.
             _addToDialog(dc.b(ControlCodes.skipArrowPrompt));
             // TODO: not sure if we need to track this in memory?
+          } else {
+            // The terminate arrow advances interaction objects while waiting.
+            _memory.clearPendingMovementState();
           }
 
           if (forEventBreak != null) {

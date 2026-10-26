@@ -201,6 +201,8 @@ class LoadMap extends Event {
   /// or if this event should immediately render the updated field (`true`).
   final bool showField;
 
+  /// Reinitializes field objects and applies the starting party position,
+  /// facing, and arrangement. Otherwise, existing object state is retained.
   final bool refreshObjects;
 
   LoadMap(

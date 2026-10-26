@@ -11,6 +11,8 @@ import 'event.dart';
 import 'labels.dart';
 import 'memory.dart';
 
+export '../model/behavior.dart' show scriptableObjectRoutine;
+
 const FacingDir_Up = Constant('FacingDir_Up');
 const FacingDir_Down = Constant('FacingDir_Down');
 const FacingDir_Left = Constant('FacingDir_Left');
@@ -19,8 +21,6 @@ const Camera_X_Step_Counter_FG = Constant('Camera_X_Step_Counter_FG');
 const Camera_Y_Step_Counter_FG = Constant('Camera_Y_Step_Counter_FG');
 const Camera_X_Step_Counter_BG = Constant('Camera_X_Step_Counter_BG');
 const Camera_Y_Step_Counter_BG = Constant('Camera_Y_Step_Counter_BG');
-
-final scriptableObjectRoutine = AsmRoutineModel(Word(0x194));
 
 /*
 Follow lead flag notes:
@@ -203,6 +203,8 @@ extension IndividualMovesToAsm on IndividualMoves {
       }
 
       if (allDelay) {
+        // Map update = async movements...
+        ctx.clearPendingMovementState();
         // Just guessing at 8 frames per step?
         // look at x/y_step_constant and FieldObj_Move routine
         // Subtract one since value is additional frames
@@ -237,6 +239,10 @@ void _throwIfIndependentPartyFollower(FieldObject obj, EventState state) {
   }
 }
 
+// Prepare or run a move for an object.
+//
+// Manipulates memory **as if the movement will be run synchronously**.
+// As such, do not use for asynchronous movements.
 Asm _moveObject({
   required MovementLookahead movement,
   required FieldObject object,
@@ -246,6 +252,11 @@ Asm _moveObject({
   required Memory mem,
 }) {
   var relativePosition = movement.relativePosition;
+
+  // Synchronous movement runs every field object, including wandering NPCs.
+  if (runMove) {
+    mem.clearObjectState(preserveScripted: true);
+  }
 
   if (currentX is Immediate && currentY is Immediate) {
     var destination =
@@ -325,6 +336,12 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
   var length = moves.destinations.length;
   var secondaryObjects = <(FieldObject, PositionExpression)>[];
   var doMove = moves.waitForMovements ? moveCharacter : setDestination;
+
+  // If moving, then like _moveObject, we need to clear other object state
+  // as objets are run during these movements
+  if (moves.waitForMovements) {
+    state.clearObjectState(preserveScripted: true);
+  }
 
   if (!moves.followLeader) {
     if (state.followLead != false &&
@@ -462,6 +479,8 @@ EventAsm absoluteMovesToAsm(AbsoluteMoves moves, Memory state,
 
 Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
   if (wait.objects.isEmpty) return Asm.empty();
+  // These engine waits advance all field objects, not just the selected ones.
+  memory.clearObjectState(preserveScripted: true);
 
   var chars = wait.objects.where((o) => o.isCharacter).toList();
   var secondary = wait.objects.where((o) => o.isNotCharacter).toList();
@@ -541,6 +560,11 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
 
               var scriptable = generator.scriptable(obj);
 
+              // Instant moves reset the destination
+              // and thus cancel any async movements.
+              final cancelMovement = memory.hasPendingMovement(obj);
+              if (cancelMovement) memory.finishMovement(obj);
+
               // TODO: why would we need to set the routine for instant moves?
               // Removing would be a behavior change though–instant moves
               // could also mean, "move here and stay here permanently"
@@ -551,12 +575,13 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
 
               return Asm([
                 obj.toA(load, memory),
-                if (!scriptable) ...[
-                  move.w(0x8194.toWord.i, load.indirect),
-                  move.l(0.i, x_step_constant(a4)),
-                  move.l(0.i, y_step_constant(a4)),
-                  move.w(0.i, x_step_duration(a4)),
-                  move.w(0.i, y_step_duration(a4)),
+                if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
+                // A teleport replaces the old destination and its active step.
+                if (!scriptable || cancelMovement) ...[
+                  move.l(0.i, x_step_constant(load)),
+                  move.l(0.i, y_step_constant(load)),
+                  move.w(0.i, x_step_duration(load)),
+                  move.w(0.i, y_step_duration(load)),
                 ],
                 move.w(x, curr_x_pos(load)),
                 // Ensure there is no fractional component
@@ -583,7 +608,7 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
             labelSuffix: '_${[
               eventIndex,
               _labelSafeString(obj),
-            ].whereNotNull().join('_')}',
+            ].nonNulls.join('_')}',
             memory: memory,
             load1: load == a4 ? a3 : a4,
             load2: load == a4 ? a2 : a3,
@@ -626,18 +651,13 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
             }),
       );
 
-      switch (facing.known(memory)) {
-        case Direction d:
-          memory.setFacing(obj, d);
-          break;
-        case null:
-          memory.clearFacing(obj);
-          break;
-      }
+      memory.setFacing(obj, facing.known(memory) ?? facing);
     }
   }
 
   // Reposition objects and camera
+  // Run objects; clear unknown object state.
+  memory.clearObjectState(preserveScripted: true);
   asm.add(Asm([
     move.l(a4, -sp),
     jsr(Label('Field_UpdateObjects').l),
@@ -781,11 +801,7 @@ class _MovementGenerator {
 
     var known = dir.known(_mem);
 
-    if (known == null) {
-      _mem.clearFacing(obj);
-    } else {
-      _mem.setFacing(obj, known);
-    }
+    _mem.setFacing(obj, known ?? dir);
   }
 }
 
@@ -798,6 +814,10 @@ Asm _waitForMovement(
     required Labeller labeller,
     required Memory memory,
     required FieldRoutineRepository fieldRoutines}) {
+  // The native routine can finish a step and change facing while we wait.
+  memory.positions[obj] = null;
+  memory.clearFacing(obj);
+
   var startOfLoop = Labeller.withContext('wait_for_movement')
       .withContextsFrom(labeller)
       .nextLocal();
@@ -1185,7 +1205,7 @@ class DirectionOfVectorAsm extends DirectionExpressionAsm {
           load2: load2);
     }
 
-    if (directionOfVector.playerIsFacingFrom) {
+    if (directionOfVector.playerIsFacingFrom(memory)) {
       return Asm([
         BySlot.one.toA(load1, memory),
         move.w(facing_dir(load1), destination),

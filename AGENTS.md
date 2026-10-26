@@ -1,0 +1,1 @@
+- For how to write tests, see doc/testing.md

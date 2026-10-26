@@ -148,8 +148,10 @@ class PauseCode extends DialogEvent {
 
   @override
   DialogAndRoutines toAsm(EventState state,
-          {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) =>
-      (delay(additionalFrames), const []);
+      {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
+    state.clearPendingMovementState();
+    return (delay(additionalFrames), const []);
+  }
 }
 
 class PanelCode extends DialogEvent {
@@ -256,8 +258,11 @@ class DialogCodesEvent extends DialogEvent {
 
   @override
   DialogAndRoutines toAsm(EventState state,
-          {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) =>
-      (dc.b(codes), const []);
+      {Labeller? labeller, FieldRoutineRepository? fieldRoutines}) {
+    // Raw control codes can change object properties outside the typed events.
+    state.clearObjectState();
+    return (dc.b(codes), const []);
+  }
 }
 
 class FaceInDialogRoutine extends DialogEvent {
@@ -355,12 +360,7 @@ class FaceInDialogByteCode extends DialogEvent {
         dc.w([face])
       ]));
 
-      switch (dir.known(state)) {
-        case null:
-          state.clearFacing(obj);
-        case var dir:
-          state.setFacing(obj, dir);
-      }
+      state.setFacing(obj, dir.known(state) ?? dir);
     }
 
     state.unknownAddressRegisters();
@@ -449,6 +449,7 @@ extension DialogToAsm on Dialog {
     if (memory.dialogPortrait != speaker.portrait ||
         memory.portraitAlignment != portraitAlignment) {
       asm.add(mode.execution.portraitCode(speaker.portrait, portraitAlignment));
+      memory.clearPendingMovementState();
       memory.dialogPortrait = speaker.portrait;
       memory.portraitAlignment = portraitAlignment;
     }
@@ -461,6 +462,8 @@ extension DialogToAsm on Dialog {
       var spanAscii = span.toAscii(quotes);
       ascii += spanAscii;
 
+      // Printing text advances interaction objects before the span's events.
+      if (spanAscii.length > 0) memory.clearPendingMovementState();
       memory.unknownAddressRegisters();
 
       for (var j = 0; j < span.events.length; j++) {

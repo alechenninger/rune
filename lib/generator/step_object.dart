@@ -37,6 +37,11 @@ Asm stepObjectToAsm(StepObject step,
     if (current != null) {
       var totalSteps = (stepPerFrame * step.frames).truncate();
       memory.positions[step.object] = current + Position.fromPoint(totalSteps);
+    } else {
+      // Already null, but need to invalid dependencies.
+      // You can depend on a state that is not known,
+      // and still need to know when it changes to something else not known.
+      memory.positions[step.object] = null;
     }
   } else {
     memory.positions[step.object] = null;
@@ -79,6 +84,8 @@ Asm stepObjectToAsm(StepObject step,
             move.w(curr_x_pos(a4), dest_x_pos(a4)),
             if (updateDestinationY) move.w(curr_y_pos(a4), dest_y_pos(a4)),
           ]));
+  // The single-object step routines also run interaction objects each frame.
+  memory.clearPendingMovementState();
   memory.putInAddress(a3, null);
   return asm;
 }
@@ -225,6 +232,11 @@ Asm stepObjectsToAsm(StepObjects step,
         // If we don't know the step, we can't set the position.
         memory.positions[obj] = null;
       }
+    } else {
+      // As above, need to invalid dependencies.
+      // You can depend on a state that is not known,
+      // and still need to know when it changes to something else not known.
+      memory.positions[obj] = null;
     }
   }
 

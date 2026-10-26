@@ -18,6 +18,7 @@ import 'behavior.dart';
 import 'conditional.dart';
 import 'cutscenes.dart';
 import 'dialog.dart';
+import 'dependencies.dart';
 import 'events.dart';
 import 'expressions.dart';
 import 'map.dart';
@@ -34,6 +35,7 @@ export 'behavior.dart';
 export 'conditional.dart';
 export 'cutscenes.dart';
 export 'dialog.dart';
+export 'dependencies.dart';
 export 'events.dart';
 export 'expressions.dart';
 export 'palette.dart';
@@ -277,13 +279,14 @@ abstract class EventVisitor {
 }
 
 class EventState {
-  EventState() : slots = Slots._() {
+  EventState() {
     _positions = Positions._(this);
+    _slots = Slots._(this);
   }
 
-  EventState._branch(EventState from) : slots = from.slots.branch() {
-    _positions = Positions._(this);
-    positions.addAll(from.positions);
+  EventState._branch(EventState from) {
+    _positions = Positions._branch(from._positions, this);
+    _slots = Slots._branch(from.slots, this);
     startingAxis = from.startingAxis;
     followLead = from.followLead;
     cameraLock = from.cameraLock;
@@ -308,6 +311,10 @@ class EventState {
   late final Positions _positions;
   Positions get positions => _positions;
 
+  /// Whether facing knowledge establishes that slot 1 faces the interaction NPC.
+  bool get playerFacesInteractionObject =>
+      getFacing(BySlot.one) == BySlot.one.towards(const InteractionObject());
+
   final _pendingMovements = <FieldObject>{};
 
   /// Objects whose scripted destinations have not yet been waited for.
@@ -318,18 +325,40 @@ class EventState {
       _pendingMovements.contains(object.resolve(this));
 
   void startMovement(FieldObject object) {
+    _invalidateObjectDependencies(object);
     // If it's known, only need to add that one
     // TODO: what if state changes, and what was once known is no longer?
     _pendingMovements.add(object.resolve(this));
   }
 
   void finishMovement(FieldObject object) {
+    _invalidateObjectDependencies(object);
     // Be more conservative here; no reason to keep either around
     _pendingMovements.removeAll(object.knownObjects(this));
   }
 
+  /// Forgets pose facts after pending movements have had a chance to advance.
+  ///
+  /// Asynchronous movements run during pauses,
+  /// even those that don't run objects.
+  /// While their destination positions are already unknown,
+  /// new dependencies may be recorded mid-move. Once those moves advance,
+  /// the dependencies should be cleared.
+  ///
+  /// See: [clearObjectState] for invalidating all objects,
+  /// not just pending ones. See [startMovement], [finishMovement],
+  /// and [hasPendingMovement] for async movement tracking.
+  void clearPendingMovementState() {
+    for (final object in pendingMovements) {
+      positions[object] = null;
+      clearFacing(object);
+    }
+  }
+
+  late final Slots _slots;
+
   /// Character field objects by slot. 1-indexed (zero is invalid).
-  final Slots slots;
+  Slots get slots => _slots;
 
   Axis? startingAxis = Axis.x;
 
@@ -368,11 +397,21 @@ class EventState {
     if (panelsShown != null) panelsShown = panelsShown! - n;
   }
 
-  final _facing = <FieldObject, Direction>{};
+  final _facing = <FieldObject, DirectionExpression>{};
   DirectionExpression? getFacing(FieldObject obj) => _facing[obj.resolve(this)];
-  void setFacing(FieldObject obj, Direction dir) {
+
+  /// Records the result of assigning [dir] to [obj]'s facing.
+  ///
+  /// A self-relative turn reads the old facing. Evaluate it before clearing
+  /// that knowledge, or forget the result if unknown: the new facing cannot
+  /// equal a nonzero rotation of itself.
+  void setFacing(FieldObject obj, DirectionExpression dir) {
+    final facing = _canRememberFacing(obj, dir) ? dir : dir.known(this);
+    clearFacing(obj);
+    if (facing == null) return;
+
     for (var obj in obj.knownObjects(this)) {
-      _facing[obj] = dir;
+      _facing[obj] = facing;
     }
 
     for (var obj in obj.unknownObjects(this)) {
@@ -381,11 +420,44 @@ class EventState {
   }
 
   void clearFacing(FieldObject obj) {
-    for (var obj in obj.knownObjects(this)) {
-      _facing.remove(obj);
+    _invalidateFacingDependencies((dependency) =>
+        dependency.property == ObjectProperty.facing &&
+        dependency.object.mayReferTo(obj, this));
+    _facing.removeWhere((owner, _) => owner.mayReferTo(obj, this));
+  }
+
+  /// Forgets position, facing, and routine facts after arbitrary object changes.
+  ///
+  /// When running normal field updates, [preserveScripted] retains stationary
+  /// party objects and NPCs known to use the scripted movement routine. Pending
+  /// moves can still change their positions and facing while objects run.
+  void clearObjectState({bool preserveScripted = false}) {
+    if (!preserveScripted) {
+      positions.clear();
+      _facing.clear();
+      resetRoutines();
+      return;
     }
-    for (var obj in obj.unknownObjects(this)) {
-      _facing.remove(obj);
+
+    final objects = <FieldObject>{
+      ..._positions._positions.keys,
+      ..._facing.keys,
+      ..._pendingMovements,
+      ...?currentMap?.objects,
+      for (final expression in _facing.values)
+        for (final dependency in expression.dependencies) dependency.object,
+    };
+    final hasInteractionCandidates =
+        currentMap?.objects.any((object) => object.isInteractive) ?? false;
+    for (final object in objects) {
+      // Actual map objects cover the interaction alias without accidentally
+      // forgetting a different, stationary scripted NPC's concrete facts.
+      if (object is InteractionObject && hasInteractionCandidates) continue;
+      if (_preservesStateWhileRunning(object)) continue;
+      _invalidateObjectDependencies(object);
+      _positions._positions
+          .removeWhere((owner, _) => owner.mayReferTo(object, this));
+      _facing.removeWhere((owner, _) => owner.mayReferTo(object, this));
     }
   }
 
@@ -409,7 +481,7 @@ class EventState {
       slots[slot] = c;
     }
     if (position != null) positions[c] = position;
-    if (facing != null) _facing[c] = facing;
+    if (facing != null) setFacing(c, facing);
   }
 
   final _routines = <FieldObject, SpecModel>{};
@@ -428,6 +500,7 @@ class EventState {
     }
   }
 
+  /// Forgets routine knowledge without changing position or facing facts.
   void resetRoutines() {
     _routines.clear();
   }
@@ -447,10 +520,75 @@ class EventState {
         'stepSpeed: $stepSpeed, '
         'panelsShown: $panelsShown, '
         'facing: $_facing, '
+        'playerFacesInteractionObject: $playerFacesInteractionObject, '
         'positions: ${positions._positions}, '
         'pendingMovements: $_pendingMovements, '
         'routines: $_routines'
         '}';
+  }
+
+  /// Whether [dir] remains true after assigning it to [object]'s facing.
+  ///
+  /// An unchanged self-facing fallback is safe. Track surrounding rotations
+  /// so a turn applied outside a vector also applies to its zero fallback.
+  /// Existing indirect dependencies are invalidated by [clearFacing].
+  bool _canRememberFacing(FieldObject object, DirectionExpression dir,
+          [int turns = 0]) =>
+      switch (dir) {
+        Direction() => true,
+        ObjectFaceDirection(:final obj) =>
+          turns % 4 == 0 || !obj.mayReferTo(object, this),
+        OffsetDirection(:final base, turns: final offset) =>
+          _canRememberFacing(object, base, turns + offset),
+        // Facing assignments do not change position inputs; only the fallback
+        // can read the facing being replaced.
+        DirectionOfVector(:final zeroValue) =>
+          _canRememberFacing(object, zeroValue, turns),
+      };
+
+  void _invalidateObjectDependencies(FieldObject object) {
+    _invalidateFacingDependencies(
+        (dependency) => dependency.object.mayReferTo(object, this));
+  }
+
+  bool _preservesStateWhileRunning(FieldObject object) {
+    try {
+      return !hasPendingMovement(object) &&
+          (object.isCharacter || getRoutine(object) == scriptableObjectRoutine);
+    } on ResolveException {
+      return false;
+    }
+  }
+
+  void _slotsChanging(Set<int> changed) {
+    bool affected(FieldObject object) =>
+        object is BySlot && changed.contains(object.index);
+    // Check expressions before remapping, while aliases still identify the
+    // objects whose old relationships are being invalidated.
+    _invalidateFacingDependencies((dependency) => affected(dependency.object));
+    _facing.removeWhere((owner, _) => affected(owner));
+    _positions._positions.removeWhere((owner, _) => affected(owner));
+  }
+
+  void _invalidateFacingDependencies(bool Function(ObjectDependency) affected) {
+    final removed = <FieldObject>{};
+    // Removing one fact can invalidate other facts that read its facing.
+    // Each pass removes entries, so cycles also terminate.
+    while (true) {
+      final invalid = _facing.entries
+          .where((entry) => entry.value.dependencies.any((dependency) =>
+              affected(dependency) ||
+              dependency.property == ObjectProperty.facing &&
+                  removed.any(
+                      (object) => dependency.object.mayReferTo(object, this))))
+          .map((entry) => entry.key)
+          .toList();
+      if (invalid.isEmpty) return;
+      for (final object in invalid) {
+        _facing.remove(object);
+        removed.add(object);
+      }
+    }
   }
 }
 
@@ -460,12 +598,14 @@ class Positions {
 
   Positions._(this._ctx);
 
-  void clear() {
-    _positions.clear();
+  Positions._branch(Positions from, this._ctx) {
+    _positions.addAll(from._positions);
   }
 
-  void addAll(Positions p) {
-    _positions.addAll(p._positions);
+  void clear() {
+    _ctx._invalidateFacingDependencies(
+        (dependency) => dependency.property == ObjectProperty.position);
+    _positions.clear();
   }
 
   void forEach(Function(FieldObject obj, Position pos) func) {
@@ -481,6 +621,10 @@ class Positions {
   }
 
   void operator []=(FieldObject obj, Position? p) {
+    _ctx._invalidateFacingDependencies((dependency) =>
+        dependency.property == ObjectProperty.position &&
+        dependency.object.mayReferTo(obj, _ctx));
+
     var update = p == null
         ? (obj) => _positions.remove(obj)
         : (obj) => _positions[obj] = p;
@@ -496,6 +640,8 @@ class Positions {
 }
 
 class Slots {
+  final EventState _ctx;
+
   /// Party order (not necessarily the same as field objects).
   final _party = BiMap<int, Character>();
   IMap<int, Character>? _priorParty;
@@ -504,22 +650,12 @@ class Slots {
 
   static const all = [1, 2, 3, 4, 5];
 
-  Slots._();
+  Slots._(this._ctx);
 
-  Slots branch() {
-    var newSlots = Slots._();
-    newSlots._party.addAll(_party);
-    newSlots._priorParty = _priorParty;
-    newSlots._partyOrderMaintained = _partyOrderMaintained;
-    return newSlots;
-  }
-
-  void addAll(Slots slots) {
-    _party.addAll(slots._party);
-  }
-
-  void forEach(Function(int, Character) func) {
-    _party.forEach(func);
+  Slots._branch(Slots from, this._ctx) {
+    _party.addAll(from._party);
+    _priorParty = from._priorParty;
+    _partyOrderMaintained = from._partyOrderMaintained;
   }
 
   /// 1-indexed (first slot is 1, there is no slot 0).
@@ -529,6 +665,7 @@ class Slots {
 
   void setPartyOrder(List<Character?> party,
       {bool saveCurrent = false, bool maintainOrder = false}) {
+    _ctx._slotsChanging(Slots.all.toSet());
     if (saveCurrent) {
       _priorParty = _party.toIMap();
     }
@@ -545,6 +682,7 @@ class Slots {
 
   void restorePreviousParty(
       [Function(int index, Character? prior, Character? current)? onRestore]) {
+    _ctx._slotsChanging(Slots.all.toSet());
     // This previously only iterated if priorParty was set,
     // but has been altered to fire callbacks in case
     // we need to restore, but the prior party is not known.
@@ -566,6 +704,10 @@ class Slots {
 
   /// 1-indexed (first slot is 1, there is no slot 0).
   void operator []=(int slot, Character? c) {
+    _ctx._slotsChanging({
+      slot,
+      if (_party.inverse[c] case final previous?) previous,
+    });
     if (c == null) {
       _party.remove(slot);
     } else {
@@ -579,6 +721,7 @@ class Slots {
   int get numCharacters => _party.keys.reduce(max);
 
   void unknownPartyOrder() {
+    _ctx._slotsChanging(Slots.all.toSet());
     _party.clear();
   }
 

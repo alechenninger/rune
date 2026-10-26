@@ -79,6 +79,26 @@ sealed class FieldObject extends Moveable {
   ///
   /// This is useful to clear state about objects in doubt.
   Iterable<FieldObject> unknownObjects(EventState state);
+
+  /// Whether two references may identify the same runtime object.
+  bool mayReferTo(FieldObject other, EventState state) {
+    if (this == other) return true;
+    if (isCharacter != other.isCharacter) return false;
+    // Party slots are distinct even when their occupants are unknown.
+    if (this is BySlot && other is BySlot) return false;
+    try {
+      final first = resolve(state);
+      final second = other.resolve(state);
+      if (first == second) return true;
+      if (first.isResolved && second.isResolved) return false;
+      final possible = {...knownObjects(state), ...unknownObjects(state)};
+      return {...other.knownObjects(state), ...other.unknownObjects(state)}
+          .any(possible.contains);
+    } on ResolveException {
+      // Missing map or alias context cannot establish that references differ.
+      return true;
+    }
+  }
 }
 
 abstract class ResolvedFieldObject extends FieldObject {
