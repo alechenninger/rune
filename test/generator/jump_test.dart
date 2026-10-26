@@ -64,7 +64,8 @@ void main() {
   test('ordinary steps after a jump resume updating the movement destination',
       () {
     final asm = generate([
-      JumpObject(BySlot.one, duration: const Duration(seconds: 1), height: 5, yMovement: 8),
+      JumpObject(BySlot.one,
+          duration: const Duration(seconds: 1), height: 5, yMovement: 8),
       StepObject.constantStep(BySlot.one,
           stepPerFrame: const Point(0, 1), frames: 2),
     ]).toList();
