@@ -2032,6 +2032,53 @@ void main() {
     });
   });
 
+  group('paired direction expressions', () {
+    test('deferring a fixed facing load preserves callback argument order', () {
+      final asm = BySlot(3).facing().withDirections(
+          memory: Memory(),
+          other: BySlot.one.facing().opposite,
+          asm: (first, second) => Asm([
+                move.w(first, d6),
+                move.w(second, d7),
+              ]));
+
+      expect(
+          asm,
+          Asm([
+            lea(Constant('Character_1').w, a4),
+            move.w(facing_dir(a4), d0),
+            bchg(2.i, d0),
+            lea(Constant('Character_3').w, a4),
+            move.w(facing_dir(a4), d6),
+            move.w(d0, d7),
+          ]));
+    });
+
+    test('callback consumes a saved value after a clobbering calculation', () {
+      final asm = BySlot.one.facing().opposite.withDirections(
+          memory: Memory(),
+          other: alys.facing().opposite,
+          asm: (first, second) => Asm([
+                move.w(first, d6),
+                move.w(second, d7),
+              ]));
+
+      expect(
+          asm,
+          Asm([
+            lea(Constant('Character_1').w, a4),
+            move.w(facing_dir(a4), d0),
+            bchg(2.i, d0),
+            move.w(d0, -(sp)),
+            characterByIdToA4(Constant('CharID_Alys').i),
+            move.w(facing_dir(a4), d0),
+            bchg(2.i, d0),
+            move.w(sp.postIncrement(), d6),
+            move.w(d0, d7),
+          ]));
+    });
+  });
+
   group('faces using expressions', () {
     late Memory state;
     late Memory testState;

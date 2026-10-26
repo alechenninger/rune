@@ -1129,6 +1129,30 @@ extension DirectionExpressionToAsm on DirectionExpression {
         load2: load2,
         labelSuffix: labelSuffix);
   }
+
+  /// Retrieves both directions for [asm], preserving values across calculations.
+  ///
+  /// Callback arguments retain their expression order even if evaluation is
+  /// reordered to defer a fixed object load. Supply distinct label suffixes
+  /// when either expression needs local labels.
+  ///
+  /// A value saved on the stack is passed as `(sp)+`. The callback must read
+  /// each argument exactly once, before branching, so the stack is balanced
+  /// without disturbing any condition codes set by the callback.
+  Asm withDirections({
+    required Memory memory,
+    required DirectionExpression other,
+    required Asm Function(Address direction, Address other) asm,
+    String? labelSuffix,
+    String? otherLabelSuffix,
+  }) {
+    return DirectionExpressionAsm.from(this).withDirections(
+        memory: memory,
+        other: DirectionExpressionAsm.from(other),
+        asm: asm,
+        labelSuffix: labelSuffix,
+        otherLabelSuffix: otherLabelSuffix);
+  }
 }
 
 abstract class DirectionExpressionAsm {
@@ -1152,6 +1176,69 @@ abstract class DirectionExpressionAsm {
     DirectAddressRegister load2 = a3,
     String? labelSuffix,
   });
+
+  /// Retrieves two directions using the callback contract in
+  /// [DirectionExpressionToAsm.withDirections].
+  Asm withDirections({
+    required Memory memory,
+    required DirectionExpressionAsm other,
+    required Asm Function(Address direction, Address other) asm,
+    String? labelSuffix,
+    String? otherLabelSuffix,
+  }) {
+    if (other is! DirectionAsm && _hasFixedFacingAddress(memory)) {
+      // A fixed object load only changes an address register. Compute the
+      // other direction first so its scratch registers need no preservation.
+      return other.withDirection(
+          memory: memory,
+          labelSuffix: otherLabelSuffix,
+          asm: (value) {
+            // Read an indirect result before the deferred load can reuse
+            // its address register (including zero-vector fallbacks).
+            final saved =
+                value is Immediate || value is DirectDataRegister ? value : d0;
+            return Asm([
+              if (saved != value) move.w(value, saved),
+              withDirection(
+                  memory: memory,
+                  labelSuffix: labelSuffix,
+                  asm: (direction) => asm(direction, saved)),
+            ]);
+          });
+    }
+
+    return withDirection(
+        memory: memory,
+        labelSuffix: labelSuffix,
+        asm: (value) {
+          final preserve = Asm.empty();
+          // Direction calculations can overwrite data and address registers,
+          // including those used by value. A fixed facing load preserves data
+          // registers, so only indirect values need materializing in that case.
+          // Otherwise save the value on the stack for the callback to consume
+          // without disturbing its condition codes.
+          if (value is! Immediate && other is! DirectionAsm) {
+            if (other._hasFixedFacingAddress(memory)) {
+              if (value is! DirectDataRegister) {
+                preserve.add(move.w(value, d0));
+                value = d0;
+              }
+            } else {
+              preserve.add(move.w(value, -(sp)));
+              value = sp.postIncrement();
+            }
+          }
+          return Asm([
+            preserve,
+            other.withDirection(
+                memory: memory,
+                labelSuffix: otherLabelSuffix,
+                asm: (otherDirection) => asm(value, otherDirection)),
+          ]);
+        });
+  }
+
+  bool _hasFixedFacingAddress(Memory memory) => false;
 }
 
 class DirectionAsm extends DirectionExpressionAsm {
@@ -1345,6 +1432,17 @@ class ObjectFaceDirectionAsm extends DirectionExpressionAsm {
       objectFaceDirection.obj.toA(load, memory),
       asm(facing_dir(load)),
     ]);
+  }
+
+  @override
+  bool _hasFixedFacingAddress(Memory memory) {
+    // Cached address registers can be overwritten by the other expression.
+    // Only fixed addresses guarantee that reloading the object will preserve
+    // data registers; unresolved character and interaction lookups use d0.
+    final obj = objectFaceDirection.obj;
+    return obj.slotAsOf(memory) != null ||
+        obj is MapObject ||
+        obj is MapObjectById;
   }
 }
 

@@ -158,7 +158,14 @@ extension IfValueAsm on IfValue {
             loadX: d2,
             loadY: d3,
             asm: compareTo);
-      case DirectionExpression():
+      case DirectionExpression d:
+        return d.withDirections(
+            memory: memory,
+            other: operand1 as DirectionExpression,
+            labelSuffix: '${branches._prefix.replaceFirst('.', '_')}operand2',
+            otherLabelSuffix:
+                '${branches._prefix.replaceFirst('.', '_')}operand1',
+            asm: (src, dst) => _cmp(src, dst, Size.w));
       case DoubleExpression():
       case Vector2dExpression():
         throw 'todo: compare($operand2)';
@@ -239,8 +246,9 @@ Asm Function(Address src, [Address? src2]) _compare(
   };
 }
 
-// Comparison operands use d0-d3 for temporary values. Reserve d4 as scratch
-// here so materializing an immediate cannot overwrite either operand.
+// Use d4 as scratch after evaluating both operands. Direction calculations
+// also use d4/d5 internally, but return their result in d0 or an address.
+// Materializing an immediate must not overwrite either operand.
 Asm _cmp(Address src, Address dst, Size size, {DirectDataRegister dR = d4}) {
   var width = switch (size) {
     byte => (c) => c.b,
