@@ -827,6 +827,7 @@ class SceneAsmGenerator implements EventVisitor {
   final _queuedGeneration = Queue<_QueuedGeneration>();
   // TODO: would be beneficial to just keep the whole event history I think.
   Event? _lastEventInCurrentDialog;
+  int? _lastDialogStart;
 
   /// Routine to change the current dialog's onClose behavior.
   ///
@@ -1157,7 +1158,7 @@ class SceneAsmGenerator implements EventVisitor {
     var (asm, post) = dialog.toGeneratedAsm(_memory, mode,
         labeller: _labeller.withContext(_eventCounter),
         fieldRoutines: _fieldRoutines);
-    _addToDialog(asm);
+    _lastDialogStart = _addToDialog(asm);
     _memory.unknownAddressRegisters();
     _postAsm.addAll(post);
   }
@@ -3624,7 +3625,15 @@ class SceneAsmGenerator implements EventVisitor {
 
         if (_currentDialog != null) {
           if (keepDialog) {
-            _addToDialog(dc.b(ControlCodes.keepDialog));
+            if (_lastDialogStart case var start?
+                when _lastEventInCurrentDialog is Dialog) {
+              // A full second line interrupts automatically. RunText only
+              // merges that prompt with an immediately following F7 or FF;
+              // putting F8 between them would prompt again on an empty page.
+              _currentDialog!.insert(start, dc.b(ControlCodes.keepDialog));
+            } else {
+              _addToDialog(dc.b(ControlCodes.keepDialog));
+            }
             _memory.keepDialog = true;
           } else {
             _memory.keepDialog = false;
@@ -3735,6 +3744,7 @@ class SceneAsmGenerator implements EventVisitor {
     // see it used that way. just an optimization so come back to this.
     _memory.hasSavedDialogPosition = false;
     _lastEventBreak = -1;
+    _lastDialogStart = null;
     _setDialogOnClose = null;
   }
 

@@ -179,8 +179,8 @@ main() {
               dc.b([Byte(0x1), Byte(0)]),
               dc.b([Byte(0xf0)]),
               dc.b([Byte(0xf7)]),
-              dc.b(Bytes.ascii('Too bad.')),
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('Too bad.')),
               dc.b([Byte(0xff)])
             ]));
 
@@ -189,8 +189,8 @@ main() {
             DialogAsm([
               dc.b([Byte(0xf0)]),
               dc.b([Byte(0xf7)]),
-              dc.b(Bytes.ascii('Great!')),
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('Great!')),
               dc.b([Byte(0xff)])
             ]));
       });
@@ -355,8 +355,8 @@ main() {
         expect(
             dialogTree[2].withoutComments(),
             DialogAsm([
-              dc.b(Bytes.ascii('Yes')),
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('Yes')),
               dc.b([Byte(0xff)]),
             ]));
         expect(
@@ -408,8 +408,8 @@ main() {
         expect(
             dialogTree[2].withoutComments(),
             DialogAsm([
-              dc.b(Bytes.ascii('Yes')),
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('Yes')),
               dc.b([Byte(0xff)]),
             ]));
         expect(

@@ -1796,15 +1796,15 @@ EventFlag_Test001 = $0001'''));
           program.dialogTrees.forMap(map.id),
           DialogTree()
             ..add(DialogAsm([
-              dc.b(Bytes.ascii('ho')),
               // Keep dialog until next event is compiled
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('ho')),
               dc.b([Byte(0xff)])
             ]))
             ..add(DialogAsm([
-              dc.b(Bytes.ascii('howdy')),
               // Keep dialog until next event is compiled
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('howdy')),
               dc.b([Byte(0xff)])
             ])));
     });
@@ -1852,15 +1852,15 @@ EventFlag_Test001 = $0001'''));
           program.dialogTrees.forMap(map.id),
           DialogTree()
             ..add(DialogAsm([
-              dc.b(Bytes.ascii('ho')),
               // Keep dialog until next event is compiled
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('ho')),
               dc.b([Byte(0xff)])
             ]))
             ..add(DialogAsm([
-              dc.b(Bytes.ascii('howdy')),
               // Keep dialog until next event is compiled
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('howdy')),
               dc.b([Byte(0xff)])
             ])));
     });
@@ -1905,15 +1905,15 @@ EventFlag_Test001 = $0001'''));
           program.dialogTrees.forMap(map.id),
           DialogTree()
             ..add(DialogAsm([
-              dc.b(Bytes.ascii('ho')),
               // Keep dialog until next event is compiled
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('ho')),
               dc.b([Byte(0xff)])
             ]))
             ..add(DialogAsm([
-              dc.b(Bytes.ascii('howdy')),
               // Keep dialog until next event is compiled
               dc.b([Byte(0xf8)]),
+              dc.b(Bytes.ascii('howdy')),
               dc.b([Byte(0xff)])
             ]))
             ..add(DialogAsm([

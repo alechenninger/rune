@@ -1118,8 +1118,9 @@ ${dialog2.toAsm()}
       expect(
           dialog.forMap(map.id).toAsm(),
           containsAllInOrder(Asm([
+            keepDialog(),
             dc.b(hello[0].toAscii()),
-            terminateDialog(keepDialog: true),
+            terminateDialog(),
             dc.b(greetings[0].toAscii()),
             terminateDialog()
           ])));
@@ -1157,10 +1158,12 @@ ${dialog2.toAsm()}
       expect(
           dialog.forMap(map.id).toAsm(),
           containsAllInOrder(Asm([
+            keepDialog(),
             dc.b(hello[0].toAscii()),
-            terminateDialog(keepDialog: true),
+            terminateDialog(),
+            keepDialog(),
             dc.b(hello2[0].toAscii()),
-            terminateDialog(keepDialog: true),
+            terminateDialog(),
             dc.b(greetings[0].toAscii()),
             terminateDialog()
           ])));
@@ -1207,10 +1210,12 @@ ${dialog2.toAsm()}
         expect(
           dialog.forMap(map.id).toAsm(),
           containsAllInOrder(Asm([
+            keepDialog(),
             dc.b(dialog1[0].toAscii()),
-            terminateDialog(keepDialog: true),
+            terminateDialog(),
+            keepDialog(),
             dc.b(dialog2[0].toAscii()),
-            terminateDialog(keepDialog: true),
+            terminateDialog(),
             dc.b(dialog3[0].toAscii()),
             terminateDialog(),
           ])),
@@ -1260,12 +1265,15 @@ ${dialog2.toAsm()}
               .withoutComments()
               .withoutEmptyLines(),
           Asm([
+            keepDialog(),
             dc.b(prior[0].toAscii()),
-            terminateDialog(keepDialog: true),
+            terminateDialog(),
+            keepDialog(),
             dc.b(hello[0].toAscii()),
-            terminateDialog(keepDialog: true),
+            terminateDialog(),
+            keepDialog(),
             dc.b(hello2[0].toAscii()),
-            terminateDialog(keepDialog: true),
+            terminateDialog(),
             dc.b(greetings[0].toAscii()),
             terminateDialog()
           ]));
