@@ -22,7 +22,7 @@ class DialogAsm extends Asm {
           dc.b([Byte(0xff)])
         ]);
   DialogAsm.fromRaw(String raw) : super.empty() {
-    add(Instruction.parse(raw));
+    add(Asm.fromRaw(raw));
   }
   DialogAsm(super.asm);
 

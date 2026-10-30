@@ -1041,8 +1041,17 @@ extension ObjectAddress on GameMap {
   }
 }
 
-FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
-  var reader = ConstantReader.asm(asm);
+/// Default map build used by Grand Cross callers without an options file.
+/// Applications assembling a different configuration supply their own constants.
+final grandCrossMapConstants = Constants.wrap(Map.unmodifiable({
+  Constant('revision'): Value.constant(1),
+  Constant('grand_cross'): Value.constant(1),
+  Constant('bugfixes'): Value.constant(1),
+}));
+
+FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm, {Constants? constants}) {
+  var reader =
+      ConstantReader.asm(asm, constants: constants ?? grandCrossMapConstants);
   // skip general var, music, something else
   _skipToSprites(reader);
   var sprites = _readSprites(reader);
@@ -1053,8 +1062,10 @@ FutureOr<Word?> firstSpriteVramTileOfMap(Asm asm) {
       .firstOrNull;
 }
 
-List<(MapId, Position, Direction, PartyArrangement)> mapTransitions(Asm asm) {
-  var reader = ConstantReader.asm(asm);
+List<(MapId, Position, Direction, PartyArrangement)> mapTransitions(Asm asm,
+    {Constants? constants}) {
+  var reader =
+      ConstantReader.asm(asm, constants: constants ?? grandCrossMapConstants);
 
   _skipToSprites(reader);
   _readSprites(reader);
@@ -1100,45 +1111,6 @@ List<(MapId, Position, Direction, PartyArrangement)> mapTransitions(Asm asm) {
   return transitions;
 }
 
-/// Select the supported Grand Cross build's map-data alternatives before
-/// reading constants. Reading both revision branches misaligns the manager tail.
-Asm _grandCrossMapData(Asm source) {
-  // TODO: consider adding broader conditional assembly support
-  // this was partially started once or twice
-  const values = {'revision': 1, 'grand_cross': 1, 'bugfixes': 1};
-  final frames = <(bool parent, bool condition)>[];
-  var active = true;
-  final selected = <Instruction>[];
-  for (final line in source) {
-    switch (line.cmd) {
-      case 'if':
-        final expression = line.operands.join(' ');
-        final match =
-            RegExp(r'^(\w+)\s*([=<>])\s*(\d+)$').firstMatch(expression);
-        if (match == null || !values.containsKey(match[1])) {
-          throw UnsupportedError(
-              'unsupported map-data build condition: $expression');
-        }
-        final left = values[match[1]]!;
-        final right = int.parse(match[3]!);
-        final condition = switch (match[2]) {
-          '=' => left == right,
-          '>' => left > right,
-          _ => left < right,
-        };
-        frames.add((active, condition));
-        active = active && condition;
-      case 'else':
-        if (frames.isNotEmpty) active = frames.last.$1 && !frames.last.$2;
-      case 'endif':
-        if (frames.isNotEmpty) active = frames.removeLast().$1;
-      default:
-        if (active) selected.add(line);
-    }
-  }
-  return Asm.fromInstructions(selected);
-}
-
 List<String> preprocessMapToRaw(Asm original,
     {required String sprites,
     required String objects,
@@ -1146,9 +1118,11 @@ List<String> preprocessMapToRaw(Asm original,
     required Label dialog,
     String? events,
     String? dataManagers,
+    Constants? constants,
     FieldRoutineRepository? fieldRoutines}) {
   fieldRoutines ??= defaultFieldRoutines;
-  final reader = ConstantReader.asm(_grandCrossMapData(original));
+  final reader = ConstantReader.asm(original,
+      constants: constants ?? grandCrossMapConstants);
   final processed = <String>[];
 
   final trimmed = original.trim();
@@ -1265,13 +1239,14 @@ Asm _defineConstants(Iterable<Sized> constants) {
 }
 
 Future<GameMap> asmToMap(Label mapLabel, Asm asm, DialogTreeLookup dialogLookup,
-    {FieldRoutineRepository? fieldRoutines}) async {
+    {Constants? constants, FieldRoutineRepository? fieldRoutines}) async {
   fieldRoutines ??= defaultFieldRoutines;
 
   final mapId = labelToMapId(mapLabel);
   final map = GameMap(mapId);
 
-  final reader = ConstantReader.asm(_grandCrossMapData(asm));
+  final reader =
+      ConstantReader.asm(asm, constants: constants ?? grandCrossMapConstants);
 
   _skipToSprites(reader);
 

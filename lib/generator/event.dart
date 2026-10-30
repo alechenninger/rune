@@ -13,7 +13,7 @@ class EventAsm extends Asm {
       : super.fromInstructions();
 
   EventAsm.fromRaw(String raw) : super.empty() {
-    add(Instruction.parse(raw));
+    add(Asm.fromRaw(raw));
   }
 }
 

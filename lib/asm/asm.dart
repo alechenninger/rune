@@ -296,9 +296,8 @@ class Asm extends IterableBase<Instruction> {
     lines.forEach(addLine);
   }
 
-  factory Asm.fromRaw(String raw) {
-    return Instruction.parse(raw);
-  }
+  factory Asm.fromRaw(String raw) =>
+      Asm.fromInstructions(LineSplitter.split(raw).map(Instruction.parse));
 
   Asm withoutComments() => Asm.fromInstructions(lines.expand((line) {
         var withoutComment = line.withoutComment();
@@ -412,9 +411,14 @@ Asm cmd(String cmd, List operands, {String? label, String? comment}) {
 }
 
 abstract class Instruction {
-  static Asm parse(String asm) {
-    var lines = LineSplitter.split(asm).map((line) => _Instruction.parse(line));
-    return Asm.fromInstructions(lines.toList());
+  Instruction();
+
+  /// Parses one assembly line. Use [Asm.fromRaw] for multiline source.
+  factory Instruction.parse(String line) {
+    if (line.contains('\n') || line.contains('\r')) {
+      throw FormatException('expected one assembly line', line);
+    }
+    return _Instruction.parse(line);
   }
 
   Asm toAsm() {
@@ -510,7 +514,6 @@ class _Instruction extends Instruction {
     String? labelOrPseudo;
     String? cmd;
     String? attribute;
-    List<Expression> ops = [];
     String? comment;
 
     var state = _Token.root;
@@ -528,8 +531,6 @@ class _Instruction extends Instruction {
             } else if (cmd == null) {
               state = _Token.cmd;
               i--;
-            } else if (c == ',') {
-              // skip
             } else {
               state = _Token.operand;
               i--;
@@ -564,16 +565,20 @@ class _Instruction extends Instruction {
           }
           break;
         case _Token.operand:
-          var remaining = chars.sublist(i);
-          Size? size;
-          if (cmd!.startsWith('dc.')) {
-            size = attribute?.map((a) => Size.valueOf(a));
-          }
-          var parsed = Expression.parse(remaining, size: size);
-          ops = parsed.expressions;
-          i += parsed.charactersParsed;
-          state = _Token.root;
-          break;
+          final tail = _InstructionTail.parse(chars.skip(i).join());
+          final size = cmd!.toLowerCase().startsWith('dc.')
+              ? Size.valueOf(attribute!)
+              : null;
+          // Non-data operands stay as source text until their consumer needs
+          // to interpret them, including conditional-assembly expressions.
+          final operands = size != null
+              ? _parseDataOperands(tail.operands, size)
+              : tail.operands;
+          return _Instruction(
+              label: labelOrPseudo,
+              cmd: cmd,
+              operands: operands,
+              comment: tail.comment);
         case _Token.comment:
           if (comment == null && isBlank(c)) {
             break;
@@ -599,8 +604,7 @@ class _Instruction extends Instruction {
     if (pseudo) {
       return _Instruction.pseudo(labelOrPseudo!, comment: comment);
     } else {
-      return _Instruction(
-          label: labelOrPseudo, cmd: cmd, operands: ops, comment: comment);
+      return _Instruction(label: labelOrPseudo, cmd: cmd, comment: comment);
     }
   }
 
@@ -632,80 +636,74 @@ enum _Token {
   pseudo,
 }
 
+/// Reads data constants from the selected conditional-assembly branches.
+///
+/// Conditions use [constants]; ordinary data operands remain symbolic. Syntax
+/// and nesting are checked as instructions are consumed, including by [remaining].
 class ConstantIterator implements Iterator<Sized> {
-  final Iterator<Instruction> _asm;
-  // ignore: unused_field
-  final Constants _constants;
-  late Queue<Sized> _remainingLineConstants;
+  final _ConditionalInstructions _asm;
+  final Queue<Sized> _remainingLineConstants = Queue();
+  final List<Instruction> _pendingLines = [];
+  Instruction? _stoppedAt;
   bool _done = false;
   Sized? _current;
 
-  ConstantIterator(this._asm, {Constants constants = const Constants.wrap({})})
-      : _constants = Constants.of(constants) {
-    _loadNextLine();
-  }
+  ConstantIterator(Iterator<Instruction> asm,
+      {Constants constants = const Constants.none()})
+      : _asm = _ConditionalInstructions(asm, Constants.of(constants));
 
+  /// Consumes and returns all unread assembly, including buffered operands.
+  ///
+  /// Already-entered conditionals are finished using their selected branches,
+  /// without orphaned else/endif directives. Complete new conditional blocks
+  /// are preserved for the assembler, even within a selected continuation.
   Asm get remaining {
-    // todo: remaining line constants
-    return Asm.fromInstructions(_asm.toList());
+    final result = _constantData(_remainingLineConstants);
+    _remainingLineConstants.clear();
+    result.lines.addAll(_pendingLines);
+    _pendingLines.clear();
+    if (_stoppedAt case final instruction?) {
+      result.addLine(instruction);
+      _stoppedAt = null;
+    }
+    result.lines.addAll(_asm.takeRemaining());
+    _current = null;
+    _done = true;
+    return result;
   }
 
-  _loadNextLine() {
-    if (!_asm.moveNext()) {
-      _done = true;
-      _remainingLineConstants = Queue();
-      return;
-    }
-
-    var next = _asm.current;
-    if (next.cmd == null) {
-      // just comment or label, skip
-      _loadNextLine();
-      return;
-    }
-
-    var cmd = next.cmdWithoutAttribute;
-
-    if (cmd == 'if' || cmd == 'include' || cmd == 'endif') {
-      // FIXME: evaluate conditional assembly
-      // for now skip
-      _loadNextLine();
-      return;
-    }
-
-    if (cmd != 'dc') {
-      _done = true;
-      _remainingLineConstants = Queue();
-      return;
-    }
-
-    var size = Size.valueOf(next.attribute!);
-    if (size == null) {
-      throw 'todo';
-    }
-
-    _remainingLineConstants = Queue.of(
-        next.operands.cast<Expression>().map((e) => size.sizedExpression(e)));
-  }
+  @override
+  Sized get current =>
+      _current ?? (throw StateError('iterator has not started or is finished'));
 
   @override
   bool moveNext() {
+    _current = null;
     if (_done) return false;
-    if (_remainingLineConstants.isNotEmpty) {
-      _current = _remainingLineConstants.removeFirst();
-      return true;
+    while (_remainingLineConstants.isEmpty) {
+      if (!_asm.moveNext()) {
+        _done = true;
+        return false;
+      }
+      final next = _asm.current;
+      if (next.cmd == null) {
+        // Retain labels/comments if a non-data instruction ends this reader.
+        _pendingLines.add(next);
+        continue;
+      }
+      if (next.cmdWithoutAttribute?.toLowerCase() != 'dc') {
+        _stoppedAt = next;
+        _done = true;
+        return false;
+      }
+      final size = Size.valueOf(next.attribute ?? '');
+      if (size == null) throw FormatException('expected a dc size', '$next');
+      _pendingLines.clear();
+      _remainingLineConstants
+          .addAll(next.operands.cast<Expression>().map(size.sizedExpression));
     }
-    _loadNextLine();
-    return moveNext();
-  }
-
-  @override
-  Sized get current {
-    var current = _current;
-    if (current == null) {
-      throw StateError('no remaining elements');
-    }
-    return current;
+    _current = _remainingLineConstants.removeFirst();
+    return true;
   }
 }
 
@@ -730,10 +728,18 @@ class ConstantReader {
   final Map<Constant, SizedValue> _constantTable = {};
   final _queue = Queue<Sized>();
 
-  Asm get remaining => _iter.remaining;
-
-  ConstantReader.asm(Asm asm) : this(ConstantIterator(asm.iterator));
+  ConstantReader.asm(Asm asm, {Constants constants = const Constants.none()})
+      : this(ConstantIterator(asm.iterator, constants: constants));
   ConstantReader(this._iter);
+
+  /// Consumes and returns the unread data and standalone assembly continuation.
+  /// See [ConstantIterator.remaining] for conditional-assembly handling.
+  Asm get remaining {
+    final result = _constantData(_queue);
+    _queue.clear();
+    result.add(_iter.remaining);
+    return result;
+  }
 
   Sized _next() {
     if (_queue.isNotEmpty) {
@@ -941,4 +947,387 @@ class _DataIterator<T extends Sized> implements Iterator<T> {
 
 class ByteIterable extends DataIterable<Byte> {
   ByteIterable(ConstantReader reader) : super(reader, (r) => r.readByte());
+}
+
+/// Source-level splitting shared by all instruction operand grammars.
+/// Commas inside quotes, addresses, or macro delimiters are not separators.
+class _InstructionTail {
+  final List<String> operands;
+  final String? comment;
+
+  _InstructionTail(this.operands, this.comment);
+
+  factory _InstructionTail.parse(String source) {
+    final operands = <String>[];
+    String? quote;
+    var escaped = false;
+    var depth = 0;
+    var start = 0;
+    var end = source.length;
+    for (var i = 0; i < source.length; i++) {
+      final character = source[i];
+      if (quote != null) {
+        if (!escaped && character == quote) quote = null;
+        escaped = !escaped && character == r'\';
+      } else if (character == '"' || character == "'") {
+        quote = character;
+      } else if (character == ';') {
+        end = i;
+        break;
+      } else if ('([{'.contains(character)) {
+        depth++;
+      } else if (')]}'.contains(character)) {
+        // Delimiters in unsupported syntax remain the assembler's concern.
+        if (depth > 0) depth--;
+      } else if (character == ',' && depth == 0) {
+        // Empty spans are arguments too; the consumer decides their validity.
+        operands.add(source.substring(start, i).trim());
+        start = i + 1;
+      }
+    }
+    final last = source.substring(start, end).trim();
+    if (last.isNotEmpty || operands.isNotEmpty) operands.add(last);
+    return _InstructionTail(operands,
+        end < source.length ? source.substring(end + 1).trimLeft() : null);
+  }
+}
+
+/// Decodes dc operands without evaluating symbolic expressions. Literal sizing
+/// and quoted-data encoding belong here, outside the scalar expression parser.
+List<Expression> _parseDataOperands(List<String> sources, Size size) {
+  List<Expression> expressions = [];
+  for (final source in sources) {
+    if (source.isEmpty) throw FormatException('empty dc operand');
+    final string = _parseDataString(source);
+    if (string != null) {
+      if (expressions.isEmpty) {
+        expressions = string;
+      } else if (expressions is Bytes) {
+        expressions += string;
+      } else {
+        expressions.addAll(string);
+      }
+      continue;
+    }
+    Expression expression;
+    try {
+      expression = Expression.parse(source);
+    } on FormatException {
+      // AS supports more syntax than our scalar grammar, including functions,
+      // repetition, and anonymous labels. Preserve it for the assembler.
+      expression = UnknownExpression(source);
+    }
+    if (expression is Value) expression = size.truncate(expression.value);
+    if (expressions.isEmpty && expression is Byte) {
+      expressions = Bytes.from([expression]);
+    } else if (expressions is Bytes && expression is Byte) {
+      expressions += [expression];
+    } else {
+      if (expressions is Bytes) expressions = List<Expression>.of(expressions);
+      expressions.add(expression);
+    }
+  }
+  return expressions;
+}
+
+Ascii? _parseDataString(String source) {
+  final quote = source[0];
+  if (quote != '"' && quote != "'") return null;
+  var escaped = false;
+  for (var i = 1; i < source.length; i++) {
+    final character = source[i];
+    if (!escaped && character == quote) {
+      if (i != source.length - 1) return null;
+      // TODO: this assumes each character represents a byte,
+      // but this depends on the attribute of the dc instruction.
+      return Bytes.ascii(source.substring(1, i));
+    }
+    escaped = !escaped && character == r'\';
+  }
+  return null;
+}
+
+/// Traverses selected instructions without interpreting their data or opcodes.
+/// Keeping this cursor separate also lets remaining return code after dc data.
+class _ConditionalInstructions implements Iterator<Instruction> {
+  final Iterator<Instruction> _source;
+  final Constants _constants;
+  final List<_ConditionalFrame> _frames = [];
+  Instruction? _current;
+  int _lineNumber = 0;
+  bool _done = false;
+
+  static const _openers = {
+    'if',
+    'ifdef',
+    'ifndef',
+    'ifused',
+    'ifnused',
+    'ifexist',
+    'ifnexist',
+    'ifb',
+    'ifnb',
+  };
+
+  _ConditionalInstructions(this._source, this._constants);
+
+  /// Whether ordinary instructions at the current position should be emitted.
+  /// The innermost frame includes its parent's activity; no frames means that
+  /// the current source is unconditional.
+  bool get _active => _frames.isEmpty || _frames.last.active;
+
+  /// The instruction returned by the last successful [moveNext].
+  /// Throws a [StateError] before that first success, after exhaustion, or after
+  /// [takeRemaining] has been fully consumed.
+  @override
+  Instruction get current =>
+      _current ?? (throw StateError('iterator has not started or is finished'));
+
+  /// Advances to the next ordinary instruction in a selected branch.
+  ///
+  /// Consumes directives and updates their frames without yielding them.
+  /// Excluded branches still have their nesting checked, but their conditions
+  /// are not evaluated. Later alternatives after a match are also unevaluated.
+  /// Returns false and clears [current] when the balanced source is exhausted.
+  @override
+  bool moveNext() {
+    _current = null;
+    if (_done) return false;
+    while (_advance()) {
+      final next = _source.current;
+      if (!_directive(next) && _active) {
+        _current = next;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Consumes the unread continuation as standalone assembly, excluding [current].
+  ///
+  /// Finishes the frames already open when enumeration begins, retaining their
+  /// selected bodies and removing their control directives. New whole blocks
+  /// within those bodies are copied or discarded as a unit, with their structure
+  /// checked but their conditions unevaluated.
+  ///
+  /// Once the inherited frames close, yields all later source unchanged, leaving
+  /// its conditional interpretation and validation to the assembler. Fully
+  /// consuming this iterable marks the cursor finished and clears [current].
+  Iterable<Instruction> takeRemaining() sync* {
+    if (_done) return;
+    while (_frames.isNotEmpty && _advance()) {
+      final next = _source.current;
+      if (_openers.contains(next.cmd?.toLowerCase())) {
+        // New whole blocks require no symbol values. Copy or discard the
+        // entire block according to the already-selected enclosing branch.
+        final retain = _active;
+        final depth = _frames.length;
+        var line = next;
+        do {
+          // Regardless of whether the line is a directive,
+          // push/pop the frame stack as needed,
+          // until we're back top-level.
+          _directive(line, evaluate: false);
+          // If the current frame is active, yield the line
+          if (retain) yield line;
+          // Must have consumed opener and end; check the next line for opener
+          if (_frames.length == depth) break;
+          // Advance until end
+          if (!_advance()) return;
+          line = _source.current;
+        } while (true);
+      } else if (!_directive(next) && _active) {
+        yield next;
+      }
+    }
+    // All inherited context is closed. Future source belongs to the assembler.
+    while (_source.moveNext()) {
+      yield _source.current;
+    }
+    _done = true;
+    _current = null;
+  }
+
+  /// Advances the raw source once and updates the one-based source line number.
+  ///
+  /// Does not interpret directives or change [current]. At end of source, throws
+  /// a [FormatException] if a frame is still open; otherwise marks the cursor
+  /// finished and returns false.
+  bool _advance() {
+    if (_source.moveNext()) {
+      _lineNumber++;
+      return true;
+    }
+    if (_frames.isNotEmpty) {
+      final frame = _frames.last;
+      throw FormatException('unterminated conditional from assembly line '
+          '${frame.lineNumber}');
+    }
+    _done = true;
+    return false;
+  }
+
+  /// Processes [line] as a conditional directive, returning whether it was one.
+  ///
+  /// Updates the frame stack and checks pairing, alternative order, and argument
+  /// counts for supported directives. Ordinary instructions return false without
+  /// changing the stack. The caller must already have advanced the source so
+  /// diagnostics refer to [line]'s position.
+  ///
+  /// Conditions are tested only with an active parent and no earlier match.
+  /// Setting [evaluate] to false suppresses those tests while retaining frame
+  /// bookkeeping and structural validation, allowing whole blocks to be preserved.
+  bool _directive(Instruction line, {bool evaluate = true}) {
+    final name = line.cmd?.toLowerCase();
+    if (_openers.contains(name)) {
+      // Other openers are balanced without interpreting their argument grammar
+      // in skipped or preserved blocks. Selecting one reports it as unsupported.
+      if (const {'if', 'ifdef', 'ifndef'}.contains(name) &&
+          line.operands.length != 1) {
+        _invalid('expected one condition', line);
+      }
+      final parentActive = _active;
+      final selected = evaluate && parentActive && _test(line);
+      _frames.add(_ConditionalAlternatives(_lineNumber, parentActive,
+          selected ? _Branch.selected : _Branch.unmatched));
+      return true;
+    }
+    if (name == 'else' || name == 'elseif') {
+      if (_frames.isEmpty) _invalid('unmatched $name', line);
+      final frame = _frames.removeLast();
+      if (frame is! _ConditionalAlternatives) {
+        _invalid('$name after a default branch', line);
+      }
+      if (line.operands.isEmpty) {
+        _frames.add(_ConditionalDefault(frame.lineNumber,
+            frame.parentActive && frame.branch == _Branch.unmatched));
+      } else {
+        if (line.operands.length != 1) _invalid('expected one condition', line);
+        final branch = frame.branch == _Branch.unmatched
+            ? (evaluate && frame.parentActive && _test(line)
+                ? _Branch.selected
+                : _Branch.unmatched)
+            : _Branch.matched;
+        _frames.add(_ConditionalAlternatives(
+            frame.lineNumber, frame.parentActive, branch));
+      }
+      return true;
+    }
+    if (name == 'endif') {
+      if (line.operands.isNotEmpty) _invalid('endif takes no operands', line);
+      if (_frames.isEmpty) _invalid('unmatched endif', line);
+      _frames.removeLast();
+      return true;
+    }
+    return false;
+  }
+
+  /// Evaluates one condition after [_directive] has checked its argument count.
+  ///
+  /// Definedness tests inspect symbol membership without resolving its value.
+  /// Other supported conditions require a known integer, with zero meaning
+  /// false. Unsupported directives throw [UnsupportedError]; unresolved values
+  /// throw [StateError]. Scalar syntax errors can throw [FormatException].
+  bool _test(Instruction line) {
+    switch (line.cmd!.toLowerCase()) {
+      case 'ifdef':
+      case 'ifndef':
+        final source = line.operands.single.toString();
+        if (!Constant.isValidConstantName(source)) {
+          _invalid('expected a symbol name', line);
+        }
+        final defined = _constants.containsConstantNamed(source);
+        return line.cmd!.toLowerCase() == 'ifdef' ? defined : !defined;
+      case 'if':
+      case 'else':
+      case 'elseif':
+        final source = line.operands.single.toString();
+        try {
+          return Expression.parse(source)
+                  .evaluate(EvaluationContext(_constants))
+                  .requireInt() !=
+              0;
+        } on StateError catch (error) {
+          throw StateError(
+              'assembly line $_lineNumber: $line: ${error.message}');
+        }
+      default:
+        throw UnsupportedError('unsupported conditional at assembly line '
+            '$_lineNumber: $line');
+    }
+  }
+
+  /// Reports [message] as a [FormatException] with the current line and its source.
+  Never _invalid(String message, Instruction line) =>
+      throw FormatException('$message at assembly line $_lineNumber', '$line');
+}
+
+/// Selection state of the current alternative in an if/elseif chain.
+///
+/// When evaluation is enabled and the parent is active, `if 0`, `elseif 1`,
+/// `elseif unknown` produce [unmatched], [selected], and [matched], respectively.
+/// The last condition is never evaluated.
+/// Enclosing branch activity is tracked separately by
+/// [_ConditionalAlternatives.parentActive]; defaults use [_ConditionalDefault].
+enum _Branch {
+  /// No alternative in this chain has been selected yet.
+  ///
+  /// A later elseif may still be selected, or the default may be taken. This
+  /// state also applies when evaluation is suppressed by an inactive parent or
+  /// while preserving a whole block, so it does not imply conditions were false.
+  unmatched,
+
+  /// This is the first alternative whose condition evaluated to true.
+  ///
+  /// Its body is active. Reaching a subsequent elseif changes the state to
+  /// [matched], ending this body and preventing another alternative from running.
+  selected,
+
+  /// An earlier alternative was selected and its body has already been passed.
+  ///
+  /// The current and all later alternatives are skipped without evaluating
+  /// their conditions, even if those conditions would also be true.
+  matched,
+}
+
+sealed class _ConditionalFrame {
+  final int lineNumber;
+
+  _ConditionalFrame(this.lineNumber);
+
+  bool get active;
+}
+
+final class _ConditionalAlternatives extends _ConditionalFrame {
+  final bool parentActive;
+  final _Branch branch;
+
+  _ConditionalAlternatives(super.lineNumber, this.parentActive, this.branch);
+
+  @override
+  bool get active => parentActive && branch == _Branch.selected;
+}
+
+/// Entering the default removes the ability to accept further alternatives.
+final class _ConditionalDefault extends _ConditionalFrame {
+  @override
+  final bool active;
+
+  _ConditionalDefault(super.lineNumber, this.active);
+}
+
+Asm _constantData(Iterable<Sized> values) {
+  final result = Asm.empty();
+  final operands = <Expression>[];
+  Size? size;
+  for (final value in values) {
+    if (size != null && size != value.size) {
+      result.add(dc.size(size, operands.toList()));
+      operands.clear();
+    }
+    size = value.size;
+    operands.add(value);
+  }
+  if (size != null) result.add(dc.size(size, operands));
+  return result;
 }

@@ -824,7 +824,7 @@ EventFlag_Test001 = $0001'''));
     var constants = program.extraConstants();
     var bytes = constants
         .map((line) => '$line'.split('=').last.trim())
-        .map((word) => Expression.parseSingleExpression(word, size: Size.w))
+        .map((word) => Word(Expression.parse(word).requireInt()))
         .cast<Word>()
         .expand((word) => word.splitToBytes());
     expect(bytes, isNot(contains(Byte(0xff))));
@@ -2636,7 +2636,7 @@ loc_742A4:
         expect(
             asm.head(3),
             Asm([
-              Instruction.parse(
+              Asm.fromRaw(
                   r'	move.l #CharID_Rune<<24|$FFFFFF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
               move.b(MapId.Test.world.toAsm.i, (World_Index).w)
@@ -2661,7 +2661,7 @@ loc_742A4:
         expect(
             asm.head(3),
             Asm([
-              Instruction.parse(
+              Asm.fromRaw(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|$FFFF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
               move.b(MapId.Test.world.toAsm.i, (World_Index).w)
@@ -2686,7 +2686,7 @@ loc_742A4:
         expect(
             asm.head(3),
             Asm([
-              Instruction.parse(
+              Asm.fromRaw(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|$FF, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
               move.b(MapId.Test.world.toAsm.i, (World_Index).w)
@@ -2711,7 +2711,7 @@ loc_742A4:
         expect(
             asm.head(3),
             Asm([
-              Instruction.parse(
+              Asm.fromRaw(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Byte.max.i, Current_Party_Slot_5.w),
               move.b(MapId.Test.world.toAsm.i, (World_Index).w)
@@ -2736,7 +2736,7 @@ loc_742A4:
         expect(
             asm.head(3),
             Asm([
-              Instruction.parse(
+              Asm.fromRaw(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
               move.b(MapId.Test.world.toAsm.i, (World_Index).w)
@@ -2830,7 +2830,7 @@ loc_742A4:
             Asm([
               move.l(Current_Party_Slots.w, Constant('Saved_Char_ID_Mem_1').w),
               move.b(Current_Party_Slot_5.w, Constant('Saved_Char_ID_Mem_5').w),
-              Instruction.parse(
+              Asm.fromRaw(
                   r'	move.l #CharID_Rune<<24|CharID_Alys<<16|CharID_Hahn<<8|CharID_Wren, (Current_Party_Slots).w'),
               move.b(Constant('CharID_Raja').i, Current_Party_Slot_5.w),
               move.b(MapId.Test.world.toAsm.i, (World_Index).w),
@@ -2924,7 +2924,7 @@ loc_742A4:
         expect(
             asm,
             Asm([
-              Instruction.parse(
+              Asm.fromRaw(
                   r'	move.l #CharID_Rune<<24|$FF<<16|CharID_Chaz<<8|$FF, d0'),
               move.b(Byte.max.i, d1),
               jsr(Label('Event_OrderParty').l),

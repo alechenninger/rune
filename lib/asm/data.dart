@@ -2,9 +2,7 @@ import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:characters/characters.dart';
 import 'package:quiver/check.dart';
-import 'package:quiver/strings.dart';
 import 'package:rune/numbers.dart';
 import 'package:rune/src/iterables.dart';
 
@@ -24,148 +22,11 @@ abstract class Expression {
 
   const Expression.constant();
 
-  static Expression parseSingleExpression(String expression,
-      {Size? size, Constants? constants}) {
-    if (_number.hasMatch(expression)) {
-      SizedValue sized;
-      bool hex = expression.startsWith(r'$');
-      var val = hex ? expression.substring(1).hex : int.parse(expression);
-
-      if (size != null) {
-        sized = size.truncate(val);
-      } else if (val <= Size.b.maxValue) {
-        sized = Byte(val);
-      } else if (val <= Size.w.maxValue) {
-        sized = Word(val);
-      } else {
-        sized = Longword(val);
-      }
-
-      return sized;
-    } else {
-      // todo could parse addresses and whatnot but jeeze
-      // fixme: we assume operand may be Expression in some cases
-      // when string, may be constant or label
-      // how to tell?
-      // we may need to be able to resolve constant values
-      var maybeConstant = Constant.isValidConstantName(expression);
-      var maybeLabel = Label.isValidLabelName(expression);
-
-      if (!maybeLabel && !maybeConstant) {
-        return UnknownExpression(expression);
-      }
-
-      if (maybeLabel && !maybeConstant) {
-        return Label(expression);
-      }
-
-      if (maybeConstant && !maybeLabel) {
-        return Constant(expression);
-      }
-
-      if (constants != null) {
-        return constants.containsConstantNamed(expression)
-            ? Constant(expression)
-            : Label(expression);
-      } else {
-        return LabelOrConstant(expression);
-      }
-    }
-  }
-
-  static ParsedExpressions parse(Iterable<String> expression,
-      {Size? size, Constants? constants}) {
-    var chars = expression.toList();
-
-    var state = _Token.root;
-
-    var escape = false;
-    String? stringDelimiter;
-    String? parsing;
-
-    var expressions = <Expression>[];
-    var i = 0;
-
-    loop:
-    for (; i < chars.length + 1; i++) {
-      var c = i == chars.length ? null : chars[i];
-
-      switch (state) {
-        case _Token.root:
-          if (isNotBlank(c)) {
-            if (c == ';') {
-              i--;
-              break loop;
-            } else if (c == ',') {
-              // skip
-            } else {
-              state = _Token.operand;
-              i--;
-            }
-          }
-          break;
-        case _Token.operand:
-          if (c == ',' || isBlank(c)) {
-            if (parsing == null) throw StateError('bad operand');
-
-            var expression = parseSingleExpression(parsing, size: size);
-
-            if (expressions.isEmpty && expression is Byte) {
-              expressions = Bytes.from([expression]);
-            } else if (expressions is Bytes && expression is Byte) {
-              expressions += [expression];
-            } else {
-              if (expressions is Bytes) {
-                expressions = List<Expression>.of(expressions);
-              }
-              expressions.add(expression);
-            }
-
-            parsing = null;
-            state = _Token.root;
-          } else if (parsing == null && (c == '"' || c == "'")) {
-            stringDelimiter = c;
-            state = _Token.stringConstant;
-          } else {
-            parsing ??= "";
-            parsing += c!;
-          }
-          break;
-        case _Token.stringConstant:
-          if ((!escape && c == stringDelimiter) || c == null) {
-            // todo: this assumes each character represents a byte,
-            // but this depends on the attribute of the dc instruction
-            if (expressions.isEmpty) {
-              expressions = Bytes.ascii(parsing ?? "");
-            } else if (expressions is Bytes) {
-              expressions += Bytes.ascii(parsing ?? "");
-            } else {
-              expressions = List.from(expressions);
-              expressions.addAll(Bytes.ascii(parsing ?? ""));
-            }
-            parsing = null;
-            escape = false;
-            stringDelimiter = null;
-            state = _Token.root;
-          } else {
-            parsing ??= "";
-            if (!escape) {
-              if (c == r'\') {
-                escape = true;
-              } else {
-                parsing += c;
-              }
-            } else {
-              parsing += '\\$c';
-              escape = false;
-            }
-          }
-          break;
-      }
-    }
-
-    return ParsedExpressions(expressions, i - 1);
-  }
+  /// Parses exactly one scalar expression, independent of symbols or data size.
+  ///
+  /// Throws a [FormatException] for unsupported or malformed expression syntax.
+  /// Instruction addresses and other opaque operands are parsed by [Instruction].
+  static Expression parse(String source) => _ExpressionParser(source).parse();
 
   Immediate get i => Immediate(this);
 
@@ -173,9 +34,16 @@ abstract class Expression {
 
   Absolute get l => Absolute.long(this);
 
-  Expression evaluate(Constants constants) {
-    return this;
-  }
+  /// Resolves known constants and operations, retaining symbolic expressions
+  /// whose values are not available in [context]. Recursive evaluation uses
+  /// the same context to retain symbol-cycle detection.
+  Expression evaluate(EvaluationContext context);
+
+  /// Returns this expression's known integer value.
+  ///
+  /// Throws a [StateError] if this expression remains symbolic. Call
+  /// [evaluate] first to resolve constants and operations.
+  int requireInt() => throw StateError('expected a known integer, got $this');
 
   Expression operator +(Expression other) {
     if (isKnownZero) return other;
@@ -213,21 +81,6 @@ abstract class Expression {
   }
 }
 
-enum _Token {
-  root,
-  operand,
-  stringConstant,
-}
-
-final _number = RegExp(r'^(\$[0-9a-fA-F]+|\d+)$');
-
-class ParsedExpressions {
-  final List<Expression> expressions;
-  final int charactersParsed;
-
-  ParsedExpressions(this.expressions, this.charactersParsed);
-}
-
 class ArithmeticExpression extends Expression {
   final Expression left;
   final Expression right;
@@ -236,7 +89,20 @@ class ArithmeticExpression extends Expression {
   ArithmeticExpression(this.operator, this.left, this.right);
 
   @override
-  bool get isKnownZero => left.isKnownZero && right.isKnownZero;
+  bool get isKnownZero => switch (operator) {
+        ArithmeticOperator.divide || ArithmeticOperator.modulo => false,
+        _ => left.isKnownZero && right.isKnownZero,
+      };
+
+  @override
+  Expression evaluate(EvaluationContext context) {
+    final left = this.left.evaluate(context);
+    final right = this.right.evaluate(context);
+    if (left is Value && right is Value) {
+      return Value(operator.apply(left.value, right.value));
+    }
+    return ArithmeticExpression(operator, left, right);
+  }
 
   String toStringOperand(ArithmeticOperator parent) {
     return parent.rank < operator.rank ? '($this)' : toString();
@@ -245,11 +111,14 @@ class ArithmeticExpression extends Expression {
   @override
   String toString() {
     var left = switch (this.left) {
+      Value(:final value) when value < 0 => '(${this.left})',
       ArithmeticExpression a => a.toStringOperand(operator),
       var l => l.toString()
     };
     var right = switch (this.right) {
-      ArithmeticExpression a => a.toStringOperand(operator),
+      Value(:final value) when value < 0 => '(${this.right})',
+      // Equal precedence on the right also needs parentheses: a-(b-c).
+      ArithmeticExpression a when a.operator.rank >= operator.rank => '($a)',
       var r => r.toString()
     };
     return '$left$operator$right';
@@ -258,22 +127,39 @@ class ArithmeticExpression extends Expression {
 
 // See http://john.ccac.rwth-aachen.de:8000/as/as_EN.html#sect_2_10_6_
 // for precedence
-enum ArithmeticOperator {
+enum ArithmeticOperator implements _BinaryOperator {
   add('+', 10),
   subtract('-', 10),
   multiply('*', 9),
   divide('/', 9),
+  modulo('#', 9),
+  xor('!', 7),
   shiftLeft('<<', 3),
   shiftRight('>>', 3),
   and('&', 5),
   or('|', 6);
 
+  @override
   final String operator;
 
   /// Lower number means higher precedence.
+  @override
   final int rank;
 
   const ArithmeticOperator(this.operator, this.rank);
+
+  int apply(int left, int right) => switch (this) {
+        add => left + right,
+        subtract => left - right,
+        multiply => left * right,
+        divide => left ~/ right,
+        modulo => left.remainder(right),
+        shiftLeft => left << right,
+        shiftRight => left >> right,
+        and => left & right,
+        or => left | right,
+        xor => left ^ right,
+      };
 
   @override
   String toString() => operator;
@@ -282,85 +168,104 @@ enum ArithmeticOperator {
 class BooleanOperation extends Expression {
   final Expression operand1;
   final Expression operand2;
-  final String operator;
+  final BooleanOperator operator;
 
-  static final operators = const ['=', '<', '<>', '>'];
-
-  BooleanOperation(this.operator, this.operand1, this.operand2) {
-    if (!operators.contains(operator)) {
-      throw ArgumentError.value(operator, 'operator', 'not a boolean operator');
-    }
-  }
-
-  factory BooleanOperation.parse(String exp) {
-    var state = 0;
-
-    var op1 = '';
-    var op = '';
-    var op2 = '';
-
-    for (var c in exp.characters) {
-      switch (state) {
-        case 0:
-          if (isBlank(c)) {
-            state = 1;
-          } else if (operators.contains(c)) {
-            state = 1;
-            op += c;
-          }
-          break;
-        case 1:
-          if (!operators.contains(c)) {
-            op2 += c;
-            state = 2;
-          } else {
-            op += c;
-          }
-          break;
-        case 2:
-          op2 += c;
-          break;
-      }
-    }
-    return BooleanOperation(op, Expression.parseSingleExpression(op1),
-        Expression.parseSingleExpression(op2));
-  }
-
-  @override
-  Expression evaluate(Constants constants) {
-    switch (operator) {
-      case '=':
-        return Value.boolean(operand1.evaluate(constants).toString() ==
-            operand2.evaluate(constants).toString());
-      case '<>':
-        return Value.boolean(operand1.evaluate(constants).toString() !=
-            operand2.evaluate(constants).toString());
-      case '>':
-        var op1 = operand1.evaluate(constants);
-        var op2 = operand2.evaluate(constants);
-        if (op1 is! Value || op2 is! Value) {
-          throw StateError('operator not supported for $op1 and/or $op2');
-        }
-        return Value.boolean(op1.value > op2.value);
-      case '<':
-        var op1 = operand1.evaluate(constants);
-        var op2 = operand2.evaluate(constants);
-        if (op1 is! Value || op2 is! Value) {
-          throw StateError('operator not supported for $op1 and/or $op2');
-        }
-        return Value.boolean(op1.value > op2.value);
-      default:
-        throw StateError('unsupported operator $operator');
-    }
-  }
+  BooleanOperation(this.operator, this.operand1, this.operand2);
 
   @override
   bool get isKnownZero => false;
 
   @override
-  String toString() {
-    return '($operand1$operator$operand2)';
+  Expression evaluate(EvaluationContext context) {
+    final left = operand1.evaluate(context);
+    final right = operand2.evaluate(context);
+    if (left is Value && right is Value) {
+      return Value.boolean(operator.apply(left.value, right.value));
+    }
+    return BooleanOperation(operator, left, right);
   }
+
+  @override
+  String toString() => '($operand1$operator$operand2)';
+}
+
+/// AS comparison and logical operators, with the assembler's precedence.
+enum BooleanOperator implements _BinaryOperator {
+  equal('=', 14),
+  notEqual('<>', 14),
+  less('<', 14),
+  lessOrEqual('<=', 14),
+  greater('>', 14),
+  greaterOrEqual('>=', 14),
+  and('&&', 11),
+  or('||', 12),
+  xor('!!', 13);
+
+  @override
+  final String operator;
+  @override
+  final int rank;
+
+  const BooleanOperator(this.operator, this.rank);
+
+  bool apply(int left, int right) => switch (this) {
+        equal => left == right,
+        notEqual => left != right,
+        less => left < right,
+        lessOrEqual => left <= right,
+        greater => left > right,
+        greaterOrEqual => left >= right,
+        and => left != 0 && right != 0,
+        or => left != 0 || right != 0,
+        xor => (left != 0) != (right != 0),
+      };
+
+  @override
+  String toString() => operator;
+}
+
+class UnaryOperation extends Expression {
+  final UnaryOperator operator;
+  final Expression operand;
+
+  UnaryOperation(this.operator, this.operand);
+
+  @override
+  bool get isKnownZero => false;
+
+  @override
+  Expression evaluate(EvaluationContext context) {
+    final operand = this.operand.evaluate(context);
+    return operand is Value
+        ? Value(operator.apply(operand.value))
+        : UnaryOperation(operator, operand);
+  }
+
+  @override
+  // Unary signs bind more loosely than shifts/bitwise operations in AS.
+  // Parenthesize the whole operation when embedding it in another expression.
+  String toString() => '($operator($operand))';
+}
+
+enum UnaryOperator {
+  plus('+'),
+  negate('-'),
+  complement('~'),
+  not('~~');
+
+  final String operator;
+
+  const UnaryOperator(this.operator);
+
+  int apply(int operand) => switch (this) {
+        plus => operand,
+        negate => -operand,
+        complement => ~operand,
+        not => operand == 0 ? 1 : 0,
+      };
+
+  @override
+  String toString() => operator;
 }
 
 class Constants extends IterableBase<MapEntry<Constant, Expression>> {
@@ -389,12 +294,46 @@ class Constants extends IterableBase<MapEntry<Constant, Expression>> {
       _map.entries.iterator;
 }
 
+/// A synchronous expression-evaluation session and its symbol-resolution path.
+///
+/// Expressions share this context when evaluating children and definitions.
+/// Resolution state is cleared on success or failure, so the context may also
+/// be reused for subsequent evaluations.
+class EvaluationContext {
+  final Constants _constants;
+  final Set<Constant> _resolving = {};
+
+  EvaluationContext(this._constants);
+
+  /// Evaluates a symbol's definition, or returns null if it is unavailable.
+  ///
+  /// Throws a [StateError] for cyclic definitions. Symbol identity uses its
+  /// name, independently of sized wrappers or other expression metadata.
+  Expression? resolve(Constant symbol) {
+    final name = Constant(symbol.constant);
+    final definition = _constants.resolve(name);
+    if (definition == null) return null;
+    if (!_resolving.add(name)) {
+      throw StateError('cyclic assembly constant: '
+          '${[..._resolving, name].join(' -> ')}');
+    }
+    try {
+      return definition.evaluate(this);
+    } finally {
+      _resolving.remove(name);
+    }
+  }
+}
+
 class UnknownExpression extends Expression {
   final String expression;
   @override
   final isKnownZero = false;
 
   const UnknownExpression(this.expression) : super.constant();
+
+  @override
+  Expression evaluate(EvaluationContext context) => this;
 
   @override
   String toString() {
@@ -415,11 +354,8 @@ class UnknownExpression extends Expression {
 class Value extends Expression implements Comparable<Value> {
   final int value;
 
-  Value(this.value) : super.constant() {
-    if (value < 0) {
-      throw ArgumentError.value(value, 'value', 'must be >= 0');
-    }
-  }
+  /// An unsized integer, including negative intermediate results.
+  Value(this.value) : super.constant();
 
   const Value.constant(this.value) : super.constant();
   const Value.boolean(bool bool)
@@ -428,6 +364,12 @@ class Value extends Expression implements Comparable<Value> {
 
   @override
   bool get isKnownZero => value == 0;
+
+  @override
+  Expression evaluate(EvaluationContext context) => this;
+
+  @override
+  int requireInt() => value;
 
   @override
   int compareTo(Value other) => value.compareTo(other.value);
@@ -502,6 +444,10 @@ class Constant extends Expression {
   const Constant(this.constant) : super.constant();
 
   @override
+  Expression evaluate(EvaluationContext context) =>
+      context.resolve(this) ?? this;
+
+  @override
   String toString() => constant;
 
   @override
@@ -569,6 +515,9 @@ class Label extends Sized implements Address {
   }
 
   @override
+  Expression evaluate(EvaluationContext context) => this;
+
+  @override
   String toString() => name;
 
   @override
@@ -594,6 +543,10 @@ class LabelOrConstant extends Expression {
         Constant.isValidConstantName(name) && Label.isValidLabelName(name),
         message: name);
   }
+
+  @override
+  Expression evaluate(EvaluationContext context) =>
+      context.resolve(Constant(name)) ?? this;
 
   @override
   String toString() => name;
@@ -665,6 +618,9 @@ class SizedConstant extends Sized implements Constant {
   String get constant => _c.constant;
 
   @override
+  Expression evaluate(EvaluationContext context) => context.resolve(_c) ?? this;
+
+  @override
   String toString() => constant;
 
   @override
@@ -707,6 +663,10 @@ class _Sized extends Sized {
   bool get isKnownZero => expression.isKnownZero;
 
   @override
+  Expression evaluate(EvaluationContext context) =>
+      size.sizedExpression(expression.evaluate(context));
+
+  @override
   String toString() => expression.toString();
 
   @override
@@ -730,7 +690,7 @@ abstract class SizedValue extends Value implements Sized {
 
   SizedValue.signed(int value, Size size)
       : super(_negativeToSigned(value, size)) {
-    _checkValue(value, size);
+    _checkValue(this.value, size);
   }
 
   static int truncate(int value, Size size) {
@@ -750,6 +710,9 @@ abstract class SizedValue extends Value implements Sized {
   }
 
   static void _checkValue(int value, Size size) {
+    if (value < 0) {
+      throw ArgumentError.value(value, 'value', 'must be >= 0');
+    }
     if (value > size.maxValue) {
       throw AsmError(value, 'too large to fit in ${size.bytes} bytes');
     }
@@ -1681,4 +1644,113 @@ extension TrimList on List<int> {
         .reversed
         .toList();
   }
+}
+
+/// Shared spelling and precedence for the two binary operator families.
+sealed class _BinaryOperator {
+  String get operator;
+
+  /// Lower number means higher precedence.
+  int get rank;
+}
+
+/// Parses one numeric expression without treating whitespace as an operand
+/// separator. Instruction operands such as addresses keep their existing parser.
+class _ExpressionParser {
+  final String source;
+  int _offset = 0;
+
+  static final _symbol = RegExp(r'[A-Za-z_@.$][A-Za-z0-9_@.$]*');
+  static final _literal = RegExp(r'\$[0-9a-fA-F]+|[0-9]+');
+  // Match longer spellings first: << and <= must be tried before <, etc.
+  // The enum values supply canonical spellings; aliases are explicit here.
+  static final _binaryOperators =
+      List<({String spelling, _BinaryOperator operator})>.unmodifiable([
+    for (final operator in <_BinaryOperator>[
+      ...ArithmeticOperator.values,
+      ...BooleanOperator.values,
+    ])
+      (spelling: operator.operator, operator: operator),
+    (spelling: '==', operator: BooleanOperator.equal),
+  ]..sort((a, b) => b.spelling.length.compareTo(a.spelling.length)));
+
+  _ExpressionParser(this.source);
+
+  Expression parse() {
+    final result = _expression(0);
+    _skipSpace();
+    if (_offset != source.length) _invalid();
+    return result;
+  }
+
+  Expression _expression(int minimumPrecedence) {
+    var left = _unary();
+    while (true) {
+      _skipSpace();
+      final match = _binaryOperators
+          .where((entry) => source.startsWith(entry.spelling, _offset))
+          .firstOrNull;
+      if (match == null) break;
+      final operator = match.operator;
+      // AS ranks increase as binding strength decreases.
+      final precedence = 15 - operator.rank;
+      if (precedence < minimumPrecedence) break;
+      _offset += match.spelling.length;
+      final right = _expression(precedence + 1);
+      left = switch (operator) {
+        ArithmeticOperator op => ArithmeticExpression(op, left, right),
+        BooleanOperator op => BooleanOperation(op, left, right),
+      };
+    }
+    return left;
+  }
+
+  Expression _unary() {
+    _skipSpace();
+    for (final operator in [
+      UnaryOperator.not,
+      UnaryOperator.complement,
+      UnaryOperator.negate,
+      UnaryOperator.plus,
+    ]) {
+      if (source.startsWith(operator.operator, _offset)) {
+        _offset += operator.operator.length;
+        // In AS a unary sign binds less tightly than multiplication, shifts,
+        // and bitwise operations: -1>>1 means -(1>>1).
+        final operand =
+            operator == UnaryOperator.negate || operator == UnaryOperator.plus
+                ? _expression(6)
+                : _unary();
+        return UnaryOperation(operator, operand);
+      }
+    }
+    if (source.startsWith('(', _offset)) {
+      _offset++;
+      final expression = _expression(0);
+      _skipSpace();
+      if (!source.startsWith(')', _offset)) _invalid();
+      _offset++;
+      return expression;
+    }
+    final literal = _literal.matchAsPrefix(source, _offset)?.group(0);
+    if (literal != null) {
+      _offset += literal.length;
+      return Value(literal.startsWith(r'$')
+          ? literal.substring(1).hex
+          : int.parse(literal));
+    }
+    final symbol = _symbol.matchAsPrefix(source, _offset)?.group(0);
+    if (symbol == null) _invalid();
+    _offset += symbol!.length;
+    return Constant(symbol);
+  }
+
+  void _skipSpace() {
+    while (_offset < source.length && source[_offset].trim().isEmpty) {
+      _offset++;
+    }
+  }
+
+  Never _invalid() =>
+      throw FormatException('invalid integer expression', source, _offset);
 }

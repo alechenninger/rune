@@ -56,6 +56,10 @@ main() {
     });
 
     group('equivalent back to string', () {
+      test('parenthesized registers remain addressing operands', () {
+        expect(Asm.fromRaw(' move.w (A0),d1'), cmd('move.w', ['(A0)', 'd1']));
+      });
+
       test('address displacement', () {
         var asm =
             Asm.fromRaw(r'	move.w	$30(a4), $38(a4)	; move current to dest x');
@@ -146,8 +150,8 @@ main() {
 \tendif''');
         var iterator = ConstantIterator(asm.iterator,
             constants: Constants.fromMap({Constant('revision'): Value(1)}));
-        expect(iterator.toList(), [Byte(2)]);
-      }, skip: 'not sure we actually need this after all');
+        expect(iterator.toList(), [Byte('2'.codeUnitAt(0))]);
+      });
     });
 
     group('reader', () {
