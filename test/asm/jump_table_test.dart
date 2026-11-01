@@ -99,18 +99,22 @@ void main() {
     expect(() => config.addRunEvent(Label('Overflow')), throwsStateError);
   });
 
-  test(
-      'manager configurations use unseeded or Grand Cross tables like run events',
+  test('manager configurations use unseeded or supplied tables like run events',
       () {
     final empty = ProgramConfiguration.empty();
     expect(empty.addMapDataManager(Label('First')), Word(0));
     expect(empty.addMapDataManager(Label('First')), Word(0));
     expect(empty.addMapDataManager(Label('Second')), Word(1));
 
-    final seeded = ProgramConfiguration.grandCross();
-    expect(seeded.addMapDataManager(Label('MapDataMan_PrincipalOffice')),
-        Word(0x1d));
-    expect(seeded.addMapDataManager(Label('First')), Word(0x8c));
-    expect(seeded.addMapDataManager(Label('First')), Word(0x8c));
+    final seeded = ProgramConfiguration.empty(
+        mapDataManagers: JumpTable<Word>.sparse(
+            jump: withNoop(Label('GetMapLayoutOffset'), bra.w),
+            newIndex: Word.new,
+            capacity: 2,
+            labels: [Label('MapDataMan_PrincipalOffice'), null]));
+    expect(
+        seeded.addMapDataManager(Label('MapDataMan_PrincipalOffice')), Word(0));
+    expect(seeded.addMapDataManager(Label('First')), Word(1));
+    expect(seeded.addMapDataManager(Label('First')), Word(1));
   });
 }

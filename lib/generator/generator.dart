@@ -1386,7 +1386,13 @@ class SceneAsmGenerator implements EventVisitor {
   @override
   void instantMoves(InstantMoves moves) {
     _addToRoutine(
-        moves, (i, asm) => instantMovesToAsm(moves, _memory, eventIndex: i));
+        moves,
+        (i, asm) => instantMovesToAsm(moves, _memory,
+            eventIndex: i, updateObjects: _gameMode is! MapDataManagerMode),
+        allowedModes: const {
+          ModeType<EventMode>(),
+          ModeType<MapDataManagerMode>(),
+        });
   }
 
   @override
@@ -4619,7 +4625,6 @@ const _defaultOriginalDataManagers = <MapId, List<Word>>{
   MapId.Molcum: [Word.constant(0x6), Word.constant(0x7)],
   MapId.TonoeStorageRoom: [Word.constant(0x6b)],
   MapId.TonoeGryzHouse: [Word.constant(0x21), Word.constant(0x22)],
-  MapId.NalyaHouse3: [Word.constant(0x86)],
   MapId.Aiedo: [Word.constant(0x83)],
   MapId.AiedoPrison: [Word.constant(0x32)],
   MapId.ShayHouse: [Word.constant(0x82)],

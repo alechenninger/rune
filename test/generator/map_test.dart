@@ -30,15 +30,18 @@ void main() {
 
   test('maps inherit configured original managers without changing the model',
       () {
-    final map = GameMap(MapId.PiataAcademyF1);
-    final compiled = Program().addMap(map);
+    final map = GameMap(MapId.Test);
     final original = [Word(0), Word(0), Word(0), Word(1)];
+    final defaults = {map.id: original};
+    final compiled = Program(originalDataManagers: defaults).addMap(map);
 
     expect(compiled.mapDataManagerIndices.withoutComments(), dc.w(original));
     expect(compiled.mapDataManagerRoutines, isEmpty);
     expect(map.dataManagers, isEmpty);
     expect(map.asmDataManagers, isEmpty);
-    expect(ProgramConfiguration.grandCross().originalDataManagersForMap(map.id),
+    expect(
+        ProgramConfiguration.empty(originalDataManagers: defaults)
+            .originalDataManagersForMap(map.id),
         original);
     expect(ProgramConfiguration.empty().originalDataManagersForMap(map.id),
         isEmpty);
@@ -74,13 +77,21 @@ void main() {
     test(
         'authored managers replace originals: generated=$generated indexed=$indexed',
         () {
-      final map = GameMap(MapId.PiataAcademyF1);
+      final map = GameMap(MapId.Test);
       if (generated) map.addDataManager(SceneId('Replacement'), Scene.empty());
-      if (indexed) map.addAsmDataManager(Word(0x1d));
+      if (indexed) map.addAsmDataManager(Word(2));
 
-      final compiled = Program().addMap(map);
+      final compiled = Program(
+          originalDataManagers: {
+            map.id: [Word(0)]
+          },
+          mapDataManagers: JumpTable<Word>.sparse(
+              jump: withNoop(Label('GetMapLayoutOffset'), bra.w),
+              newIndex: Word.new,
+              capacity: 3,
+              labels: [Label('Original'), null, Label('Indexed')])).addMap(map);
       expect(compiled.mapDataManagerIndices.withoutComments(),
-          dc.w([if (generated) Word(0x8c), if (indexed) Word(0x1d)]));
+          dc.w([if (generated) Word(1), if (indexed) Word(2)]));
     });
   }
 

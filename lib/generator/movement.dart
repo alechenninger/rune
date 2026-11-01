@@ -537,8 +537,15 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
   return asm;
 }
 
+/// Sets object positions and facing immediately.
+///
+/// Map data managers set [updateObjects] to false because map loading runs
+/// objects and builds sprites after all managers finish. Running objects here
+/// would also advance unrelated objects before their setup is complete.
 Asm instantMovesToAsm(InstantMoves moves, Memory memory,
-    {required int eventIndex, DirectAddressRegister load = a4}) {
+    {required int eventIndex,
+    DirectAddressRegister load = a4,
+    bool updateObjects = true}) {
   var asm = EventAsm.empty();
   var generator = _MovementGenerator(asm, memory);
   var adjustCamera = false;
@@ -655,20 +662,22 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
     }
   }
 
-  // Reposition objects and camera
-  // Run objects; clear unknown object state.
-  memory.clearObjectState(preserveScripted: true);
-  asm.add(Asm([
-    move.l(a4, -sp),
-    jsr(Label('Field_UpdateObjects').l),
-    if (memory.cameraLock != true && adjustCamera) ...[
-      jsr(Label('UpdateCameraXPosFG').l),
-      jsr(Label('UpdateCameraYPosFG').l),
-      jsr(Label('UpdateCameraXPosBG').l),
-      jsr(Label('UpdateCameraYPosBG').l),
-    ],
-    move.l(sp.postIncrement(), a4),
-  ]));
+  if (updateObjects) {
+    // Reposition objects and camera
+    // Run objects; clear unknown object state.
+    memory.clearObjectState(preserveScripted: true);
+    asm.add(Asm([
+      move.l(a4, -sp),
+      jsr(Label('Field_UpdateObjects').l),
+      if (memory.cameraLock != true && adjustCamera) ...[
+        jsr(Label('UpdateCameraXPosFG').l),
+        jsr(Label('UpdateCameraYPosFG').l),
+        jsr(Label('UpdateCameraXPosBG').l),
+        jsr(Label('UpdateCameraYPosBG').l),
+      ],
+      move.l(sp.postIncrement(), a4),
+    ]));
+  }
 
   return asm;
 }
