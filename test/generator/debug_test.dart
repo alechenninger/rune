@@ -4,6 +4,99 @@ import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('preset replaces both flag banks, all party slots, inventory and macros',
+      () {
+    final asm = debugPreset(
+        party: [shay, hahn],
+        flagsSet: [EventFlag('First'), EventFlag('Extended')],
+        eventFlags: FixedEventFlags({
+          Constant('EventFlag_First'): Word(0),
+          Constant('EventFlag_Extended'): Word(0x101),
+        }),
+        loadMap: LoadMap(
+            map: GameMap(MapId.ShayHouse),
+            startingPosition: Position(0x1f0, 0x280),
+            facing: Direction.down),
+        items: [ItemId.Dagger, ItemId.Dagger]);
+
+    expect(
+        asm.withoutComments().withoutEmptyLines(),
+        Asm([
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          lea(Constant('Macro_Data').w, a0),
+          moveq(39.i, d7),
+          trap(0.i),
+          Asm.fromRaw('\tlea\t.preset_data(pc), a0'),
+          lea(Constant('Event_Flags').w, a1),
+          moveq(31.i, d7),
+          trap(1.i),
+          lea(Constant('Current_Party_Slots').w, a1),
+          moveq(22.i, d7),
+          trap(1.i),
+          lea(Constant('Macro_Data').w, a1),
+          moveq(3.i, d7),
+          trap(1.i),
+          moveq(Constant('TempEveFlag_ChazHouse').i, d0),
+          jsr(Label('TempEveFlags_Set').l),
+          move.b(0.i, Constant('World_Index').w),
+          move.w(Constant('MapID_ChazHouse').i, Constant('Field_Map_Index').w),
+          move.w(Word(0xffff).i, Constant('Field_Map_Index_2').w),
+          move.w(Word(0x3e).i, Constant('Map_Start_X_Pos').w),
+          move.w(Word(0x50).i, Constant('Map_Start_Y_Pos').w),
+          move.w(
+              Constant('FacingDir_Down').i, Constant('Map_Start_Facing_Dir').w),
+          move.w(0.i, Constant('Map_Start_Char_Align').w),
+          bclr(3.i, Constant('Map_Load_Flags').w),
+          move.w(8.i, Constant('Game_Mode_Index').w),
+          rts,
+          label(Label('.preset_data')),
+          dc.b([
+            Byte(0x80),
+            ...List.filled(31, Byte.zero),
+            Byte(0x40),
+            ...List.filled(31, Byte.zero)
+          ]),
+          dc.b([
+            Constant('CharID_Chaz'),
+            Constant('CharID_Hahn'),
+            ...List.filled(4, Byte(0xff))
+          ]),
+          dc.b([
+            Constant('ItemID_Dagger'),
+            Constant('ItemID_Dagger'),
+            ...List.filled(38, Byte.zero)
+          ]),
+          dc.b([
+            Constant('CharID_Chaz'),
+            Constant('Command_Attack'),
+            Byte.zero,
+            Byte.zero,
+            Constant('CharID_Hahn'),
+            Constant('Command_Attack'),
+            Byte.zero,
+            Byte.zero
+          ]),
+        ]));
+  });
+
+  test('preset rejects invalid party and overflowing inventory', () {
+    Asm generate(List<Character> party, List<ItemId> items) => debugPreset(
+        party: party,
+        flagsSet: [],
+        eventFlags: FixedEventFlags({}),
+        loadMap: LoadMap(
+            map: GameMap(MapId.ShayHouse),
+            startingPosition: Position(0x1f0, 0x280),
+            facing: Direction.down),
+        items: items);
+    expect(() => generate([], []), throwsArgumentError);
+    expect(() => generate([shay, shay], []), throwsArgumentError);
+    expect(() => generate([shay, alys, hahn, rune, gryz, rika], []),
+        throwsArgumentError);
+    expect(() => generate([shay], List.filled(41, ItemId.Dagger)),
+        throwsArgumentError);
+  });
+
   test('example debug start', () {
     var asm = debugStart(
         party: [

@@ -497,29 +497,100 @@ class _EventRoutinesWrappingConfiguration extends ProgramConfiguration {
       _builtInSprites[map] ?? const [];
 }
 
-class EventFlags {
+/// Resolve model flags to assembly symbols and numeric IDs.
+abstract interface class EventFlags {
+  /// Allocate custom flags while generating a new program.
+  factory EventFlags() = _AllocatingEventFlags;
+
+  Word? get peekNextEventFlag;
+
+  /// Newly allocated definitions; fixed mappings never allocate definitions.
+  Map<Word, Constant> customEventFlags();
+
+  Word toId(EventFlag flag);
+  KnownConstantValue toConstantValue(EventFlag flag);
+  Constant toConstant(EventFlag flag);
+}
+
+/// Resolve flags against an existing build without allocating new IDs.
+///
+/// Keys are assembly constants such as `EventFlag_PiataFirstTime`. Lookup is
+/// case-insensitive to accept ASL's uppercase symbol exports, while generated
+/// constants retain their requested spelling. The supplied mapping is copied
+/// and is authoritative, including for vanilla flags. Missing names throw an
+/// [ArgumentError] instead of falling back to a potentially different build.
+class FixedEventFlags implements EventFlags {
+  final Map<String, Word> _flags;
+
+  FixedEventFlags(Map<Constant, Word> flags) : _flags = _fixedMapping(flags);
+
+  @override
+  Word? get peekNextEventFlag => null;
+
+  @override
+  Map<Word, Constant> customEventFlags() => const {};
+
+  @override
+  Word toId(EventFlag flag) =>
+      _flags['EVENTFLAG_${flag.name.toUpperCase()}'] ??
+      (throw ArgumentError.value(flag.name, 'flag', 'Unknown event flag in build'));
+
+  @override
+  KnownConstantValue toConstantValue(EventFlag flag) =>
+      KnownConstantValue(Constant('EventFlag_${flag.name}'), toId(flag));
+
+  @override
+  Constant toConstant(EventFlag flag) {
+    toId(flag); // Validate even when only the symbolic name is requested.
+    return Constant('EventFlag_${flag.name}');
+  }
+
+  static Map<String, Word> _fixedMapping(Map<Constant, Word> flags) {
+    final fixed = <String, Word>{};
+    for (final entry in flags.entries) {
+      final name = entry.key.constant.toUpperCase();
+      if (entry.value > Word(0x1ff)) {
+        throw ArgumentError.value(entry.value, name, 'Event flag exceeds \$1FF');
+      }
+      final previous = fixed[name];
+      if (previous != null && previous != entry.value) {
+        throw ArgumentError('Conflicting event flag assignments for $name');
+      }
+      fixed[name] = entry.value;
+    }
+    return Map.unmodifiable(fixed);
+  }
+}
+
+class _AllocatingEventFlags implements EventFlags {
   Word? _eventFlagOffset;
   final BiMap<Word, Constant> _customEventFlags = BiMap();
+  @override
   Word? get peekNextEventFlag => _eventFlagOffset;
+
+  @override
   Map<Word, Constant> customEventFlags() =>
       _customEventFlags.toIMap().unlockLazy;
 
   final _freeEventFlags = freeEventFlags();
 
-  EventFlags() {
+  _AllocatingEventFlags() {
     _setNextFreeEventFlag();
   }
 
+  @override
   Word toId(EventFlag flag) {
     var c = Constant('EventFlag_${flag.name}');
     return _addEventFlag(c);
   }
 
+  @override
   KnownConstantValue toConstantValue(EventFlag flag) {
     var c = Constant('EventFlag_${flag.name}');
     return KnownConstantValue(c, _addEventFlag(c));
   }
 
+  @override
   Constant toConstant(EventFlag flag) {
     var c = Constant('EventFlag_${flag.name}');
     _addEventFlag(c);
