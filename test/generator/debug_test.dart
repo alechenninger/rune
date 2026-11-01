@@ -4,6 +4,62 @@ import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('advancement merges flags and preserves retained macro commands', () {
+    final asm = debugAdvance(
+        previousParty: [shay, alys],
+        party: [shay, hahn],
+        flagsSet: [EventFlag('First'), EventFlag('Extended')],
+        eventFlags: FixedEventFlags({
+          Constant('EventFlag_First'): Word(0),
+          Constant('EventFlag_Extended'): Word(0x101)
+        }),
+        loadMap: LoadMap(
+            map: GameMap(MapId.ShayHouse),
+            startingPosition: Position(0x1f0, 0x280),
+            facing: Direction.down));
+    expect(
+        asm.withoutComments().withoutEmptyLines(),
+        Asm([
+          jsr(Label('PalFadeOut_ClrSpriteTbl').l),
+          Asm.fromRaw('\tlea\t.advance_flags(pc), a0'),
+          lea(Constant('Event_Flags').w, a1),
+          moveq(31.i, d7),
+          label(Label('.advance_merge')),
+          move.w(a0.postIncrement(), d0),
+          or.w(d0, a1.postIncrement()),
+          dbf(d7, Label('.advance_merge')),
+          moveq(Constant('CharID_Alys').i, d0),
+          jsr(Label('Event_RemoveCharFromMacros').l),
+          moveq(Constant('CharID_Hahn').i, d0),
+          jsr(Label('Event_AddMacro').l),
+          move.l(
+              ((Constant('CharID_Chaz') << 24.toValue) |
+                      (Constant('CharID_Hahn') << 16.toValue) |
+                      0xffff.toValue)
+                  .i,
+              Constant('Current_Party_Slots').w),
+          move.b(Byte(0xff).i, Constant('Current_Party_Slot_5').w),
+          move.b(0.i, Constant('World_Index').w),
+          move.w(Constant('MapID_ChazHouse').i, Constant('Field_Map_Index').w),
+          move.w(Word(0xffff).i, Constant('Field_Map_Index_2').w),
+          move.w(Word(0x3e).i, Constant('Map_Start_X_Pos').w),
+          move.w(Word(0x50).i, Constant('Map_Start_Y_Pos').w),
+          move.w(
+              Constant('FacingDir_Down').i, Constant('Map_Start_Facing_Dir').w),
+          clr.w(Constant('Map_Start_Char_Align').w),
+          bclr(3.i, Constant('Map_Load_Flags').w),
+          move.w(8.i, Constant('Game_Mode_Index').w),
+          rts,
+          label(Label('.advance_flags')),
+          dc.b([
+            Byte(0x80),
+            ...List.filled(31, Byte.zero),
+            Byte(0x40),
+            ...List.filled(31, Byte.zero)
+          ]),
+        ]));
+  });
+
   test('preset replaces both flag banks, all party slots, inventory and macros',
       () {
     final asm = debugPreset(
@@ -45,7 +101,7 @@ void main() {
           move.w(Word(0x50).i, Constant('Map_Start_Y_Pos').w),
           move.w(
               Constant('FacingDir_Down').i, Constant('Map_Start_Facing_Dir').w),
-          move.w(0.i, Constant('Map_Start_Char_Align').w),
+          clr.w(Constant('Map_Start_Char_Align').w),
           bclr(3.i, Constant('Map_Load_Flags').w),
           move.w(8.i, Constant('Game_Mode_Index').w),
           rts,
@@ -166,7 +222,7 @@ void main() {
 	move.w	#$003E, (Map_Start_X_Pos).w
 	move.w	#$0050, (Map_Start_Y_Pos).w
 	move.w	#FacingDir_Down, (Map_Start_Facing_Dir).w
-	move.w	#0, (Map_Start_Char_Align).w
+	clr.w	(Map_Start_Char_Align).w
 	bclr	#3, (Map_Load_Flags).w	; Don't delete objects
 	move.w	#8, (Game_Mode_Index).w
 

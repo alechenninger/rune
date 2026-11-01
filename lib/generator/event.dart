@@ -507,7 +507,7 @@ const _mapDataManagersTable = [
   Label.known('MapDataMan_Aiedo'), // $83
   Label.known('MapDataMan_ClrBioPlantAlarm'), // $84
   Label.known('MapDataMan_RyuonFirstTime'), // $85
-  Label.known('MapDataMan_NalyaHouse3'), // $86
+  null, // $86. was custom nalyahouse3
   Label.known('MapDataMan_MeeseClinicF1Konrad'), // $87
   Label.known('MapDataMan_MeeseClinicKonrad'), // $88
   Label.known('MapDataMan_SoldiersTempleOutside'), // $89

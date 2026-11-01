@@ -60,14 +60,7 @@ EventAsm debugPreset({
   checkArgument(items.length <= 40,
       message: 'Inventory holds at most 40 items');
 
-  // A bitmap keeps code size independent of story progress. The two flag banks
-  // occupy adjacent 32-byte blocks, with the high bit first in each byte.
-  final flags = List.filled(64, 0);
-  for (final flag in flagsSet) {
-    final id = eventFlags.toId(flag).value;
-    checkArgument(id >= 0 && id < 512, message: 'Event flag exceeds \$1FF');
-    flags[id >> 3] |= 1 << (7 - (id & 7));
-  }
+  final flags = _flagBitmap(flagsSet, eventFlags);
 
   return EventAsm([
     fadeOut(),
@@ -111,6 +104,89 @@ EventAsm debugPreset({
   ]);
 }
 
+/// Add story flags and reconcile party membership without resetting game state.
+/// Macro commands for retained characters survive; departing characters are
+/// removed and new members receive attack commands in existing nonempty macros.
+/// The caller must verify that [previousParty] still describes the live party.
+EventAsm debugAdvance({
+  required List<model.Character> previousParty,
+  required List<model.Character> party,
+  required List<model.EventFlag> flagsSet,
+  required EventFlags eventFlags,
+  required model.LoadMap loadMap,
+}) {
+  for (final members in [previousParty, party]) {
+    checkArgument(
+        members.isNotEmpty &&
+            members.length <= 5 &&
+            members.toSet().length == members.length,
+        message: 'Expected 1..5 unique party members');
+  }
+  final flags = _flagBitmap(flagsSet, eventFlags);
+  return EventAsm([
+    fadeOut(),
+    // Merge at execution time: unlisted flags, including optional progress and
+    // custom flags in the extended bank, are never cleared.
+    Asm.fromRaw('\tlea\t.advance_flags(pc), a0'),
+    lea(Constant('Event_Flags').w, a1),
+    moveq(31.i, d7),
+    label(Label('.advance_merge')),
+    move.w(a0.postIncrement(), d0),
+    or.w(d0, a1.postIncrement()),
+    dbf(d7, Label('.advance_merge')),
+    _advanceMacros(previousParty, party),
+    loadPartySlots(party.map((member) => member.charId).toList(),
+        Constant('Current_Party_Slots').w, Constant('Current_Party_Slot_5').w),
+    _loadMap(loadMap),
+    rts,
+    label(Label('.advance_flags')),
+    dc.b(flags.map(Byte.new).toList()),
+  ]);
+}
+
+Asm _advanceMacros(
+    List<model.Character> previousParty, List<model.Character> party) {
+  final removed =
+      previousParty.where((member) => !party.contains(member)).toList();
+  final added =
+      party.where((member) => !previousParty.contains(member)).toList();
+  Asm remove(model.Character member) => Asm([
+        moveq(member.charIdAddress, d0),
+        jsr(Label('Event_RemoveCharFromMacros').l),
+      ]);
+  Asm add(model.Character member) => Asm([
+        moveq(member.charIdAddress, d0),
+        jsr(Label('Event_AddMacro').l),
+      ]);
+  final asm = Asm.empty();
+  if (removed.length == previousParty.length && added.isNotEmpty) {
+    // AddMacro skips empty macros. When replacing every member, keep at least
+    // one entry alive; free a slot first if the previous party was full.
+    if (previousParty.length == 5) asm.add(remove(removed.removeAt(0)));
+    asm.add(add(added.removeAt(0)));
+  }
+  // Remove before adding so no macro temporarily exceeds five characters.
+  for (final member in removed) {
+    asm.add(remove(member));
+  }
+  for (final member in added) {
+    asm.add(add(member));
+  }
+  return asm;
+}
+
+List<int> _flagBitmap(List<model.EventFlag> flagsSet, EventFlags eventFlags) {
+  // A bitmap keeps code size independent of story progress. The two flag banks
+  // occupy adjacent 32-byte blocks, with the high bit first in each byte.
+  final flags = List.filled(64, 0);
+  for (final flag in flagsSet) {
+    final id = eventFlags.toId(flag).value;
+    checkArgument(id >= 0 && id < 512, message: 'Event flag exceeds \$1FF');
+    flags[id >> 3] |= 1 << (7 - (id & 7));
+  }
+  return flags;
+}
+
 Asm _avoidRestDialog() => Asm([
       comment('to avoid rest dialog'),
       moveq(Constant('TempEveFlag_ChazHouse').i, d0),
@@ -131,7 +207,12 @@ Asm _loadMap(model.LoadMap loadMap) {
     move.w(x.toWord.i, Map_Start_X_Pos.w),
     move.w(y.toWord.i, Map_Start_Y_Pos.w),
     move.w(facing.i, Map_Start_Facing_Dir.w),
-    move.w(alignByte.i, Map_Start_Char_Align.w),
+    // The overlapping arrangement is zero. CLR saves two bytes in live events,
+    // keeping even a five-for-five party replacement within the RAM buffer.
+    if (loadMap.arrangement == model.PartyArrangement.overlapping)
+      clr.w(Map_Start_Char_Align.w)
+    else
+      move.w(alignByte.i, Map_Start_Char_Align.w),
     bclr(3.i, Map_Load_Flags.w, comment: "Don't delete objects"),
     move.w(8.i, Constant('Game_Mode_Index').w),
   ]);
