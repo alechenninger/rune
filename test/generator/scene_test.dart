@@ -79,6 +79,33 @@ void main() {
           throwsUnsupportedError);
       expect(asm, movem.l(d0 - a6, -(sp)));
     });
+
+    test('map setup defers routine initialization regardless of event option',
+        () {
+      map.addObject(MapObject(
+          id: 'guest',
+          startPosition: Position(0x200, 0x100),
+          spec: Npc(Sprite.PalmanMan1, WanderAround(up))));
+      for (final initialize in [true, false]) {
+        final asm = Asm.empty();
+        SceneAsmGenerator.forMapDataManager(SceneId('SetRoutine'),
+            inMap: map, managerAsm: asm, config: ProgramConfiguration.empty())
+          ..changeObjectRoutine(ChangeObjectRoutine(
+              MapObjectById.of('guest'), NpcRoutineModel(FaceDown),
+              initialize: initialize))
+          ..finish();
+        expect(
+            asm.withoutComments().withoutEmptyLines(),
+            Asm([
+              movem.l(d0 - a6, -(sp)),
+              lea(Absolute.word(Longword(0xffffc300)), a4),
+              move.w(Word(0x38).i, a4.indirect),
+              movem.l(sp.postIncrement(), d0 - a6),
+              moveq(0.i, d7),
+              rts,
+            ]));
+      }
+    });
   });
 
   group('map manager instant moves', () {
@@ -98,17 +125,17 @@ void main() {
           spec: Npc(Sprite.PalmanMan1, WanderAround(up))));
     });
 
-    test('sets NPC position and facing without running objects or camera', () {
+    test('sets NPC position and facing while retaining its original routine',
+        () {
       final moves = InstantMoves()
         ..move(MapObjectById(MapObjectId('guest')),
-            to: Position(0x1c0, 0x210), face: down);
+            to: Position(0x1c0, 0x210), face: down, scripted: false);
 
       expect(
           generate(moves),
           Asm([
             movem.l(d0 - a6, -(sp)),
             lea(Absolute.word(Longword(0xffffc300)), a4),
-            move.w(Word(0x8194).i, a4.indirect),
             move.l(0.i, x_step_constant(a4)),
             move.l(0.i, y_step_constant(a4)),
             move.w(0.i, x_step_duration(a4)),
@@ -129,15 +156,49 @@ void main() {
     test('facing alone retains the NPC position and resets its destination',
         () {
       expect(
+          generate(InstantMoves()
+            ..face(MapObjectById(MapObjectId('guest')), down)
+            ..setScripted(MapObjectById(MapObjectId('guest')), false)),
+          Asm([
+            movem.l(d0 - a6, -(sp)),
+            lea(Absolute.word(Longword(0xffffc300)), a4),
+            move.w(FacingDir_Down.i, facing_dir(a4)),
+            move.w(curr_x_pos(a4), dest_x_pos(a4)),
+            move.w(curr_y_pos(a4), dest_y_pos(a4)),
+            movem.l(sp.postIncrement(), d0 - a6),
+            moveq(0.i, d7),
+            rts,
+          ]));
+    });
+
+    test(
+        'scripted defaults to true in map managers with initialization pending',
+        () {
+      expect(
           generate(
               InstantMoves()..face(MapObjectById(MapObjectId('guest')), down)),
           Asm([
             movem.l(d0 - a6, -(sp)),
             lea(Absolute.word(Longword(0xffffc300)), a4),
-            move.w(Word(0x8194).i, a4.indirect),
+            move.w(Word(0x194).i, a4.indirect),
             move.w(FacingDir_Down.i, facing_dir(a4)),
             move.w(curr_x_pos(a4), dest_x_pos(a4)),
             move.w(curr_y_pos(a4), dest_y_pos(a4)),
+            movem.l(sp.postIncrement(), d0 - a6),
+            moveq(0.i, d7),
+            rts,
+          ]));
+    });
+
+    test('a standalone scripting choice also leaves initialization pending',
+        () {
+      expect(
+          generate(
+              InstantMoves()..setScripted(MapObjectById.of('guest'), true)),
+          Asm([
+            movem.l(d0 - a6, -(sp)),
+            lea(Absolute.word(Longword(0xffffc300)), a4),
+            move.w(Word(0x194).i, a4.indirect),
             movem.l(sp.postIncrement(), d0 - a6),
             moveq(0.i, d7),
             rts,

@@ -728,7 +728,7 @@ void main() {
 
     expectGenerated(generated, [
       npc.toA4(memory),
-      move.w(0x8194.toWord.i, a4.indirect),
+      move.w(Word(0x8194).i, a4.indirect),
       bset(1.i, priority_flag(a4)),
       setDestination(x: 0x100.toWord.i, y: 0x100.toWord.i),
       moveCharacter(x: dest_x_pos(a4), y: dest_y_pos(a4)),

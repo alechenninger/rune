@@ -539,19 +539,37 @@ Asm waitForMovementsToAsm(WaitForMovements wait, {required Memory memory}) {
 
 /// Sets object positions and facing immediately.
 ///
-/// Map data managers set [updateObjects] to false because map loading runs
-/// objects and builds sprites after all managers finish. Running objects here
-/// would also advance unrelated objects before their setup is complete.
+/// If [updateObjects] is true, object routines will run once
+/// and sprites will be built, across all objects.
+/// Additionally, this will allow the camera to move if slot 1
+/// is among moved objects.
+///
+/// [moves] may change object routines if an object should be `scripted`.
+/// [objectsInitialized] controls whether,
+/// when routine manipulation is required,
+/// the initialization bit is set. Already initialized objects
+/// retain their initialization bit and will not reinitialize.
 Asm instantMovesToAsm(InstantMoves moves, Memory memory,
     {required int eventIndex,
     DirectAddressRegister load = a4,
-    bool updateObjects = true}) {
+    bool updateObjects = true,
+    bool objectsInitialized = true}) {
   var asm = EventAsm.empty();
   var generator = _MovementGenerator(asm, memory);
   var adjustCamera = false;
 
-  for (var MapEntry(key: obj, value: (position, facing))
+  for (var MapEntry(key: obj, value: (position, facing, scripted))
       in moves.destinations.entries) {
+    if (position == null &&
+        facing == null &&
+        scripted &&
+        !generator.scriptable(obj)) {
+      // If no movement but scripted, just adjust the routine
+      asm.add(obj.toA(load, memory));
+      asm.add(_setScriptableRoutine(load, initialized: objectsInitialized));
+      memory.setRoutine(obj, scriptableObjectRoutine);
+    }
+
     if (position != null) {
       var slot = obj.slotAsOf(memory);
       if (slot == 1 || slot == null) {
@@ -572,17 +590,14 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
               final cancelMovement = memory.hasPendingMovement(obj);
               if (cancelMovement) memory.finishMovement(obj);
 
-              // TODO: why would we need to set the routine for instant moves?
-              // Removing would be a behavior change though–instant moves
-              // could also mean, "move here and stay here permanently"
-              // If we don't change the routine, this may not be the case.
-              if (!scriptable) {
+              if (!scriptable && scripted) {
                 memory.setRoutine(obj, scriptableObjectRoutine);
               }
 
               return Asm([
                 obj.toA(load, memory),
-                if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
+                if (!scriptable && scripted)
+                  _setScriptableRoutine(load, initialized: objectsInitialized),
                 // A teleport replaces the old destination and its active step.
                 if (!scriptable || cancelMovement) ...[
                   move.l(0.i, x_step_constant(load)),
@@ -623,7 +638,7 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
               // Facing may require changing the routine
               // (e.g. some routines will always set facing a certain direction)
               var scriptable = generator.scriptable(obj);
-              if (!scriptable
+              if (!scriptable && scripted
                   // &&
                   // TODO: technically facing has meant "permanently face" in most cases
                   // if we don't set scriptable, it may not be permanent.
@@ -647,7 +662,8 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
                 obj.toA(load, memory),
                 // TODO: if only facing,
                 //  we may need to wait for movements to finish.
-                if (!scriptable) move.w(0x8194.toWord.i, load.indirect),
+                if (!scriptable && scripted)
+                  _setScriptableRoutine(load, initialized: objectsInitialized),
                 move.w(d, facing_dir(load)),
                 // Only needed if we didn't already set the position.
                 if (!scriptable && position == null) ...[
@@ -681,6 +697,15 @@ Asm instantMovesToAsm(InstantMoves moves, Memory memory,
 
   return asm;
 }
+
+/// Initialization follows the caller's execution context. Map setup leaves the
+/// first update pending; ordinary scripting retains existing sprite mappings.
+Asm _setScriptableRoutine(DirectAddressRegister object,
+        {required bool initialized}) =>
+    move.w(
+        Word(scriptableObjectRoutine.index.value | (initialized ? 0x8000 : 0))
+            .i,
+        object.indirect);
 
 class _MovementGenerator {
   _MovementGenerator(this.asm, this._mem, [Labeller? labeller])
@@ -719,7 +744,7 @@ class _MovementGenerator {
     if (!scriptable(obj)) {
       // Make map object scriptable
       asm.add(obj.toA4(_mem));
-      asm.add(asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect));
+      asm.add(_setScriptableRoutine(a4, initialized: true));
       _mem.setRoutine(obj, scriptableObjectRoutine);
       return true;
     }
@@ -756,7 +781,7 @@ class _MovementGenerator {
               memory: _mem,
               fieldRoutines: fieldRoutines),
         obj.toA4(_mem),
-        asmlib.move.w(0x8194.toWord.i, asmlib.a4.indirect),
+        _setScriptableRoutine(a4, initialized: true),
         // Destination attributes are not always set,
         // resulting in odd character movements with this routine.
         PositionOfObject(obj).withPosition(

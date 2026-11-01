@@ -533,7 +533,8 @@ class FixedEventFlags implements EventFlags {
   @override
   Word toId(EventFlag flag) =>
       _flags['EVENTFLAG_${flag.name.toUpperCase()}'] ??
-      (throw ArgumentError.value(flag.name, 'flag', 'Unknown event flag in build'));
+      (throw ArgumentError.value(
+          flag.name, 'flag', 'Unknown event flag in build'));
 
   @override
   KnownConstantValue toConstantValue(EventFlag flag) =>
@@ -550,7 +551,8 @@ class FixedEventFlags implements EventFlags {
     for (final entry in flags.entries) {
       final name = entry.key.constant.toUpperCase();
       if (entry.value > Word(0x1ff)) {
-        throw ArgumentError.value(entry.value, name, 'Event flag exceeds \$1FF');
+        throw ArgumentError.value(
+            entry.value, name, 'Event flag exceeds \$1FF');
       }
       final previous = fixed[name];
       if (previous != null && previous != entry.value) {
@@ -1388,7 +1390,9 @@ class SceneAsmGenerator implements EventVisitor {
     _addToRoutine(
         moves,
         (i, asm) => instantMovesToAsm(moves, _memory,
-            eventIndex: i, updateObjects: _gameMode is! MapDataManagerMode),
+            eventIndex: i,
+            updateObjects: _gameMode is! MapDataManagerMode,
+            objectsInitialized: _gameMode is! MapDataManagerMode),
         allowedModes: const {
           ModeType<EventMode>(),
           ModeType<MapDataManagerMode>(),
@@ -2834,8 +2838,13 @@ class SceneAsmGenerator implements EventVisitor {
                 'try adding field routine metadata to generator.');
       }
 
+      final mapSetup = _gameMode is MapDataManagerMode;
+      // During map setup, we won't run the object immediately
+      // We let the map load do that
+      // In events, we do, if the change should be initialized.
+      final runInitializer = change.initialize && !mapSetup;
       _memory.setRoutine(obj, change.routine);
-      if (change.initialize) {
+      if (runInitializer) {
         // The initializer executes immediately and can change either property.
         // Technically, an object routine can do almost anything.
         // This is just typical.
@@ -2844,7 +2853,7 @@ class SceneAsmGenerator implements EventVisitor {
         _memory.clearFacing(obj);
       }
 
-      var index = switch (change.initialize) {
+      var index = switch (mapSetup || change.initialize) {
         true => routine.index,
         false => routine.index | 0x8000.toValue
       };
@@ -2852,8 +2861,11 @@ class SceneAsmGenerator implements EventVisitor {
       return Asm([
         if (_memory.inAddress(a4)?.obj != obj) obj.toA4(_memory),
         move.w(index.i, a4.indirect),
-        if (change.initialize) jsr(routine.label.l)
+        if (runInitializer) jsr(routine.label.l)
       ]);
+    }, allowedModes: const {
+      ModeType<EventMode>(),
+      ModeType<MapDataManagerMode>(),
     });
   }
 

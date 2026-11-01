@@ -764,7 +764,7 @@ void main() {
             sceneAsm.event.withoutComments().trim(),
             Asm([
               lea(0xFFFFC300.w, a4),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
@@ -797,7 +797,7 @@ void main() {
             sceneAsm.event.withoutComments().trim(),
             Asm([
               lea(0xFFFFC300.w, a4),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
@@ -836,7 +836,7 @@ void main() {
             sceneAsm.event.withoutComments().trim(),
             Asm([
               lea(0xFFFFC300.w, a4),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
@@ -879,7 +879,7 @@ void main() {
             sceneAsm.event.withoutComments().trim(),
             Asm([
               lea(0xFFFFC300.w, a4),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
@@ -887,7 +887,7 @@ void main() {
               doMapUpdateLoop(Word(7 /*8 frames per step?*/)),
               lea(0xFFFFC300.w, a4),
               // Arbitrary assembly can change both routine and coordinates.
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(curr_x_pos(a4), d0),
               move.w(curr_y_pos(a4), d1),
               addi.w(0x20.toWord.i, d0),
@@ -913,7 +913,7 @@ void main() {
             sceneAsm.event.withoutComments().trim(),
             Asm([
               lea(0xFFFFC300.w, a4),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(0x50.toWord.i, dest_x_pos(a4)),
               move.w(0x60.toWord.i, dest_y_pos(a4)),
               moveq(FacingDir_Right.i, d0),
@@ -951,7 +951,7 @@ void main() {
               jsr(Label('VInt_Prepare').l),
               bra.s(Label('.wait_for_movement_1_MapObjecttestnpc_0_0')),
               label(Label('.1_MapObjecttestnpc_0_0_wait_for_movements_done')),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(curr_x_pos(a4), dest_x_pos(a4)),
               move.w(curr_y_pos(a4), dest_y_pos(a4)),
               moveq(FacingDir_Right.i, d0),
@@ -978,7 +978,7 @@ void main() {
             sceneAsm.event.withoutComments().trim(),
             Asm([
               lea(0xFFFFC300.w, a4),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
@@ -1007,7 +1007,7 @@ void main() {
             sceneAsm.event.withoutComments().trim(),
             Asm([
               lea(0xFFFFC300.w, a4),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.w(Word(0x70).i, d0),
               move.w(Word(0x50).i, d1),
               jsr(Label('Event_MoveCharacter').l),
@@ -1261,7 +1261,7 @@ void main() {
           asm,
           EventAsm([
             npc.toA4(testState),
-            move.w(0x8194.toWord.i, a4.indirect),
+            move.w(Word(0x8194).i, a4.indirect),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
           ]));
     });
@@ -1404,7 +1404,7 @@ void main() {
           asm,
           EventAsm([
             npc.toA4(testState),
-            move.w(0x8194.toWord.i, a4.indirect),
+            move.w(Word(0x8194).i, a4.indirect),
             moveCharacter(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
           ]));
       expect(state.positions[npc], Position(0x1a0, 0x1f0));
@@ -1733,7 +1733,7 @@ void main() {
             bset(1.i, priority_flag(a4)),
             setDestination(x: 0x1a0.toWord.i, y: 0x1f0.toWord.i),
             npc.toA4(testState),
-            move.w(0x8194.toWord.i, a4.indirect),
+            move.w(Word(0x8194).i, a4.indirect),
             bset(1.i, priority_flag(a4)),
             setDestination(x: 0x1b0.toWord.i, y: 0x1f0.toWord.i),
             rts,
@@ -2839,7 +2839,7 @@ void main() {
             asm,
             Asm([
               testnpc.toA4(testMemory),
-              move.w(0x8194.toWord.i, a4.indirect),
+              move.w(Word(0x8194).i, a4.indirect),
               move.l(0.i, x_step_constant(a4)),
               move.l(0.i, y_step_constant(a4)),
               move.w(0.i, x_step_duration(a4)),
@@ -2858,6 +2858,55 @@ void main() {
               jsr(Label('UpdateCameraXPosBG').l),
               jsr(Label('UpdateCameraYPosBG').l),
               move.l(sp.postIncrement(), a4),
+            ]));
+      });
+
+      test('scripted false retains an already scripted routine', () {
+        testMemory.setRoutine(testnpc, scriptableObjectRoutine);
+        final moves = InstantMoves()
+          ..move(testnpc, face: down, scripted: false);
+        final asm = instantMovesToAsm(moves, testMemory,
+            eventIndex: 1, updateObjects: false);
+        expect(
+            asm,
+            Asm([
+              lea(Absolute.word(Longword(0xffffc300)), a4),
+              move.w(FacingDir_Down.i, facing_dir(a4)),
+            ]));
+        expect(testMemory.getRoutine(testnpc), scriptableObjectRoutine);
+      });
+
+      test('scripting choices are independent for each moved NPC', () {
+        final moves = InstantMoves()
+          ..move(testnpc, face: down, scripted: false)
+          ..move(scriptableNpc, face: up);
+        final asm = instantMovesToAsm(moves, testMemory,
+            eventIndex: 1, updateObjects: false);
+        expect(
+            asm,
+            Asm([
+              lea(Absolute.word(Longword(0xffffc300)), a4),
+              move.w(FacingDir_Down.i, facing_dir(a4)),
+              move.w(curr_x_pos(a4), dest_x_pos(a4)),
+              move.w(curr_y_pos(a4), dest_y_pos(a4)),
+              lea(Absolute.word(Longword(0xffffc340)), a4),
+              move.w(Word(0x8194).i, a4.indirect),
+              move.w(FacingDir_Up.i, facing_dir(a4)),
+              move.w(curr_x_pos(a4), dest_x_pos(a4)),
+              move.w(curr_y_pos(a4), dest_y_pos(a4)),
+            ]));
+        expect(testMemory.getRoutine(testnpc), isNot(scriptableObjectRoutine));
+        expect(testMemory.getRoutine(scriptableNpc), scriptableObjectRoutine);
+      });
+
+      test('a standalone scripted setter changes only the routine', () {
+        final moves = InstantMoves()..setScripted(testnpc, true);
+        expect(
+            instantMovesToAsm(moves, testMemory,
+                eventIndex: 1, updateObjects: false),
+            Asm([
+              lea(Absolute.word(Longword(0xffffc300)), a4),
+              move.w(Word(0x8194).i, a4.indirect),
             ]));
       });
     });

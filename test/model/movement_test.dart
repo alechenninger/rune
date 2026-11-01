@@ -3,6 +3,34 @@ import 'package:rune/model/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('instant moves', () {
+    final npc = MapObjectById.of('npc');
+
+    test('scripted defaults to true and participates in equality', () {
+      final implicit = InstantMoves()..put(npc, Position(8, 16));
+      final explicit = InstantMoves()
+        ..move(npc, to: Position(8, 16), scripted: true);
+      final autonomous = InstantMoves()
+        ..move(npc, to: Position(8, 16), scripted: false);
+      expect(implicit, explicit);
+      expect(implicit.hashCode, explicit.hashCode);
+      expect(implicit, isNot(autonomous));
+    });
+
+    test('position and facing setters preserve each object scripting choice',
+        () {
+      final moves = InstantMoves()
+        ..setScripted(npc, false)
+        ..put(npc, Position(8, 16))
+        ..face(npc, up)
+        ..put(alys, Position(16, 8));
+      expect(moves.destinations[npc], (Position(8, 16), up, false));
+      expect(moves.destinations[alys], (Position(16, 8), null, true));
+      moves.setScripted(npc, true);
+      expect(moves.destinations[npc], (Position(8, 16), up, true));
+    });
+  });
+
   group('MovesObjects', () {
     test('reports affected references without event state', () {
       var npc = MapObjectById.of('npc');

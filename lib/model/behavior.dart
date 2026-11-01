@@ -26,7 +26,7 @@ class ResetObjectRoutine extends Event {
 
   /// Controls whether or not to reinitialize the routine.
   ///
-  /// If [true], the routine will not be initialized.
+  /// If [true], the routine will not be initialized if it has already run.
   final bool resume;
 
   ResetObjectRoutine(this.object, {this.resume = false});
@@ -58,10 +58,13 @@ class ChangeObjectRoutine extends Event {
   /// npc behavior type
   final SpecModel routine;
 
-  /// Whether or not to initialize the routine.
+  /// Whether to initialize the replacement routine immediately in field events.
   ///
   /// Some routines have specific run-once behavior on initialize.
   /// This can be used to skip that behavior.
+  /// If the object has never been initialized,
+  /// this is always effectively true.
+  /// Objects must be initialized at least once.
   final bool initialize;
 
   ChangeObjectRoutine(this.object, this.routine, {this.initialize = true});

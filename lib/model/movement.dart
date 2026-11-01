@@ -595,25 +595,39 @@ class WaitForMovements extends Event implements RunnableInDialog {
 }
 
 class InstantMoves extends Event implements MovesObjects {
-  Map<FieldObject, (PositionExpression? position, DirectionExpression? facing)>
-      destinations = {};
+  /// Position, facing, and whether to adopt scripted behavior for each object.
+  /// False leaves the object's current routine unchanged.
+  Map<
+      FieldObject,
+      (
+        PositionExpression? position,
+        DirectionExpression? facing,
+        bool scripted
+      )> destinations = {};
 
   @override
   Iterable<FieldObject> movedObjects() => destinations.keys;
 
   void move(FieldObject obj,
-      {PositionExpression? to, DirectionExpression? face}) {
-    destinations[obj] = (to, face);
+      {PositionExpression? to,
+      DirectionExpression? face,
+      bool scripted = true}) {
+    destinations[obj] = (to, face, scripted);
   }
 
   void put(FieldObject obj, PositionExpression at) {
-    destinations.update(obj, (result) => (at, result.$2),
-        ifAbsent: () => (at, null));
+    destinations.update(obj, (result) => (at, result.$2, result.$3),
+        ifAbsent: () => (at, null, true));
   }
 
   void face(FieldObject obj, DirectionExpression face) {
-    destinations.update(obj, (result) => (result.$1, face),
-        ifAbsent: () => (null, face));
+    destinations.update(obj, (result) => (result.$1, face, result.$3),
+        ifAbsent: () => (null, face, true));
+  }
+
+  void setScripted(FieldObject obj, bool scripted) {
+    destinations.update(obj, (result) => (result.$1, result.$2, scripted),
+        ifAbsent: () => (null, null, scripted));
   }
 
   @override
