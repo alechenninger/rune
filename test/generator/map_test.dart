@@ -161,6 +161,36 @@ void main() {
         ]));
   });
 
+  test('Dezolis loads Ice Digger debris even without map objects', () {
+    final mapAsm = program.addMap(GameMap(MapId.Dezolis));
+
+    expect(
+        mapAsm.sprites,
+        Asm([
+          dc.w([Word(0x39b)]),
+          dc.l([Label('loc_114808')]),
+        ]));
+    expect(mapAsm.objects, isEmpty);
+  });
+
+  test('Dezolis reserves all five debris frames before allocating NPC art', () {
+    final map = GameMap(MapId.Dezolis)
+      ..addObject(MapObject(
+          startPosition: Position(0x100, 0x100),
+          spec: Npc(Sprite.PalmanMan1, FaceDown()),
+          onInteract: Scene.empty()));
+    final mapAsm = program.addMap(map);
+
+    expect(
+        mapAsm.sprites,
+        Asm([
+          dc.w([Word(0x39b)]),
+          dc.l([Label('loc_114808')]),
+          dc.w([Word(0x3af)]),
+          dc.l([Constant('Art_PalmanMan1')]),
+        ]));
+  });
+
   test('multiple sprites tile numbers are separated by 0x48', () {
     testMap.addObject(MapObject(
         startPosition: Position('1e0'.hex, '2e0'.hex),

@@ -4986,6 +4986,15 @@ final Map<MapId, Word> _defaultSpriteVramOffsets = {
 }.map((l, o) => MapEntry(labelToMapId(l), o));
 
 final _defaultBuiltInSprites = {
+  MapId.Dezolis: [
+    // TileColl_IceBlock spawns FieldObj_Dust at runtime, so there is no map
+    // object to request its art. Its five 2x2-tile frames use fixed tiles
+    // $39B-$3AE; load them and reserve that range from other map sprites.
+    SpriteVramMapping(
+        tiles: 0x14,
+        art: RomArt(label: Label('loc_114808')),
+        requiredVramTile: Word(0x39b))
+  ],
   MapId.BirthValley_B1: [
     SpriteVramMapping(
         tiles: 0x39,
