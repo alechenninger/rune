@@ -1662,15 +1662,11 @@ class SceneAsmGenerator implements EventVisitor {
 
         _flagUnknown(flag);
 
-        // no more events can be added
-        // because we would have to add them to both branches
-        // which is not supported when starting from dialog loop
-        // todo: finished is actually a per-branch state,
-        //   but we're using 'empty' condition
-        //   to proxy for the original state or 'root' state
-        if (_currentCondition == Condition.empty()) {
-          _setCurrentStateFinished();
-        }
+        // No more events can be added because we would have to add them to both
+        // branches, which is not supported when starting from the dialog loop.
+        // Both children are finished, so their parent is finished even when
+        // nested. Otherwise an enclosing branch would emit another epilogue.
+        _setCurrentStateFinished();
 
         // TODO(ifflag): should we update state graph here?
 

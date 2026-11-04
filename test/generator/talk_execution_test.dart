@@ -51,6 +51,40 @@ void main() {
         ]);
   });
 
+  for (final keepDialog in [false, true, null]) {
+    test('nested Talk branches finish once with keepDialog=$keepDialog', () {
+      final asm = EventAsm.empty();
+      SceneAsmGenerator.forTalk(DialogTrees(), asm, TestEventRoutines())
+        ..setContext(SetContext((state) => state.keepDialog = keepDialog))
+        ..ifFlag(IfFlag(EventFlag('outer'), isSet: [
+          IfFlag(EventFlag('inner'), isSet: [
+            Dialog(spans: [DialogSpan('Before')]),
+            Pause(Duration(milliseconds: 500)),
+            Dialog(spans: [DialogSpan('After')]),
+          ], isUnset: [
+            Dialog(spans: [DialogSpan('Inner unset')]),
+          ]),
+        ], isUnset: [
+          Dialog(spans: [DialogSpan('Outer unset')]),
+        ]))
+        ..finish();
+
+      expect(
+          asm.withoutComments().withoutEmptyLines(),
+          Asm([
+            setLabel('Event_GrandCross_Talkinner_set'),
+            move.b(SoundEffect.selection.sfxId.i, Constant('Sound_Index').l),
+            moveq(Byte(3).i, d0),
+            jsr(Label('Talk_Event_GetAndRunDialogue3').l),
+            move.w(Word(29).i, d0),
+            jsr(Label('VInt_PrepareLoop').l),
+            popdlg,
+            jsr(Label('Talk_Event_RunDialogue3').l),
+            rts,
+          ]));
+    });
+  }
+
   test('a leading pause waits before opening the first dialog window', () {
     var program = Program(eventPointers: EventPointers.empty());
     var after = Dialog(spans: [DialogSpan('After')]);
