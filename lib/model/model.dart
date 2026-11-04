@@ -639,6 +639,13 @@ class Positions {
   }
 }
 
+/// A slot's saved character and its occupant just before restoration.
+typedef PartySlotRestoration = ({
+  int slot,
+  Character? prior,
+  Character? current,
+});
+
 class Slots {
   final EventState _ctx;
 
@@ -680,18 +687,20 @@ class Slots {
     }
   }
 
-  void restorePreviousParty(
-      [Function(int index, Character? prior, Character? current)? onRestore]) {
+  /// Restore the saved party, returning each slot's restoration in slot order.
+  ///
+  /// Each current occupant is captured immediately before restoring that slot,
+  /// since earlier restorations can remove characters from later slots.
+  List<PartySlotRestoration> restorePreviousParty() {
     _ctx._slotsChanging(Slots.all.toSet());
-    // This previously only iterated if priorParty was set,
-    // but has been altered to fire callbacks in case
-    // we need to restore, but the prior party is not known.
+    final restored = <PartySlotRestoration>[];
+    // Return entries even when the prior party is not known.
     // This can happen, e.g., if a prior scene saves the party,
     // and the next scene immediately follows.
     for (var i = 1; i <= 5; i++) {
       var prior = _priorParty?[i];
       var current = _party[i];
-      onRestore?.call(i, prior, current);
+      restored.add((slot: i, prior: prior, current: current));
       if (prior == null) {
         _party.remove(i);
       } else {
@@ -700,6 +709,7 @@ class Slots {
       }
     }
     _priorParty = null;
+    return restored;
   }
 
   /// 1-indexed (first slot is 1, there is no slot 0).

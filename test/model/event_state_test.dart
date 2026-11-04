@@ -87,6 +87,49 @@ void main() {
       });
     });
 
+    group('${factory.key} party restoration', () {
+      test('returns each slot as it is restored', () {
+        final state = factory.value();
+        state.slots.setPartyOrder([rune, alys, hahn, wren, raja]);
+        state.slots
+            .setPartyOrder([alys, hahn, rune, wren, raja], saveCurrent: true);
+
+        final restored = state.slots.restorePreviousParty();
+
+        expect(restored, [
+          (slot: 1, prior: rune, current: alys),
+          (slot: 2, prior: alys, current: hahn),
+          // Restoring Rune in slot 1 already removed him from slot 3.
+          (slot: 3, prior: hahn, current: null),
+          (slot: 4, prior: wren, current: wren),
+          (slot: 5, prior: raja, current: raja),
+        ]);
+        expect(
+            state.slots
+                .hasPartyOrder({1: rune, 2: alys, 3: hahn, 4: wren, 5: raja}),
+            isTrue);
+      });
+
+      test('returns all slots even when the saved party is unknown', () {
+        final state = factory.value();
+        state.slots.setPartyOrder([rune, alys]);
+
+        final restored = state.slots.restorePreviousParty();
+
+        expect(restored, [
+          (slot: 1, prior: null, current: rune),
+          (slot: 2, prior: null, current: alys),
+          (slot: 3, prior: null, current: null),
+          (slot: 4, prior: null, current: null),
+          (slot: 5, prior: null, current: null),
+        ]);
+        expect(
+            state.slots
+                .hasPartyOrder({1: null, 2: null, 3: null, 4: null, 5: null}),
+            isTrue);
+      });
+    });
+
     group('${factory.key} slot ownership', () {
       final mutations =
           <String, ({void Function(Slots) change, Character? firstSlot})>{

@@ -2954,23 +2954,24 @@ class SceneAsmGenerator implements EventVisitor {
       // x/y positions. Only slot assignments change.
       var prior = _memory.branch();
 
-      _memory.slots.restorePreviousParty((i, prior, current) {
+      for (var (:slot, prior: saved, :current)
+          in _memory.slots.restorePreviousParty()) {
         if (_memory.slots.partyOrderMaintained) {
-          if (i == 5) return;
+          if (slot == 5) continue;
         } else
         // If both are the same, nothing to do.
         // However if they are both null,
         // we don't know whether they changed or not,
         // so do the swap just in case.
-        if (prior == current && current != null) {
-          return;
+        if (saved == current && current != null) {
+          continue;
         }
         asm.add(Asm([
-          move.b((Constant('Saved_Char_ID_Mem_$i').w), d0),
-          moveq((i - 1).i, d1),
+          move.b((Constant('Saved_Char_ID_Mem_$slot').w), d0),
+          moveq((slot - 1).i, d1),
           jsr(Label('Event_SwapCharacter').l),
         ]));
-      });
+      }
 
       // Reset slot positions now that slots have been restored.
       // Characters don't physically move - they stay at their x/y positions.

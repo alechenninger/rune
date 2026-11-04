@@ -2029,6 +2029,46 @@ void main() {
   group('run events compiler', () {
     late MapAsm asm;
 
+    test('party restoration emits no extra code when branch state is replayed',
+        () {
+      testMap.addEvent(
+          SceneId('restoreParty'),
+          Scene([
+            IfFlag(EventFlag('seen'), isUnset: [
+              ChangePartyOrder([raja], maintainOrder: true),
+              RestoreSavedPartyOrder(),
+            ]),
+          ]));
+
+      asm = program.addMap(testMap);
+
+      expect(
+          asm.events.withoutComments().withoutEmptyLines(),
+          Asm([
+            label(Label('Event_GrandCross_restoreParty3')),
+            move.l(Constant('Current_Party_Slots').w,
+                Constant('Saved_Char_ID_Mem_1').w),
+            move.b(Constant('Current_Party_Slot_5').w,
+                Constant('Saved_Char_ID_Mem_5').w),
+            move.l(Constant(r'CharID_Raja<<24|$FFFFFF').i, d0),
+            move.b(Byte.max.i, d1),
+            jsr(Label('Event_OrderParty').l),
+            move.b(Constant('Saved_Char_ID_Mem_1').w, d0),
+            moveq(0.i, d1),
+            jsr(Label('Event_SwapCharacter').l),
+            move.b(Constant('Saved_Char_ID_Mem_2').w, d0),
+            moveq(1.i, d1),
+            jsr(Label('Event_SwapCharacter').l),
+            move.b(Constant('Saved_Char_ID_Mem_3').w, d0),
+            moveq(2.i, d1),
+            jsr(Label('Event_SwapCharacter').l),
+            move.b(Constant('Saved_Char_ID_Mem_4').w, d0),
+            moveq(3.i, d1),
+            jsr(Label('Event_SwapCharacter').l),
+            rts,
+          ]));
+    });
+
     group('with only asm events', () {
       test('generates run event indices', () {
         testMap.addAsmEvent(Byte(0xf));

@@ -467,10 +467,8 @@ class _Slots implements Slots {
   bool priorSameAsCurrent() => _memory._eventState.slots.priorSameAsCurrent();
 
   @override
-  void restorePreviousParty(
-      [Function(int index, Character? prior, Character? current)? onRestore]) {
-    _memory._apply(RestoreSavedPartyInSlots(onRestore));
-  }
+  List<PartySlotRestoration> restorePreviousParty() =>
+      _memory._apply(RestoreSavedPartyInSlots());
 
   @override
   void unknownPriorPartyOrder() {
@@ -692,15 +690,10 @@ class UnknownPartyOrder extends StateChange {
   }
 }
 
-class RestoreSavedPartyInSlots extends StateChange {
-  Function(int index, Character? prior, Character? current)? onRestore;
-
-  RestoreSavedPartyInSlots([this.onRestore]);
-
+class RestoreSavedPartyInSlots extends StateChange<List<PartySlotRestoration>> {
   @override
-  apply(Memory memory) {
-    memory._eventState.slots.restorePreviousParty(onRestore);
-  }
+  List<PartySlotRestoration> apply(Memory memory) =>
+      memory._eventState.slots.restorePreviousParty();
 
   @override
   mayApply(Memory memory) {
